@@ -1,0 +1,17 @@
+{
+ "recorded": "2026-11-10T03:41:42Z",
+ "responses": [
+  {
+   "source": "alpaca",
+   "url": "https://data.alpaca.markets/v1/corporate-actions",
+   "params": {
+    "types": "name_change",
+    "start": "2016-01-01",
+    "end": "2026-11-10",
+    "limit": "1000"
+   },
+   "status": 200,
+   "body": "{\"corporate_actions\": {\"name_changes\": [{\"id\": \"3bb1937e-72e3-49a8-b799-6b565062fea9\", \"new_cusip\": \"03073E105\", \"new_symbol\": \"COR\", \"old_cusip\": \"03073E105\", \"old_symbol\": \"ABC\", \"process_date\": \"2023-08-30\"}, {\"id\": \"19d81650-abbe-4e5a-ba76-f67057b9264d\", \"new_cusip\": \"036752103\", \"new_symbol\": \"ELV\", \"old_cusip\": \"036752103\", \"old_symbol\": \"ANTM\", \"process_date\": \"2022-06-28\"}, {\"id\": \"ed6f16b1-fc46-443e-8dba-898ed9007a7a\", \"new_cusip\": \"30303M102\", \"new_symbol\": \"META\", \"old_cusip\": \"30303M102\", \"old_symbol\": \"FB\", \"process_date\": \"2022-06-09\"}, {\"id\": \"19a51822-eda9-40e2-9301-b8958c74a003\", \"new_cusip\": \"53656F417\", \"new_symbol\": \"METV\", \"old_cusip\": \"53656F417\", \"old_symbol\": \"META\", \"process_date\": \"2022-01-31\"}]}, \"next_page_token\": null}"
+  }
+ ]
+}

@@ -1,0 +1,2 @@
+-r research.pins.txt
+torch==2.15.0+cpu

@@ -1,0 +1,597 @@
+{
+  "manifestVersion": 5,
+  "id": "market",
+  "ai": {"guide": "GUIDE.md"},
+  "name": "Market data",
+  "version": "2.1.0",
+  "description": "Market data: instruments, local history, live data and sources",
+  "entries": {
+    "backend": "backend.entry",
+    "frontend": "frontend/module.tsx"
+  },
+  "requires": {},
+  "panels": {
+    "main": {
+      "title": "Market",
+      "icon": "layers",
+      "launcher": true,
+      "description": "Local data library, data detail and sources. Open targets: objectId \"data:<instrumentId>\" or \"data:<instrumentId>:<capability>[:<timeframe>]\" opens one data item's detail; \"source:<sourceId>\" opens a source with its key and test; \"job:<jobId>\" shows a fetch job."
+    }
+  },
+  "views": {
+    "search_box": {
+      "props": {
+        "type": "object",
+        "properties": {
+          "placeholder": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "markets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/MarketCode"
+            }
+          },
+          "venues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "string", "enum": ["production", "testnet", "demo"]
+          },
+          "constraint": {
+            "$ref": "#/$defs/TradeSearchConstraint"
+          },
+          "currentInstrumentId": {
+            "type": "string",
+            "description": "The host's current instrument (the chart's symbol); its row is marked in the results."
+          },
+          "callerActions": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "activeInstrumentIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "emits": {
+        "selected": {
+          "type": "object",
+          "properties": {
+            "instrument": {
+              "$ref": "#/$defs/Instrument"
+            },
+            "series": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SeriesId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set when the user picked an imported dataset or a derived value series instead of the instrument itself."
+            }
+          },
+          "required": [
+            "instrument",
+            "series"
+          ],
+          "additionalProperties": false
+        },
+        "caller_action": {
+          "type": "object",
+          "properties": {
+            "actionId": {
+              "type": "string"
+            },
+            "instrument": {
+              "$ref": "#/$defs/Instrument"
+            }
+          },
+          "required": [
+            "actionId",
+            "instrument"
+          ],
+          "additionalProperties": false
+        },
+        "closed": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      }
+    },
+    "sources_settings": {
+      "description": "Market's page in the settings window: its sources, each on or off, with its key and settings.",
+      "props": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    }
+  },
+  "provides": {
+    "platform.settings_section": [
+      {
+        "id": "sources",
+        "descriptor": {
+          "title": "Sources",
+          "view": "sources_settings"
+        }
+      }
+    ],
+    "market.data_source": [
+      {
+        "id": "yfinance",
+        "descriptor": {
+          "name": "Yahoo Finance",
+          "sourceIds": [
+            "yfinance"
+          ],
+          "kinds": [
+            "bars",
+            "quotes",
+            "actions",
+            "classification",
+            "shares"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund",
+            "index",
+            "fx",
+            "commodity",
+            "rate"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "search",
+            "history",
+            "live",
+            "research"
+          ]
+        }
+      },
+      {
+        "id": "ccxt",
+        "descriptor": {
+          "name": "Crypto exchanges",
+          "sourceIds": [
+            "binance",
+            "bitfinex",
+            "bitget",
+            "bybit",
+            "coinbase",
+            "cryptocom",
+            "deribit",
+            "gate",
+            "htx",
+            "hyperliquid",
+            "kraken",
+            "kucoin",
+            "mexc",
+            "okx"
+          ],
+          "kinds": [
+            "bars",
+            "quotes",
+            "trades",
+            "order_book",
+            "funding_rate",
+            "open_interest"
+          ],
+          "assetClasses": [
+            "crypto",
+            "tokenized_equity",
+            "equity",
+            "index",
+            "fx",
+            "commodity",
+            "precious_metal"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "catalog",
+            "history",
+            "live"
+          ]
+        }
+      },
+      {
+        "id": "nasdaqtrader",
+        "descriptor": {
+          "name": "Nasdaq Trader symbol directory",
+          "sourceIds": [
+            "nasdaqtrader"
+          ],
+          "kinds": [
+            "listings"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund",
+            "warrant"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "catalog"
+          ]
+        }
+      },
+      {
+        "id": "sp500_history",
+        "descriptor": {
+          "name": "S&P 500 member history (fja05680)",
+          "sourceIds": [
+            "sp500_history"
+          ],
+          "kinds": [
+            "members"
+          ],
+          "assetClasses": [
+            "index"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "research"
+          ]
+        }
+      },
+      {
+        "id": "sec",
+        "descriptor": {
+          "name": "SEC EDGAR company facts",
+          "sourceIds": [
+            "sec"
+          ],
+          "kinds": [
+            "financials"
+          ],
+          "assetClasses": [
+            "equity"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "research"
+          ],
+          "settings": [
+            {
+              "name": "contactEmail",
+              "label": "Contact e-mail (sent to the SEC with each request)",
+              "type": "string",
+              "secret": false,
+              "required": true
+            }
+          ]
+        }
+      },
+      {
+        "id": "coingecko",
+        "descriptor": {
+          "name": "CoinGecko",
+          "sourceIds": [
+            "coingecko"
+          ],
+          "kinds": [
+            "listings",
+            "market_cap",
+            "categories"
+          ],
+          "assetClasses": [
+            "crypto"
+          ],
+          "credentials": "optional",
+          "paid": false,
+          "supports": [
+            "catalog",
+            "research"
+          ],
+          "attribution": "Data provided by CoinGecko",
+          "settings": [
+            {
+              "name": "apiKey",
+              "label": "Demo API key (optional)",
+              "type": "string",
+              "secret": true,
+              "required": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "baostock",
+        "descriptor": {
+          "name": "Baostock",
+          "sourceIds": [
+            "baostock"
+          ],
+          "kinds": [
+            "listings",
+            "bars",
+            "actions",
+            "classification",
+            "shares"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund",
+            "index"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "catalog",
+            "history",
+            "research"
+          ]
+        }
+      },
+      {
+        "id": "tushare",
+        "descriptor": {
+          "name": "Tushare Pro",
+          "sourceIds": [
+            "tushare"
+          ],
+          "kinds": [
+            "bars"
+          ],
+          "assetClasses": [
+            "equity"
+          ],
+          "credentials": "required",
+          "paid": true,
+          "supports": [
+            "history",
+            "bulk"
+          ],
+          "settings": [
+            {
+              "name": "token",
+              "label": "Tushare token",
+              "type": "string",
+              "secret": true,
+              "required": true
+            }
+          ]
+        }
+      },
+      {
+        "id": "hkex",
+        "descriptor": {
+          "name": "HKEX list of securities",
+          "sourceIds": [
+            "hkex"
+          ],
+          "kinds": [
+            "listings"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "catalog"
+          ]
+        }
+      },
+      {
+        "id": "alpaca",
+        "descriptor": {
+          "name": "Alpaca",
+          "sourceIds": [
+            "alpaca"
+          ],
+          "kinds": [
+            "bars",
+            "code_history"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund"
+          ],
+          "credentials": "required",
+          "paid": false,
+          "supports": [
+            "history"
+          ],
+          "settings": [
+            {
+              "name": "keyId",
+              "label": "API key id",
+              "type": "string",
+              "secret": true,
+              "required": true
+            },
+            {
+              "name": "secretKey",
+              "label": "API secret key",
+              "type": "string",
+              "secret": true,
+              "required": true
+            }
+          ]
+        }
+      },
+      {
+        "id": "sharadar",
+        "descriptor": {
+          "name": "Sharadar (Nasdaq Data Link)",
+          "sourceIds": [
+            "sharadar"
+          ],
+          "kinds": [
+            "bars"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund"
+          ],
+          "credentials": "required",
+          "paid": true,
+          "supports": [
+            "history"
+          ],
+          "settings": [
+            {
+              "name": "apiKey",
+              "label": "Nasdaq Data Link API key",
+              "type": "string",
+              "secret": true,
+              "required": true
+            }
+          ]
+        }
+      },
+      {
+        "id": "databento",
+        "descriptor": {
+          "name": "Databento",
+          "sourceIds": [
+            "databento"
+          ],
+          "kinds": [
+            "bars"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund"
+          ],
+          "credentials": "required",
+          "paid": true,
+          "supports": [
+            "history",
+            "configure"
+          ],
+          "settings": [
+            {
+              "name": "apiKey",
+              "label": "Databento API key",
+              "type": "string",
+              "secret": true,
+              "required": true
+            },
+            {
+              "name": "dataset",
+              "label": "Dataset (billed per use)",
+              "type": "choice",
+              "choices": [
+                "XNAS.ITCH",
+                "DBEQ.BASIC"
+              ],
+              "secret": false,
+              "required": true
+            }
+          ]
+        }
+      },
+      {
+        "id": "ib",
+        "descriptor": {
+          "name": "Interactive Brokers (IB Gateway)",
+          "sourceIds": [
+            "ib"
+          ],
+          "kinds": [
+            "bars"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund",
+            "index"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "history",
+            "configure"
+          ],
+          "localGateway": true,
+          "settings": [
+            {
+              "name": "port",
+              "label": "IB Gateway or TWS API port",
+              "type": "integer",
+              "secret": false,
+              "required": true
+            },
+            {
+              "name": "clientId",
+              "label": "API client id",
+              "type": "integer",
+              "secret": false,
+              "required": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "futu",
+        "descriptor": {
+          "name": "Futu (OpenD)",
+          "sourceIds": [
+            "futu"
+          ],
+          "kinds": [
+            "bars"
+          ],
+          "assetClasses": [
+            "equity",
+            "fund",
+            "index"
+          ],
+          "credentials": "none",
+          "paid": false,
+          "supports": [
+            "history",
+            "configure"
+          ],
+          "localGateway": true,
+          "settings": [
+            {
+              "name": "port",
+              "label": "OpenD port",
+              "type": "integer",
+              "secret": false,
+              "required": true
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

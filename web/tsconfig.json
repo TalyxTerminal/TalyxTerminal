@@ -1,0 +1,69 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "react": [
+        "./node_modules/@types/react/index.d.ts"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ],
+      "react-dom": [
+        "./node_modules/@types/react-dom/index.d.ts"
+      ],
+      "react-dom/*": [
+        "./node_modules/@types/react-dom/*"
+      ],
+      "@talyx/sdk": [
+        "../sdk/ui/src/linkage.tsx"
+      ],
+      "@talyx/vocab": [
+        "../vocabulary/ts/index.ts"
+      ],
+      "@talyx/sdk-ui": [
+        "../sdk/ui/src/index.ts"
+      ],
+      "@radix-ui/*": [
+        "./node_modules/@radix-ui/*"
+      ],
+      "*": [
+        "./node_modules/*"
+      ],
+      "semver": [
+        "./node_modules/@types/semver/index.d.ts"
+      ],
+      "rbush": [
+        "./node_modules/@types/rbush/index.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "../modules/*/frontend",
+    "../modules/*/public/ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "../modules/**/*.test.ts",
+    "../modules/**/*.test.tsx"
+  ]
+}

@@ -1,0 +1,114 @@
+/* The shell's overlays and the empty workspace. Surfaces are component library parts; this file lays out what
+   goes in them, with --tx-* values and the local sizes below. */
+
+/* ── "+" box: search, New workspace, saved workspaces ──────────────────────────────────────── */
+.tx-popover.talyx-launcher {
+  --talyx-launcher-width: 360px;
+  --talyx-launcher-height: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tx-space-1);
+  width: var(--talyx-launcher-width);
+  max-width: min(calc(100vw - var(--tx-space-6)), var(--radix-popover-content-available-width));
+  max-height: min(var(--talyx-launcher-height), var(--radix-popover-content-available-height));
+  padding: var(--tx-space-1-quarter);
+  overflow: hidden;
+}
+.talyx-launcher > .tx-search { flex: none; }
+.talyx-launcher > .tx-search .tx-input { width: 100%; }
+.talyx-launcher-list { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.talyx-launcher-list::-webkit-scrollbar { display: none; }
+.talyx-launcher-list > .tx-btn[data-variant="row"] { flex: none; min-height: calc(var(--tx-control) + var(--tx-space-half)); align-items: center; }
+.talyx-launcher-new { color: var(--tx-text); }
+.talyx-launcher-new svg { width: var(--tx-icon-sm); height: var(--tx-icon-sm); color: var(--tx-text-2); }
+.talyx-launcher-new + .tx-btn { margin-top: var(--tx-space-1); position: relative; }
+.talyx-launcher-new + .tx-btn::before { content: ""; position: absolute; top: calc(-1 * var(--tx-space-half) - var(--tx-hairline)); left: var(--tx-space-2); right: var(--tx-space-2); height: var(--tx-hairline); background: var(--tx-white-07); }
+.talyx-launcher-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tx-text); }
+.talyx-launcher-when { flex: none; padding-left: var(--tx-space-3); color: var(--tx-text-3); font-size: var(--tx-size-xs); font-variant-numeric: tabular-nums; }
+.talyx-launcher-row:disabled .talyx-launcher-name { color: var(--tx-text-3); }
+.talyx-launcher-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tx-space-3);
+  padding: var(--tx-space-3) var(--tx-space-2);
+  color: var(--tx-text-3);
+  font-size: var(--tx-size-sm);
+  line-height: var(--tx-leading);
+}
+.talyx-launcher-state[role="alert"] { color: var(--tx-text-2); }
+.talyx-launcher-skeleton { display: flex; align-items: center; height: calc(var(--tx-control) + var(--tx-space-half)); padding: 0 var(--tx-space-2); }
+
+/* ── Adding a module: one row per module, its icon and name ─────────────────────────────────── */
+.tx-popover.talyx-module-picker { min-width: 200px; padding: var(--tx-space-1-quarter); }
+.talyx-module-picker [role="list"] { display: flex; flex-direction: column; }
+.talyx-module-picker .tx-btn[data-variant="row"] { min-height: var(--tx-control); align-items: center; gap: var(--tx-space-2); }
+.talyx-module-picker .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; color: var(--tx-text-2); }
+.talyx-module-picker .tx-btn:disabled .talyx-launcher-name { color: var(--tx-text-3); }
+
+/* ── An empty workspace: the modules it can start with ───────────────────────────────────── */
+.talyx-dock-empty {
+  --talyx-tile-width: 112px;
+  --talyx-tile-height: 92px;
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 0;
+  background: var(--tx-panel);
+  font-family: var(--tx-font);
+}
+.talyx-dock-empty-body { display: flex; flex-direction: column; align-items: center; gap: var(--tx-space-5); padding: var(--tx-space-6); }
+.talyx-dock-empty-title { margin: 0; color: var(--tx-text-2); font-size: var(--tx-size); font-weight: var(--tx-weight-medium); letter-spacing: var(--tx-tracking); }
+.talyx-dock-empty-modules { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tx-space-2); max-width: calc(var(--talyx-tile-width) * 5 + var(--tx-space-2) * 4); }
+.talyx-module-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tx-space-2-half);
+  width: var(--talyx-tile-width);
+  height: var(--talyx-tile-height);
+  padding: 0 var(--tx-space-2);
+  border: var(--tx-hairline) solid var(--tx-line);
+  border-radius: var(--tx-radius);
+  background: var(--tx-white-02);
+  color: var(--tx-text-2);
+  font: inherit;
+  font-size: var(--tx-size-sm);
+  font-weight: var(--tx-weight-medium);
+  cursor: pointer;
+  transition: background var(--tx-fast) var(--tx-ease), border-color var(--tx-fast) var(--tx-ease), color var(--tx-fast) var(--tx-ease);
+}
+.talyx-module-tile .tx-icon { width: var(--tx-space-5); height: var(--tx-space-5); color: var(--tx-text-3); transition: color var(--tx-fast) var(--tx-ease); }
+.talyx-module-tile > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talyx-module-tile:hover { border-color: var(--tx-line-2); background: var(--tx-white-05); color: var(--tx-text); }
+.talyx-module-tile:hover .tx-icon { color: var(--tx-text); }
+.talyx-module-tile:active { background: var(--tx-press); }
+.talyx-module-tile:focus-visible { outline: var(--tx-hairline) solid var(--tx-ember); outline-offset: var(--tx-space-half); }
+.talyx-module-tile:disabled { cursor: default; opacity: .4; }
+.talyx-module-tile:disabled:hover { border-color: var(--tx-line); background: var(--tx-white-02); color: var(--tx-text-2); }
+
+/* ── Dialogs ──────────────────────────────────────────────────────────────────────────────── */
+.tx-dialog.talyx-shell-dialog .tx-dialog-body p { margin: 0; }
+.tx-dialog.talyx-shell-dialog .tx-dialog-body p + p { margin-top: var(--tx-space-2); }
+
+/* ── Command palette (Ctrl+K): a library dialog with a search and one list ────────────────── */
+.tx-dialog.talyx-palette {
+  --talyx-palette-width: 560px;
+  --talyx-palette-list: 380px;
+  top: 16vh;
+  transform: translate(-50%, 0);
+  width: min(var(--talyx-palette-width), calc(100vw - var(--tx-space-6) * 2));
+}
+.tx-dialog.talyx-palette .tx-dialog-head { display: none; }
+.tx-dialog.talyx-palette .tx-dialog-body { display: flex; flex-direction: column; gap: var(--tx-space-1); padding: var(--tx-space-1-quarter); }
+.talyx-palette .tx-search .tx-input { width: 100%; height: calc(var(--tx-control) + var(--tx-space-2)); font-size: var(--tx-size); }
+.talyx-palette-list { max-height: var(--talyx-palette-list); overflow-y: auto; scrollbar-width: none; }
+.talyx-palette-list::-webkit-scrollbar { display: none; }
+.talyx-palette-group { padding: var(--tx-space-2) var(--tx-space-2) var(--tx-space-1); color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.talyx-palette-list > .tx-btn[data-variant="row"] { min-height: calc(var(--tx-control) + var(--tx-space-half)); align-items: center; }
+.talyx-palette-list > .tx-btn[data-variant="row"] svg { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; color: var(--tx-text-3); }
+.talyx-palette-list > .tx-btn[data-variant="row"][aria-selected="true"] svg { color: var(--tx-text-2); }
+.talyx-palette-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talyx-palette-list kbd { flex: none; color: var(--tx-text-4); font-family: var(--tx-font-mono); font-size: var(--tx-size-xs); }
+.talyx-palette-none { padding: var(--tx-space-3) var(--tx-space-2); color: var(--tx-text-3); font-size: var(--tx-size-sm); }

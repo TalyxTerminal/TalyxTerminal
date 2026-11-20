@@ -1,0 +1,21 @@
+{
+  "GET /documents/checkpoints/{checkpoint_id}": {"actions":["developer.documents.read_checkpoint"]},
+  "GET /documents/unsaved": {"actions":["developer.documents.list","developer.documents.read"]},
+  "GET /documents/{document_id}/versions": {"actions":["developer.documents.read_versions"]},
+  "GET /help": {"actions":["developer.help"]},
+  "GET /projects": {"actions":["developer.projects.list"]},
+  "GET /projects/{project_id}/files": {"actions":["developer.projects.read_tree"]},
+  "GET /projects/{project_id}/history": {"actions":["developer.projects.file_history"]},
+  "GET /projects/{project_id}/history/{revision_id}": {"actions":["developer.projects.file_history"]},
+  "GET /projects/{project_id}/module": {"actions":["developer.projects.module_status"]},
+  "POST /documents/{document_id}/resolve": {"actions":["developer.documents.resolve"]},
+  "POST /language/resolve": {"userOnly":"The editor starts and drives a Python language service session using the cursor position as the user types."},
+  "POST /modules": {"actions":["developer.projects.create_module"]},
+  "POST /projects/open": {"actions":["developer.projects.open"]},
+  "POST /projects/{project_id}/activate": {"userOnly":"This selects the project shown in the workbench. AI actions identify projects by ID."},
+  "POST /projects/{project_id}/debug": {"userOnly":"The desktop opens VS Code or starts an interactive debugging session in the user's IDE."},
+  "POST /projects/{project_id}/history/{revision_id}/restore": {"actions":["developer.projects.restore_revision"]},
+  "POST /projects/{project_id}/remove": {"actions":["developer.projects.remove"]},
+  "POST /projects/{project_id}/vscode": {"userOnly":"The desktop opens VS Code or starts an interactive debugging session in the user's IDE."},
+  "WS /language/sessions/{session}": {"userOnly":"The editor starts and drives a Python language service session using the cursor position as the user types."}
+}

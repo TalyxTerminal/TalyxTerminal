@@ -1,0 +1,59 @@
+{
+  "official": {
+    "distribution": "nautilus_trader",
+    "note": "PyPI sdists. The sdist omits the Cargo patch crates (patches/) and python/pyproject.toml; those come from the release tag's commit and are pinned by overlay digest. Every archive below is a complete patched source tree whose records in ../patches are diffs against its base.",
+    "releases": {
+      "2.0.0rc8": {
+        "tag": "v2.0.0rc8",
+        "commit": "d53849b216e20f2c122ca01b4dd0da377638b186",
+        "sdist": {
+          "filename": "nautilus_trader-2.0.0rc8.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/f5/b7/c66cfc72f660b1214b6724717af2f58f23cecfca6f03c78266890762a419/nautilus_trader-2.0.0rc8.tar.gz",
+          "sha256": "b5a1caffbb3a2e1a4a1259a33ca2f058d2e703f6efe06780e63fd48b1a79e973"
+        },
+        "overlay": {
+          "files": 49,
+          "sha256": "cc38922d78fe80cb32dd0f923e5fb673722144435f49e34fb023c36221b85b00"
+        }
+      }
+    }
+  },
+  "archives": {
+    "2.0.0rc8+talyx.18": {
+      "filename": "nautilus-trader-2.0.0rc8+talyx.18-source.tar.gz",
+      "sha256": "532c57db95bb50bdd0aaed346421b42a866ae5f472f79b255c22e5d978bb1cb9",
+      "byteSize": 13101514,
+      "base": "official:2.0.0rc8",
+      "patches": [
+        "patches/nautilus-trader-2.0.0rc8+talyx.18-official-base.patch",
+        "patches/nautilus-trader-2.0.0rc8+talyx.18-cash-fees.patch"
+      ],
+      "locks": []
+    },
+    "2.0.0rc8+talyx.19": {
+      "filename": "nautilus-trader-2.0.0rc8+talyx.19-source.tar.gz",
+      "sha256": "c1c698562128347390f498e3f0f0574c0f551ee508e340ec6e84abc84dfe4342",
+      "byteSize": 13107779,
+      "base": "2.0.0rc8+talyx.18",
+      "patches": [
+        "patches/nautilus-trader-2.0.0rc8+talyx.19-stock-conditions.patch"
+      ],
+      "locks": [
+        "strategy"
+      ]
+    },
+    "2.0.0rc8+talyx.20": {
+      "filename": "nautilus-trader-2.0.0rc8+talyx.20-source.tar.gz",
+      "sha256": "091ad95e0746315eecbfcc15d3e36504eeb8b05b8405317e669c2e44d94b645f",
+      "byteSize": 13109134,
+      "base": "2.0.0rc8+talyx.18",
+      "patches": [
+        "patches/nautilus-trader-2.0.0rc8+talyx.20-stock-conditions.patch",
+        "patches/nautilus-trader-2.0.0rc8+talyx.20-reference-prices.patch"
+      ],
+      "locks": [
+        "strategy"
+      ]
+    }
+  }
+}

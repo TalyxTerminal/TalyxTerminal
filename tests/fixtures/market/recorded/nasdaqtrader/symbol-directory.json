@@ -1,0 +1,19 @@
+{
+ "recordedAt": "2026-11-10T01:14:29Z",
+ "responses": [
+  {
+   "source": "nasdaqtrader",
+   "url": "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt",
+   "params": {},
+   "status": 200,
+   "body": "Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares\nAAPL|Apple Inc. - Common Stock|Q|N|N|40|N|N\nAMZN|Amazon.com, Inc. - Common Stock|Q|N|N|40|N|N\nAPC|ARKO Petroleum Corp. - Class A Common Stock|S|N|N|100|N|N\nCSCO|Cisco Systems, Inc. - Common Stock|Q|N|N|100|N|N\nGOOGL|Alphabet Inc. - Class A Common Stock|Q|N|N|40|N|N\nMETA|Meta Platforms, Inc. - Class A Common Stock|Q|N|N|40|N|N\nMSFT|Microsoft Corporation - Common Stock|Q|N|N|40|N|N\nNVDA|NVIDIA Corporation - Common Stock|Q|N|N|100|N|N\nPEP|PepsiCo, Inc. - Common Stock|Q|N|N|100|N|N\nPOM|POMDOCTOR LIMITED - Class A Ordinary Shares|G|N|D|100|N|N\nSTI|Solidion Technology, Inc. - Common Stock|S|N|N|100|N|N\nWMT|Walmart Inc. - Common Stock|Q|N|N|100|N|N\nFile Creation Time: 1109202618:01|||||||"
+  },
+  {
+   "source": "nasdaqtrader",
+   "url": "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt",
+   "params": {},
+   "status": 200,
+   "body": "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol\nAAC.U|Ares Acquisition Corporation III Units, each consisting of one Class A ordinary share and one-tenth of one redeemable warrant|N|AAC.U|N|100|N|AAC=\nAAC.W|Ares Acquisition Corporation III Redeemable warrants, each whole warrant exercisable for one Class A ordinary share at an exercise price of $11.50|N|AAC.WS|N|100|N|AAC+\nABR$D|Arbor Realty Trust 6.375% Series D Cumulative Redeemable Preferred Stock, Liquidation Preference $25.00 per Share|N|ABRpD|N|100|N|ABR-D\nAIIA|AI Infrastructure Acquisition Corp. Class A Ordinary Shares|N|AIIA|N|100|N|AIIA\nAIIA.R|AI Infrastructure Acquisition Corp. Rights, each entitling the holder to receive one-fifth (1/5) of one Class A Ordinary Share|N|AIIAr|N|100|N|AIIA^\nBF.B|Brown Forman Inc Class B Common Stock|N|BF.B|N|100|N|BF.B\nBRK.B|Berkshire Hathaway Inc. New Common Stock|N|BRK.B|N|40|N|BRK.B\nFB|ProShares S&P 500 Dynamic Buffer ETF|Z|FB|Y|100|N|FB\nHD|Home Depot, Inc. (The) Common Stock|N|HD|N|40|N|HD\nIBM|International Business Machines Corporation Common Stock|N|IBM|N|100|N|IBM\nJNJ|Johnson & Johnson Common Stock|N|JNJ|N|40|N|JNJ\nJPM|JP Morgan Chase & Co. Common Stock|N|JPM|N|40|N|JPM\nKO|Coca-Cola Company (The) Common Stock|N|KO|N|100|N|KO\nLB|LandBridge Corporation Class A Common Stock|N|LB|N|100|N|LB\nMA|Mastercard Incorporated Common Stock|N|MA|N|40|N|MA\nPG|Procter & Gamble Company (The) Common Stock|N|PG|N|100|N|PG\nUNH|UnitedHealth Group Incorporated Common Stock (DE)|N|UNH|N|40|N|UNH\nV|Visa Inc.|N|V|N|40|N|V\nXOM|ExxonMobil Holdings Corporation Common Stock|N|XOM|N|100|N|XOM\nCOR|Cencora, Inc. Common Stock|N|COR|N|40|N|COR\nELV|Elevance Health, Inc. Common Stock|N|ELV|N|40|N|ELV\nMETV|Roundhill Metaverse ETF|P|METV|Y|100|N|METV\nFile Creation Time: 1109202618:01||||||"
+  }
+ ]
+}

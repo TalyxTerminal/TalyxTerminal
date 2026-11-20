@@ -1,0 +1,66 @@
+{
+  "version": "2.0.0rc8+talyx.18",
+  "base": {
+    "version": "official:2.0.0rc8",
+    "sha256": "b5a1caffbb3a2e1a4a1259a33ca2f058d2e703f6efe06780e63fd48b1a79e973",
+    "overlay": "cc38922d78fe80cb32dd0f923e5fb673722144435f49e34fb023c36221b85b00"
+  },
+  "patches": [
+    {
+      "file": "patches/nautilus-trader-2.0.0rc8+talyx.18-official-base.patch",
+      "sha256": "5c6f03e92bde07192035bcd120ddd61a32bacb3ec3edaadb3c81757adb62a594"
+    },
+    {
+      "file": "patches/nautilus-trader-2.0.0rc8+talyx.18-cash-fees.patch",
+      "sha256": "98436155c44ac174dd64e79cc6e1c7b5f88f987d1e206ac923496686e993453c"
+    }
+  ],
+  "source": "upstream/nautilus-trader-2.0.0rc8+talyx.18-source.tar.gz",
+  "source_sha256": "532c57db95bb50bdd0aaed346421b42a866ae5f472f79b255c22e5d978bb1cb9",
+  "tools": {
+    "tool_lock_sha256": "bbd8d131a1970789a73b8675f2f3736ddf91aa9c7d65ae0c33fb9022e185a7bd",
+    "rustc": "1.99.1 (build/tools.json)",
+    "compiler": "MSVC 14.44.35207 Hostx64/x64 (tools/native-build/assets.lock.json)",
+    "maturin": "1.15.0 (build/tools.json)",
+    "jobs": 6,
+    "profile": {
+      "name": "release",
+      "lto": false,
+      "codegen_units": 16
+    }
+  },
+  "features": [
+    "extension-module",
+    "arrow",
+    "betfair",
+    "high-precision",
+    "mimalloc",
+    "redis",
+    "postgres",
+    "defi",
+    "hypersync",
+    "tracing-bridge"
+  ],
+  "command": [
+    "maturin",
+    "build",
+    "--release",
+    "--locked",
+    "--interpreter",
+    "<CPython 3.13>",
+    "--out",
+    "<wheels>",
+    "--features",
+    "extension-module,arrow,betfair,high-precision,mimalloc,redis,postgres,defi,hypersync,tracing-bridge"
+  ],
+  "typing": {
+    "generated_typing_files": 38,
+    "native_binaries_sha256": {
+      "nautilus_trader/_libnautilus.cp313-win_amd64.pyd": "8f39356077810fb0004cafb1356d6b4631d6987a4be3f58e898a1c3784dc1e60"
+    },
+    "packaging": "Maturin compiled wheel plus same-DLL Rust inventory typing; wheel RECORD regenerated"
+  },
+  "native_sha256": "8f39356077810fb0004cafb1356d6b4631d6987a4be3f58e898a1c3784dc1e60",
+  "wheel": "nautilus_trader-2.0.0rc8+talyx.18-cp313-cp313-win_amd64.whl",
+  "sha256": "db526e8bec1658e1865e668f2a69f2cc3c0d4cd3e1d4388208b546b7a321fa0f"
+}

@@ -1,0 +1,3 @@
+{"manifestVersion": 5, "id": "consumer", "name": "Consumer", "version": "1.0.0", "description": "Platform test module",
+ "entries": {"backend": "backend.entry"}, "requires": {"echo": {}, "late": {"optional": true}, "marketpage": {"optional": true}},
+ "provides": {"echo.greeter": [{"id": "polite", "descriptor": {}}, {"id": "rude", "descriptor": {}}]}}

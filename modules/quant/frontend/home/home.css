@@ -1,0 +1,59 @@
+/* Quant home (output/quant-design/home.css, the React draft's home.css). Components come from the SDK; this file lays out the three bands. */
+.qv-home-page { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.qv-scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; }
+.qv-scroll::-webkit-scrollbar { display: none; }
+.qv-table { width: 100%; border-collapse: collapse; font-size: var(--tx-size-sm); }
+.qv-table th { height: 28px; font-weight: var(--tx-weight); font-size: var(--tx-size-xs); color: var(--tx-text-3); text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line-2); white-space: nowrap; position: sticky; top: 0; background: var(--tx-panel); z-index: 1; }
+.qv-table td { height: 28px; text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line); font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tx-tracking-tight); white-space: nowrap; }
+.qv-table .l { text-align: left; font-family: var(--tx-font); letter-spacing: var(--tx-tracking); }
+.qv-table tbody tr:hover td { background: var(--tx-white-02); }
+.qv-home-attn tbody tr { cursor: pointer; }
+.qv-home-sec { padding: 4px 14px 12px; border-bottom: 1px solid var(--tx-line); min-width: 0; }
+/* On very wide panels the bands stop at a readable width instead of spreading every column apart. */
+@media (min-width: 2000px) {
+  .qv-home-sec { max-width: 1760px; margin-inline: auto; box-sizing: border-box; width: 100%; }
+}
+.qv-home-head { display: flex; align-items: center; gap: 10px; height: 38px; font-size: var(--tx-size-sm); }
+.qv-home-head h3 { margin: 0; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-strong); }
+.qv-home-count { color: var(--tx-ember-text); font-weight: var(--tx-weight-strong); }
+.qv-home-dim { color: var(--tx-text-3); font-family: var(--tx-font); }
+.qv-home-link { background: none; border: 0; padding: 0; color: var(--tx-text-3); font: inherit; font-size: var(--tx-size-xs); cursor: pointer; }
+.qv-home-link:hover { color: var(--tx-text); }
+.qv-home-calm { padding: 10px 0; color: var(--tx-text-2); font-size: var(--tx-size-sm); }
+.qv-home-calm b { color: var(--tx-text); font-family: var(--tx-font-mono); font-weight: var(--tx-weight); }
+.qv-home-name { display: inline-flex; align-items: center; gap: 6px; }
+.qv-home-name b { font-weight: var(--tx-weight-medium); }
+.qv-home-name .qv-home-dim { font-size: var(--tx-size-xs); }
+.qv-home-attn { table-layout: fixed; }
+.qv-home-attn td:nth-child(1) { width: 320px; }
+
+.qv-home-attn td:nth-child(3) { width: 72px; }
+.qv-home-attn td:nth-child(4) { width: 220px; }
+.qv-home-why { font-family: var(--tx-font) !important; color: var(--tx-text-2); overflow: hidden; text-overflow: ellipsis; }
+.qv-home-act { width: 1px; font-family: var(--tx-font) !important; }
+.qv-home-jobs .tx-live { font-family: var(--tx-font); }
+/* New: a card a kind. A cover with the kind's icon as a glass tile over a warm light (as Community's covers), the blank start under its name,
+   the ready-made ones under that. The page itself sits under a faint warm light from the top, as Community does. */
+.qv-home { background: radial-gradient(ellipse 70% 420px at 50% -160px, var(--tx-ember-backdrop), var(--tx-clear) 100%); }
+.qv-home-kinds { display: grid; grid-template-columns: repeat(var(--qv-kinds, 5), minmax(0, 1fr)); gap: var(--tx-space-3); margin: var(--tx-space-1) 0 var(--tx-space-1-half); }
+.qv-home-kind { min-width: 0; }
+.qv-home-cover { position: relative; width: 100%; aspect-ratio: 16 / 7; overflow: hidden; border-radius: var(--tx-radius); border: var(--tx-hairline) solid var(--tx-line); background: linear-gradient(165deg, var(--tx-white-05), var(--tx-white-02)); }
+.qv-home-cover > button { position: absolute; inset: 0; width: 100%; height: 100%; }
+.qv-home-art { display: block; width: 100%; height: 100%; }
+.qv-home-kind h4 { display: flex; align-items: baseline; gap: var(--tx-space-2); margin: var(--tx-space-3) var(--tx-space-2) var(--tx-space-1); font-size: var(--tx-size); font-weight: var(--tx-weight-strong); }
+.qv-home-kind ul { margin: 0; padding: 0; list-style: none; }
+.qv-home-kind li button { white-space: normal; height: auto; min-height: var(--tx-button-sm); }
+@container (max-width: 860px) { .qv-home-kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 620px) {
+  .qv-home-sec .qv-table { width: 100%; table-layout: fixed; }
+  .qv-home-sec .qv-table :is(th, td) { white-space: normal; overflow-wrap: anywhere; width: auto; padding-inline: var(--tx-space-1); }
+  .qv-home-sec .qv-home-name { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+}
+.qv-home-recent tbody tr { cursor: pointer; }
+.qv-home-attn .qv-home-name b, .qv-home-jobs .qv-home-name b { display: inline-block; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.qv-home { container-type: inline-size; }
+
+/* A state as a word in its tone, no dot: what needs a hand now in the attention colour, what to watch in amber. */
+.qv-home-state { margin-right: 12px; color: var(--tx-text-2); }
+.qv-home-state[data-tone="fix"] { color: var(--tx-ember-text); }
+.qv-home-state[data-tone="watch"] { color: var(--tx-watch); }

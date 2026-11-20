@@ -1,0 +1,209 @@
+/* The workspace frame. Groups meet on a 1px line, with no title bars, gaps,
+   radii or shadows. A low tab row: tabs as wide as their names, the current panel marked by one thin orange line.
+   A workspace with a single panel has no tab row. Values are --tx-* tokens; the frame's own sizes are the local
+   --talyx-* below. */
+
+.experience-dockview-host {
+  --talyx-dock-tab-height: 30px;
+  --talyx-dock-tab-max: 220px;
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  background: var(--tx-panel);
+}
+.experience-dockview-host > .dv-dockview { height: 100%; }
+
+.talyx-dock-theme {
+  --dv-group-view-background-color: var(--tx-panel);
+  --dv-tabs-and-actions-container-background-color: var(--tx-panel);
+  --dv-tabs-and-actions-container-height: var(--talyx-dock-tab-height);
+  --dv-tabs-and-actions-container-font-size: var(--tx-size-sm);
+  --dv-activegroup-visiblepanel-tab-background-color: transparent;
+  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-inactivegroup-visiblepanel-tab-background-color: transparent;
+  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-activegroup-visiblepanel-tab-color: var(--tx-text);
+  --dv-activegroup-hiddenpanel-tab-color: var(--tx-text-3);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--tx-text-2);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--tx-text-3);
+  --dv-tab-divider-color: transparent;
+  --dv-tab-margin: 0;
+  --dv-tab-font-size: var(--tx-size-sm);
+  --dv-separator-border: var(--tx-line-2);
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: transparent;
+  --dv-drag-over-background-color: var(--tx-ember-14);
+  --dv-drag-over-border: none;
+  --dv-drag-over-border-color: var(--tx-ember);
+  --dv-icon-hover-background-color: var(--tx-hover);
+  --dv-transition-duration: var(--tx-fast);
+  --dv-floating-box-shadow: var(--tx-glass-shadow);
+  --dv-floating-border: var(--tx-hairline) solid var(--tx-glass-edge);
+  font-family: var(--tx-font);
+  color: var(--tx-text);
+}
+
+.talyx-dock-theme .dv-content-container { background: var(--tx-panel); }
+.talyx-dock-module-live { height: 100%; min-height: 0; overflow: hidden; }
+
+/* ── Dividers: a 1px line; the grip lights only while hovered or dragged ─────────────────────── */
+.talyx-dock-theme .dv-sash { position: absolute; }
+.talyx-dock-theme .dv-sash::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  transition: background-color var(--tx-fast) var(--tx-ease);
+}
+.talyx-dock-theme .dv-horizontal > .dv-sash-container > .dv-sash::after { top: 0; bottom: 0; left: 50%; width: var(--tx-space-half); transform: translateX(-50%); }
+.talyx-dock-theme .dv-vertical > .dv-sash-container > .dv-sash::after { left: 0; right: 0; top: 50%; height: var(--tx-space-half); transform: translateY(-50%); }
+.talyx-dock-theme .dv-sash.dv-enabled:hover::after,
+.talyx-dock-theme .dv-sash.dv-enabled:active::after { background: var(--tx-text-3); transition-delay: var(--tx-fast); }
+
+/* ── Tab row ──────────────────────────────────────────────────────────────────────────────── */
+.talyx-dock-theme .dv-tabs-and-actions-container {
+  box-shadow: inset 0 calc(-1 * var(--tx-hairline)) 0 var(--tx-line);
+  user-select: none;
+}
+.talyx-dock-theme .dv-tabs-container { scrollbar-width: none; }
+.talyx-dock-theme .dv-tabs-container::-webkit-scrollbar { display: none; }
+.talyx-dock-theme .dv-tab { display: flex; align-items: stretch; padding: 0; }
+.talyx-dock-theme .dv-tab::after,
+.talyx-dock-theme .dv-tab::before { display: none !important; }
+.talyx-dock-theme .dv-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--tx-hairline) var(--tx-ember); }
+.talyx-dock-theme .dv-tab > .dv-react-part { display: flex; }
+
+/* One panel in the whole workspace: no tab row. */
+.experience-dockview-host[data-single] .dv-tabs-and-actions-container { display: none; }
+
+.talyx-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-1-half);
+  height: 100%;
+  max-width: var(--talyx-dock-tab-max);
+  padding: 0 var(--tx-space-1) 0 var(--tx-space-2-half);
+  font-size: var(--tx-size-sm);
+  font-weight: var(--tx-weight-medium);
+  letter-spacing: var(--tx-tracking);
+  white-space: nowrap;
+  cursor: default;
+  transition: color var(--tx-fast) var(--tx-ease), background-color var(--tx-fast) var(--tx-ease);
+}
+.talyx-dock-theme .dv-tab:hover .talyx-tab { color: var(--tx-text); background: var(--tx-white-02); }
+.talyx-tab-icon { flex: none; width: var(--tx-icon-sm); height: var(--tx-icon-sm); color: var(--tx-text-3); }
+.talyx-dock-theme .dv-tab.dv-active-tab .talyx-tab-icon { color: var(--tx-text-2); }
+.talyx-tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* The current panel: one orange line under its tab, only in the focused group. */
+.dv-groupview.dv-active-group .dv-tab.dv-active-tab .talyx-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--tx-space-half);
+  background: var(--tx-ember);
+}
+
+/* Close: on the current tab and under the pointer; the space stays so tabs don't shift. */
+.talyx-tab-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--tx-space-4-half);
+  height: var(--tx-space-4-half);
+  padding: 0;
+  border: 0;
+  border-radius: var(--tx-radius-xs);
+  background: transparent;
+  color: var(--tx-text-3);
+  cursor: pointer;
+  visibility: hidden;
+}
+.talyx-tab-close svg { width: var(--tx-size-sm); height: var(--tx-size-sm); }
+.talyx-tab-close:hover { background: var(--tx-press); color: var(--tx-text); }
+.talyx-tab-close:focus-visible { visibility: visible; outline: var(--tx-hairline) solid var(--tx-ember); }
+.talyx-dock-theme .dv-tab:hover .talyx-tab-close,
+.talyx-dock-theme .dv-tab.dv-active-tab .talyx-tab-close { visibility: visible; }
+
+/* After the tabs: "+" while the row is hovered; restore at the end while maximized. */
+.talyx-dock-theme .dv-left-actions-container,
+.talyx-dock-theme .dv-right-actions-container { display: flex; align-items: center; height: 100%; }
+.talyx-dock-theme :is(.dv-left-actions-container, .dv-right-actions-container) > .dv-react-part { display: flex; align-items: center; height: 100%; }
+.talyx-group-add,
+.talyx-group-restore {
+  display: grid;
+  place-items: center;
+  width: var(--tx-button-sm);
+  height: var(--tx-button-sm);
+  margin: 0 var(--tx-space-1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--tx-radius-xs);
+  background: transparent;
+  color: var(--tx-text-3);
+  cursor: pointer;
+  transition: opacity var(--tx-fast) var(--tx-ease), background-color var(--tx-fast) var(--tx-ease), color var(--tx-fast) var(--tx-ease);
+}
+.talyx-group-add svg,
+.talyx-group-restore svg { width: var(--tx-icon-sm); height: var(--tx-icon-sm); }
+.talyx-group-add:hover,
+.talyx-group-restore:hover { background: var(--tx-hover); color: var(--tx-text); }
+.talyx-group-add:focus-visible,
+.talyx-group-restore:focus-visible { outline: var(--tx-hairline) solid var(--tx-ember); }
+.talyx-group-add { opacity: 0; }
+.talyx-dock-theme .dv-tabs-and-actions-container:hover .talyx-group-add,
+.talyx-group-add:focus-visible { opacity: 1; }
+
+/* ── Drag and drop: where the panel will land ─────────────────────────────────────────────── */
+/* Module views are drawn above the groups; while a panel is dragged they let the pointer through, so the group under it
+   (its sides, its middle, its tab row) is what the drop is measured against. */
+.experience-dockview-host:is(.is-dragging-panel, .is-dragging-group) .dv-render-overlay { pointer-events: none; }
+.experience-dockview-host:is(.is-dragging-panel, .is-dragging-group) .talyx-dock-drag-source > .dv-content-container { opacity: .5; transition: opacity var(--tx-fast) var(--tx-ease); }
+
+/* Where the panel lands: an orange wash with a thin orange edge, inset from the edges of the place it will take. It
+   moves at once with the pointer, so what is lit is always where releasing puts it. Dockview's own overlays never show. */
+.talyx-dock-theme .dv-drop-target-container { display: none; }
+.talyx-dock-drop-hint {
+  position: absolute;
+  z-index: 1001;
+  box-sizing: border-box;
+  border: var(--tx-space-1) solid transparent;
+  border-radius: calc(var(--tx-radius-sm) + var(--tx-space-1));
+  background: var(--tx-ember-14);
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 var(--tx-hairline) var(--tx-ember-55);
+  pointer-events: none;
+}
+/* Between two tabs: a 2px orange line where the tab will go. */
+.talyx-dock-drop-hint[data-line] {
+  width: var(--tx-space-half) !important;
+  margin-left: calc(var(--tx-space-half) / -2);
+  border: 0;
+  border-radius: 0;
+  background: var(--tx-ember);
+  box-shadow: none;
+}
+
+/* A panel that just landed: its group's edge glows once. */
+.talyx-dock-theme .dv-groupview.talyx-dock-drop-settling { animation: talyx-dock-settle var(--tx-slow) var(--tx-ease); }
+@keyframes talyx-dock-settle { from { box-shadow: inset 0 0 0 var(--tx-hairline) var(--tx-ember-55); } to { box-shadow: inset 0 0 0 var(--tx-hairline) transparent; } }
+
+/* The tab under the pointer while dragging. */
+body > .dv-tab-ghost-drag {
+  display: flex;
+  align-items: center;
+  height: var(--tx-button);
+  padding: 0 var(--tx-space-3);
+  border-radius: var(--tx-radius-sm);
+  background: var(--tx-raised);
+  box-shadow: inset 0 0 0 var(--tx-hairline) var(--tx-line-3), var(--tx-glass-shadow);
+  color: var(--tx-text);
+  font-family: var(--tx-font);
+  font-size: var(--tx-size-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talyx-dock-theme .dv-groupview.talyx-dock-drop-settling { animation: none; }
+}

@@ -1,0 +1,250 @@
+/* Platform chrome that the design-system components don't cover.
+   Only design tokens here — no colour literals, no font stacks, no sizes. */
+
+body:has([data-platform-controls]) { background: var(--tx-bg); }
+
+.talyx-platform-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-3);
+  margin-left: auto;
+  flex-wrap: nowrap;
+}
+
+.talyx-platform-controls button:focus-visible {
+  outline: var(--tx-space-half) solid var(--tx-ember);
+  outline-offset: var(--tx-space-half);
+}
+
+/* Settings: a near-full-window dialog. Sections on the glass at the left, the
+   page on a solid surface at the right so text and tables stay readable. */
+.tx-dialog.talyx-settings {
+  width: min(calc(var(--tx-settings-width) + var(--tx-space-8) * 5), calc(100vw - var(--tx-space-6) * 2));
+  height: min(var(--tx-settings-height), calc(100dvh - var(--tx-space-6) * 2));
+  max-width: none;
+  max-height: none;
+}
+/* The title stays for screen readers; the nav carries the visible one. */
+.talyx-settings > .tx-dialog-head { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.talyx-settings > .tx-dialog-body { display: flex; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.talyx-settings > .tx-dialog-foot { display: none; }
+
+.talyx-settings-layout { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
+.talyx-settings-close.tx-icon-btn { position: absolute; top: var(--tx-space-3); right: var(--tx-space-3); z-index: 1; }
+
+.talyx-settings-nav {
+  width: calc(var(--tx-settings-nav-width) + var(--tx-space-6));
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tx-space-4);
+  padding: var(--tx-space-4) var(--tx-space-2-half) var(--tx-space-3);
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-right: var(--tx-hairline) solid var(--tx-line);
+}
+.talyx-settings-nav-title {
+  padding: var(--tx-space-1) var(--tx-space-2-half) 0;
+  color: var(--tx-text);
+  font-size: var(--tx-size-lg);
+  font-weight: var(--tx-weight-strong);
+  letter-spacing: var(--tx-tracking-tight);
+}
+.talyx-settings-group { display: flex; flex-direction: column; gap: var(--tx-hairline); }
+.talyx-settings-group-label {
+  padding: 0 var(--tx-space-2-half) var(--tx-space-1);
+  color: var(--tx-text-3);
+  font-size: var(--tx-size-xs);
+  font-weight: var(--tx-weight-medium);
+}
+/* Section links are the design system's row buttons; only their layout and the quieter idle text are set here. */
+.talyx-settings-link.tx-btn { justify-content: space-between; min-height: var(--tx-button); padding: 0 var(--tx-space-2-half); color: var(--tx-text-2); font-size: var(--tx-size); }
+.talyx-settings-link > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talyx-settings-link.tx-btn:hover, .talyx-settings-link.tx-btn[aria-current="page"] { color: var(--tx-text); }
+.talyx-settings-link.tx-btn[aria-current="page"] { font-weight: var(--tx-weight-medium); }
+.talyx-settings-nav-foot { margin-top: auto; padding-top: var(--tx-space-2); border-top: var(--tx-hairline) solid var(--tx-line); }
+.talyx-settings-nav-foot .talyx-settings-link { color: var(--tx-text-3); }
+.talyx-settings-nav-foot .tx-error { display: block; padding: 0 var(--tx-space-2-half) var(--tx-space-1); }
+
+/* Global | This workspace, at the top of the window. */
+.talyx-settings-scope { padding: 0 var(--tx-space-1); }
+.talyx-settings-scope .tx-seg { display: flex; width: 100%; }
+.talyx-settings-scope .tx-seg > button { flex: 1; justify-content: center; }
+
+.talyx-settings-main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--tx-panel); }
+.talyx-settings-pane {
+  flex: 1;
+  scrollbar-width: none;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--tx-panel);
+  color: var(--tx-text-2);
+}
+.talyx-settings-pane::-webkit-scrollbar { display: none; }
+.talyx-settings-pane:focus { outline: none; }
+.talyx-settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tx-space-5);
+  min-height: 100%;
+  max-width: calc(var(--tx-settings-page-width) + var(--tx-space-8) * 8);
+  margin: 0 auto;
+  padding: var(--tx-space-6) var(--tx-space-8) var(--tx-doc-top);
+}
+.talyx-settings-head { display: flex; align-items: center; justify-content: space-between; gap: var(--tx-space-4); min-height: var(--tx-button); padding-right: var(--tx-space-8); }
+.talyx-settings-heading {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tx-text);
+  font-size: var(--tx-size-title);
+  font-weight: var(--tx-weight-strong);
+  letter-spacing: var(--tx-tracking-heading);
+}
+.talyx-settings-head .tx-btn { flex: none; }
+.talyx-settings-head .tx-btn .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); }
+.talyx-settings-blank { display: flex; flex: 1; align-items: center; justify-content: center; }
+.talyx-settings-blank .tx-empty-title { color: var(--tx-text-2); font-weight: var(--tx-weight-medium); }
+
+.talyx-tip-target { display: inline-flex; cursor: default; }
+.talyx-settings-attention .tx-settings-card { border-color: var(--tx-ember-line); background: var(--tx-ember-select); }
+
+/* External AI: one row per connection, its recent calls under it. */
+.talyx-connection > .talyx-calls { margin: 0 var(--tx-pad) var(--tx-space-3); }
+.talyx-calls {
+  display: flex;
+  flex-direction: column;
+  padding: var(--tx-space-1);
+  border: var(--tx-hairline) solid var(--tx-line);
+  border-radius: var(--tx-radius-sm);
+  background: var(--tx-white-02);
+}
+.talyx-calls > .tx-btn { align-self: flex-start; margin-top: var(--tx-space-1); }
+.talyx-call {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--tx-space-3);
+  min-height: var(--tx-control);
+  padding: 0 var(--tx-space-2);
+  border: 0;
+  border-radius: var(--tx-radius-sm);
+  background: transparent;
+  color: var(--tx-text);
+  font: inherit;
+  font-size: var(--tx-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.talyx-call:hover, .talyx-call[aria-expanded="true"] { background: var(--tx-white-04); }
+.talyx-call-action { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talyx-call-time { flex: none; color: var(--tx-text-3); font-family: var(--tx-font-mono); font-size: var(--tx-size-xs); }
+.talyx-call-body { padding: var(--tx-space-1) var(--tx-space-2) var(--tx-space-2); }
+
+/* Forms in settings dialogs. */
+.talyx-settings-form { display: flex; flex-direction: column; gap: var(--tx-space-3); }
+.talyx-settings-form-help { margin: 0; color: var(--tx-text-3); font-size: var(--tx-size-sm); line-height: var(--tx-leading); }
+.talyx-settings-form .tx-error { margin: 0; }
+.talyx-form-guide { display: inline-flex; align-items: center; gap: var(--tx-space-1-half); align-self: flex-start; color: var(--tx-text-3); font-size: var(--tx-size-sm); cursor: default; }
+.talyx-form-guide .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); }
+.talyx-form-guide:hover { color: var(--tx-text-2); }
+
+/* A changed module setting held in Global until Apply. */
+.talyx-apply-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-4);
+  flex: none;
+  min-height: calc(var(--tx-button) + var(--tx-space-5));
+  padding: 0 var(--tx-space-4) 0 var(--tx-space-8);
+  border-top: var(--tx-hairline) solid var(--tx-line-2);
+  background: var(--tx-card);
+  color: var(--tx-text-2);
+  font-size: var(--tx-size-sm);
+}
+.talyx-apply-bar-text { display: flex; align-items: center; gap: var(--tx-space-2); min-width: 0; white-space: nowrap; overflow: hidden; }
+.talyx-apply-bar-text > span:nth-child(2) { color: var(--tx-text); margin-right: var(--tx-space-2); }
+.talyx-apply-bar-text strong { color: var(--tx-text); font-weight: var(--tx-weight-medium); font-variant-numeric: tabular-nums; font-size: var(--tx-size-xs); }
+.talyx-apply-bar-text .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; color: var(--tx-text-3); }
+.talyx-apply-bar-where { display: inline-flex; align-items: center; gap: var(--tx-space-1); color: var(--tx-text-3); }
+.talyx-apply-bar-where .tx-icon { width: var(--tx-space-3); height: var(--tx-space-3); }
+.talyx-apply-bar-end { margin-left: auto; display: flex; flex: none; gap: var(--tx-space-2); }
+.talyx-apply-from { color: var(--tx-text-3); font-variant-numeric: tabular-nums; font-size: var(--tx-size-xs); }
+
+/* The choice after Apply */
+.talyx-apply-body { display: flex; flex-direction: column; gap: var(--tx-space-5); }
+.talyx-apply-change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "where values" "what values";
+  align-items: center;
+  column-gap: var(--tx-space-4);
+  row-gap: var(--tx-space-half);
+  padding: var(--tx-space-3) var(--tx-space-4);
+  border: var(--tx-hairline) solid var(--tx-line);
+  border-radius: var(--tx-radius-sm);
+  background: var(--tx-panel);
+}
+.talyx-apply-where { grid-area: where; display: inline-flex; align-items: center; gap: var(--tx-space-1); color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.talyx-apply-where .tx-icon { width: var(--tx-space-3); height: var(--tx-space-3); }
+.talyx-apply-what { grid-area: what; color: var(--tx-text); font-size: var(--tx-size); font-weight: var(--tx-weight-medium); }
+.talyx-apply-values { grid-area: values; display: inline-flex; align-items: center; gap: var(--tx-space-2); }
+.talyx-apply-values .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); color: var(--tx-text-3); }
+.talyx-apply-values strong { color: var(--tx-text); font-variant-numeric: tabular-nums; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); }
+.talyx-apply-values .talyx-apply-from { font-size: var(--tx-size-sm); }
+
+.talyx-choices { display: flex; flex-direction: column; gap: var(--tx-space-1); }
+.talyx-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-3);
+  width: 100%;
+  min-height: calc(var(--tx-row) + var(--tx-space-2-half));
+  padding: 0 var(--tx-space-3);
+  border: var(--tx-hairline) solid transparent;
+  border-radius: var(--tx-radius-sm);
+  background: none;
+  color: var(--tx-text-2);
+  font: inherit;
+  font-size: var(--tx-size);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tx-row-time) var(--tx-ease);
+}
+.talyx-choice:hover { background: var(--tx-hover); }
+.talyx-choice[aria-checked="true"] { border-color: var(--tx-line-2); background: var(--tx-chosen); color: var(--tx-text); }
+.talyx-choice:focus-visible { outline: var(--tx-space-half) solid var(--tx-ember); outline-offset: calc(var(--tx-space-half) * -1); }
+.talyx-radio {
+  width: var(--tx-icon);
+  height: var(--tx-icon);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: var(--tx-hairline) solid var(--tx-line-3);
+  border-radius: 50%;
+}
+.talyx-choice[aria-checked="true"] .talyx-radio { border-color: var(--tx-ember); }
+.talyx-choice[aria-checked="true"] .talyx-radio::after { content: ''; width: var(--tx-space-2); height: var(--tx-space-2); border-radius: 50%; background: var(--tx-ember); }
+.talyx-choice-label { flex: 1; min-width: 0; }
+.talyx-choice-end { flex: none; color: var(--tx-text-3); font-variant-numeric: tabular-nums; font-size: var(--tx-size-xs); }
+
+.talyx-apply-list { display: flex; flex-direction: column; margin: 0 0 var(--tx-space-1) calc(var(--tx-icon) + var(--tx-space-6)); border: var(--tx-hairline) solid var(--tx-line); border-radius: var(--tx-radius-sm); background: var(--tx-panel); }
+.talyx-apply-list-head { display: flex; align-items: center; padding: var(--tx-space-1) var(--tx-space-3); border-bottom: var(--tx-hairline) solid var(--tx-line); }
+.talyx-apply-scroll { max-height: calc(var(--tx-row) * 5.5); overflow-y: auto; scrollbar-width: none; padding: var(--tx-space-1) 0; }
+.talyx-apply-scroll::-webkit-scrollbar { display: none; }
+.talyx-apply-ws { display: flex; align-items: center; gap: var(--tx-space-2); min-height: var(--tx-row); padding: 0 var(--tx-space-3); }
+.talyx-apply-ws:hover { background: var(--tx-hover); }
+.talyx-apply-ws .tx-check { flex: 1; min-width: 0; }
+.talyx-apply-ws .tx-check > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talyx-apply-open { flex: none; color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+
+/* The workspace side: what this workspace keeps apart from global. */
+.talyx-group-path { display: inline-flex; align-items: center; gap: var(--tx-space-1); }
+.talyx-group-path > span:first-child { color: var(--tx-text-3); font-weight: var(--tx-weight-medium); }
+.talyx-group-path .tx-icon { width: var(--tx-space-3); height: var(--tx-space-3); color: var(--tx-text-4); }
+.talyx-override { display: inline-flex; align-items: center; gap: var(--tx-space-2); flex: none; font-variant-numeric: tabular-nums; font-size: var(--tx-size-sm); }
+.talyx-override .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); color: var(--tx-text-4); }
+.talyx-override-global { color: var(--tx-text-3); cursor: default; }
+.talyx-override-value { color: var(--tx-text); }

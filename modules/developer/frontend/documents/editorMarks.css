@@ -1,0 +1,12 @@
+/* Line marks an embedding module gives the editor view: the line tinted, a bar in the gutter, the detail under the line. */
+.developer-mark-line.developer-mark-error { background: var(--tx-ember-select); }
+.developer-mark-line.developer-mark-warning, .developer-mark-line.developer-mark-information { background: var(--tx-white-04); }
+.developer-mark-gutter { margin-left: 3px; width: 2px !important; }
+.developer-mark-gutter.developer-mark-error { background: var(--tx-ember); }
+.developer-mark-gutter.developer-mark-warning { background: var(--tx-ember-text); }
+.developer-mark-gutter.developer-mark-information { background: var(--tx-text-3); }
+.developer-mark-peek { box-sizing: border-box; margin: 2px 12px 6px 0; padding: 6px 10px; border-left: 2px solid var(--tx-ember); border-radius: 0 4px 4px 0;
+  background: var(--tx-card); color: var(--tx-text-2); font-family: var(--tx-font); font-size: var(--tx-size-sm); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.developer-mark-peek[data-severity="information"] { border-left-color: var(--tx-text-3); }
+.developer-mark-peek b { color: var(--tx-text); font-weight: var(--tx-weight-medium); }
+.developer-mark-source { margin-left: 8px; color: var(--tx-text-3); }

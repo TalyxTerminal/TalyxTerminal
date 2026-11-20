@@ -1,0 +1,10 @@
+{
+  "python": "3.12",
+  "scope": "Deep learning models: the research environment's packages plus one PyTorch build, chosen from the devices the machine has.",
+  "variants": {
+    "cpu": {"lock": "deep-cpu.lock", "torch": "2.15.0+cpu", "size": "about 1.5 GB"},
+    "cuda": {"lock": "deep-cuda.lock", "torch": "2.15.0+cu132", "cuda": "13.2", "size": "about 3.4 GB"},
+    "xpu": {"lock": "deep-xpu.lock", "torch": "2.15.0+xpu", "size": "about 4 GB"}
+  },
+  "rule": "Each lock is research.lock's packages plus one torch (and triton-xpu for xpu); regenerate with modules/quant/runtime/build_deep_locks.py whenever research.pins.txt changes."
+}

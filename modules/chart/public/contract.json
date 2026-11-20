@@ -1,0 +1,4057 @@
+{
+ "contractVersion": 5,
+ "module": "chart",
+ "deleteWorkspace": true,
+ "actions": {
+  "backfill_chart": {
+   "description": "Extend an open chart's historical window by bars or back to an ISO date (one required). Read the added\nhistory with read_data or export_chart. Returns loaded, reachedStart and limitReached.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/BackfillChart"
+   },
+   "output": {
+    "$ref": "#/$defs/BackfillResult"
+   },
+   "examples": [
+    {
+     "chartId": "chart-1a2b",
+     "bars": 500
+    }
+   ],
+   "errors": [
+    "not_found",
+    "unavailable",
+    "invalid_input"
+   ]
+  },
+  "export_chart": {
+   "description": "Export all closed bars and computed indicator columns of the open chart window to CSV, JSON or Parquet.\nReturns filename, mediaType, rows and file {path, sha256, bytes}. Chart keeps the file for 24 hours.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ExportChart"
+   },
+   "output": {
+    "$ref": "#/$defs/ExportedChart"
+   },
+   "examples": [
+    {
+     "chartId": "chart-1a2b",
+     "format": "parquet"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "unavailable"
+   ]
+  },
+  "read_alert": {
+   "description": "The workspace's alerts. view=list (20 per page, filter by state active, paused, triggered, expired) and\nview=one: target (a chart's series, a symbol and timeframe, or every member of a watchlist on a timeframe),\nconditions, frequency, state and why, Market's state of the series, outdated (an indicator changed since), last\nfired. view=log: triggers newest first (time, bar, symbol, message, value, delivery), optionally of one alertId;\n90 days are kept. Example: {\"view\":\"log\",\"limit\":20}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadAlertInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "view": "log",
+     "limit": 20
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "too_large"
+   ]
+  },
+  "read_chart": {
+   "description": "Read the workspace's charts: what the user sees. view=list: every chart (chartId, symbol, timeframe, chart\ntype, revision, saved, Market's data status while it is open, how many indicators, drawings and comparisons).\nview=one: one chart's panes, indicators (id, name, params, pane), comparisons and the drawings shown now (tool,\npoints with ISO-8601 UTC times and prices, text), 50 drawings per page (nextCursor). The chart's bars and indicator\nvalues come from read_data with its chartId; change a chart with write_chart at its revision. The current view\nresource names the chart on screen. view=layer with chartId and layerId returns the saved research layer or its JSON FileRef.\nview=workspace reads alert defaults and engine/storage health.\nview=templates lists global templates, or reads one including content by templateId. Example: {\"view\":\"one\",\"chartId\":\"chart-1a2b\"}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadChartInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "view": "list"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "too_large"
+   ]
+  },
+  "read_data": {
+   "description": "Bars and indicator values, as columns: of a chart (chartId: its series and every indicator on it, the values\nit shows), or of a symbol and timeframe with indicators computed without a chart (indicators: [{name,\nparams}], names from read_indicator). Rows are closed bars, oldest first, the latest `limit` (default 100, max\n500) of the window Chart computes on (the latest 10,000 bars, the same window charts and alerts use); nextCursor\npages back through it. Columns: time (bar open, ISO-8601 UTC), open, high, low, close, volume, then\n<indicatorId>.<output> (null where the indicator has no value); `columns` picks some. indicators[].outputs names\neach output column; an indicator that cannot compute says why in its error and the others still come. status is\nMarket's state of the series (connecting, live, delayed, history_only, market_closed, recovering, failed);\nforming is the bar still open. An answer over 18,000 characters fails with too_large and how many rows fit.\nExample: {\"symbol\":\"okx:BTC/USDT\",\"timeframe\":\"1h\",\"indicators\":[{\"name\":\"rsi\",\"params\":{\"period\":14}}],\n\"limit\":50}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadDataInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "symbol": "okx:BTC/USDT",
+     "timeframe": "1h",
+     "indicators": [
+      {
+       "name": "rsi",
+       "params": {
+        "period": 14
+       }
+      }
+     ],
+     "limit": 50
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "too_large",
+    "unavailable"
+   ]
+  },
+  "read_indicator": {
+   "description": "The indicator library. view=list: built-in and the user's indicators (name, source builtin or user, title,\nshort title, category, overlay), filter by query, category or source, 100 per page. view=one: one indicator's\ndescription, inputs (id, type, default, bounds, options), alert conditions and, for the user's, whether it loads\n(error, line) and its code's file uri. Output ids appear as read_data columns. Example:\n{\"view\":\"one\",\"name\":\"rsi\"}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadIndicatorInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "view": "one",
+     "name": "rsi"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "too_large"
+   ]
+  },
+  "read_screen": {
+   "description": "The workspace's screens. view=list: name, scope, timeframe, conditions and the last run (state, done of total,\nhow many matched). view=one: the last run's rows (symbol, matched, the values compared, bar time, error),\nmatchedOnly to keep matches, 50 per page. Example: {\"view\":\"one\",\"screenId\":\"sc-1a2b\",\"matchedOnly\":true}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadScreenInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "view": "list"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "too_large"
+   ]
+  },
+  "read_watchlist": {
+   "description": "The workspace's watchlists. view=list: name, revision and sections. view=one: members in order with their\nsection and current quote (price, change and percent with its basis, delayed, as of), 50 per page. Example:\n{\"view\":\"one\",\"watchlistId\":\"wl-1a2b\"}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadWatchlistInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "view": "list"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "too_large"
+   ]
+  },
+  "replay_chart": {
+   "description": "Control bar replay on an open chart. Start at an ISO date/time, step by 1 to 1000 bars, or stop to return\nto live data. Returns active, current bar time (UTC epoch milliseconds) and end of window.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReplayInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "start",
+      "chartId": "chart-1a2b",
+      "at": "2026-11-16"
+     }
+    }
+   ],
+   "errors": [
+    "not_found",
+    "unavailable",
+    "invalid_input",
+    "conflict"
+   ]
+  },
+  "restart_indicators": {
+   "description": "Start Chart's indicator processes anew; the indicators on charts, alerts and screens start again (the health\nstatus item's Restart).",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RestartIndicatorsInput"
+   },
+   "output": {
+    "$ref": "#/$defs/RestartIndicatorsInput"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "write_alert": {
+   "description": "Create and manage alerts. They watch while the workspace is open, on realtime bars only. op=create {target,\nconditions, frequency, expiresAt, message, name, channels}: target {chartId} (that chart's series), {symbol,\ntimeframe} or {watchlistId, timeframe}; up to 5 conditions that must all hold: {left, op, right} with operands\nprice, indicator, drawing (a chart's drawing; not on watchlists), value; channel ops take a\nchannel drawing or right and right2; moving ops take left, amount and bars; triggered takes an alertcondition.\nfrequency once (default), once_per_bar, once_per_bar_close, once_per_minute. op=update at its revision merges:\nthe fields given replace, null clears an optional one, the rest stay; op=pause, op=resume (also retries a failed\none) at its revision; op=delete.",
+   "effects": [
+    "write",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "create": {
+      "effects": [
+       "write"
+      ]
+     },
+     "update": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.alertId"
+     },
+     "pause": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.alertId"
+     },
+     "resume": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.alertId"
+     },
+     "delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.alertId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WriteAlertInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "create",
+      "target": {
+       "symbol": "okx:BTC/USDT",
+       "timeframe": "1h"
+      },
+      "conditions": [
+       {
+        "left": {
+         "kind": "price"
+        },
+        "op": "crossing_up",
+        "right": {
+         "kind": "value",
+         "value": 100000
+        }
+       }
+      ]
+     }
+    },
+    {
+     "operation": {
+      "op": "update",
+      "alertId": "<alertId>",
+      "revision": 2,
+      "frequency": "once_per_bar_close"
+     }
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "conflict"
+   ]
+  },
+  "write_chart": {
+   "description": "op=create makes a new chart {symbol, timeframe, indicators [{name, params}]} (names and params from\nread_indicator; oscillators get their own pane) and returns its chartId, revision and openTarget; show it with\nplatform.panels.open_target. Other ops change a chart at the revision you read (baseRevision; a stale one fails\nwith conflict and the current revision). op=edit applies changes in order, adding or changing only: kind=selection {symbol, timeframe,\npriceBasis, adjustment}; kind=chart_type {chartType}; kind=indicator {name (from read_indicator),\nparams, paneId, label, visible} adds one, or with the id of one on the chart changes it; new oscillators get\ntheir own pane; kind=drawing {tool, points [{time ISO-8601, price}], text, style, settings, label, locked, visible} adds one\n(tools: trendline, ray, extended_line, hline, horizontal_ray, vline, rect, parallel_channel, fib, text, note,\narrow_marker, long_position, short_position, path, ...), or with an id changes it; kind=comparison {symbol,\nscale, color} adds another symbol, or with an id changes it. op=remove deletes indicators, drawings or\ncomparisons or layers by id. For research snapshots create with layers:[ResearchLayer]; an existing chart with a\nmatching layer id is reused. kind=layer {layer} adds or replaces a snapshot by id. The change is on the user's undo stack. Returns the\nnew revision and the ids of what was added. Create accepts importId or copyOf alone. For panel edits use\ncommands instead of changes, with the panel's type and fields (times in epoch milliseconds). Examples:\n[{type:\"display.update\",patch:{timeZone:\"UTC\"}},{type:\"pane.update\",id:\"price\",height:4}].\nUse op=remove for a batch containing deletion or drawings.replace/indicators.replace. See the Chart guide.",
+   "effects": [
+    "write",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "create": {
+      "effects": [
+       "write"
+      ]
+     },
+     "edit": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.chartId"
+     },
+     "remove": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.chartId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WriteChartInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ChartChangeResult"
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "create",
+      "symbol": "AAPL",
+      "timeframe": "1d",
+      "indicators": [
+       {
+        "name": "sma",
+        "params": {
+         "period": 200
+        }
+       },
+       {
+        "name": "rsi",
+        "params": {
+         "period": 14
+        }
+       }
+      ]
+     }
+    },
+    {
+     "operation": {
+      "op": "edit",
+      "chartId": "chart-1a2b",
+      "baseRevision": 7,
+      "changes": [
+       {
+        "kind": "indicator",
+        "name": "ema",
+        "params": {
+         "period": 50
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "conflict",
+    "too_large"
+   ]
+  },
+  "write_indicator": {
+   "description": "Save one of the user's indicators and check it, as Chart's editor does (how to write one: the indicators doc,\nplatform.ai.guide {module:\"chart\", topic:\"indicators\"}). op=create writes a new file, op=update replaces a file's\nwhole text, op=delete removes an indicator. name is the file in the user's indicators folder: chan.py, or\nchan/main.py and chan/helpers.py for an indicator of several files (named chan). Returns the indicator's name and\ncheck: how Chart loads it now (title, overlay, inputs, alert conditions; error and line when it does not load).\nFix the error and update until it loads, then add it to a chart with write_chart by that name.",
+   "effects": [
+    "write",
+    "code",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "create": {
+      "effects": [
+       "write",
+       "code"
+      ]
+     },
+     "update": {
+      "effects": [
+       "write",
+       "code"
+      ],
+      "target": "operation.name"
+     },
+     "delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.name"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WriteIndicatorInput"
+   },
+   "output": {
+    "$ref": "#/$defs/IndicatorWritten"
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "create",
+      "name": "distance.py",
+      "content": "\"\"\"@pyne\"\"\"\nfrom pynecore.lib import close, plot, script, ta\n\n@script.indicator(\"Distance from MA\", overlay=False)\ndef main():\n    plot(close - ta.sma(close, 50), \"Distance\")\n"
+     }
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "conflict"
+   ]
+  },
+  "write_screen": {
+   "description": "Screens find the symbols whose latest closed bar meets every condition. op=save {name, scope {watchlistId} or\n{symbols}, timeframe, conditions} creates one, or with screenId and revision changes it; conditions as alerts'\nwith price, indicator and value operands. op=run computes it on each member's latest\n10,000 bars and finishes with the matches; op=delete. Every op returns a task: read it with platform.tasks.get,\ncancel a run with platform.tasks.cancel. Example: {\"operation\":{\"op\":\"save\",\"name\":\"RSI under 30\",\"scope\":\n{\"watchlistId\":\"wl-1a2b\"},\"timeframe\":\"1d\",\"conditions\":[{\"left\":{\"kind\":\"indicator\",\"name\":\"rsi\",\n\"output\":\"rsi\"},\"op\":\"less\",\"right\":{\"kind\":\"value\",\"value\":30}}]}}.",
+   "effects": [
+    "write",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "save": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.screenId"
+     },
+     "run": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.screenId"
+     },
+     "delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.screenId"
+     }
+    }
+   },
+   "task": true,
+   "input": {
+    "$ref": "#/$defs/WriteScreenInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "save",
+      "name": "RSI under 30",
+      "scope": {
+       "watchlistId": "wl-1a2b"
+      },
+      "timeframe": "1d",
+      "conditions": [
+       {
+        "left": {
+         "kind": "indicator",
+         "name": "rsi",
+         "output": "rsi"
+        },
+        "op": "less",
+        "right": {
+         "kind": "value",
+         "value": 30
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "conflict"
+   ]
+  },
+  "write_template": {
+   "description": "Save a global template from a chart, apply one at the chart's baseRevision, or delete by templateId.\nkind=indicators saves indicators and panes, chart saves appearance, drawing saves the selected tool's style\nand settings (drawingId required to save or apply). Read ids and content with read_chart view=templates.",
+   "effects": [
+    "write",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "save": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.templateId"
+     },
+     "apply": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.chartId"
+     },
+     "delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.templateId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WriteTemplate"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "save",
+      "chartId": "chart-1a2b",
+      "name": "Trend",
+      "kind": "indicators"
+     }
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "conflict"
+   ]
+  },
+  "write_watchlist": {
+   "description": "Create and change watchlists (at most 200 symbols each). op=create {name, sections [{name, symbols}]};\nop=update at its revision: name, sections (replaces all), add [{symbol, section}] (a new section name creates\nit), remove [symbol]; op=delete. Symbols as Market writes them (okx:BTC/USDT, AAPL, 600519.SH).",
+   "effects": [
+    "write",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "create": {
+      "effects": [
+       "write"
+      ]
+     },
+     "update": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.watchlistId"
+     },
+     "delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.watchlistId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WriteWatchlistInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "create",
+      "name": "Banks",
+      "sections": [
+       {
+        "name": "US",
+        "symbols": [
+         "JPM",
+         "BAC",
+         "WFC",
+         "C"
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "operation": {
+      "op": "update",
+      "watchlistId": "wl-1a2b",
+      "revision": 3,
+      "add": [
+       {
+        "symbol": "okx:ETH/USDT"
+       }
+      ]
+     }
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "conflict"
+   ]
+  }
+ },
+ "streams": {
+  "alert_fired": {
+   "description": "One fact per actual alert firing in this workspace. Filter by alert or instrument. Times are epoch nanoseconds.",
+   "cursor": true,
+   "trigger": true,
+   "params": {
+    "$ref": "#/$defs/AlertFilter"
+   },
+   "item": {
+    "$ref": "#/$defs/AlertFired"
+   }
+  }
+ },
+ "events": {},
+ "extensionPoints": {},
+ "settings": {
+  "alertPopup": {
+   "title": "Show popup",
+   "description": "Whether a new alert starts with a desktop popup; each alert can change it.",
+   "globalOnly": false,
+   "group": "New alerts",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  },
+  "alertSound": {
+   "title": "Play sound",
+   "description": "Whether a new alert starts with a sound; each alert can change it.",
+   "globalOnly": false,
+   "group": "New alerts",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  }
+ },
+ "$defs": {
+  "AlertChannels": {
+   "additionalProperties": false,
+   "properties": {
+    "toast": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Toast"
+    },
+    "sound": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Sound"
+    },
+    "mobile": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Mobile"
+    }
+   },
+   "title": "AlertChannels",
+   "type": "object"
+  },
+  "AlertCondition": {
+   "additionalProperties": false,
+   "properties": {
+    "left": {
+     "$ref": "#/$defs/Operand"
+    },
+    "op": {
+     "enum": [
+      "crossing",
+      "crossing_up",
+      "crossing_down",
+      "greater",
+      "less",
+      "entering_channel",
+      "exiting_channel",
+      "inside_channel",
+      "outside_channel",
+      "moving_up",
+      "moving_down",
+      "moving_up_percent",
+      "moving_down_percent",
+      "triggered"
+     ],
+     "title": "Op",
+     "type": "string"
+    },
+    "right": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Operand"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "price {field: close|open|high|low|hl2|hlc3|ohlc4|volume}; indicator {name, params, output} (output is the output id read_data lists); drawing {chartId, drawingId}; value {value}; alertcondition {name, params, condition} (with op triggered)."
+    },
+    "right2": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Operand"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "price {field: close|open|high|low|hl2|hlc3|ohlc4|volume}; indicator {name, params, output} (output is the output id read_data lists); drawing {chartId, drawingId}; value {value}; alertcondition {name, params, condition} (with op triggered)."
+    },
+    "amount": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Amount"
+    },
+    "bars": {
+     "anyOf": [
+      {
+       "maximum": 5000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Bars"
+    }
+   },
+   "required": [
+    "left",
+    "op"
+   ],
+   "title": "AlertCondition",
+   "type": "object"
+  },
+  "AlertConditionUpdate": {
+   "additionalProperties": false,
+   "properties": {
+    "left": {
+     "$ref": "#/$defs/Operand"
+    },
+    "op": {
+     "enum": [
+      "crossing",
+      "crossing_up",
+      "crossing_down",
+      "greater",
+      "less",
+      "entering_channel",
+      "exiting_channel",
+      "inside_channel",
+      "outside_channel",
+      "moving_up",
+      "moving_down",
+      "moving_up_percent",
+      "moving_down_percent",
+      "triggered"
+     ],
+     "title": "Op",
+     "type": "string"
+    },
+    "right": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Operand"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "price {field: close|open|high|low|hl2|hlc3|ohlc4|volume}; indicator {name, params, output} (output is the output id read_data lists); drawing {chartId, drawingId}; value {value}; alertcondition {name, params, condition} (with op triggered)."
+    },
+    "right2": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Operand"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "price {field: close|open|high|low|hl2|hlc3|ohlc4|volume}; indicator {name, params, output} (output is the output id read_data lists); drawing {chartId, drawingId}; value {value}; alertcondition {name, params, condition} (with op triggered)."
+    },
+    "amount": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Amount"
+    },
+    "bars": {
+     "anyOf": [
+      {
+       "maximum": 5000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Bars"
+    }
+   },
+   "required": [
+    "left",
+    "op"
+   ],
+   "title": "AlertConditionUpdate",
+   "type": "object"
+  },
+  "AlertCreate": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "create",
+     "title": "Op",
+     "type": "string"
+    },
+    "target": {
+     "$ref": "#/$defs/AlertTarget"
+    },
+    "conditions": {
+     "items": {
+      "$ref": "#/$defs/AlertCondition"
+     },
+     "maxItems": 5,
+     "minItems": 1,
+     "title": "Conditions",
+     "type": "array"
+    },
+    "frequency": {
+     "anyOf": [
+      {
+       "enum": [
+        "once",
+        "once_per_bar",
+        "once_per_bar_close",
+        "once_per_minute"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Frequency"
+    },
+    "expiresAt": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "ISO-8601; omit for never",
+     "title": "Expiresat"
+    },
+    "message": {
+     "anyOf": [
+      {
+       "maxLength": 2000,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Message"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 64,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "channels": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/AlertChannels"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    }
+   },
+   "required": [
+    "op",
+    "target",
+    "conditions"
+   ],
+   "title": "AlertCreate",
+   "type": "object"
+  },
+  "AlertDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "delete",
+     "title": "Op",
+     "type": "string"
+    },
+    "alertId": {
+     "minLength": 1,
+     "title": "Alertid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "alertId"
+   ],
+   "title": "AlertDelete",
+   "type": "object"
+  },
+  "AlertFilter": {
+   "additionalProperties": false,
+   "properties": {
+    "alertId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Alertid"
+    },
+    "instrumentId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Instrumentid"
+    }
+   },
+   "title": "AlertFilter",
+   "type": "object"
+  },
+  "AlertFired": {
+   "additionalProperties": false,
+   "properties": {
+    "alertId": {
+     "title": "Alertid",
+     "type": "string"
+    },
+    "instrumentId": {
+     "title": "Instrumentid",
+     "type": "string"
+    },
+    "triggeredAt": {
+     "title": "Triggeredat",
+     "type": "string"
+    },
+    "barOpen": {
+     "title": "Baropen",
+     "type": "string"
+    },
+    "condition": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "A readable description of the condition, absent on older log entries",
+     "title": "Condition"
+    },
+    "openTarget": {
+     "$ref": "#/$defs/AlertOpenTarget"
+    }
+   },
+   "required": [
+    "alertId",
+    "instrumentId",
+    "triggeredAt",
+    "barOpen",
+    "condition",
+    "openTarget"
+   ],
+   "title": "AlertFired",
+   "type": "object"
+  },
+  "AlertOpenTarget": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "const": "chart",
+     "title": "Module",
+     "type": "string"
+    },
+    "panelType": {
+     "const": "main",
+     "title": "Paneltype",
+     "type": "string"
+    },
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "module",
+    "panelType",
+    "objectId"
+   ],
+   "title": "AlertOpenTarget",
+   "type": "object"
+  },
+  "AlertPause": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "pause",
+     "title": "Op",
+     "type": "string"
+    },
+    "alertId": {
+     "minLength": 1,
+     "title": "Alertid",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op",
+    "alertId",
+    "revision"
+   ],
+   "title": "AlertPause",
+   "type": "object"
+  },
+  "AlertResume": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "resume",
+     "title": "Op",
+     "type": "string"
+    },
+    "alertId": {
+     "minLength": 1,
+     "title": "Alertid",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op",
+    "alertId",
+    "revision"
+   ],
+   "title": "AlertResume",
+   "type": "object"
+  },
+  "AlertTarget": {
+   "additionalProperties": false,
+   "properties": {
+    "chartId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Chartid"
+    },
+    "symbol": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Symbol"
+    },
+    "timeframe": {
+     "anyOf": [
+      {
+       "minLength": 2,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "1m 5m 15m 1h 4h 1d 1w 1mo ...",
+     "title": "Timeframe"
+    },
+    "watchlistId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Watchlistid"
+    }
+   },
+   "title": "AlertTarget",
+   "type": "object"
+  },
+  "AlertUpdate": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "update",
+     "title": "Op",
+     "type": "string"
+    },
+    "alertId": {
+     "minLength": 1,
+     "title": "Alertid",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "integer"
+    },
+    "target": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/AlertTarget"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "conditions": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/AlertConditionUpdate"
+       },
+       "maxItems": 5,
+       "minItems": 1,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Conditions"
+    },
+    "frequency": {
+     "anyOf": [
+      {
+       "enum": [
+        "once",
+        "once_per_bar",
+        "once_per_bar_close",
+        "once_per_minute"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Frequency"
+    },
+    "expiresAt": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "ISO-8601; omit for never",
+     "title": "Expiresat"
+    },
+    "message": {
+     "anyOf": [
+      {
+       "maxLength": 2000,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Message"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 64,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "channels": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/AlertChannels"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    }
+   },
+   "required": [
+    "op",
+    "alertId",
+    "revision"
+   ],
+   "title": "AlertUpdate",
+   "type": "object"
+  },
+  "BackfillChart": {
+   "additionalProperties": false,
+   "properties": {
+    "chartId": {
+     "title": "Chartid",
+     "type": "string"
+    },
+    "to": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "ISO-8601 date or time, instead of bars",
+     "title": "To"
+    },
+    "bars": {
+     "anyOf": [
+      {
+       "maximum": 30000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Bars"
+    }
+   },
+   "required": [
+    "chartId"
+   ],
+   "title": "BackfillChart",
+   "type": "object"
+  },
+  "BackfillResult": {
+   "additionalProperties": false,
+   "description": "``reachedStart``: Market has nothing older. ``limitReached``: the window is at 30,000 bars;\n``to`` was not reached when either is true.",
+   "properties": {
+    "loaded": {
+     "title": "Loaded",
+     "type": "integer"
+    },
+    "reachedStart": {
+     "title": "Reachedstart",
+     "type": "boolean"
+    },
+    "limitReached": {
+     "title": "Limitreached",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "loaded",
+    "reachedStart",
+    "limitReached"
+   ],
+   "title": "BackfillResult",
+   "type": "object"
+  },
+  "ChartChange": {
+   "additionalProperties": false,
+   "properties": {
+    "kind": {
+     "enum": [
+      "selection",
+      "chart_type",
+      "indicator",
+      "drawing",
+      "comparison",
+      "layer"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "layer": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ResearchLayer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "id": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Id"
+    },
+    "symbol": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Symbol"
+    },
+    "timeframe": {
+     "anyOf": [
+      {
+       "minLength": 2,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "1m 5m 15m 1h 4h 1d 1w 1mo ...",
+     "title": "Timeframe"
+    },
+    "priceBasis": {
+     "anyOf": [
+      {
+       "enum": [
+        "last",
+        "mark",
+        "index"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Pricebasis"
+    },
+    "adjustment": {
+     "anyOf": [
+      {
+       "enum": [
+        "raw",
+        "split",
+        "split_dividend"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Adjustment"
+    },
+    "chartType": {
+     "anyOf": [
+      {
+       "enum": [
+        "candles",
+        "hollow_candles",
+        "bars",
+        "line",
+        "line_markers",
+        "step_line",
+        "area",
+        "hlc_area",
+        "baseline",
+        "columns",
+        "high_low",
+        "heikin_ashi",
+        "renko",
+        "kagi",
+        "point_figure",
+        "line_break",
+        "range"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Charttype"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "params": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Params"
+    },
+    "paneId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Paneid"
+    },
+    "label": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Label"
+    },
+    "visible": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Visible"
+    },
+    "tool": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Tool"
+    },
+    "points": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/DrawingPoint"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Points"
+    },
+    "text": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Text"
+    },
+    "style": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Style"
+    },
+    "settings": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Settings"
+    },
+    "locked": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Locked"
+    },
+    "scale": {
+     "anyOf": [
+      {
+       "enum": [
+        "same_percent",
+        "new_left",
+        "new_right"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Scale"
+    },
+    "color": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Color"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "title": "ChartChange",
+   "type": "object"
+  },
+  "ChartChangeResult": {
+   "additionalProperties": false,
+   "properties": {
+    "layerIds": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "For create with research layers, the stable layer IDs on the committed chart.",
+     "title": "Layerids"
+    },
+    "chartId": {
+     "title": "Chartid",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "integer"
+    },
+    "added": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Added"
+    },
+    "openTarget": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Opentarget"
+    }
+   },
+   "required": [
+    "chartId",
+    "revision"
+   ],
+   "title": "ChartChangeResult",
+   "type": "object"
+  },
+  "ChartCreate": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "create",
+     "title": "Op",
+     "type": "string"
+    },
+    "symbol": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Symbol"
+    },
+    "timeframe": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Timeframe"
+    },
+    "importId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Importid"
+    },
+    "copyOf": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Copyof"
+    },
+    "indicators": {
+     "items": {
+      "$ref": "#/$defs/CreateIndicator"
+     },
+     "maxItems": 100,
+     "title": "Indicators",
+     "type": "array"
+    },
+    "layers": {
+     "items": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/ResearchLayer"
+       },
+       {
+        "$ref": "#/$defs/FileRef"
+       }
+      ]
+     },
+     "title": "Layers",
+     "type": "array"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "ChartCreate",
+   "type": "object"
+  },
+  "ChartEdit": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "edit",
+     "title": "Op",
+     "type": "string"
+    },
+    "chartId": {
+     "minLength": 1,
+     "title": "Chartid",
+     "type": "string"
+    },
+    "baseRevision": {
+     "title": "Baserevision",
+     "type": "integer"
+    },
+    "changes": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/ChartChange"
+       },
+       "maxItems": 100,
+       "minItems": 1,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Changes"
+    },
+    "commands": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "maxItems": 500,
+       "minItems": 1,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Commands"
+    }
+   },
+   "required": [
+    "op",
+    "chartId",
+    "baseRevision"
+   ],
+   "title": "ChartEdit",
+   "type": "object"
+  },
+  "ChartRemove": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "remove",
+     "title": "Op",
+     "type": "string"
+    },
+    "chartId": {
+     "minLength": 1,
+     "title": "Chartid",
+     "type": "string"
+    },
+    "baseRevision": {
+     "title": "Baserevision",
+     "type": "integer"
+    },
+    "commands": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "maxItems": 500,
+       "minItems": 1,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Commands"
+    },
+    "indicators": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/IndicatorId"
+       },
+       "maxItems": 500,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Indicators"
+    },
+    "drawings": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/DrawingId"
+       },
+       "maxItems": 500,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Drawings"
+    },
+    "comparisons": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/ComparisonId"
+       },
+       "maxItems": 500,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Comparisons"
+    },
+    "layers": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Research layer ids to remove.",
+     "title": "Layers"
+    }
+   },
+   "required": [
+    "op",
+    "chartId",
+    "baseRevision"
+   ],
+   "title": "ChartRemove",
+   "type": "object"
+  },
+  "ColumnName": {
+   "minLength": 1,
+   "title": "ColumnName",
+   "type": "string"
+  },
+  "ComparisonId": {
+   "minLength": 1,
+   "title": "ComparisonId",
+   "type": "string"
+  },
+  "CreateIndicator": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "source": {
+     "default": "builtin",
+     "enum": [
+      "builtin",
+      "user"
+     ],
+     "title": "Source",
+     "type": "string"
+    },
+    "params": {
+     "additionalProperties": true,
+     "default": {},
+     "title": "Params",
+     "type": "object"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "CreateIndicator",
+   "type": "object"
+  },
+  "DrawingId": {
+   "minLength": 1,
+   "title": "DrawingId",
+   "type": "string"
+  },
+  "DrawingPoint": {
+   "additionalProperties": false,
+   "properties": {
+    "time": {
+     "minLength": 1,
+     "title": "Time",
+     "type": "string"
+    },
+    "price": {
+     "title": "Price",
+     "type": "number"
+    }
+   },
+   "required": [
+    "time",
+    "price"
+   ],
+   "title": "DrawingPoint",
+   "type": "object"
+  },
+  "ExportChart": {
+   "additionalProperties": false,
+   "properties": {
+    "chartId": {
+     "maxLength": 128,
+     "minLength": 1,
+     "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+     "title": "Chartid",
+     "type": "string"
+    },
+    "format": {
+     "enum": [
+      "csv",
+      "json",
+      "parquet"
+     ],
+     "title": "Format",
+     "type": "string"
+    }
+   },
+   "required": [
+    "chartId",
+    "format"
+   ],
+   "title": "ExportChart",
+   "type": "object"
+  },
+  "ExportedChart": {
+   "additionalProperties": false,
+   "properties": {
+    "filename": {
+     "title": "Filename",
+     "type": "string"
+    },
+    "mediaType": {
+     "title": "Mediatype",
+     "type": "string"
+    },
+    "rows": {
+     "title": "Rows",
+     "type": "integer"
+    },
+    "file": {
+     "$ref": "#/$defs/FileRef"
+    }
+   },
+   "required": [
+    "filename",
+    "mediaType",
+    "rows",
+    "file"
+   ],
+   "title": "ExportedChart",
+   "type": "object"
+  },
+  "FileRef": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "sha256": {
+     "pattern": "^[a-f0-9]{64}$",
+     "title": "Sha256",
+     "type": "string"
+    },
+    "bytes": {
+     "minimum": 0,
+     "title": "Bytes",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "path",
+    "sha256",
+    "bytes"
+   ],
+   "title": "FileRef",
+   "type": "object"
+  },
+  "IndicatorCheck": {
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "shortTitle": {
+     "title": "Shorttitle",
+     "type": "string"
+    },
+    "overlay": {
+     "title": "Overlay",
+     "type": "boolean"
+    },
+    "inputs": {
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Inputs",
+     "type": "array"
+    },
+    "alertConditions": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Alertconditions",
+     "type": "array"
+    },
+    "error": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Why the indicator does not load; null when it loads.",
+     "title": "Error"
+    },
+    "line": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Line of the error in the indicator's code, when known.",
+     "title": "Line"
+    }
+   },
+   "required": [
+    "title",
+    "shortTitle",
+    "overlay",
+    "inputs",
+    "alertConditions",
+    "error",
+    "line"
+   ],
+   "title": "IndicatorCheck",
+   "type": "object"
+  },
+  "IndicatorDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "delete",
+     "title": "Op",
+     "type": "string"
+    },
+    "name": {
+     "description": "A user indicator's name as read_indicator lists it: chan.py, or chan for a folder (deleted whole).",
+     "maxLength": 256,
+     "minLength": 1,
+     "pattern": "^[^/\\\\:]+$",
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "name"
+   ],
+   "title": "IndicatorDelete",
+   "type": "object"
+  },
+  "IndicatorId": {
+   "minLength": 1,
+   "title": "IndicatorId",
+   "type": "string"
+  },
+  "IndicatorRequest": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "params": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Params"
+    },
+    "id": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Id"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "enum": [
+        "builtin",
+        "user"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Source"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "IndicatorRequest",
+   "type": "object"
+  },
+  "IndicatorSave": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "enum": [
+      "create",
+      "update"
+     ],
+     "title": "Op",
+     "type": "string"
+    },
+    "name": {
+     "description": "The file in the user's indicators folder: chan.py (an indicator of one file), or chan/main.py and chan/helpers.py\n(an indicator of a folder, named chan).",
+     "pattern": "^[^/\\\\:]+(/[^/\\\\:]+)?\\.py$",
+     "title": "Name",
+     "type": "string"
+    },
+    "content": {
+     "description": "The file's whole text.",
+     "maxLength": 1000000,
+     "minLength": 1,
+     "title": "Content",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "name",
+    "content"
+   ],
+   "title": "IndicatorSave",
+   "type": "object"
+  },
+  "IndicatorWritten": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "The indicator's name, as read_indicator, read_data and write_chart take it.",
+     "title": "Name",
+     "type": "string"
+    },
+    "file": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "The file written; null after a delete.",
+     "title": "File"
+    },
+    "check": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/IndicatorCheck"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "How Chart loads the indicator now; null after a delete."
+    }
+   },
+   "required": [
+    "name",
+    "file",
+    "check"
+   ],
+   "title": "IndicatorWritten",
+   "type": "object"
+  },
+  "Operand": {
+   "additionalProperties": true,
+   "description": "price {field: close|open|high|low|hl2|hlc3|ohlc4|volume}; indicator {name, params, output} (output is the output id read_data lists); drawing {chartId, drawingId}; value {value}; alertcondition {name, params, condition} (with op triggered).",
+   "properties": {
+    "kind": {
+     "enum": [
+      "price",
+      "indicator",
+      "drawing",
+      "value",
+      "alertcondition"
+     ],
+     "title": "Kind",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "title": "Operand",
+   "type": "object"
+  },
+  "ReadAlertInput": {
+   "additionalProperties": false,
+   "properties": {
+    "view": {
+     "enum": [
+      "list",
+      "one",
+      "log"
+     ],
+     "title": "View",
+     "type": "string"
+    },
+    "alertId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Alertid"
+    },
+    "state": {
+     "anyOf": [
+      {
+       "enum": [
+        "active",
+        "paused",
+        "triggered",
+        "expired"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "State"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page",
+     "title": "Cursor"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 100,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    }
+   },
+   "required": [
+    "view"
+   ],
+   "title": "ReadAlertInput",
+   "type": "object"
+  },
+  "ReadChartInput": {
+   "additionalProperties": false,
+   "properties": {
+    "view": {
+     "enum": [
+      "list",
+      "one",
+      "workspace",
+      "templates",
+      "layer"
+     ],
+     "title": "View",
+     "type": "string"
+    },
+    "layerId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "view=layer: the saved research snapshot to read from chartId.",
+     "title": "Layerid"
+    },
+    "templateId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Templateid"
+    },
+    "chartId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Chartid"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page",
+     "title": "Cursor"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 200,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    }
+   },
+   "required": [
+    "view"
+   ],
+   "title": "ReadChartInput",
+   "type": "object"
+  },
+  "ReadDataInput": {
+   "additionalProperties": false,
+   "properties": {
+    "chartId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Chartid"
+    },
+    "symbol": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Symbol"
+    },
+    "timeframe": {
+     "anyOf": [
+      {
+       "minLength": 2,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "1m 5m 15m 1h 4h 1d 1w 1mo ...",
+     "title": "Timeframe"
+    },
+    "indicators": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/IndicatorRequest"
+       },
+       "maxItems": 10,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Indicators"
+    },
+    "columns": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/ColumnName"
+       },
+       "maxItems": 64,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Columns"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 500,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page",
+     "title": "Cursor"
+    }
+   },
+   "title": "ReadDataInput",
+   "type": "object"
+  },
+  "ReadIndicatorInput": {
+   "additionalProperties": false,
+   "properties": {
+    "view": {
+     "enum": [
+      "list",
+      "one"
+     ],
+     "title": "View",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "enum": [
+        "builtin",
+        "user"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Source"
+    },
+    "query": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Query"
+    },
+    "category": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Category"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page",
+     "title": "Cursor"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 300,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    }
+   },
+   "required": [
+    "view"
+   ],
+   "title": "ReadIndicatorInput",
+   "type": "object"
+  },
+  "ReadScreenInput": {
+   "additionalProperties": false,
+   "properties": {
+    "view": {
+     "enum": [
+      "list",
+      "one"
+     ],
+     "title": "View",
+     "type": "string"
+    },
+    "screenId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Screenid"
+    },
+    "matchedOnly": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Matchedonly"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page",
+     "title": "Cursor"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 200,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    }
+   },
+   "required": [
+    "view"
+   ],
+   "title": "ReadScreenInput",
+   "type": "object"
+  },
+  "ReadWatchlistInput": {
+   "additionalProperties": false,
+   "properties": {
+    "view": {
+     "enum": [
+      "list",
+      "one"
+     ],
+     "title": "View",
+     "type": "string"
+    },
+    "watchlistId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Watchlistid"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page",
+     "title": "Cursor"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 200,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    }
+   },
+   "required": [
+    "view"
+   ],
+   "title": "ReadWatchlistInput",
+   "type": "object"
+  },
+  "ReplayAdvance": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "step",
+     "title": "Op",
+     "type": "string"
+    },
+    "chartId": {
+     "title": "Chartid",
+     "type": "string"
+    },
+    "bars": {
+     "default": 1,
+     "maximum": 1000,
+     "minimum": 1,
+     "title": "Bars",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op",
+    "chartId"
+   ],
+   "title": "ReplayAdvance",
+   "type": "object"
+  },
+  "ReplayBegin": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "start",
+     "title": "Op",
+     "type": "string"
+    },
+    "chartId": {
+     "title": "Chartid",
+     "type": "string"
+    },
+    "at": {
+     "description": "ISO-8601 date or time in the chart's loaded window",
+     "title": "At",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "chartId",
+    "at"
+   ],
+   "title": "ReplayBegin",
+   "type": "object"
+  },
+  "ReplayEnd": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "stop",
+     "title": "Op",
+     "type": "string"
+    },
+    "chartId": {
+     "title": "Chartid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "chartId"
+   ],
+   "title": "ReplayEnd",
+   "type": "object"
+  },
+  "ReplayInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ReplayBegin"
+      },
+      {
+       "$ref": "#/$defs/ReplayAdvance"
+      },
+      {
+       "$ref": "#/$defs/ReplayEnd"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "ReplayInput",
+   "type": "object"
+  },
+  "ResearchLayer": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "description": "Stable caller-supplied snapshot id.",
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "label": {
+     "title": "Label",
+     "type": "string"
+    },
+    "instrumentId": {
+     "title": "Instrumentid",
+     "type": "string"
+    },
+    "timeframe": {
+     "title": "Timeframe",
+     "type": "string"
+    },
+    "adjustment": {
+     "enum": [
+      "raw",
+      "split",
+      "split_dividend"
+     ],
+     "title": "Adjustment",
+     "type": "string"
+    },
+    "window": {
+     "$ref": "#/$defs/ResearchWindow"
+    },
+    "panes": {
+     "items": {
+      "$ref": "#/$defs/ResearchPane"
+     },
+     "title": "Panes",
+     "type": "array"
+    },
+    "series": {
+     "items": {
+      "$ref": "#/$defs/ResearchSeries"
+     },
+     "title": "Series",
+     "type": "array"
+    },
+    "markers": {
+     "items": {
+      "$ref": "#/$defs/ResearchMarker"
+     },
+     "title": "Markers",
+     "type": "array"
+    }
+   },
+   "required": [
+    "id",
+    "label",
+    "instrumentId",
+    "timeframe",
+    "adjustment",
+    "window",
+    "panes",
+    "series",
+    "markers"
+   ],
+   "title": "ResearchLayer",
+   "type": "object"
+  },
+  "ResearchMarker": {
+   "additionalProperties": false,
+   "properties": {
+    "time": {
+     "description": "Actual fill time, ISO-8601 UTC.",
+     "title": "Time",
+     "type": "string"
+    },
+    "side": {
+     "enum": [
+      "buy",
+      "sell"
+     ],
+     "title": "Side",
+     "type": "string"
+    },
+    "price": {
+     "title": "Price",
+     "type": "number"
+    },
+    "quantity": {
+     "title": "Quantity",
+     "type": "number"
+    }
+   },
+   "required": [
+    "time",
+    "side",
+    "price",
+    "quantity"
+   ],
+   "title": "ResearchMarker",
+   "type": "object"
+  },
+  "ResearchPane": {
+   "additionalProperties": false,
+   "properties": {
+    "key": {
+     "title": "Key",
+     "type": "string"
+    },
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "position": {
+     "enum": [
+      "above",
+      "below"
+     ],
+     "title": "Position",
+     "type": "string"
+    }
+   },
+   "required": [
+    "key",
+    "title",
+    "position"
+   ],
+   "title": "ResearchPane",
+   "type": "object"
+  },
+  "ResearchPoint": {
+   "additionalProperties": false,
+   "properties": {
+    "time": {
+     "description": "ISO-8601 UTC. A point belongs to the last bar opened at or before this time.",
+     "title": "Time",
+     "type": "string"
+    },
+    "value": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Value"
+    }
+   },
+   "required": [
+    "time",
+    "value"
+   ],
+   "title": "ResearchPoint",
+   "type": "object"
+  },
+  "ResearchSeries": {
+   "additionalProperties": false,
+   "properties": {
+    "key": {
+     "title": "Key",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "pane": {
+     "description": "price or a declared pane key.",
+     "title": "Pane",
+     "type": "string"
+    },
+    "style": {
+     "enum": [
+      "line",
+      "step",
+      "area"
+     ],
+     "title": "Style",
+     "type": "string"
+    },
+    "role": {
+     "enum": [
+      "main",
+      "benchmark",
+      "compare",
+      "data"
+     ],
+     "title": "Role",
+     "type": "string"
+    },
+    "points": {
+     "items": {
+      "$ref": "#/$defs/ResearchPoint"
+     },
+     "title": "Points",
+     "type": "array"
+    }
+   },
+   "required": [
+    "key",
+    "name",
+    "pane",
+    "style",
+    "role",
+    "points"
+   ],
+   "title": "ResearchSeries",
+   "type": "object"
+  },
+  "ResearchWindow": {
+   "additionalProperties": false,
+   "properties": {
+    "from": {
+     "description": "First bar open in the snapshot, ISO-8601 UTC.",
+     "title": "From",
+     "type": "string"
+    },
+    "to": {
+     "description": "Inclusive end of the snapshot, ISO-8601 UTC.",
+     "title": "To",
+     "type": "string"
+    }
+   },
+   "required": [
+    "from",
+    "to"
+   ],
+   "title": "ResearchWindow",
+   "type": "object"
+  },
+  "RestartIndicatorsInput": {
+   "additionalProperties": false,
+   "properties": {},
+   "title": "RestartIndicatorsInput",
+   "type": "object"
+  },
+  "ScreenCondition": {
+   "additionalProperties": false,
+   "properties": {
+    "left": {
+     "$ref": "#/$defs/Operand"
+    },
+    "op": {
+     "enum": [
+      "crossing",
+      "crossing_up",
+      "crossing_down",
+      "greater",
+      "less",
+      "entering_channel",
+      "exiting_channel",
+      "inside_channel",
+      "outside_channel",
+      "moving_up",
+      "moving_down",
+      "moving_up_percent",
+      "moving_down_percent",
+      "triggered"
+     ],
+     "title": "Op",
+     "type": "string"
+    },
+    "right": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Operand"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "price {field: close|open|high|low|hl2|hlc3|ohlc4|volume}; indicator {name, params, output} (output is the output id read_data lists); drawing {chartId, drawingId}; value {value}; alertcondition {name, params, condition} (with op triggered)."
+    },
+    "right2": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Operand"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "price {field: close|open|high|low|hl2|hlc3|ohlc4|volume}; indicator {name, params, output} (output is the output id read_data lists); drawing {chartId, drawingId}; value {value}; alertcondition {name, params, condition} (with op triggered)."
+    },
+    "amount": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Amount"
+    },
+    "bars": {
+     "anyOf": [
+      {
+       "maximum": 5000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Bars"
+    }
+   },
+   "required": [
+    "left",
+    "op"
+   ],
+   "title": "ScreenCondition",
+   "type": "object"
+  },
+  "ScreenDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "delete",
+     "title": "Op",
+     "type": "string"
+    },
+    "screenId": {
+     "minLength": 1,
+     "title": "Screenid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "screenId"
+   ],
+   "title": "ScreenDelete",
+   "type": "object"
+  },
+  "ScreenRun": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "run",
+     "title": "Op",
+     "type": "string"
+    },
+    "screenId": {
+     "minLength": 1,
+     "title": "Screenid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "screenId"
+   ],
+   "title": "ScreenRun",
+   "type": "object"
+  },
+  "ScreenSave": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "save",
+     "title": "Op",
+     "type": "string"
+    },
+    "screenId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Screenid"
+    },
+    "revision": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Revision"
+    },
+    "name": {
+     "maxLength": 64,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "scope": {
+     "$ref": "#/$defs/ScreenScope"
+    },
+    "timeframe": {
+     "description": "1m 5m 15m 1h 4h 1d 1w 1mo ...",
+     "minLength": 2,
+     "title": "Timeframe",
+     "type": "string"
+    },
+    "conditions": {
+     "items": {
+      "$ref": "#/$defs/ScreenCondition"
+     },
+     "maxItems": 5,
+     "minItems": 1,
+     "title": "Conditions",
+     "type": "array"
+    }
+   },
+   "required": [
+    "op",
+    "name",
+    "scope",
+    "timeframe",
+    "conditions"
+   ],
+   "title": "ScreenSave",
+   "type": "object"
+  },
+  "ScreenScope": {
+   "additionalProperties": false,
+   "properties": {
+    "watchlistId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Watchlistid"
+    },
+    "symbols": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/SymbolName"
+       },
+       "maxItems": 200,
+       "minItems": 1,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Symbols"
+    }
+   },
+   "title": "ScreenScope",
+   "type": "object"
+  },
+  "SymbolName": {
+   "minLength": 1,
+   "title": "SymbolName",
+   "type": "string"
+  },
+  "TemplateApply": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "apply",
+     "title": "Op",
+     "type": "string"
+    },
+    "chartId": {
+     "title": "Chartid",
+     "type": "string"
+    },
+    "baseRevision": {
+     "title": "Baserevision",
+     "type": "integer"
+    },
+    "templateId": {
+     "title": "Templateid",
+     "type": "string"
+    },
+    "drawingId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Drawingid"
+    }
+   },
+   "required": [
+    "op",
+    "chartId",
+    "baseRevision",
+    "templateId"
+   ],
+   "title": "TemplateApply",
+   "type": "object"
+  },
+  "TemplateDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "delete",
+     "title": "Op",
+     "type": "string"
+    },
+    "templateId": {
+     "title": "Templateid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "templateId"
+   ],
+   "title": "TemplateDelete",
+   "type": "object"
+  },
+  "TemplateSave": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "save",
+     "title": "Op",
+     "type": "string"
+    },
+    "chartId": {
+     "title": "Chartid",
+     "type": "string"
+    },
+    "templateId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Templateid"
+    },
+    "name": {
+     "maxLength": 64,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "indicators",
+      "chart",
+      "drawing"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "drawingId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Drawingid"
+    }
+   },
+   "required": [
+    "op",
+    "chartId",
+    "name",
+    "kind"
+   ],
+   "title": "TemplateSave",
+   "type": "object"
+  },
+  "WatchlistAdd": {
+   "additionalProperties": false,
+   "properties": {
+    "symbol": {
+     "minLength": 1,
+     "title": "Symbol",
+     "type": "string"
+    },
+    "section": {
+     "anyOf": [
+      {
+       "maxLength": 64,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Section"
+    }
+   },
+   "required": [
+    "symbol"
+   ],
+   "title": "WatchlistAdd",
+   "type": "object"
+  },
+  "WatchlistCreate": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "create",
+     "title": "Op",
+     "type": "string"
+    },
+    "name": {
+     "maxLength": 64,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "sections": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/WatchlistSection"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Sections"
+    }
+   },
+   "required": [
+    "op",
+    "name"
+   ],
+   "title": "WatchlistCreate",
+   "type": "object"
+  },
+  "WatchlistDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "delete",
+     "title": "Op",
+     "type": "string"
+    },
+    "watchlistId": {
+     "minLength": 1,
+     "title": "Watchlistid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "watchlistId"
+   ],
+   "title": "WatchlistDelete",
+   "type": "object"
+  },
+  "WatchlistRemove": {
+   "minLength": 1,
+   "title": "WatchlistRemove",
+   "type": "string"
+  },
+  "WatchlistSection": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 64,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "symbols": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/SymbolName"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Symbols"
+    }
+   },
+   "title": "WatchlistSection",
+   "type": "object"
+  },
+  "WatchlistSectionUpdate": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 64,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "symbols": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/SymbolName"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Symbols"
+    }
+   },
+   "title": "WatchlistSectionUpdate",
+   "type": "object"
+  },
+  "WatchlistUpdate": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "update",
+     "title": "Op",
+     "type": "string"
+    },
+    "watchlistId": {
+     "minLength": 1,
+     "title": "Watchlistid",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "integer"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 64,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "sections": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/WatchlistSectionUpdate"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Sections"
+    },
+    "add": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/WatchlistAdd"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Add"
+    },
+    "remove": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/WatchlistRemove"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Remove"
+    }
+   },
+   "required": [
+    "op",
+    "watchlistId",
+    "revision"
+   ],
+   "title": "WatchlistUpdate",
+   "type": "object"
+  },
+  "WriteAlertInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/AlertCreate"
+      },
+      {
+       "$ref": "#/$defs/AlertUpdate"
+      },
+      {
+       "$ref": "#/$defs/AlertPause"
+      },
+      {
+       "$ref": "#/$defs/AlertResume"
+      },
+      {
+       "$ref": "#/$defs/AlertDelete"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "WriteAlertInput",
+   "type": "object"
+  },
+  "WriteChartInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ChartCreate"
+      },
+      {
+       "$ref": "#/$defs/ChartEdit"
+      },
+      {
+       "$ref": "#/$defs/ChartRemove"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "WriteChartInput",
+   "type": "object"
+  },
+  "WriteIndicatorInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/IndicatorSave"
+      },
+      {
+       "$ref": "#/$defs/IndicatorDelete"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "WriteIndicatorInput",
+   "type": "object"
+  },
+  "WriteScreenInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ScreenSave"
+      },
+      {
+       "$ref": "#/$defs/ScreenRun"
+      },
+      {
+       "$ref": "#/$defs/ScreenDelete"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "WriteScreenInput",
+   "type": "object"
+  },
+  "WriteTemplate": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/TemplateSave"
+      },
+      {
+       "$ref": "#/$defs/TemplateApply"
+      },
+      {
+       "$ref": "#/$defs/TemplateDelete"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "WriteTemplate",
+   "type": "object"
+  },
+  "WriteWatchlistInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/WatchlistCreate"
+      },
+      {
+       "$ref": "#/$defs/WatchlistUpdate"
+      },
+      {
+       "$ref": "#/$defs/WatchlistDelete"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "WriteWatchlistInput",
+   "type": "object"
+  }
+ },
+ "changes": true
+}

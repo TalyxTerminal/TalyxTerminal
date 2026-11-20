@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Number": {"type": ["number", "null"]},
+    "Numbers": {"type": "array", "items": {"type": ["number", "null"]}},
+    "PlotlyTrace": {
+      "title": "FactorPlotlyTrace",
+      "description": "One Plotly trace. meta.role says what it is, and the display colours it by that: main (the text colour), benchmark (thin grey, also reference lines such as zero, a mean or the 45-degree line), compare (another run, grey dashed), group (one step of a neutral ramp, meta.index of meta.of), updown (the user's up and down colours by sign), attention (orange: something to deal with). meta.key is the trace's identity inside its figure.",
+      "type": "object",
+      "properties": {
+        "type": {"type": "string"},
+        "name": {"type": "string"},
+        "meta": {
+          "type": "object",
+          "properties": {
+            "role": {"enum": ["main", "benchmark", "compare", "group", "updown", "attention", "detail"]},
+            "key": {"type": "string", "minLength": 1},
+            "index": {"type": "integer", "minimum": 0},
+            "of": {"type": "integer", "minimum": 1}, "side": {"enum": ["up", "down"]}
+          },
+          "required": ["role", "key"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["meta"],
+      "additionalProperties": true
+    },
+    "PlotlyFigure": {
+      "title": "FactorPlotlyFigure",
+      "description": "A Plotly figure drawn by the backend; layout.meta.key is the figure's fixed identity (factor.results.<name>, factor.groups ...).",
+      "type": "object",
+      "properties": {
+        "data": {"type": "array", "items": {"$ref": "#/$defs/PlotlyTrace"}},
+        "layout": {
+          "type": "object",
+          "properties": {
+            "meta": {
+              "type": "object",
+              "properties": {"key": {"type": "string", "pattern": "^factor\\."}},
+              "required": ["key"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["meta"],
+          "additionalProperties": true
+        }
+      },
+      "required": ["data", "layout"],
+      "additionalProperties": false
+    },
+    "Figure": {
+      "title": "FactorResultsFigure",
+      "description": "One figure of a Results tab: the figure, or why it could not be drawn (unavailable). The figure is left out when read without figures.",
+      "type": "object",
+      "properties": {
+        "key": {"type": "string", "pattern": "^factor\\."},
+        "title": {"type": "string"},
+        "figure": {"$ref": "#/$defs/PlotlyFigure"},
+        "unavailable": {"type": "string"}
+      },
+      "required": ["key", "title"],
+      "additionalProperties": false
+    },
+    "Missing": {
+      "description": "Each table or figure that could not be made, by its name, and why; tab is set when the whole tab failed.",
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "TabState": {"enum": ["waiting", "running", "done", "failed"]},
+    "State": {
+      "title": "FactorResultsState",
+      "description": "Where a run's Results are. none: a held-out validation or an unfinished run has none; notbuilt: not built yet (a sweep combination, or an earlier run put aside for a newer one), build_factor_results builds them; queued and running: building in the background, progress is the share of tabs done; done; failed (message says why); interrupted: Quant closed while building. Tabs that are done can be read while the rest build.",
+      "type": "object",
+      "properties": {
+        "state": {"enum": ["none", "notbuilt", "queued", "running", "done", "failed", "interrupted"]},
+        "progress": {"type": "number", "minimum": 0, "maximum": 1},
+        "tabs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/TabState"}},
+        "message": {"type": "string"},
+        "seconds": {"type": "number"},
+        "computeSeconds": {"type": "number"},
+        "queuedAt": {"type": "integer"},
+        "startedAt": {"type": "integer"},
+        "endedAt": {"type": "integer"},
+        "about": {
+          "type": "object",
+          "properties": {
+            "styles": {"type": "string"},
+            "versions": {"type": "object", "additionalProperties": {"type": "string"}},
+            "seconds": {"type": "number"},
+            "unit": {"type": "string"},
+            "shares": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["state", "progress", "tabs"],
+      "additionalProperties": false
+    },
+    "ReturnsTab": {
+      "title": "FactorReturnsTab",
+      "type": "object",
+      "properties": {
+        "tab": {"const": "returns"},
+        "holding": {"type": "integer"}, "unit": {"enum": ["day", "hour", "bar"]}, "periods": {"type": "array", "items": {"type": "integer"}},
+        "periodLabels": {"type": "array", "items": {"type": "string"}}, "missing": {"$ref": "#/$defs/Missing"}, "seconds": {"type": "number"}, "failed": {"type": "string"},
+        "figures": {
+          "type": "object",
+          "description": "groups: each group's cumulative return relative to all names and the long–short net (TALYX draws it; click a day, other runs dashed). meanByGroup and violin: Alphalens' return by group, bps a bar. factorWeighted: Alphalens' factor-weighted long–short, cumulative from 1. spread: top minus bottom at the holding, bps, 100% gross, 1-month mean ± 0.5 standard error.",
+          "properties": {
+            "groups": {"$ref": "#/$defs/Figure"}, "meanByGroup": {"$ref": "#/$defs/Figure"}, "violin": {"$ref": "#/$defs/Figure"},
+            "factorWeighted": {"$ref": "#/$defs/Figure"}, "spread": {"$ref": "#/$defs/Figure"}
+          },
+          "additionalProperties": false
+        },
+        "groupStats": {"type": "array", "description": "Alphalens' quantile statistics: the factor values of each group pooled over the period.", "items": {
+          "type": "object",
+          "properties": {"group": {"type": "integer"}, "min": {"$ref": "#/$defs/Number"}, "max": {"$ref": "#/$defs/Number"}, "mean": {"$ref": "#/$defs/Number"},
+                         "std": {"$ref": "#/$defs/Number"}, "count": {"type": "integer"}, "pct": {"$ref": "#/$defs/Number"}},
+          "required": ["group", "min", "max", "mean", "std", "count", "pct"], "additionalProperties": false}},
+        "returnsByPeriod": {"type": "array", "description": "Alphalens' returns table for each period: alpha a year (a share), beta, the top and bottom group's mean and the spread (bps per period, spread at 100% gross).", "items": {
+          "type": "object",
+          "properties": {"period": {"type": "integer"}, "alpha": {"$ref": "#/$defs/Number"}, "beta": {"$ref": "#/$defs/Number"}, "top": {"$ref": "#/$defs/Number"},
+                         "bottom": {"$ref": "#/$defs/Number"}, "spread": {"$ref": "#/$defs/Number"}},
+          "required": ["period", "alpha", "beta", "top", "bottom", "spread"], "additionalProperties": false}},
+        "meanByGroup": {"type": "array", "description": "Mean return by group over the whole period, every name together (not by sector): bps per bar for each period, with standard errors.", "items": {
+          "type": "object",
+          "properties": {"group": {"type": "integer"}, "means": {"$ref": "#/$defs/Numbers"}, "errors": {"$ref": "#/$defs/Numbers"}},
+          "required": ["group", "means", "errors"], "additionalProperties": false}},
+        "spreadPeriod": {"type": "integer"},
+        "groupCount": {"type": "integer"}
+      },
+      "required": ["tab", "holding", "unit", "periods", "periodLabels", "figures", "missing"],
+      "additionalProperties": false
+    },
+    "IcTab": {
+      "title": "FactorIcTab",
+      "type": "object",
+      "properties": {
+        "tab": {"const": "ic"},
+        "holding": {"type": "integer"}, "unit": {"enum": ["day", "hour", "bar"]}, "periods": {"type": "array", "items": {"type": "integer"}},
+        "periodLabels": {"type": "array", "items": {"type": "string"}}, "missing": {"$ref": "#/$defs/Missing"}, "seconds": {"type": "number"}, "failed": {"type": "string"},
+        "figures": {
+          "type": "object",
+          "properties": {
+            "daily": {"$ref": "#/$defs/Figure"},
+            "histogram": {"$ref": "#/$defs/Figure"}, "qq": {"$ref": "#/$defs/Figure"},
+            "years": {"$ref": "#/$defs/Figure"}, "monthly": {"$ref": "#/$defs/Figure"}
+          },
+          "additionalProperties": false
+        },
+        "information": {"type": "array", "description": "Alphalens' information table for each period, with TALYX's overlap-corrected (Newey–West) t and its p.", "items": {
+          "type": "object",
+          "properties": {"period": {"type": "integer"}, "mean": {"$ref": "#/$defs/Number"}, "std": {"$ref": "#/$defs/Number"}, "riskAdjusted": {"$ref": "#/$defs/Number"},
+                         "t": {"$ref": "#/$defs/Number"}, "p": {"$ref": "#/$defs/Number"}, "tOverlap": {"$ref": "#/$defs/Number"}, "pOverlap": {"$ref": "#/$defs/Number"},
+                         "skew": {"$ref": "#/$defs/Number"}, "kurtosis": {"$ref": "#/$defs/Number"}},
+          "required": ["period", "mean", "std", "riskAdjusted", "t", "p", "tOverlap", "pOverlap", "skew", "kurtosis"], "additionalProperties": false}},
+        "daily": {"type": "object", "properties": {"mean": {"$ref": "#/$defs/Number"}, "std": {"$ref": "#/$defs/Number"}, "days": {"type": "integer"}},
+                  "required": ["mean", "std", "days"], "additionalProperties": false},
+        "years": {"type": "array", "description": "Each calendar year in sample: rank IC, its overlap-corrected t, long–short net a year, Sharpe, turnover; whole is false for a part year.", "items": {
+          "type": "object",
+          "properties": {"year": {"type": "integer"}, "whole": {"type": "boolean"}, "rankIc": {"$ref": "#/$defs/Number"}, "t": {"$ref": "#/$defs/Number"},
+                         "longShortNet": {"$ref": "#/$defs/Number"}, "sharpe": {"$ref": "#/$defs/Number"}, "turnover": {"$ref": "#/$defs/Number"}, "days": {"type": "integer"}},
+          "required": ["year", "whole", "rankIc", "t", "longShortNet", "sharpe", "turnover", "days"], "additionalProperties": false}},
+        "heldOut": {"description": "Where the held-out period starts (ms); not in any number here.", "oneOf": [{"type": "null"},
+                    {"type": "object", "properties": {"from": {"type": "integer"}}, "required": ["from"], "additionalProperties": false}]}
+      },
+      "required": ["tab", "holding", "unit", "periods", "periodLabels", "figures", "missing"],
+      "additionalProperties": false
+    },
+    "IndustryTab": {
+      "title": "FactorIndustryTab",
+      "type": "object",
+      "properties": {
+        "tab": {"const": "industry"},
+        "holding": {"type": "integer"}, "unit": {"enum": ["day", "hour", "bar"]}, "periods": {"type": "array", "items": {"type": "integer"}},
+        "periodLabels": {"type": "array", "items": {"type": "string"}}, "missing": {"$ref": "#/$defs/Missing"}, "seconds": {"type": "number"}, "failed": {"type": "string"},
+        "figures": {
+          "type": "object",
+          "properties": {"sectors": {"$ref": "#/$defs/Figure"}, "sizeAndPeriod": {"$ref": "#/$defs/Figure"}, "decay": {"$ref": "#/$defs/Figure"}},
+          "additionalProperties": false
+        },
+        "sectors": {"type": "array", "description": "Alphalens' mean IC inside each sector (the industry Market gives) at the holding period, with its Newey-West t (lag = holding - 1) and the days it has an IC on.", "items": {
+          "type": "object",
+          "properties": {"sector": {"type": "string"}, "rankIc": {"$ref": "#/$defs/Number"}, "t": {"$ref": "#/$defs/Number"}, "days": {"type": "integer"}, "names": {"type": "integer"}, "observations": {"type": "integer"}},
+          "required": ["sector", "rankIc", "t", "days", "names", "observations"], "additionalProperties": false}},
+        "sizeAndPeriod": {"type": "array", "description": "Rank IC inside each third by size (each day) and in each half of the days.", "items": {
+          "type": "object",
+          "properties": {"name": {"type": "string"}, "kind": {"enum": ["size", "period"]}, "rankIc": {"$ref": "#/$defs/Number"}, "note": {"type": "string"}},
+          "required": ["name", "kind", "rankIc", "note"], "additionalProperties": false}},
+        "decay": {"type": "object", "description": "Rank IC for holding 1 to 20, before taking out industry and size and after (the run's way, or industry and size when the run took out nothing).",
+                  "properties": {"before": {"$ref": "#/$defs/Numbers"}, "after": {"$ref": "#/$defs/Numbers"}, "neutralize": {"type": "string"}, "run": {"type": "string"}},
+                  "required": ["before", "after", "neutralize", "run"], "additionalProperties": false},
+        "method": {"type": "object", "properties": {"neutralize": {"type": "string"}, "extremes": {"type": "string"}, "scale": {"type": "string"}, "industry": {"type": "string"},
+                                                    "size": {"type": "string"}, "notes": {"type": "array", "items": {"type": "string"}}},
+                   "required": ["neutralize", "extremes", "scale", "industry", "size", "notes"], "additionalProperties": false}
+      },
+      "required": ["tab", "holding", "unit", "periods", "periodLabels", "figures", "missing"],
+      "additionalProperties": false
+    },
+    "StyleTab": {
+      "title": "FactorStyleTab",
+      "type": "object",
+      "properties": {
+        "tab": {"const": "style"},
+        "holding": {"type": "integer"}, "unit": {"enum": ["day", "hour", "bar"]}, "periods": {"type": "array", "items": {"type": "integer"}},
+        "periodLabels": {"type": "array", "items": {"type": "string"}}, "missing": {"$ref": "#/$defs/Missing"}, "seconds": {"type": "number"}, "failed": {"type": "string"},
+        "figures": {"type": "object", "properties": {"like": {"$ref": "#/$defs/Figure"}}, "additionalProperties": false},
+        "version": {"type": "string", "description": "The style definitions' version (Styles v1), also in the run record."},
+        "styles": {"type": "array", "items": {
+          "title": "FactorStyleCorrelation",
+          "type": "object",
+          "properties": {"style": {"type": "string"}, "family": {"enum": ["price", "financial"]}, "measuredAs": {"type": "string"}, "rho": {"type": ["number", "null"]}, "unavailable": {"type": "string"}},
+          "required": ["style", "family", "measuredAs"], "additionalProperties": false}},
+        "like": {"type": "array", "description": "Library factors and styles by their mean daily rank correlation with this run, the largest first.", "items": {
+          "type": "object",
+          "properties": {"name": {"type": "string"}, "version": {"type": ["string", "null"]}, "kind": {"enum": ["library", "style"]}, "rho": {"$ref": "#/$defs/Number"}},
+          "required": ["name", "kind", "rho"], "additionalProperties": false}},
+        "residual": {"type": "object", "description": "Rank IC of what is left after taking out the price styles each day, against the run's.",
+                     "properties": {"rankIc": {"$ref": "#/$defs/Number"}, "before": {"$ref": "#/$defs/Number"}, "t": {"$ref": "#/$defs/Number"}, "styles": {"type": "array", "items": {"type": "string"}}},
+                     "required": ["rankIc", "before", "t", "styles"], "additionalProperties": false}
+      },
+      "required": ["tab", "holding", "unit", "periods", "periodLabels", "figures", "missing"],
+      "additionalProperties": false
+    },
+    "TurnoverTab": {
+      "title": "FactorTurnoverTab",
+      "type": "object",
+      "properties": {
+        "tab": {"const": "turnover"},
+        "holding": {"type": "integer"}, "unit": {"enum": ["day", "hour", "bar"]}, "periods": {"type": "array", "items": {"type": "integer"}},
+        "periodLabels": {"type": "array", "items": {"type": "string"}}, "missing": {"$ref": "#/$defs/Missing"}, "seconds": {"type": "number"}, "failed": {"type": "string"},
+        "figures": {"type": "object", "properties": {"topBottom": {"$ref": "#/$defs/Figure"}, "autocorrelation": {"$ref": "#/$defs/Figure"}}, "additionalProperties": false},
+        "turnover": {"type": "array", "description": "Alphalens' turnover table: each group's mean share of names new to it, and the mean rank autocorrelation, for each period.", "items": {
+          "type": "object",
+          "properties": {"period": {"type": "integer"}, "groups": {"$ref": "#/$defs/Numbers"}, "autocorrelation": {"$ref": "#/$defs/Number"}},
+          "required": ["period", "groups", "autocorrelation"], "additionalProperties": false}},
+        "groups": {"type": "array", "items": {"type": "integer"}}
+      },
+      "required": ["tab", "holding", "unit", "periods", "periodLabels", "figures", "missing"],
+      "additionalProperties": false
+    },
+    "CostsTab": {
+      "title": "FactorCostsTab",
+      "type": "object",
+      "properties": {
+        "tab": {"const": "costs"},
+        "holding": {"type": "integer"}, "unit": {"enum": ["day", "hour", "bar"]}, "periods": {"type": "array", "items": {"type": "integer"}},
+        "periodLabels": {"type": "array", "items": {"type": "string"}}, "missing": {"$ref": "#/$defs/Missing"}, "seconds": {"type": "number"}, "failed": {"type": "string"},
+        "figures": {"type": "object", "properties": {"byCost": {"$ref": "#/$defs/Figure"}}, "additionalProperties": false},
+        "split": {"type": "object", "description": "Where the long–short's cost goes, a year as shares: gross, trading on each leg and borrowing the short leg (positive amounts taken off), net; break-even cost a trade in bps.",
+                  "properties": {"gross": {"$ref": "#/$defs/Number"}, "tradingLong": {"$ref": "#/$defs/Number"}, "tradingShort": {"$ref": "#/$defs/Number"}, "borrow": {"$ref": "#/$defs/Number"},
+                                 "net": {"$ref": "#/$defs/Number"}, "breakEven": {"$ref": "#/$defs/Number"}, "costBps": {"type": "number"}, "borrowPct": {"type": "number"}, "traded": {"$ref": "#/$defs/Number"}},
+                  "required": ["gross", "tradingLong", "tradingShort", "borrow", "net", "breakEven", "costBps", "borrowPct", "traded"], "additionalProperties": false},
+        "holdings": {"type": "array", "description": "The same factor held 1, 2, 3, 5, 10 and 20 bars: rank IC, gross, turnover, costs (negative), net a year, Sharpe, break-even bps.", "items": {
+          "type": "object",
+          "properties": {"holding": {"type": "integer"}, "rankIc": {"$ref": "#/$defs/Number"}, "gross": {"$ref": "#/$defs/Number"}, "turnover": {"$ref": "#/$defs/Number"},
+                         "costs": {"$ref": "#/$defs/Number"}, "net": {"$ref": "#/$defs/Number"}, "sharpe": {"$ref": "#/$defs/Number"}, "breakEven": {"$ref": "#/$defs/Number"}},
+          "required": ["holding", "rankIc", "gross", "turnover", "costs", "net", "sharpe", "breakEven"], "additionalProperties": false}}
+      },
+      "required": ["tab", "holding", "unit", "periods", "periodLabels", "figures", "missing"],
+      "additionalProperties": false
+    },
+    "EventTab": {
+      "title": "FactorEventTab",
+      "type": "object",
+      "properties": {
+        "tab": {"const": "event"},
+        "holding": {"type": "integer"}, "unit": {"enum": ["day", "hour", "bar"]}, "periods": {"type": "array", "items": {"type": "integer"}},
+        "periodLabels": {"type": "array", "items": {"type": "string"}}, "missing": {"$ref": "#/$defs/Missing"}, "seconds": {"type": "number"}, "failed": {"type": "string"},
+        "figures": {"type": "object", "properties": {"event": {"$ref": "#/$defs/Figure"}}, "additionalProperties": false},
+        "offsets": {"type": "array", "items": {"type": "integer"}, "description": "Bars from the value: -5 to 20."},
+        "basis": {"enum": ["raw", "all", "group"], "description": "What the returns are relative to, from the run's settings: nothing (Raw), all names with a value that day (Demeaned), or the names of the same industry (Group neutral)."},
+        "event": {"type": "array", "description": "Each group's mean return at each offset, relative to what `basis` says (as Alphalens' average_cumulative_return_by_quantile with the run's demeaned and group_adjust), its standard deviation over days, and the path added up from the day of the value (shares).", "items": {
+          "type": "object",
+          "properties": {"group": {"type": "integer"}, "mean": {"$ref": "#/$defs/Numbers"}, "std": {"$ref": "#/$defs/Numbers"}, "cumulative": {"$ref": "#/$defs/Numbers"}},
+          "required": ["group", "mean", "std", "cumulative"], "additionalProperties": false}},
+        "table": {"type": "array", "description": "The path 5 bars before and 1, 5, 10 and 20 after, relative to what `basis` says (shares).", "items": {
+          "type": "object",
+          "properties": {"group": {"type": "integer"}, "before": {"$ref": "#/$defs/Number"}, "after1": {"$ref": "#/$defs/Number"}, "after5": {"$ref": "#/$defs/Number"},
+                         "after10": {"$ref": "#/$defs/Number"}, "after20": {"$ref": "#/$defs/Number"}},
+          "required": ["group", "before", "after1", "after5", "after10", "after20"], "additionalProperties": false}}
+      },
+      "required": ["tab", "holding", "unit", "periods", "periodLabels", "figures", "missing"],
+      "additionalProperties": false
+    },
+    "Tab": {
+      "title": "FactorResultsTab",
+      "oneOf": [{"$ref": "#/$defs/ReturnsTab"}, {"$ref": "#/$defs/IcTab"}, {"$ref": "#/$defs/IndustryTab"}, {"$ref": "#/$defs/StyleTab"},
+                {"$ref": "#/$defs/TurnoverTab"}, {"$ref": "#/$defs/CostsTab"}, {"$ref": "#/$defs/EventTab"}]
+    },
+    "Run": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "number": {"type": "integer"},
+        "results": {"type": "object", "description": "The Results' state, short: state, progress, tabs, message, seconds."},
+        "resultsProgress": {"type": ["number", "null"], "description": "0 to 1 while the Results build in the background, else null."}
+      },
+      "required": ["id", "number", "results", "resultsProgress"],
+      "additionalProperties": true
+    },
+    "View": {
+      "title": "FactorResultsView",
+      "description": "A factor run's Results: the run (as the runs list shows it), where its Results are, and the tab asked for once built (null before).",
+      "type": "object",
+      "properties": {
+        "run": {"$ref": "#/$defs/Run"},
+        "results": {"$ref": "#/$defs/State"},
+        "tab": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/Tab"}]},
+        "cell": {"type": "integer", "minimum": 0}
+      },
+      "required": ["run", "results", "tab"],
+      "additionalProperties": false
+    },
+    "Started": {
+      "title": "FactorResultsStarted",
+      "description": "A run's Results after asking for them: the run and where its Results are (no tab).",
+      "type": "object",
+      "properties": {
+        "run": {"$ref": "#/$defs/Run"},
+        "results": {"$ref": "#/$defs/State"},
+        "tab": {"type": "null"},
+        "cell": {"type": "integer", "minimum": 0}
+      },
+      "required": ["run", "results", "tab"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,167 @@
+/* Allocation preview page. Components come from the SDK; this file only lays out what is the allocation's own. */
+.al-work { display: flex; flex-direction: column; }
+.qv-scroll.al-work { overflow-x: hidden; }
+.al-work > * { flex: none; }
+.al-dim { color: var(--tx-text-3); }
+.al-up { color: var(--tx-up); }
+.al-down { color: var(--tx-down); }
+.al-inline { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.al-link { background: none; border: 0; padding: 0; color: var(--tx-text-2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font: inherit; }
+.al-bad .tx-params-row { box-shadow: inset 2px 0 var(--tx-ember); background: var(--tx-ember-wash); }
+.al-flash { animation: al-flash 1.4s ease-out; }
+@keyframes al-flash { from { background: var(--tx-ember-wash); } to { background: transparent; } }
+.al-links { padding: 4px 14px 8px; display: flex; flex-direction: column; gap: 4px; }
+.al-sublabel { display: flex; align-items: center; gap: 6px; font-size: var(--tx-size-xs); color: var(--tx-text-3); margin: 2px 0; }
+.al-linkrow { display: flex; flex-direction: column; gap: 1px; font-size: var(--tx-size-sm); }
+.al-linkrow > .al-dim { padding-left: 24px; font-size: var(--tx-size-xs); }
+/* this period and every period */
+.al-periodsec { display: flex; flex-wrap: wrap; min-height: 0; border-bottom: 1px solid var(--tx-line); container-type: inline-size; }
+.al-periodmain { flex: 1 1 58%; min-width: 0; }
+/* The period's date, the view switch and the note wrap onto a second row rather than run past the edge. */
+.al-periodmain > .tx-regionhead { flex-wrap: wrap; row-gap: 4px; padding-block: 4px; }
+.al-history { flex: 1 1 42%; min-width: 0; border-left: 1px solid var(--tx-line); display: flex; flex-direction: column; padding-right: 6px; }
+/* Too narrow for the table and the chart side by side: every period goes under this one, each the full width. */
+@container (max-width: 760px) {
+  .al-periodmain, .al-history { flex-basis: 100%; }
+  .al-history { border-left: 0; border-top: 1px solid var(--tx-line); }
+}
+/* The chart takes the height of the table beside it, so neither leaves an empty block under it. */
+.al-history > .fx-rch { flex: 1 1 auto; height: auto; min-height: 240px; margin-bottom: 8px; }
+.al-nav { display: inline-flex; align-items: center; gap: 2px; font-size: var(--tx-size-sm); }
+.al-nav b { min-width: 70px; text-align: center; font-weight: var(--tx-weight-medium); }
+.al-nav button { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--tx-line-2); border-radius: 6px; background: none; color: var(--tx-text-2); cursor: pointer; }
+.al-nav .tx-icon { width: 12px; height: 12px; }
+.al-period td.al-lead, .al-period th:nth-child(2) { color: var(--tx-text); font-weight: var(--tx-weight-medium); }
+.al-period td.al-lead[data-held] { color: var(--tx-ember-text); }
+.al-period td.al-lead .tx-icon { width: 11px; height: 11px; margin-right: 4px; vertical-align: -1px; }
+.al-period td[title] { cursor: pointer; }
+.al-ticker { display: inline-flex; align-items: center; gap: 7px; color: var(--tx-text); font-family: var(--tx-font-mono); }
+.al-ticker i { width: 8px; height: 8px; border-radius: 2px; }
+.al-subtotal td { color: var(--tx-text-2); background: var(--tx-white-02); }
+/* The tag sits at the cell's left and takes no width, so the weight stays in line with the column (it pushed IEF's 20.00% out of line). */
+.al-period td.al-lead { position: relative; }
+.al-cap { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); padding: 0 5px; border: 1px solid var(--tx-watch-line); border-radius: 4px; color: var(--tx-watch); font-family: var(--tx-font); font-size: 10.5px; line-height: 15px; }
+.al-bars { width: 96px; }
+/* Weight and risk share as the Risk tab's chart draws them: weight the text colour, risk share the blue. */
+.al-bars i { display: block; height: 3px; margin: 2px 0; border-radius: 2px; background: var(--tx-text-2); }
+.al-bars i[data-risk] { background: var(--tx-series-1); opacity: .6; }
+.al-key { display: inline-flex; align-items: center; gap: 5px; }
+.al-key i { width: 8px; height: 8px; border-radius: 2px; background: var(--tx-text-2); margin-left: 4px; }
+.al-key i[data-risk] { background: var(--tx-series-1); opacity: .6; }
+.al-foot { display: flex; gap: 18px; padding: 8px 8px 0; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.al-foot b { color: var(--tx-text); font-family: var(--tx-font-mono); font-weight: var(--tx-weight); }
+.al-legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 4px 14px 10px; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.al-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.al-legend i { width: 9px; height: 9px; border-radius: 2px; }
+.al-legend i[data-kind] { height: 2px; }
+.al-legend i[data-kind="dot"] { background: none !important; border-top: 2px dotted #A8A6A1; height: 0; }
+.al-legend i[data-kind="dash"] { background: none !important; border-top: 2px dashed #8C8A84; height: 0; }
+/* the monthly review */
+.al-review { margin: 10px 14px 0; padding: 10px 12px; border: 1px solid var(--tx-ember-line); border-radius: var(--tx-radius); background: var(--tx-ember-wash); display: flex; flex-direction: column; gap: 8px; font-size: var(--tx-size-sm); }
+.al-review-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--tx-text-2); }
+.al-review-head b { color: var(--tx-text); font-weight: var(--tx-weight-strong); }
+.al-review-trial { display: grid; grid-template-columns: auto minmax(0, 320px); justify-content: start; gap: 12px; align-items: center; color: var(--tx-text-2); }
+.al-review-trial b { color: var(--tx-text); font-weight: var(--tx-weight-medium); }
+.al-review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.al-reviewed { display: flex; align-items: center; gap: 8px; margin: 10px 14px 0; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.al-reviewed .tx-icon { width: 13px; height: 13px; color: var(--tx-state-ok-mark); }
+/* checks, runs, sweep, failure */
+.al-checks { border-bottom: 1px solid var(--tx-line); }
+.al-runs { overflow-x: auto; }
+.al-tags { display: inline-flex; align-items: center; gap: 6px; }
+.al-star { width: 13px; height: 13px; color: var(--tx-watch); }
+.al-sweep { border-bottom: 1px solid var(--tx-line); padding: 6px 14px 0; }
+.al-cellbar { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: var(--tx-size-sm); }
+.al-failure { padding-top: 12px; }
+.al-selrow td { background: var(--tx-ember-wash); color: var(--tx-text); }
+/* Results */
+.al-rsec { border-bottom: 1px solid var(--tx-line); }
+.al-grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.al-grid2 > .al-rsec + .al-rsec { border-left: 1px solid var(--tx-line); }
+.al-more { display: flex; align-items: center; gap: 8px; padding-top: 8px; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.al-wrap { white-space: normal !important; max-width: 280px; }
+.al-click { cursor: pointer; }
+.al-kv td { height: 26px; }
+.al-ask { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px dashed var(--tx-line-2); border-radius: var(--tx-radius-sm); font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.al-ask .tx-icon { width: 13px; height: 13px; color: var(--tx-text-3); }
+.al-tabdot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--tx-watch); margin-left: 6px; vertical-align: 2px; }
+.al-holdinput { display: inline-block; width: 92px; }
+.al-holdinput .tx-input { height: 24px; }
+.qv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.qv-scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; }
+.qv-scroll::-webkit-scrollbar { display: none; }
+.qv-pad { padding: 0 14px 12px; }
+.qv-table { width: 100%; border-collapse: collapse; font-size: var(--tx-size-sm); }
+.qv-table th { height: 28px; font-weight: var(--tx-weight); font-size: var(--tx-size-xs); color: var(--tx-text-3); text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line-2); white-space: nowrap; position: sticky; top: 0; background: var(--tx-panel); z-index: 1; }
+.qv-table td { height: 28px; text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line); font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tx-tracking-tight); white-space: nowrap; }
+.qv-table .l { text-align: left; font-family: var(--tx-font); letter-spacing: var(--tx-tracking); }
+.qv-table tbody tr:hover td { background: var(--tx-white-02); }
+.qv-placeholder { display: flex; align-items: center; justify-content: center; color: var(--tx-text-4); font-size: var(--tx-size-sm); border: 1px dashed var(--tx-line-2); border-radius: var(--tx-radius-sm); margin: 10px 14px; }
+.al-bad { color: var(--tx-fix, #e57f96); font-size: 12px; }
+.al-poolbox, .al-mini { font-size: 12px; }
+.al-mini { width: 100%; border-collapse: collapse; }
+.al-mini th { text-align: left; font-weight: 500; color: var(--tx-text-3); padding: 2px 4px; }
+.al-results .al-resbody { overflow: auto; flex: 1; padding: 0 12px 16px; }
+.al-failed { padding: 8px 12px; }
+.qv-tabs { height: var(--tx-panel-tabs-height); flex: none; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); }
+.qv-tabs .tx-icon { width: 14px; height: 14px; color: var(--tx-text-3); }
+.qv-table { width: 100%; border-collapse: collapse; font-size: var(--tx-size-sm); }
+.qv-table th { height: 28px; font-weight: var(--tx-weight); font-size: var(--tx-size-xs); color: var(--tx-text-3); text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line-2); white-space: nowrap; position: sticky; top: 0; background: var(--tx-panel); z-index: 1; }
+.qv-table td { height: 28px; text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line); font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tx-tracking-tight); white-space: nowrap; }
+.qv-table .l { text-align: left; font-family: var(--tx-font); letter-spacing: var(--tx-tracking); }
+.qv-table tbody tr:hover td { background: var(--tx-white-02); }
+
+.al-sweep { border-bottom: 1px solid var(--tx-line); padding: 6px 14px 10px; }
+.al-sweepform { display: flex; flex-direction: column; gap: 8px; min-width: 420px; }
+.al-sweeprow { display: grid; grid-template-columns: 180px 1fr; gap: 8px; }
+.al-warn { color: var(--tx-watch, #E2A35A); }
+.al-heldask { display: flex; align-items: center; gap: 12px; color: var(--tx-text-2); }
+
+.al-swg { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.al-swg > * { min-width: 0; }
+.al-swg .tx-heatmap > header { display: none; }
+.al-hm { position: relative; padding-left: 20px; }
+.al-axisy { position: absolute; left: 0; top: 50%; transform: translateY(-50%) rotate(180deg); writing-mode: vertical-rl; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.al-axisx { display: block; text-align: center; font-size: var(--tx-size-xs); color: var(--tx-text-3); padding-top: 2px; }
+.al-swg .tx-heatmap table { width: 100%; }
+.al-swg .tx-heatmap td { min-width: 0; }
+.al-swg .tx-heatmap .tx-seg { max-width: 100%; overflow-x: auto; }
+.al-swgtable { overflow-x: auto; }
+.al-swgtable .al-sweeptable { align-self: start; }
+.al-poolsheet { display: flex; flex-direction: column; gap: 12px; }
+.al-poolbtns { display: flex; gap: 8px; }
+.al-links { display: flex; flex-direction: column; border: 1px solid var(--tx-line); border-radius: var(--tx-radius, 6px); max-height: 180px; overflow: auto; }
+.al-linkrow { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; background: none; border: 0; border-bottom: 1px solid var(--tx-line); color: var(--tx-text); font: inherit; cursor: pointer; text-align: left; }
+.al-poolrow { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; }
+.al-shock { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
+.al-shock > * { flex: none; }
+.al-shock > .al-dim { white-space: nowrap; }
+.al-shock > :nth-child(2) { width: 200px; }
+.al-shock .tx-input { width: 110px; }
+.al-grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 16px; align-items: start; }
+@media (max-width: 900px) { .al-grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* The code beside the page: the standard flow read-only, or the project's own code area. */
+.al-code { flex: none; width: 520px; min-width: 300px; display: flex; flex-direction: column; min-height: 0; background: var(--tx-panel); border-left: 1px solid var(--tx-line); }
+.al-snaphead { flex: none; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.al-snap { margin: 0; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 14px; font: 12px/1.6 var(--tx-font-mono); color: var(--tx-text-2); tab-size: 4; white-space: pre; background: var(--tx-panel); }
+
+.al-kv td { padding: 3px 12px; }
+.al-kv .al-sgh td { padding-top: 10px; font-weight: var(--tx-weight-medium); color: var(--tx-text-2); }
+/* The value sits next to its label, not across half the page. */
+.al-kv td:first-child:not([colspan]) { width: 220px; }
+
+.al-limits { display: grid; gap: 6px; max-width: 360px; font-size: var(--tx-size-sm); }
+.al-limit { display: grid; grid-template-columns: 56px 1fr; gap: 10px; }
+
+/* The publish sheet: the switch takes the whole row, the comparison keeps one line a row, a long check is cut. */
+.al-pb .pb-row[data-solo] { display: block; }
+.al-pb .pb-table td, .al-pb .pb-table th { white-space: nowrap; }
+.al-pb .pb-ck { white-space: nowrap; }
+.al-pb .pb-ck .pb-t2 { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+.al-notes { display: grid; gap: 8px; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.al-notes p { margin: 0; }
+
+.al-starbtn { background: none; border: 0; padding: 0 2px; cursor: pointer; color: var(--tx-text-3); display: inline-flex; }
+.al-starbtn[aria-pressed="false"] { opacity: .45; }

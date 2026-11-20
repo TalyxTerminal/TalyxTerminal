@@ -1,0 +1,5 @@
+{
+  "platform.notifications.configure": {"userOnly":"The user supplies and saves credentials for notification delivery."},
+  "platform.workspace.set_folder": {"userOnly":"The user binds a workspace to a local folder and sets its file access scope."},
+  "platform.workspace.shown": {"userOnly":"Only the window knows which workspace the user has actually seen."}
+}

@@ -1,0 +1,569 @@
+{
+ "inputs": {
+  "quotes": {
+   "descriptor": {
+    "name": "USD source rates",
+    "kind": "quote_set",
+    "sourceId": "user_professional",
+    "sourceVersion": "ledger-1",
+    "availability": {
+     "publishedAt": null,
+     "revisedAt": null,
+     "revisionHistory": "unknown",
+     "reference": null
+    },
+    "formatVersion": "talyx.market.professional.v1",
+    "coverage": {
+     "requestedMembers": [
+      "fixture.ore:USD-LIBOR-3M"
+     ],
+     "returnedMembers": [
+      "fixture.ore:USD-LIBOR-3M"
+     ],
+     "missingMembers": [],
+     "completeness": "unknown",
+     "statement": "Three asynchronous source rate observations",
+     "timeRanges": [
+      {
+       "member": "fixture.ore:USD-LIBOR-3M",
+       "start": {
+        "precision": "instant",
+        "value": 1451606400000
+       },
+       "end": {
+        "precision": "instant",
+        "value": 1451606400002
+       }
+      }
+     ]
+    }
+   },
+   "file": "rates.json",
+   "content": "[{\"quoteId\": \"usd-0\", \"quoteType\": \"rate\", \"subject\": {\"namespace\": \"fixture.ore\", \"key\": \"USD-LIBOR-3M\"}, \"observedAt\": {\"precision\": \"instant\", \"value\": 1451606400000}, \"value\": \"0.02500000000000000001\", \"unit\": \"decimal_rate\", \"currency\": \"USD\", \"dimensions\": {\"tenor\": \"1Y\"}, \"sourceKey\": \"RATE/0\"}, {\"quoteId\": \"usd-1\", \"quoteType\": \"rate\", \"subject\": {\"namespace\": \"fixture.ore\", \"key\": \"USD-LIBOR-3M\"}, \"observedAt\": {\"precision\": \"instant\", \"value\": 1451606400001}, \"value\": \"0.02500000000000000001\", \"unit\": \"decimal_rate\", \"currency\": \"USD\", \"dimensions\": {\"tenor\": \"2Y\"}, \"sourceKey\": \"RATE/1\"}, {\"quoteId\": \"usd-2\", \"quoteType\": \"rate\", \"subject\": {\"namespace\": \"fixture.ore\", \"key\": \"USD-LIBOR-3M\"}, \"observedAt\": {\"precision\": \"instant\", \"value\": 1451606400002}, \"value\": \"0.02500000000000000001\", \"unit\": \"decimal_rate\", \"currency\": \"USD\", \"dimensions\": {\"tenor\": \"3Y\"}, \"sourceKey\": \"RATE/2\"}]"
+  },
+  "terms": {
+   "descriptor": {
+    "name": "ORE example terms",
+    "kind": "instrument_terms",
+    "sourceId": "user_professional",
+    "sourceVersion": "ledger-1",
+    "availability": {
+     "publishedAt": null,
+     "revisedAt": null,
+     "revisionHistory": "unknown",
+     "reference": null
+    },
+    "formatVersion": "talyx.market.professional.v1",
+    "coverage": {
+     "requestedMembers": [
+      "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+      "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+     ],
+     "returnedMembers": [
+      "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+      "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+     ],
+     "missingMembers": [],
+     "completeness": "unknown",
+     "statement": "ORE official example trades",
+     "timeRanges": []
+    }
+   },
+   "file": "ore-terms.json",
+   "content": "[{\"instrument\": {\"sourceId\": \"ore_official_example\", \"venueId\": \"official_example\", \"symbol\": \"SECURITY_1\", \"displaySymbol\": \"SECURITY_1\", \"marketType\": \"spot\", \"assetClass\": \"fixed_income\", \"adapterId\": \"user_import\", \"nativeId\": null, \"base\": \"SECURITY_1\", \"quote\": \"EUR\", \"settle\": null, \"contractOrientation\": \"none\", \"contractSize\": null, \"expiry\": null, \"strike\": null, \"optionSide\": null, \"underlyingSymbol\": null, \"calendarId\": \"24_7\", \"adjustmentEligible\": false, \"securityType\": null, \"shareClass\": null, \"name\": null, \"countryCode\": null, \"currency\": null, \"mic\": null, \"isOtc\": null, \"active\": null, \"instrumentId\": \"vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef\", \"identityVersion\": 1}, \"effectiveFrom\": {\"precision\": \"date\", \"value\": \"2016-02-03\", \"timezone\": null}, \"effectiveUntil\": {\"precision\": \"date\", \"value\": \"2021-02-03\", \"timezone\": null}, \"termType\": \"bond\", \"terms\": {\"unitFaceValue\": \"1\", \"currency\": \"EUR\", \"couponType\": \"fixed\", \"couponRate\": \"0.05\", \"floatingIndex\": null, \"paymentSchedule\": [], \"resetSchedule\": [], \"calendar\": \"TARGET\", \"dayCount\": \"ACT/ACT\", \"businessDayConvention\": \"F\", \"maturity\": {\"precision\": \"date\", \"value\": \"2021-02-03\", \"timezone\": null}, \"issuer\": \"CPTY_C\", \"settlementDays\": 2, \"issueDate\": {\"precision\": \"date\", \"value\": \"2016-02-03\", \"timezone\": null}, \"scheduleRules\": {\"start\": {\"precision\": \"date\", \"value\": \"2016-02-03\", \"timezone\": null}, \"end\": {\"precision\": \"date\", \"value\": \"2021-02-03\", \"timezone\": null}, \"tenor\": \"1Y\", \"rule\": \"Forward\", \"terminationConvention\": \"F\", \"endOfMonth\": null}}}, {\"instrument\": {\"sourceId\": \"ore_official_example\", \"venueId\": \"official_example\", \"symbol\": \"LUFTHANSA-20180301-C12.24\", \"displaySymbol\": \"Lufthansa-20180301-C12.24\", \"marketType\": \"option\", \"assetClass\": \"equity\", \"adapterId\": \"user_import\", \"nativeId\": null, \"base\": \"LUFTHANSA-20180301-C12.24\", \"quote\": \"EUR\", \"settle\": null, \"contractOrientation\": \"none\", \"contractSize\": null, \"expiry\": null, \"strike\": null, \"optionSide\": null, \"underlyingSymbol\": null, \"calendarId\": \"24_7\", \"adjustmentEligible\": false, \"securityType\": null, \"shareClass\": null, \"name\": null, \"countryCode\": null, \"currency\": null, \"mic\": null, \"isOtc\": null, \"active\": null, \"instrumentId\": \"vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815\", \"identityVersion\": 1}, \"effectiveFrom\": null, \"effectiveUntil\": null, \"termType\": \"option\", \"terms\": {\"underlying\": {\"sourceId\": \"ore_official_example\", \"venueId\": \"official_example\", \"symbol\": \"LUFTHANSA\", \"displaySymbol\": \"Lufthansa\", \"marketType\": \"spot\", \"assetClass\": \"equity\", \"adapterId\": \"user_import\", \"nativeId\": null, \"base\": \"LUFTHANSA\", \"quote\": \"EUR\", \"settle\": null, \"contractOrientation\": \"none\", \"contractSize\": null, \"expiry\": null, \"strike\": null, \"optionSide\": null, \"underlyingSymbol\": null, \"calendarId\": \"24_7\", \"adjustmentEligible\": false, \"securityType\": null, \"shareClass\": null, \"name\": null, \"countryCode\": null, \"currency\": null, \"mic\": null, \"isOtc\": null, \"active\": null, \"instrumentId\": \"vi1_dc07f3484e79d592a2806194889dc3d4279a13151bac58179b21ce55fd0debf1\", \"identityVersion\": 1}, \"strike\": \"12.24\", \"currency\": \"EUR\", \"style\": \"european\", \"optionType\": \"call\", \"settlement\": \"cash\", \"deliverable\": \"Lufthansa underlying payoff unit (official synthetic example)\", \"multiplier\": \"1\", \"expiry\": {\"precision\": \"date\", \"value\": \"2018-03-01\", \"timezone\": null}, \"payoffAtExpiry\": false}}]"
+  }
+ },
+ "list": {
+  "materials": [
+   {
+    "acquiredAt": 1794284024636,
+    "availability": {
+     "publishedAt": null,
+     "reference": null,
+     "revisedAt": null,
+     "revisionHistory": "unknown"
+    },
+    "coverage": {
+     "completeness": "unknown",
+     "missingMembers": [],
+     "requestedMembers": [
+      "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+      "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+     ],
+     "returnedMembers": [
+      "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+      "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+     ],
+     "statement": "ORE official example trades",
+     "timeRanges": []
+    },
+    "files": [
+     {
+      "byteSize": 3443,
+      "filename": "source.json",
+      "format": "json",
+      "role": "source",
+      "rowCount": 2,
+      "sha256": "79ea13fc1bf8c717c5ced5895263f438086df77a8886d5039d88e3479ee7f418"
+     },
+     {
+      "byteSize": 3159,
+      "filename": "rows.json",
+      "format": "json",
+      "role": "rows",
+      "rowCount": 2,
+      "sha256": "817cd2a3efe6e0a813554729f47ed84776ce43aac9576bfefac62f1d358b98f7"
+     }
+    ],
+    "formatVersion": "talyx.market.professional.v1",
+    "kind": "instrument_terms",
+    "materialId": "mpm_5bf8ce233da7d7fee123ca8b8a6d4f80",
+    "name": "ORE example terms",
+    "sourceId": "user_professional",
+    "sourceVersion": "ledger-1",
+    "version": "46b5165aaadc4daa52d1ce0bb200085dadae961fe2bf7c483e12a73f901c788b"
+   },
+   {
+    "acquiredAt": 1794284024604,
+    "availability": {
+     "publishedAt": null,
+     "reference": null,
+     "revisedAt": null,
+     "revisionHistory": "unknown"
+    },
+    "coverage": {
+     "completeness": "unknown",
+     "missingMembers": [],
+     "requestedMembers": [
+      "fixture.ore:USD-LIBOR-3M"
+     ],
+     "returnedMembers": [
+      "fixture.ore:USD-LIBOR-3M"
+     ],
+     "statement": "Three asynchronous source rate observations",
+     "timeRanges": [
+      {
+       "end": {
+        "precision": "instant",
+        "value": 1451606400002
+       },
+       "member": "fixture.ore:USD-LIBOR-3M",
+       "start": {
+        "precision": "instant",
+        "value": 1451606400000
+       }
+      }
+     ]
+    },
+    "files": [
+     {
+      "byteSize": 909,
+      "filename": "source.json",
+      "format": "json",
+      "role": "source",
+      "rowCount": 3,
+      "sha256": "2815736644a678325922ef22525bdbdb9a6b0c0afe4d77338d26206a5ed68c9b"
+     },
+     {
+      "byteSize": 835,
+      "filename": "rows.json",
+      "format": "json",
+      "role": "rows",
+      "rowCount": 3,
+      "sha256": "99f46ed72523f43603ab5e2b67df71a0f85a9ab676dbf8c22068bc4b7c7221ac"
+     }
+    ],
+    "formatVersion": "talyx.market.professional.v1",
+    "kind": "quote_set",
+    "materialId": "mpm_b6da1b95ffa48acb61f82b879ea94403",
+    "name": "USD source rates",
+    "sourceId": "user_professional",
+    "sourceVersion": "ledger-1",
+    "version": "d3283a77c24b0ad408b6944d72d5d0a4ce7a21f4ab4397cb481b2ecc9d054277"
+   }
+  ],
+  "hasMore": false,
+  "nextAfter": null
+ },
+ "read": [
+  {
+   "material": {
+    "acquiredAt": 1794284024604,
+    "availability": {
+     "publishedAt": null,
+     "reference": null,
+     "revisedAt": null,
+     "revisionHistory": "unknown"
+    },
+    "coverage": {
+     "completeness": "unknown",
+     "missingMembers": [],
+     "requestedMembers": [
+      "fixture.ore:USD-LIBOR-3M"
+     ],
+     "returnedMembers": [
+      "fixture.ore:USD-LIBOR-3M"
+     ],
+     "statement": "Three asynchronous source rate observations",
+     "timeRanges": [
+      {
+       "end": {
+        "precision": "instant",
+        "value": 1451606400002
+       },
+       "member": "fixture.ore:USD-LIBOR-3M",
+       "start": {
+        "precision": "instant",
+        "value": 1451606400000
+       }
+      }
+     ]
+    },
+    "files": [
+     {
+      "byteSize": 909,
+      "filename": "source.json",
+      "format": "json",
+      "role": "source",
+      "rowCount": 3,
+      "sha256": "2815736644a678325922ef22525bdbdb9a6b0c0afe4d77338d26206a5ed68c9b"
+     },
+     {
+      "byteSize": 835,
+      "filename": "rows.json",
+      "format": "json",
+      "role": "rows",
+      "rowCount": 3,
+      "sha256": "99f46ed72523f43603ab5e2b67df71a0f85a9ab676dbf8c22068bc4b7c7221ac"
+     }
+    ],
+    "formatVersion": "talyx.market.professional.v1",
+    "kind": "quote_set",
+    "materialId": "mpm_b6da1b95ffa48acb61f82b879ea94403",
+    "name": "USD source rates",
+    "sourceId": "user_professional",
+    "sourceVersion": "ledger-1",
+    "version": "d3283a77c24b0ad408b6944d72d5d0a4ce7a21f4ab4397cb481b2ecc9d054277"
+   },
+   "rows": [
+    {
+     "currency": "USD",
+     "dimensions": {
+      "tenor": "1Y"
+     },
+     "observedAt": {
+      "precision": "instant",
+      "value": 1451606400000
+     },
+     "quoteId": "usd-0",
+     "quoteType": "rate",
+     "sourceKey": "RATE/0",
+     "subject": {
+      "key": "USD-LIBOR-3M",
+      "namespace": "fixture.ore"
+     },
+     "unit": "decimal_rate",
+     "value": "0.02500000000000000001"
+    },
+    {
+     "currency": "USD",
+     "dimensions": {
+      "tenor": "2Y"
+     },
+     "observedAt": {
+      "precision": "instant",
+      "value": 1451606400001
+     },
+     "quoteId": "usd-1",
+     "quoteType": "rate",
+     "sourceKey": "RATE/1",
+     "subject": {
+      "key": "USD-LIBOR-3M",
+      "namespace": "fixture.ore"
+     },
+     "unit": "decimal_rate",
+     "value": "0.02500000000000000001"
+    },
+    {
+     "currency": "USD",
+     "dimensions": {
+      "tenor": "3Y"
+     },
+     "observedAt": {
+      "precision": "instant",
+      "value": 1451606400002
+     },
+     "quoteId": "usd-2",
+     "quoteType": "rate",
+     "sourceKey": "RATE/2",
+     "subject": {
+      "key": "USD-LIBOR-3M",
+      "namespace": "fixture.ore"
+     },
+     "unit": "decimal_rate",
+     "value": "0.02500000000000000001"
+    }
+   ],
+   "coverage": {
+    "completeness": "unknown",
+    "missingMembers": [],
+    "requestedMembers": [
+     "fixture.ore:USD-LIBOR-3M"
+    ],
+    "returnedMembers": [
+     "fixture.ore:USD-LIBOR-3M"
+    ],
+    "statement": "Three asynchronous source rate observations",
+    "timeRanges": [
+     {
+      "end": {
+       "precision": "instant",
+       "value": 1451606400002
+      },
+      "member": "fixture.ore:USD-LIBOR-3M",
+      "start": {
+       "precision": "instant",
+       "value": 1451606400000
+      }
+     }
+    ]
+   },
+   "hasMore": false,
+   "nextAfter": null
+  },
+  {
+   "material": {
+    "acquiredAt": 1794284024636,
+    "availability": {
+     "publishedAt": null,
+     "reference": null,
+     "revisedAt": null,
+     "revisionHistory": "unknown"
+    },
+    "coverage": {
+     "completeness": "unknown",
+     "missingMembers": [],
+     "requestedMembers": [
+      "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+      "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+     ],
+     "returnedMembers": [
+      "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+      "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+     ],
+     "statement": "ORE official example trades",
+     "timeRanges": []
+    },
+    "files": [
+     {
+      "byteSize": 3443,
+      "filename": "source.json",
+      "format": "json",
+      "role": "source",
+      "rowCount": 2,
+      "sha256": "79ea13fc1bf8c717c5ced5895263f438086df77a8886d5039d88e3479ee7f418"
+     },
+     {
+      "byteSize": 3159,
+      "filename": "rows.json",
+      "format": "json",
+      "role": "rows",
+      "rowCount": 2,
+      "sha256": "817cd2a3efe6e0a813554729f47ed84776ce43aac9576bfefac62f1d358b98f7"
+     }
+    ],
+    "formatVersion": "talyx.market.professional.v1",
+    "kind": "instrument_terms",
+    "materialId": "mpm_5bf8ce233da7d7fee123ca8b8a6d4f80",
+    "name": "ORE example terms",
+    "sourceId": "user_professional",
+    "sourceVersion": "ledger-1",
+    "version": "46b5165aaadc4daa52d1ce0bb200085dadae961fe2bf7c483e12a73f901c788b"
+   },
+   "rows": [
+    {
+     "effectiveFrom": {
+      "precision": "date",
+      "timezone": null,
+      "value": "2016-02-03"
+     },
+     "effectiveUntil": {
+      "precision": "date",
+      "timezone": null,
+      "value": "2021-02-03"
+     },
+     "instrument": {
+      "active": null,
+      "adapterId": "user_import",
+      "adjustmentEligible": false,
+      "assetClass": "fixed_income",
+      "base": "SECURITY_1",
+      "calendarId": "24_7",
+      "contractOrientation": "none",
+      "contractSize": null,
+      "countryCode": null,
+      "currency": null,
+      "displaySymbol": "SECURITY_1",
+      "expiry": null,
+      "identityVersion": 1,
+      "instrumentId": "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+      "isOtc": null,
+      "marketType": "spot",
+      "mic": null,
+      "name": null,
+      "nativeId": null,
+      "optionSide": null,
+      "quote": "EUR",
+      "securityType": null,
+      "settle": null,
+      "shareClass": null,
+      "sourceId": "ore_official_example",
+      "strike": null,
+      "symbol": "SECURITY_1",
+      "underlyingSymbol": null,
+      "venueId": "official_example"
+     },
+     "termType": "bond",
+     "terms": {
+      "businessDayConvention": "F",
+      "calendar": "TARGET",
+      "couponRate": "0.05",
+      "couponType": "fixed",
+      "currency": "EUR",
+      "dayCount": "ACT/ACT",
+      "floatingIndex": null,
+      "issueDate": {
+       "precision": "date",
+       "timezone": null,
+       "value": "2016-02-03"
+      },
+      "issuer": "CPTY_C",
+      "maturity": {
+       "precision": "date",
+       "timezone": null,
+       "value": "2021-02-03"
+      },
+      "paymentSchedule": [],
+      "resetSchedule": [],
+      "scheduleRules": {
+       "end": {
+        "precision": "date",
+        "timezone": null,
+        "value": "2021-02-03"
+       },
+       "endOfMonth": null,
+       "rule": "Forward",
+       "start": {
+        "precision": "date",
+        "timezone": null,
+        "value": "2016-02-03"
+       },
+       "tenor": "1Y",
+       "terminationConvention": "F"
+      },
+      "settlementDays": 2,
+      "unitFaceValue": "1"
+     }
+    },
+    {
+     "effectiveFrom": null,
+     "effectiveUntil": null,
+     "instrument": {
+      "active": null,
+      "adapterId": "user_import",
+      "adjustmentEligible": false,
+      "assetClass": "equity",
+      "base": "LUFTHANSA-20180301-C12.24",
+      "calendarId": "24_7",
+      "contractOrientation": "none",
+      "contractSize": null,
+      "countryCode": null,
+      "currency": null,
+      "displaySymbol": "Lufthansa-20180301-C12.24",
+      "expiry": null,
+      "identityVersion": 1,
+      "instrumentId": "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815",
+      "isOtc": null,
+      "marketType": "option",
+      "mic": null,
+      "name": null,
+      "nativeId": null,
+      "optionSide": null,
+      "quote": "EUR",
+      "securityType": null,
+      "settle": null,
+      "shareClass": null,
+      "sourceId": "ore_official_example",
+      "strike": null,
+      "symbol": "LUFTHANSA-20180301-C12.24",
+      "underlyingSymbol": null,
+      "venueId": "official_example"
+     },
+     "termType": "option",
+     "terms": {
+      "currency": "EUR",
+      "deliverable": "Lufthansa underlying payoff unit (official synthetic example)",
+      "expiry": {
+       "precision": "date",
+       "timezone": null,
+       "value": "2018-03-01"
+      },
+      "multiplier": "1",
+      "optionType": "call",
+      "payoffAtExpiry": false,
+      "settlement": "cash",
+      "strike": "12.24",
+      "style": "european",
+      "underlying": {
+       "active": null,
+       "adapterId": "user_import",
+       "adjustmentEligible": false,
+       "assetClass": "equity",
+       "base": "LUFTHANSA",
+       "calendarId": "24_7",
+       "contractOrientation": "none",
+       "contractSize": null,
+       "countryCode": null,
+       "currency": null,
+       "displaySymbol": "Lufthansa",
+       "expiry": null,
+       "identityVersion": 1,
+       "instrumentId": "vi1_dc07f3484e79d592a2806194889dc3d4279a13151bac58179b21ce55fd0debf1",
+       "isOtc": null,
+       "marketType": "spot",
+       "mic": null,
+       "name": null,
+       "nativeId": null,
+       "optionSide": null,
+       "quote": "EUR",
+       "securityType": null,
+       "settle": null,
+       "shareClass": null,
+       "sourceId": "ore_official_example",
+       "strike": null,
+       "symbol": "LUFTHANSA",
+       "underlyingSymbol": null,
+       "venueId": "official_example"
+      }
+     }
+    }
+   ],
+   "coverage": {
+    "completeness": "unknown",
+    "missingMembers": [],
+    "requestedMembers": [
+     "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+     "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+    ],
+    "returnedMembers": [
+     "vi1_00144034bab39f16470233ba6a08bb4c051804e086677cd627dd9a691fe7e6ef",
+     "vi1_2c78fae5d5dded2877143dd3bd354ccb0e9a8fe310e649dfce7d3d939a8f7815"
+    ],
+    "statement": "ORE official example trades",
+    "timeRanges": []
+   },
+   "hasMore": false,
+   "nextAfter": null
+  }
+ ]
+}

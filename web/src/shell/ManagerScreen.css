@@ -1,0 +1,195 @@
+/* All workspaces: one list of saved workspaces across the page. Values only from the design tokens.
+   Like Community, no frame around the page: rows sit on the app background, set apart by hairlines. */
+
+.ws-shell {
+  position: absolute;
+  inset: 0;
+  padding-top: var(--tx-topbar-height);
+  display: flex;
+  flex-direction: column;
+  background: var(--tx-bg);
+  color: var(--tx-text-2);
+  font-size: var(--tx-size);
+}
+
+.ws-page {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: var(--tx-doc-width);
+  margin: 0 auto;
+  padding: var(--tx-space-4) var(--tx-space-8) 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ws-sr { position: absolute; width: var(--tx-hairline); height: var(--tx-hairline); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ── The list: a head with the tools, the column names, then rows ─────────────────────────────────────────────────── */
+
+.ws-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+
+.ws-head { flex: none; display: flex; align-items: center; gap: var(--tx-space-2); min-height: calc(var(--tx-space-8) + var(--tx-space-2)); }
+.ws-head h1, .ws-empty h1 {
+  margin: 0;
+  color: var(--tx-text);
+  font-size: var(--tx-size-title);
+  font-weight: var(--tx-weight-strong);
+  letter-spacing: var(--tx-tracking-heading);
+}
+.ws-count { color: var(--tx-text-3); font-size: var(--tx-size-sm); font-variant-numeric: tabular-nums; }
+.ws-tools { margin-left: auto; display: flex; align-items: center; gap: var(--tx-space-2-half); }
+.ws-search { width: calc(var(--tx-menu-width) + var(--tx-space-4)); }
+
+.ws-table {
+  --ws-sketch-w: calc(var(--tx-space-8) * 2 + var(--tx-space-4));
+  --ws-sketch-h: calc(var(--tx-space-8) + var(--tx-space-4) + var(--tx-space-half));
+  --ws-columns: var(--ws-sketch-w) minmax(0, 1fr) calc(var(--tx-space-8) * 4) calc(var(--tx-space-8) * 3);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--tx-space-3);
+}
+
+.ws-table-head, .ws-row {
+  display: grid;
+  grid-template-columns: var(--ws-columns);
+  align-items: center;
+  column-gap: var(--tx-space-4);
+  padding: 0 var(--tx-space-3);
+}
+.ws-table-head {
+  flex: none;
+  min-height: var(--tx-head-row);
+  border-bottom: var(--tx-hairline) solid var(--tx-line);
+  color: var(--tx-text-3);
+  font-size: var(--tx-size-xs);
+  font-weight: var(--tx-weight-medium);
+}
+.ws-table-head .ws-col-name { grid-column: 1 / 3; }
+
+/* Scrolls without a scrollbar; rows fade in under the column names instead of being cut. */
+.ws-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-bottom: calc(var(--tx-space-8) * 2);
+  mask-image: linear-gradient(to bottom, var(--tx-clear), var(--tx-bg) var(--tx-space-2));
+}
+.ws-rows::-webkit-scrollbar { display: none; }
+
+.ws-row {
+  position: relative;
+  padding-top: var(--tx-space-2);
+  padding-bottom: var(--tx-space-2);
+  box-shadow: inset 0 calc(var(--tx-hairline) * -1) 0 var(--tx-line);
+  font-size: var(--tx-size-sm);
+  transition: background-color var(--tx-row-time) var(--tx-ease);
+}
+.ws-row:hover, .ws-row:focus-within, .ws-row:has([data-state="open"]) { border-radius: var(--tx-radius-sm); box-shadow: none; background: var(--tx-hover); }
+.ws-row > :not(.ws-hit) { position: relative; pointer-events: none; }
+
+/* The whole row opens the workspace; its cells sit on top and let the click through, the actions take their own. */
+.ws-hit {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--tx-radius-sm);
+  background: none;
+  cursor: pointer;
+}
+.ws-hit:active:not(:disabled) { background: var(--tx-press); }
+.ws-hit:disabled { cursor: default; }
+.ws-hit:focus-visible { outline: var(--tx-space-half) solid var(--tx-ember); outline-offset: calc(var(--tx-space-half) * -1); }
+
+/* The sketch: the workspace's panels where they sit, each with its module's icon. */
+.ws-sketch {
+  width: var(--ws-sketch-w);
+  height: var(--ws-sketch-h);
+  border-radius: var(--tx-radius-xs);
+  background: var(--tx-panel);
+  box-shadow: inset 0 0 0 var(--tx-hairline) var(--tx-line-2);
+}
+.ws-sketch-area { position: absolute; inset: var(--tx-space-half); }
+.ws-tile { position: absolute; padding: var(--tx-hairline); }
+.ws-tile > span {
+  container-type: size;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: var(--tx-space-half);
+  background: var(--tx-white-06);
+  color: var(--tx-text-3);
+  transition: background-color var(--tx-row-time) var(--tx-ease), color var(--tx-row-time) var(--tx-ease);
+}
+.ws-tile .tx-icon { width: calc(var(--tx-space-2) + var(--tx-space-half)); height: calc(var(--tx-space-2) + var(--tx-space-half)); }
+@container (max-width: 13px) or (max-height: 12px) { .ws-tile .tx-icon { display: none; } }
+.ws-row:hover .ws-tile > span, .ws-row:focus-within .ws-tile > span { background: var(--tx-white-10); color: var(--tx-text-2); }
+
+.ws-name { display: flex; flex-direction: column; gap: var(--tx-space-1); min-width: 0; }
+.ws-name-line { display: flex; align-items: center; gap: var(--tx-space-2); min-width: 0; }
+.ws-name-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tx-text);
+  font-size: var(--tx-size);
+  font-weight: var(--tx-weight-medium);
+}
+.ws-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tx-text-3); }
+
+.ws-open {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tx-space-1-half);
+  height: calc(var(--tx-space-4) + var(--tx-space-half));
+  padding: 0 var(--tx-space-1-half);
+  border: var(--tx-hairline) solid var(--tx-line-2);
+  border-radius: var(--tx-radius-xs);
+  color: var(--tx-text-2);
+  font-size: var(--tx-size-2xs);
+  font-weight: var(--tx-weight-medium);
+  white-space: nowrap;
+}
+.ws-open i { width: var(--tx-space-1-half); height: var(--tx-space-1-half); border-radius: var(--tx-radius-pill); background: var(--tx-text-2); }
+.ws-open .tx-icon { width: calc(var(--tx-space-2) + var(--tx-space-half)); height: calc(var(--tx-space-2) + var(--tx-space-half)); color: var(--tx-text-3); }
+
+.ws-when { color: var(--tx-text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Open and ⋯ show under the pointer, on keyboard focus, and while the menu is open. */
+.ws-row > .ws-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tx-space-1);
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity var(--tx-fast) var(--tx-ease);
+}
+.ws-row:hover > .ws-actions, .ws-row:focus-within > .ws-actions, .ws-row > .ws-actions:has([data-state="open"]) { opacity: 1; }
+
+.ws-nothing { padding: calc(var(--tx-space-8) * 2) 0; color: var(--tx-text-3); text-align: center; }
+.ws-state { padding-top: var(--tx-space-4); }
+.ws-row .tx-skeleton + .tx-skeleton { margin-top: var(--tx-space-1-half); }
+
+/* ── Nothing saved yet ─────────────────────────────────────────────────────── */
+
+.ws-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tx-space-5);
+  padding-bottom: var(--tx-topbar-height);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-row, .ws-tile > span, .ws-row > .ws-actions { transition: none; }
+}

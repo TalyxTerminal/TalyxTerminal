@@ -1,0 +1,5 @@
+.agent-root { height: 100%; }
+.agent-chat-rules { display: flex; flex-direction: column; gap: var(--tx-space-4); }
+.agent-chat-rules section { display: flex; flex-direction: column; gap: var(--tx-space-1); }
+.agent-chat-rules h4 { margin: 0; color: var(--tx-text); font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); }
+.agent-chat-rules p { margin: 0 0 var(--tx-space-1); }

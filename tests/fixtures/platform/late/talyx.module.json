@@ -1,0 +1,2 @@
+{"manifestVersion": 5, "id": "late", "name": "Late", "version": "1.0.0", "description": "Platform test module that starts slowly",
+ "entries": {"backend": "backend.entry"}, "requires": {}}

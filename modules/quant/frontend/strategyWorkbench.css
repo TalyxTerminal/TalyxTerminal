@@ -1,0 +1,20 @@
+/* Strategy results. Inspector layout comes from the shared workbench parts. */
+.quant-strategy-report { display: flex; flex-direction: column; gap: var(--tx-space-4); min-width: 0; }
+.quant-report-head { display: flex; align-items: flex-end; gap: var(--tx-space-3); border-bottom: var(--tx-hairline) solid var(--tx-line); }
+.quant-report-head > .tx-tabs { border-bottom: 0; flex: 1; min-width: 0; overflow-x: auto; }
+.quant-report-candidate.tx-select { width: calc(var(--tx-control) * 7); margin-bottom: var(--tx-space-1); }
+.quant-strategy-performance { display: flex; flex-direction: column; gap: var(--tx-space-3); min-width: 0; }
+.quant-strategy-navigation { display: flex; align-items: center; gap: var(--tx-space-2); flex-wrap: wrap; }
+.quant-strategy-navigation .tx-btn { margin-top: 0; }
+.quant-strategy-navigation > span { color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.quant-strategy-summary { display: flex; flex-wrap: wrap; gap: var(--tx-space-4); color: var(--tx-text-2); font-size: var(--tx-size-sm); }
+.quant-native-section { display: flex; flex-direction: column; gap: var(--tx-space-3); }
+.quant-native-section > h3 { margin: var(--tx-space-2) 0 0; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-strong); }
+.quant-strategy-report .tx-table { width: 100%; }
+
+.quant-portfolio-rebalances { display: flex; flex-direction: column; gap: var(--tx-space-2); border-top: var(--tx-hairline) solid var(--tx-line); padding-top: var(--tx-space-3); }
+.quant-portfolio-rebalances h3, .quant-portfolio-rebalances p { margin: 0; }
+.quant-portfolio-rebalances .quant-strategy-navigation { justify-content: space-between; }
+
+.quant-report-more.tx-btn { margin: 0 0 var(--tx-space-1); gap: var(--tx-space-1); }
+.quant-report-more .tx-icon { transform: rotate(90deg); width: var(--tx-size-sm); height: var(--tx-size-sm); color: var(--tx-text-3); }

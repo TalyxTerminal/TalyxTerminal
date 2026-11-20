@@ -1,0 +1,37 @@
+TalyxTerminal
+Copyright 2026 the TalyxTerminal authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes or builds on the following third-party software. Each component
+keeps its own copyright and license.
+
+Charting
+  TradingView Lightweight Charts — Copyright TradingView, Inc. (https://www.tradingview.com/)
+  Apache License 2.0. TalyxTerminal's charts are rendered with this library.
+
+Indicator engine
+  PyneCore — Apache License 2.0.
+  Distributed in modules/chart/backend/engine_materials/ as a wheel built with TalyxTerminal's
+  patches (version suffix "talyx").
+
+Quant runtime (license texts in modules/quant/runtime/licenses/)
+  NautilusTrader — Copyright Nautech Systems Pty Ltd. GNU LGPL v3.0.
+    Used as the backtest engine with TalyxTerminal's patches (modules/quant/runtime/patches/).
+    The patched wheel and its corresponding source archive are published with each release.
+  Qlib — Copyright Microsoft Corporation. MIT License.
+    Distributed as a wheel built with TalyxTerminal's patches; the upstream source is in
+    modules/quant/runtime/upstream/.
+  skfolio — BSD 3-Clause License.
+  Alphalens (alphalens-reloaded) — Apache License 2.0.
+  arch, linearmodels — Copyright Kevin Sheppard. NCSA / BSD-style licenses.
+  statsmodels — BSD 3-Clause License.
+  pyhdfe — MIT License.
+  Open Source Risk Engine (ORE) — Copyright Quaternion Risk Management Ltd. Modified BSD License.
+  QuantLib-SWIG — Modified BSD License.
+  PySCIPOpt — MIT License; SCIP Optimization Suite — Apache License 2.0.
+  mypy-extensions — MIT License.
+
+Other Python and JavaScript dependencies are installed from their package registries
+(see pyproject.toml, uv.lock, web/package.json and web/package-lock.json) and are used
+under their respective licenses.

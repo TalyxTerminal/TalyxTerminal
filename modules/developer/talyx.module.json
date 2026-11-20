@@ -1,0 +1,610 @@
+{
+  "manifestVersion": 5,
+  "id": "developer",
+  "ai": {"guide": "GUIDE.md", "docs": [{"topic": "module", "title": "Write a TALYX module: template, declarations, the SDK references", "file": "docs/module.md"}]},
+  "requires": {"agent": {"optional": true}},
+  "name": "Developer",
+  "version": "2.0.0",
+  "description": "Source projects, shared documents and writing TALYX modules.",
+  "entries": {
+    "backend": "backend.entry",
+    "frontend": "frontend/module.tsx"
+  },
+  "panels": {
+    "main": {
+      "title": "Developer",
+      "icon": "code-slash",
+      "launcher": true,
+      "description": "The editor. Open targets: objectId \"file:<file URI>\" opens that file; \"folder:<path>\" opens that folder as a project."
+    }
+  },
+  "views": {
+    "editor": {
+      "description": "One shared document in an editor: by source (opened for you) or documentId. Every editor of a document shares its buffer; markers are line marks the embedding module gives.",
+      "props": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "file"
+                  },
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "uri"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "contribution"
+                  },
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sourceKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "target": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "providerId",
+                  "sourceKey"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "line"
+            ],
+            "additionalProperties": false
+          },
+          "positionRequestId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "markers": {
+            "type": "array",
+            "maxItems": 100,
+            "description": "Line marks the embedding module gives, such as where its own run of this file failed. They sit beside the language service's and development supports' diagnostics and leave them alone; Developer does not interpret them. The first mark with detail is shown under its line.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "endLine": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "endColumn": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "severity": {
+                  "enum": [
+                    "error",
+                    "warning",
+                    "information"
+                  ]
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "A short lead shown in bold before the detail, e.g. the exception type."
+                },
+                "detail": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000,
+                  "description": "Shown under the line, inside the editor."
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "description": "Who says so, shown with the message (e.g. \"Run #12\")."
+                }
+              },
+              "required": [
+                "line",
+                "severity",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "emits": {
+        "changed": {
+          "type": "object",
+          "properties": {
+            "documentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "documentId",
+            "version",
+            "dirty"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "text_editor": {
+      "description": "An editor for text the embedding module keeps itself (a notebook cell): it gives the value and hears every change; with assist, completion and hover are asked of it.",
+      "props": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "autoHeight": {
+            "type": "boolean"
+          },
+          "lineNumbers": {
+            "type": "boolean"
+          },
+          "keys": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "Shift+Enter",
+                "Ctrl+Enter",
+                "Alt+Enter",
+                "Ctrl+S",
+                "Escape"
+              ]
+            }
+          },
+          "assist": {
+            "type": "boolean"
+          },
+          "answer": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "const": "complete"
+                  },
+                  "start": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "end": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "items": {
+                    "type": "array",
+                    "maxItems": 2000,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "enum": [
+                            "function",
+                            "class",
+                            "module",
+                            "variable",
+                            "keyword",
+                            "property",
+                            "file",
+                            "text"
+                          ]
+                        },
+                        "detail": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "requestId",
+                  "kind",
+                  "start",
+                  "end",
+                  "items"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "const": "inspect"
+                  },
+                  "text": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "requestId",
+                  "kind",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "focusRequestId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "value",
+          "language"
+        ],
+        "additionalProperties": false
+      },
+      "emits": {
+        "changed": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        "focus": {
+          "type": "object",
+          "properties": {
+            "focused": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "focused"
+          ],
+          "additionalProperties": false
+        },
+        "key": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "enum": [
+                "Shift+Enter",
+                "Ctrl+Enter",
+                "Alt+Enter",
+                "Ctrl+S",
+                "Escape"
+              ]
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        "complete": {
+          "type": "object",
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "string"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "requestId",
+            "value",
+            "offset"
+          ],
+          "additionalProperties": false
+        },
+        "inspect": {
+          "type": "object",
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "string"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "requestId",
+            "value",
+            "offset"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "project_editor": {
+      "description": "A project's file tree, tabs and editor, embedded in another module's panel.",
+      "props": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Developer project (from developer.projects.open); the file tree reads it."
+          },
+          "rootUri": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project's folder."
+          },
+          "treeTitle": {
+            "type": "string",
+            "description": "What the file tree's header says; the folder's name when absent."
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A file of the project to open (its uri)."
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "line"
+            ],
+            "additionalProperties": false
+          },
+          "positionRequestId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "markers": {
+            "type": "array",
+            "maxItems": 200,
+            "description": "Line marks by file, such as where a run of the project failed: a file's tab and tree row show how many it has.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The file the mark is on."
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "endLine": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "endColumn": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "severity": {
+                  "enum": [
+                    "error",
+                    "warning",
+                    "information"
+                  ]
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "A short lead shown in bold before the detail, e.g. the exception type."
+                },
+                "detail": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000,
+                  "description": "Shown under the line, inside the editor."
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "description": "Who says so, shown with the message (e.g. \"Run #12\")."
+                }
+              },
+              "required": [
+                "uri",
+                "line",
+                "severity",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "tree": {
+            "type": "boolean",
+            "description": "Whether the file tree is open."
+          }
+        },
+        "required": [
+          "rootUri"
+        ],
+        "additionalProperties": false
+      },
+      "emits": {
+        "changed": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "documentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "uri",
+            "documentId",
+            "version",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "opened": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "uri"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "provides": {
+    "agent.open_file": [{"id": "editor", "descriptor": {}}],
+    "developer.document_source": [
+      {
+        "id": "talyx-sdk",
+        "descriptor": {
+          "name": "TALYX SDK references",
+          "readOnly": true
+        }
+      }
+    ]
+  }
+}

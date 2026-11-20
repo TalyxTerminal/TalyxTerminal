@@ -1,0 +1,356 @@
+/* A factor's Work (output/quant-design/factor.css): what this page adds to the shared research components. Values from tokens only. */
+.fx-page { --fx-watch: var(--tx-watch); display: flex; flex-direction: column; min-height: 0; height: 100%; }
+/* The run is read once a second: the bar glides to each new share instead of jumping. */
+.fx-page .tx-runbar i { transition: width 1s linear; }
+@media (prefers-reduced-motion: reduce) { .fx-page .tx-runbar i { transition: none; } }
+.fx-t2 { color: var(--tx-text-2); } .fx-t3 { color: var(--tx-text-3); } .fx-t4 { color: var(--tx-text-4); }
+.fx-attn { color: var(--tx-ember-text); } .fx-watch { color: var(--tx-watch); }
+.fx-num { font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tx-tracking-tight); }
+.fx-empty { padding: 22px 16px; color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+
+/* ---------------------------------------------------------------- head */
+.fx-head { gap: 8px; }
+.fx-head > .qx-title { flex: 0 1 auto; min-width: 90px; }
+.fx-kind { font-size: var(--tx-size-sm); color: var(--tx-text-3); margin-left: -4px; }
+.fx-head > .tx-datachip, .fx-head > button.tx-datachip { flex: 0 1 auto; min-width: 0; }
+.fx-head .tx-datachip > .tx-icon:first-child { width: 13px; height: 13px; }
+.fx-chgl { font-size: var(--tx-size-xs); color: var(--tx-ember-text); white-space: nowrap; flex: none; }
+@container (max-width: 900px) { .fx-kind { display: none; } .fx-chgl { display: none; } }
+.fx-cfm p { margin: 0; font-size: var(--tx-size-sm); line-height: var(--tx-leading-note); color: var(--tx-text-2); }
+.fx-dpop { margin-top: 4px; font-size: var(--tx-size-sm); }
+.fx-dr { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 30px; }
+.fx-dr > span:first-child { color: var(--tx-text-3); }
+.fx-ro { display: inline-flex; align-items: center; gap: 6px; font-family: var(--tx-font-mono); color: var(--tx-text); }
+.fx-ro .tx-icon { width: 12px; height: 12px; color: var(--tx-text-3); }
+/* The page's rows under the data settings sit on the settings' columns and read as their values. */
+.fx-dpop .fx-dr { column-gap: var(--tx-space-4); }
+.fx-dpop .fx-ro { font-family: inherit; }
+.fx-lim { padding: 8px 0 2px; border-top: 1px solid var(--tx-white-07); margin-top: 6px; color: var(--tx-text-2); }
+.fx-lim h5 { margin: 0 0 4px; font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); color: var(--tx-text-3); display: flex; gap: 8px; }
+.fx-lim > div { padding: 3px 0; line-height: 1.45; font-size: var(--tx-size-xs); }
+.fx-lim code { font-family: var(--tx-font-mono); color: var(--tx-text); }
+.fx-xrow { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 1px; }
+.fx-xrow > b { flex: 0 0 100%; font-weight: var(--tx-weight-medium); color: var(--tx-text-2); }
+
+/* ---------------------------------------------------------------- the desk: work beside the code */
+.fx-desk { flex: 1; min-height: 0; display: flex; }
+.fx-view { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.fx-view > .tx-params { min-height: 0; }
+.fx-rowwrap { display: contents; }
+.fx-chk { position: relative; display: flex; align-items: center; min-height: 28px; padding: 0 12px 0 14px; font-size: var(--tx-size-sm); }
+.fx-chk[data-changed]::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 1px; background: var(--tx-ember); }
+.fx-held { position: relative; display: flex; align-items: center; min-width: 0; }
+.fx-held .tx-icon { position: absolute; left: 9px; width: 12px; height: 12px; color: var(--tx-text-3); pointer-events: none; }
+.fx-held .tx-input { flex: 1; min-width: 0; padding-left: 27px; font-family: var(--tx-font-mono); color-scheme: dark; }
+.fx-paramerror { display: flex; gap: 8px; align-items: flex-start; width: 100%; padding: 6px 12px 6px 14px; text-align: left; font-size: var(--tx-size-xs); color: var(--tx-ember-text); background: none; border: 0; cursor: pointer; }
+.fx-paramerror .tx-icon { width: 12px; height: 12px; flex: none; margin-top: 2px; }
+.fx-paramnone { padding: 8px 14px; font-size: var(--tx-size-xs); color: var(--tx-text-4); }
+.fx-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* Before the first run: the run to come in place of the result and the runs. */
+.fx-firstwrap { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; }
+.fx-firstwrap::-webkit-scrollbar { display: none; }
+.fx-firstformula { font-family: var(--tx-font-mono); font-size: var(--tx-size-sm); }
+
+/* ---------------------------------------------------------------- formula box, code bar */
+.fx-fbox { flex: none; padding: 12px 16px 0; }
+.fx-fline { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 6px 0 14px; border: 1px solid var(--tx-line-2); border-radius: var(--tx-radius-sm); background: var(--tx-black-20); }
+.fx-fline:focus-within { border-color: var(--tx-line-3); }
+.fx-fbox[data-bad] .fx-fline { border-color: var(--tx-ember-line); }
+.fx-fcode { position: relative; flex: 1; min-width: 0; padding: 10px 8px 10px 0; }
+.fx-fcode pre, .fx-fcode textarea { margin: 0; padding: 0; font: 14.5px/22px var(--tx-font-mono); font-variant-ligatures: none; letter-spacing: 0; white-space: pre-wrap; word-break: break-word; }
+.fx-fcode pre { color: var(--tx-text); pointer-events: none; }
+.fx-fcode textarea { position: absolute; inset: 10px 8px 10px 0; width: calc(100% - 8px); resize: none; overflow: hidden; border: 0; outline: none; background: none; color: transparent; caret-color: var(--tx-text); }
+.fx-fcode textarea:focus-visible { outline: none; }
+.fx-fcode textarea::placeholder { color: var(--tx-text-4); }
+.fx-fcode textarea::selection { background: var(--tx-white-14); color: transparent; }
+.fx-tq { color: var(--tx-user-palette-10); } .fx-tf { color: var(--tx-user-palette-11); } .fx-tn { color: var(--tx-user-palette-7); } .fx-ts { color: var(--tx-user-palette-8); }
+.fx-sq { text-decoration: underline wavy var(--tx-ember); text-underline-offset: 4px; text-decoration-skip-ink: none; }
+.fx-miss { display: inline-block; width: 10px; }
+.fx-ferr { display: flex; align-items: center; gap: 8px; min-height: 12px; padding: 6px 2px 0; font-size: var(--tx-size-sm); color: var(--tx-ember-text); }
+.fx-ferr:empty { padding-top: 0; }
+.fx-ferr b { font-weight: var(--tx-weight-medium); }
+.fx-ferr .tx-icon { width: 13px; height: 13px; flex: none; }
+.fx-fns { width: 340px; }
+.fx-fns h5 { margin: 8px 0 5px; font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); color: var(--tx-text-3); }
+.fx-fns > div:first-child h5 { margin-top: 0; }
+.fx-fnl { display: flex; flex-wrap: wrap; gap: 4px; }
+.fx-fn { height: 22px; padding: 0 7px; border-radius: 5px; border: 1px solid var(--tx-line-2); font: 11.5px var(--tx-font-mono); color: var(--tx-text-2); background: none; cursor: pointer; }
+.fx-fn:hover { color: var(--tx-text); border-color: var(--tx-line-3); background: var(--tx-white-04); }
+.fx-fn[data-off] { color: var(--tx-text-4); text-decoration: line-through; text-decoration-color: var(--tx-text-4); }
+.fx-codebar { container-type: inline-size; }
+.fx-codebar .fx-fline { gap: 10px; font-size: var(--tx-size-sm); padding-right: 10px; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+.fx-codebar .fx-fline > :not(.tx-spacer):not(.fx-files) { flex: none; }
+.fx-codebar .fx-files { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
+/* Narrow: the save state goes first, then the shortcut, then the label; the files and Show code stay. Nothing wraps. */
+@container (max-width: 620px) { .fx-codebar [data-priority="3"] { display: none; } }
+@container (max-width: 500px) { .fx-codebar [data-priority="2"] { display: none; } }
+@container (max-width: 380px) { .fx-codebar [data-priority="1"] { display: none; } }
+.fx-codebar .tx-icon { width: 15px; height: 15px; }
+.fx-files { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.fx-ftag { height: 22px; padding: 0 8px; border-radius: 5px; border: 1px solid var(--tx-line-2); font: 12px var(--tx-font-mono); color: var(--tx-text-2); background: none; cursor: pointer; }
+.fx-ftag:hover, .fx-ftag[data-on] { color: var(--tx-text); border-color: var(--tx-line-3); }
+
+/* ---------------------------------------------------------------- result, splitter, the tabs under it */
+.fx-res { flex: 0 1 auto; min-height: 0; overflow: auto; scrollbar-width: none; display: flex; flex-direction: column; }
+.fx-res::-webkit-scrollbar { display: none; }
+/* The result is a column that gives way from the bottom: header and key numbers keep their height, the charts and checks take what is left (never below a floor,
+   then the area scrolls), and under the floor the checks fold to one line, as in a narrow panel. */
+.fx-rwrap { container-type: inline-size; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.fx-rwrap > .fx-lhead, .fx-rwrap > .fx-stats, .fx-rwrap > .fx-note { flex: none; }
+.fx-rwrap > .fx-frow { flex: 1 1 262px; min-height: 210px; }
+.fx-hgut { flex: none; height: 7px; cursor: row-resize; position: relative; z-index: 3; }
+.fx-hgut::after { content: ''; position: absolute; left: 0; right: 0; top: 3px; height: 1px; background: var(--tx-line-2); }
+.fx-hgut:hover::after { background: var(--tx-line-3); }
+/* The runs give way to the result down to a header and two rows, so the checks and the charts stay whole at 1536 x 730. */
+.fx-bot { flex: 1 0 132px; min-height: 132px; display: flex; flex-direction: column; }
+/* as specific as strategy.css's `.fx-main > .fx-bot` (32%), which is loaded later, so a dragged or filled bottom takes the room. */
+.fx-main > .fx-bot[data-grow] { flex: 1 1 0; min-height: 120px; }
+.fx-btabs { flex: none; height: 36px; display: flex; align-items: center; gap: 2px; padding: 0 8px 0 6px; border-bottom: 1px solid var(--tx-line); overflow: hidden; }
+@container (max-width: 620px) { .fx-btabs .fx-cmp { display: none; } }
+.fx-tab { position: relative; height: 36px; padding: 0 10px; font-size: var(--tx-size-sm); color: var(--tx-text-3); white-space: nowrap; background: none; border: 0; cursor: pointer; }
+.fx-tab:hover { color: var(--tx-text-2); }
+.fx-tab[aria-selected="true"] { color: var(--tx-text); }
+.fx-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 1.5px; background: var(--tx-ember); }
+.fx-cnt { color: var(--tx-text-4); font-family: var(--tx-font-mono); margin-left: 6px; }
+.fx-bsc { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; }
+.fx-bsc::-webkit-scrollbar { display: none; }
+
+/* ---------------------------------------------------------------- the selected run */
+.fx-lhead { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 16px; font-size: var(--tx-size-sm); color: var(--tx-text-2); white-space: nowrap; overflow: hidden; }
+.fx-lhead > b { font-family: var(--tx-font-mono); font-weight: var(--tx-weight-strong); color: var(--tx-text); }
+.fx-lhead .tx-tag { flex: none; }
+.fx-lhead.fx-sub { border-top: 1px solid var(--tx-line); }
+.fx-lhead .fx-combo { font-family: var(--tx-font); font-weight: var(--tx-weight-strong); color: var(--tx-text); }
+.fx-down { transform: rotate(90deg); width: 12px !important; height: 12px !important; }
+.fx-noteslist { max-width: 420px; padding: 2px 0; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.fx-noteslist div { padding: 4px 0; line-height: 1.45; }
+.fx-stats { border-top: 1px solid var(--tx-line); }
+.fx-stats .tx-keynumbers { grid-template-columns: repeat(6, minmax(0, 1fr)); border-bottom: 0; }
+@container (max-width: 760px) { .fx-stats .tx-keynumbers { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.fx-stats[data-void] .tx-knv { color: var(--tx-text-4); text-decoration: line-through; text-decoration-thickness: 1px; }
+.fx-stats[data-void] .tx-knv span { color: inherit; }
+.fx-stats[data-void] .tx-knd { visibility: hidden; }
+.fx-frow { display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) 196px 420px; border-top: 1px solid var(--tx-line); border-bottom: 1px solid var(--tx-line); }
+.fx-frow > .fx-fsec { padding: 9px 10px 6px 16px; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.fx-frow > .fx-csec { overflow: auto; scrollbar-width: none; }
+.fx-frow > .fx-fsec + .fx-fsec { border-left: 1px solid var(--tx-line); padding-left: 12px; }
+/* Work's section heads are region heads, so a chart's key sits right of the title and the charts of a section move together (the shared chart layer). */
+.fx-fsec > .tx-regionhead { flex: none; align-items: baseline; gap: 8px; min-height: 0; height: 20px; margin-bottom: 2px; padding: 0; overflow: hidden; }
+.fx-fsec > .tx-regionhead h3 { flex: none; }
+.fx-fsec > .tx-regionhead .tx-regionkeys { align-self: center; }
+.fx-ch { flex: 1 1 0; min-height: 90px; min-width: 0; position: relative; }
+.fx-ch .tx-plotly { position: absolute; inset: 0; height: auto; }
+.fx-skel { border: 1px dashed var(--tx-line-2); border-radius: var(--tx-radius-sm); height: 200px; margin-top: 8px; }
+.fx-frow.fx-two { grid-template-columns: minmax(0, 1fr) 360px; }
+/* "Every year": a column a whole year, the rank IC's sign above and the long–short net below, in the up and down colours. */
+.fx-yrs { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.fx-yrstrip { display: inline-flex; gap: 3px; min-width: 0; }
+.fx-yrstrip > span { display: flex; flex: 0 1 8px; min-width: 3px; flex-direction: column; gap: 2px; }
+.fx-yrstrip i { height: 7px; border-radius: 1px; background: currentColor; }
+.fx-yrstrip i:not(.tx-up):not(.tx-down) { background: var(--tx-text-4); }
+.fx-ckfold { display: none; }
+@container (max-width: 1000px) {
+  .fx-frow { grid-template-columns: minmax(0, 1fr) 200px; }
+  .fx-frow > .fx-csec { grid-column: 1 / -1; border-left: 0 !important; border-top: 1px solid var(--tx-line); padding: 0 10px 0 16px !important; }
+  /* Narrow, the checks fold into one line under the charts: never below the fold, all of them one click away. */
+  .fx-ckfold { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0; border: 0; background: none; color: var(--tx-text); font: inherit; font-size: var(--tx-size-sm); cursor: pointer; }
+  .fx-ckfold b { font-weight: var(--tx-weight-strong); }
+  .fx-ckfold .fx-watch, .fx-ckfold .fx-t3 { font-size: var(--tx-size-xs); }
+  .fx-ckfold:hover b { text-decoration: underline; text-underline-offset: 3px; }
+  .fx-ckchev { width: 11px; height: 11px; color: var(--tx-text-3); transform: rotate(90deg); transition: transform .12s; }
+  .fx-csec[data-open] .fx-ckchev { transform: rotate(-90deg); }
+  .fx-csec .tx-checklist > header { display: none; }
+  .fx-csec:not([data-open]) .tx-checklist { display: none; }
+  .fx-csec[data-open] .tx-checklist { padding-bottom: 8px; }
+  /* Held at the bottom of the result while the charts run past it, so the line is always in view. */
+  .fx-frow > .fx-csec:not([data-open]) { position: sticky; bottom: 0; z-index: 2; background: var(--tx-panel); }
+}
+
+/* Short, the same fold: the row of charts and checks is under the height the checks need beside the charts (a narrow panel folds them too, above). */
+.fx-frow[data-short] { grid-template-columns: minmax(0, 1fr) 200px; }
+.fx-frow[data-short] > .fx-csec { grid-column: 1 / -1; border-left: 0 !important; border-top: 1px solid var(--tx-line); padding: 0 10px 0 16px !important; }
+.fx-frow[data-short] .fx-ckfold { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0; border: 0; background: none; color: var(--tx-text); font: inherit; font-size: var(--tx-size-sm); cursor: pointer; }
+.fx-frow[data-short] .fx-ckfold b { font-weight: var(--tx-weight-strong); }
+.fx-frow[data-short] .fx-ckfold .fx-watch, .fx-ckfold .fx-t3 { font-size: var(--tx-size-xs); }
+.fx-frow[data-short] .fx-ckfold:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.fx-frow[data-short] .fx-ckchev { width: 11px; height: 11px; color: var(--tx-text-3); transform: rotate(90deg); transition: transform .12s; }
+.fx-frow[data-short] .fx-csec[data-open] .fx-ckchev { transform: rotate(-90deg); }
+.fx-frow[data-short] .fx-csec .tx-checklist > header { display: none; }
+.fx-frow[data-short] .fx-csec:not([data-open]) .tx-checklist { display: none; }
+.fx-frow[data-short] .fx-csec[data-open] .tx-checklist { padding-bottom: 8px; }
+.fx-frow[data-short] > .fx-csec:not([data-open]) { position: sticky; bottom: 0; z-index: 2; background: var(--tx-panel); }
+.fx-frow[data-short] { grid-template-columns: minmax(0, 1fr) 200px; grid-template-rows: minmax(0, 1fr) auto; }
+
+/* ---------------------------------------------------------------- tables */
+.fx-pad { padding: 0 16px 16px; }
+table.fx-g { width: 100%; border-collapse: collapse; font-size: var(--tx-size-sm); }
+table.fx-g th { height: 28px; font-weight: var(--tx-weight); font-size: var(--tx-size-xs); color: var(--tx-text-3); text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line-2); white-space: nowrap; position: sticky; top: 0; background: var(--tx-panel); z-index: 1; }
+table.fx-g td { height: 26px; text-align: right; padding: 0 8px; border-bottom: 1px solid var(--tx-line); font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tx-tracking-tight); white-space: nowrap; }
+table.fx-g .l { text-align: left; font-family: var(--tx-font); letter-spacing: var(--tx-tracking); }
+table.fx-g tbody tr:hover td { background: var(--tx-white-02); }
+table.fx-g tr[data-selected] td { background: var(--tx-ember-select); }
+table.fx-g tr[data-selected] td:first-child { box-shadow: inset 2px 0 0 var(--tx-ember); }
+table.fx-g td.fx-tk { font-family: var(--tx-font-mono); color: var(--tx-text); }
+table.fx-g td.fx-sec { color: var(--tx-text-2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.fx-runs { padding-top: 4px; }
+.fx-runs .tx-runtable td[data-kind="change"] { min-width: 150px; max-width: 640px; }
+.fx-runs code { font: 12px/1.45 var(--tx-font-mono); color: var(--tx-text-2); word-break: break-word; }
+.fx-runs code em { font-style: normal; color: var(--tx-text); background: var(--tx-white-07); border-radius: 2px; }
+.fx-runs .fx-sx { display: block; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.fx-runs .fx-sx em, .fx-runs .fx-cx em { font-style: normal; color: var(--tx-text); }
+.fx-runs .fx-cx { color: var(--tx-text-2); }
+.fx-hz { font-family: var(--tx-font-mono); font-size: 10px; color: var(--tx-text-4); margin-left: 5px; }
+.fx-hz[data-on] { color: var(--tx-text-2); }
+.fx-star { display: inline-flex; background: none; border: 0; padding: 2px; cursor: pointer; color: var(--tx-text-4); }
+.fx-star .tx-icon { width: 13px; height: 13px; }
+.fx-star[data-on] { color: var(--tx-text-2); }
+.fx-star[data-on] .tx-icon { fill: currentColor; }
+.fx-vtop { flex: none; }
+.fx-vbar { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; white-space: nowrap; border-bottom: 1px solid var(--tx-line); }
+.fx-vbar .fx-sub2 { font-size: var(--tx-size-sm); font-weight: var(--tx-weight-strong); }
+.fx-cnt2 { font-size: var(--tx-size-sm); } .fx-cnt2 b { color: var(--tx-text); font-weight: var(--tx-weight-medium); }
+.fx-datenav { display: inline-flex; align-items: center; border: 1px solid var(--tx-line-2); border-radius: var(--tx-radius-sm); height: 26px; }
+.fx-datenav button { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--tx-text-3); background: none; border: 0; cursor: pointer; }
+.fx-datenav button:hover:not(:disabled) { color: var(--tx-text); }
+.fx-datenav button:disabled { visibility: hidden; }  /* no day on that side: the step is not shown (its place kept) */
+.fx-datenav .tx-icon { width: 13px; height: 13px; }
+.fx-datenav span, .fx-datenav .fx-dayfield { padding: 0 8px; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); border-left: 1px solid var(--tx-line); border-right: 1px solid var(--tx-line); line-height: 24px; min-width: 104px; text-align: center; }
+.fx-srch { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid var(--tx-line-2); border-radius: var(--tx-radius-sm); color: var(--tx-text-3); }
+.fx-srch .tx-icon { width: 12px; height: 12px; }
+.fx-srch input { width: 64px; border: 0; background: none; outline: none; font-size: var(--tx-size-sm); color: var(--tx-text); }
+.fx-small .tx-seg button { height: 20px; padding: 0 8px; font-size: var(--tx-size-xs); }
+.fx-chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: var(--tx-radius-pill); border: 1px solid var(--tx-watch-line); font-size: var(--tx-size-xs); color: var(--tx-watch); background: none; cursor: pointer; white-space: nowrap; }
+.fx-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tx-watch); flex: none; display: inline-block; }
+.fx-note { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: var(--tx-size-sm); color: var(--tx-text-2); border-bottom: 1px solid var(--tx-line); background: var(--tx-watch-wash); }
+.fx-note b { color: var(--tx-text); font-family: var(--tx-font-mono); font-weight: var(--tx-weight-medium); }
+.fx-vtab tr[data-flag] td { background: var(--tx-watch-wash); }
+.fx-vtab tr[data-pick] td { background: var(--tx-ember-select); }
+.fx-vtab tbody tr { cursor: pointer; }
+.fx-cbar { position: relative; display: inline-block; width: 180px; height: 8px; vertical-align: -1px; }
+.fx-cbar .fx-z { position: absolute; left: 50%; top: -2px; bottom: -2px; border-left: 1px solid var(--tx-line-3); }
+.fx-cbar i { position: absolute; top: 1px; height: 6px; border-radius: 1px; background: var(--tx-text-2); }
+.fx-cbar b { position: absolute; top: -3px; height: 14px; border-left: 1px dashed var(--tx-watch-line); }
+.fx-sim { padding-top: 4px; }
+
+/* ---------------------------------------------------------------- in place: progress and failure */
+.fx-stages { padding: 0 16px 10px; }
+.fx-stg { display: flex; align-items: center; gap: 10px; height: 28px; font-size: var(--tx-size-sm); color: var(--tx-text-3); white-space: nowrap; }
+.fx-stg b { font-weight: var(--tx-weight-medium); width: 150px; color: var(--tx-text-3); flex: none; }
+.fx-stg:is([data-state="on"], [data-state="fail"], [data-state="done"]) b { color: var(--tx-text); }
+.fx-stg .fx-what { color: var(--tx-text-2); display: inline-flex; gap: 6px; align-items: center; }
+.fx-si { width: 14px; display: inline-flex; justify-content: center; }
+.fx-si i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--tx-line-3); }
+.fx-stg[data-state="fail"] .fx-si i { background: var(--tx-ember); border-color: var(--tx-ember); }
+.fx-si .tx-icon { width: 12px; height: 12px; }
+.fx-bar { width: 110px; height: 3px; border-radius: 2px; background: var(--tx-line-2); overflow: hidden; display: inline-block; }
+.fx-bar i { display: block; height: 100%; background: var(--tx-text-2); }
+
+/* ---------------------------------------------------------------- sweep, held out */
+.fx-swgrid { display: grid; grid-template-columns: minmax(240px, 330px) minmax(0, 1fr); max-height: 260px; border-top: 1px solid var(--tx-line); }
+.fx-swh { padding: 6px 10px 8px 14px; min-width: 0; overflow: auto; }
+.fx-swt { border-left: 1px solid var(--tx-line); min-height: 0; overflow: auto; padding: 0 12px 6px 8px; }
+.fx-swt tbody tr { cursor: pointer; }
+.fx-swgrid:not(:has(.fx-swh)) { grid-template-columns: minmax(0, 1fr); }
+.fx-swgrid:not(:has(.fx-swh)) .fx-swt { border-left: 0; }
+.fx-pad.fx-hot { padding: 0 16px 10px; border-top: 1px solid var(--tx-line); }
+
+/* ---------------------------------------------------------------- the code beside */
+.fx-vsplit { flex: none; width: 7px; margin: 0 -4px 0 -3px; cursor: col-resize; position: relative; z-index: 3; }
+.fx-vsplit::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: var(--tx-line); }
+.fx-vsplit:hover::after { background: var(--tx-text-3); }
+.fx-code { flex: 0 0 var(--fx-side); min-width: 300px; display: flex; flex-direction: column; min-height: 0; background: var(--tx-panel); }
+.fx-codetabs { flex: none; display: flex; align-items: center; gap: 2px; height: 34px; padding: 0 6px 0 8px; border-bottom: 1px solid var(--tx-line); }
+.fx-ftab { height: 26px; padding: 0 10px; border-radius: var(--tx-radius-sm); font: 12px var(--tx-font-mono); color: var(--tx-text-3); background: none; border: 0; cursor: pointer; }
+.fx-ftab:hover { color: var(--tx-text-2); }
+.fx-ftab[aria-selected="true"] { color: var(--tx-text); background: var(--tx-white-05); }
+.fx-sbline { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+.fx-editor { flex: 1; min-height: 0; }
+.fx-sb { flex: none; display: flex; align-items: center; gap: 14px; height: 26px; padding: 0 12px; border-top: 1px solid var(--tx-line); font-size: var(--tx-size-xs); color: var(--tx-text-3); white-space: nowrap; overflow: hidden; }
+
+/* ---------------------------------------------------------------- Results: the report of one run, a tab at a time */
+.fx-results { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
+.fx-results > .tx-tabs { flex: none; padding: 0 10px; border-bottom: 1px solid var(--tx-line); }
+.fx-results .tx-runstrip { border-bottom: 1px solid var(--tx-line); }
+.fx-rscroll { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; container-type: size; }
+.fx-rscroll::-webkit-scrollbar { display: none; }
+.fx-rsec { padding: 6px 0 14px; border-bottom: 1px solid var(--tx-line); min-width: 0; }
+.fx-rsec > .fx-rtable { padding: 0 14px; }
+.fx-rsec > .fx-rplot, .fx-rsec > .fx-rch, .fx-rsec > .fx-why { margin: 0 14px; }
+.fx-rplot { min-width: 0; }
+/* A chart takes its height from the box of its size, which follows the height of the page; the draft's boxes are 240, 190 and 300. */
+.fx-rch { min-width: 0; position: relative; height: max(240px, 38cqh); }
+.fx-rch[data-size="s"] { height: max(190px, 30cqh); }
+.fx-rch[data-size="l"] { height: max(300px, 48cqh); }
+.fx-rtable { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.fx-rtable::-webkit-scrollbar { display: none; }
+/* A report's table fills its section, so a row of sections reads edge to edge with no hole beside a short table. */
+.fx-results table.fx-g { width: 100%; }
+.fx-results table.fx-g th + th, .fx-results table.fx-g td + td { padding-left: 18px; }
+/* Sections side by side, as wide as the row's --fx-cols; under 1100 px a row of three keeps its first section across the top, under 900 px all stack. */
+.fx-rtwo { display: grid; grid-template-columns: var(--fx-cols, minmax(0, 1fr) minmax(0, 1fr)); border-bottom: 1px solid var(--tx-line); }
+.fx-rtwo > .fx-rsec { border-bottom: 0; }
+.fx-rtwo > * + * { border-left: 1px solid var(--tx-line); }
+/* A chart and its table inside one section. */
+.fx-rpair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; padding: 0 14px; }
+@container (max-width: 1100px) {
+  .fx-rtwo:has(> :nth-child(3)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .fx-rtwo:has(> :nth-child(3)) > :first-child { grid-column: 1 / -1; }
+  .fx-rtwo:has(> :nth-child(3)) > :nth-child(2) { border-left: 0; border-top: 1px solid var(--tx-line); }
+  .fx-rtwo:has(> :nth-child(3)) > :nth-child(3) { border-top: 1px solid var(--tx-line); }
+}
+@container (max-width: 900px) {
+  .fx-rtwo, .fx-rtwo:has(> :nth-child(3)), .fx-rpair { grid-template-columns: minmax(0, 1fr); }
+  .fx-rtwo > * + * { border-left: 0 !important; border-top: 1px solid var(--tx-line); }
+}
+.fx-why { display: flex; align-items: flex-start; gap: 8px; padding: 12px 12px; border: 1px dashed var(--tx-line-2); border-radius: var(--tx-radius-sm); color: var(--tx-text-2); font-size: var(--tx-size-sm); line-height: var(--tx-leading-note); }
+.fx-why .tx-icon { width: 13px; height: 13px; flex: none; margin-top: 2px; color: var(--tx-text-3); }
+.fx-rskel { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.fx-rskel .fx-rskel-plot { height: 240px; }
+.fx-rwait { display: flex; align-items: center; gap: 10px; padding: 36px 16px; color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.fx-rwait .tx-icon { width: 14px; height: 14px; flex: none; }
+.fx-results .tx-failure { margin: 14px; }
+table.fx-g tr.fx-hl td { background: var(--tx-white-04); }
+table.fx-g td.fx-kcol { width: 150px; }
+table.fx-g td .fx-wrap, table.fx-g td.fx-wrap { white-space: normal; }
+table.fx-g td.fx-wrap { font-family: var(--tx-font); letter-spacing: var(--tx-tracking); }
+table.fx-g td .fx-left { font-family: var(--tx-font); letter-spacing: var(--tx-tracking); display: block; text-align: left; }
+.fx-heldrow { display: inline-flex; align-items: center; gap: 6px; }
+.fx-heldrow .tx-icon { width: 11px; height: 11px; }
+.fx-livetag { display: inline-flex; flex: none; }
+.fx-results .tx-runstrip button[data-on] .tx-icon { fill: currentColor; }
+.fx-fields { width: 620px; max-height: 460px; overflow: auto; scrollbar-width: none; padding: 4px 0 8px; }
+.fx-fields::-webkit-scrollbar { display: none; }
+.fx-fields h5 { margin: 10px 4px 4px; font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); color: var(--tx-text-3); }
+.fx-fields table.fx-g td { height: 26px; }
+.fx-fields tr { cursor: pointer; }
+.fx-fields tr[data-off] { cursor: default; }
+.fx-fields tr[data-off] td { color: var(--tx-text-4); }
+.fx-fields td.fx-fname { width: 170px; font-family: var(--tx-font-mono); }
+.fx-fields td.fx-fnote { white-space: normal; font-family: var(--tx-font); letter-spacing: var(--tx-tracking); }
+.fx-dot[data-tone="now"] { background: var(--tx-ember); }
+.fx-rsec > .fx-rwhy { padding: 0 14px; }
+
+
+.fx-snaphead { flex: none; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.fx-snap { margin: 0; height: 100%; overflow: auto; padding: 8px 14px; font: 12px/1.6 var(--tx-font-mono); color: var(--tx-text-2); tab-size: 4; white-space: pre; background: var(--tx-panel); }
+.fx-oldformula { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 13px var(--tx-font-mono); color: var(--tx-text-2); }
+.fx-vtag { display: inline-flex; padding: 0; border: 0; background: none; cursor: pointer; }
+table.fx-g tr[data-unmapped] td { color: var(--tx-text-4); }
+/* Opened from the folded line, the checks cover the row of charts (an opaque layer with the line on top) instead of squeezing the charts to nothing under them. */
+.fx-frow[data-short] { position: relative; }
+.fx-frow[data-short] > .fx-csec[data-open] { position: absolute; inset: 0; z-index: 3; background: var(--tx-panel); overflow: auto; border-top: 0; }
+@container (max-width: 1000px) {
+  .fx-frow { position: relative; }
+  .fx-frow > .fx-csec[data-open] { position: absolute; inset: 0; z-index: 3; background: var(--tx-panel); overflow: auto; border-top: 0; }
+}
+/* A year (or a holding) in a Results table that opens what it names. */
+.fx-cellgo { all: unset; cursor: pointer; }
+.fx-cellgo:hover, .fx-cellgo:focus-visible { text-decoration: underline; }
+.fx-datenav .fx-dayfield { width: 112px; height: 24px; box-sizing: border-box; background: none; color: var(--tx-text); font: inherit; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); border-top: 0; border-bottom: 0; outline: none; }
+.fx-datenav .fx-dayfield:focus { background: var(--tx-white-04); }
+
+@container qx (max-width: 620px) {
+  .fx-head { height: auto; min-height: var(--tx-panel-tabs-height); flex-wrap: wrap; gap: var(--tx-space-1) var(--tx-space-2); padding-block: var(--tx-space-1); }
+  .fx-view:has(> .tx-params) { flex-direction: column; }
+  .fx-view > .tx-params { width: 100%; max-height: 30%; }
+}

@@ -1,0 +1,344 @@
+/* TALYX design tokens. Use these variables throughout the application. The --tx- prefix keeps SDK tokens separate from legacy shell variables. */
+
+:root {
+  /* Surfaces from darkest to lightest */
+  --tx-bg: #050506;            /* Application background */
+  --tx-panel: #0B0B0D;         /* Panel */
+  --tx-card: #111114;          /* Card or table header */
+  --tx-raised: #17171B;        /* Raised surface */
+
+  /* Dividers */
+  --tx-line: rgba(255, 255, 255, .065);
+  --tx-line-2: rgba(255, 255, 255, .11);
+  --tx-line-3: rgba(255, 255, 255, .17);
+
+  /* Text from highest to lowest emphasis */
+  --tx-text: #F4F3F0;
+  --tx-text-2: #A8A6A1;
+  --tx-text-3: #6E6C68;
+  --tx-text-4: #45443F;
+
+  /* Orange marks primary actions, selection, items requiring action and keyboard focus. */
+  --tx-ember: #F36B21;
+  --tx-ember-text: #F8A97E;                    /* Text on orange glass buttons */
+  --tx-ember-ink: #160700;                     /* Text on solid orange controls, including checkboxes */
+  --tx-ember-wash: rgba(243, 107, 33, .13);
+  --tx-ember-select: rgba(243, 107, 33, .07);  /* Selected table row */
+  --tx-ember-line: rgba(243, 107, 33, .42);
+  --tx-ember-glow: rgba(243, 107, 33, .32);
+  --tx-ember-backdrop: rgba(243, 107, 33, .075); /* Warm glow over the application background */
+  /* Orange glass button gradient stops and borders at the original opacities */
+  --tx-ember-14: rgba(243, 107, 33, .14);
+  --tx-ember-20: rgba(243, 107, 33, .20);
+  --tx-ember-30: rgba(243, 107, 33, .30);
+  --tx-ember-40: rgba(243, 107, 33, .40);
+  --tx-ember-55: rgba(243, 107, 33, .55);
+
+  /* Amber marks items for review, including late data, weakening signals and risk drift. Orange calls for immediate action. */
+  --tx-watch: #D6A13F;
+  --tx-watch-line: rgba(214, 161, 63, .42);
+  --tx-watch-wash: rgba(214, 161, 63, .08);
+
+  /* Status colors are independent of rising and falling values. Use orange for action, amber for attention, muted text for normal states and a hollow dot for inactivity. */
+  --tx-state-fix: var(--tx-ember-text);
+  --tx-state-fix-mark: var(--tx-ember);
+  --tx-state-watch: var(--tx-watch);
+  --tx-state-ok: var(--tx-text-2);
+  --tx-state-ok-mark: var(--tx-text-3);
+  --tx-state-off: var(--tx-text-3);
+  --tx-state-off-mark: var(--tx-text-4);
+
+  /* Controls have a dark input surface and progressively lighter hover, pressed and selected states. */
+  --tx-field-fill: rgba(0, 0, 0, .22);
+  --tx-hover: rgba(255, 255, 255, .05);
+  --tx-press: rgba(255, 255, 255, .085);
+  --tx-chosen: rgba(255, 255, 255, .08);
+
+  /* Directional colors for price, profit and loss, buy and sell, and long and short. The global preference defaults to green up and red down. */
+  --tx-green: #20C08A;
+  --tx-red: #F04760;
+  --tx-up: var(--tx-green);
+  --tx-down: var(--tx-red);
+
+  /* Use the data palette in order to distinguish indicators, drawings, areas and allocations. Reserve orange for attention and red and green for rising and falling values. */
+  --tx-series-1: #83B1F7;
+  --tx-series-2: #67C8DE;
+  --tx-series-3: #E2A35A;
+  --tx-series-4: #C59BEF;
+  --tx-series-5: #E3D477;
+
+  /* Grayscale chart grid, crosshair, reference lines and legend background */
+  --tx-chart-grid: rgba(255, 255, 255, .055);
+  --tx-chart-crosshair: var(--tx-text-3);
+  --tx-chart-reference: var(--tx-text-4);
+  --tx-chart-legend: rgba(11, 11, 13, .78);
+
+  /* Chart series use text white, blue, warm brown, purple and gray. Warm brown stays distinct from orange and amber by a color difference of at least 15. */
+  --tx-chart-warm: #A85B05;
+  /* Ordered groups run from cool and dark to warm and bright via purple and taupe. Each stays at least 15 color-difference units from the down color. */
+  --tx-chart-order-1: #3566B8;
+  --tx-chart-order-2: #8C6EC4;
+  --tx-chart-order-3: #ABA58C;
+  --tx-chart-order-4: #EEC469;
+
+  /* Drawing color choices are saved with user data. */
+  --tx-user-palette-1: #FFFFFF;
+  --tx-user-palette-2: #B8BDC8;
+  --tx-user-palette-3: #747C8C;
+  --tx-user-palette-4: #242833;
+  --tx-user-palette-5: #F04452;
+  --tx-user-palette-6: #F08C46;
+  --tx-user-palette-7: #F6C65B;
+  --tx-user-palette-8: #8EC95E;
+  --tx-user-palette-9: #31C79B;
+  --tx-user-palette-10: #3EC8D4;
+  --tx-user-palette-11: #4F98EF;
+  --tx-user-palette-12: #726DE4;
+  --tx-user-palette-13: #AB6EE6;
+  --tx-user-palette-14: #E072B8;
+  --tx-user-palette-15: #BD8B65;
+  --tx-user-palette-16: #000000;
+
+  /* Medium glass for overlays and the top bar */
+  --tx-glass-blur: 24px;
+  --tx-glass-saturate: 150%;
+  --tx-glass-fill: rgba(16, 16, 19, .62);
+  --tx-glass-sheen: rgba(255, 255, 255, .04);   /* Highlight fading down from the top */
+  --tx-glass-edge: rgba(255, 255, 255, .10);
+  --tx-glass-highlight: rgba(255, 255, 255, .16); /* Inner highlight along the top edge */
+  --tx-glass-shadow: 0 30px 70px -20px rgba(0, 0, 0, .85), 0 2px 10px rgba(0, 0, 0, .45);
+  --tx-glass-solid: #141417;     /* Opaque glass fill when the system asks for reduced transparency */
+
+  /* Home screen shader and fallback gradient use dark amber veins in obsidian. */
+  --tx-home-stone: #030202;          /* Stone base */
+  --tx-home-stone-body: #130C04;     /* Amber body */
+  --tx-home-stone-glow: #261607;     /* Glow alongside veins */
+  --tx-home-stone-vein: #754516;     /* Fine veins */
+  --tx-home-stone-sheen: #857F7A;    /* Surface reflection */
+  --tx-home-stone-sheen-warm: #9E6B33; /* Warm amber reflection */
+  --tx-home-stone-fallback: radial-gradient(120% 90% at 70% 10%, #140D06 0%, #070605 55%, #040404 100%);
+
+  /* Shared translucent layers */
+  --tx-clear: rgba(255, 255, 255, 0);
+  --tx-white-015: rgba(255, 255, 255, .015);
+  --tx-white-02: rgba(255, 255, 255, .02);
+  --tx-white-025: rgba(255, 255, 255, .025);
+  --tx-white-035: rgba(255, 255, 255, .035);
+  --tx-white-04: rgba(255, 255, 255, .04);
+  --tx-white-045: rgba(255, 255, 255, .045);
+  --tx-white-05: rgba(255, 255, 255, .05);
+  --tx-white-06: rgba(255, 255, 255, .06);
+  --tx-white-07: rgba(255, 255, 255, .07);
+  --tx-white-08: rgba(255, 255, 255, .08);
+  --tx-white-085: rgba(255, 255, 255, .085);
+  --tx-white-10: rgba(255, 255, 255, .10);
+  --tx-white-11: rgba(255, 255, 255, .11);
+  --tx-white-12: rgba(255, 255, 255, .12);
+  --tx-white-14: rgba(255, 255, 255, .14);
+  --tx-white-16: rgba(255, 255, 255, .16);
+  --tx-white-20: rgba(255, 255, 255, .20);
+  --tx-white-22: rgba(255, 255, 255, .22);
+  --tx-black-20: rgba(0, 0, 0, .20);
+  --tx-black-25: rgba(0, 0, 0, .25);
+  --tx-black-35: rgba(0, 0, 0, .35);
+  --tx-black-40: rgba(0, 0, 0, .40);
+  --tx-black-50: rgba(0, 0, 0, .50);
+  --tx-scrim: rgba(3, 3, 4, .38);
+  --tx-tooltip-fill: rgba(24, 24, 28, .94);
+  --tx-button-blur: 12px;
+  --tx-button-saturate: 140%;
+
+  /* Scroll indicators appear during scrolling without consuming layout space. */
+  --tx-scroll-hint: rgba(255, 255, 255, .2);
+  --tx-scroll-hint-width: 3px;
+  --tx-scroll-hint-min: 24px;
+  --tx-scroll-hint-fade: 700ms;
+
+  /* Shared container dimensions and three overlay sizes */
+  --tx-topbar-height: 48px;
+  --tx-panel-tabs-height: 36px;
+  --tx-sheet-width: 392px;
+  --tx-dialog-compact-width: 480px;
+  --tx-dialog-standard-width: 800px;
+  --tx-dialog-wide-width: 1000px;
+  --tx-dialog-width: var(--tx-dialog-compact-width);
+  --tx-dialog-max-height: 720px;
+  --tx-search-dialog-height: 680px;
+  --tx-menu-width: 232px;
+  /* Settings dialog fills most of the window, with navigation at left and content at right. */
+  --tx-settings-width: 1120px;
+  --tx-settings-height: 800px;
+  --tx-settings-nav-width: 232px;
+  --tx-settings-page-width: 720px;
+  --tx-doc-width: 1320px;
+  --tx-doc-stage-height: 230px;
+  --tx-doc-overlay-height: 300px;
+  --tx-doc-section-gap: 72px;
+  --tx-doc-top: 44px;
+  --tx-doc-bottom: 120px;
+  --tx-doc-card-radius: 10px;
+  --tx-size-display: 30px;
+  --tx-size-button: 12.5px;
+  --tx-size-key: 10px;
+  --tx-space-half: 2px;
+  --tx-space-1-half: 6px;
+  --tx-space-2-half: 10px;
+  --tx-space-4-half: 18px;
+  --tx-space-5: 20px;
+  --tx-space-5-half: 22px;
+  --tx-radius-menu: 10px;
+
+  /* Shared component dimensions */
+  --tx-hairline: 1px;
+  --tx-stroke: 1.5px;
+  --tx-check-stroke: 1.6px;
+  --tx-half-pixel: .5px;
+  --tx-space-3-quarter: 3px;
+  --tx-space-1-quarter: 5px;
+  --tx-space-2-quarter: 9px;
+  --tx-check-radius: 4px;
+  --tx-empty-padding: 26px;
+  --tx-switch-width: 30px;
+  --tx-switch-height: 18px;
+  --tx-tabs-height: 36px;
+  --tx-panel-head-height: 38px;
+  --tx-affix-padding: 44px;
+  --tx-sheet-top: 56px;
+  --tx-toast-min-width: 280px;
+  --tx-toast-max-width: 420px;
+  --tx-swatch-height: 46px;
+  --tx-empty-line-width: 34ch;
+  --tx-alert-line-width: 70ch;
+  --tx-tracking: -.003em;
+  --tx-tracking-tight: -.01em;
+  --tx-tracking-heading: -.02em;
+  --tx-press-time: 90ms;
+  --tx-row-time: 100ms;
+  --tx-switch-time: 150ms;
+  --tx-thumb-time: 180ms;
+  --tx-spin-time: .9s;
+  --tx-progress-time: 1.4s;
+  --tx-shimmer-time: 1.6s;
+  --tx-leading: 1.45;
+  --tx-leading-note: 1.55;
+  --tx-leading-code: 1.6;
+  --tx-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236E6C68' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --tx-doc-backdrop: radial-gradient(1200px 700px at 6% -12%,var(--tx-ember-backdrop),transparent 62%),var(--tx-bg);
+
+  /* Inter for prose and monospace for machine-generated values. Both ship locally under the OFL. */
+  --tx-font: 'Inter', -apple-system, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --tx-font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --tx-weight: 400;
+  --tx-weight-medium: 500;
+  --tx-weight-strong: 600;     /* Use semibold */
+
+  /* Type sizes at standard density */
+  --tx-size-2xs: 10.5px;       /* Tags and shortcuts */
+  --tx-size-xs: 11px;          /* Table headers, subtitles and hints */
+  --tx-size-sm: 12px;          /* Labels, small buttons, tables and controls */
+  --tx-size: 13px;             /* Body text */
+  --tx-size-lg: 15px;          /* Card and dialog titles */
+  --tx-size-num: 18px;         /* Key figures */
+  --tx-size-title: 19px;       /* Page titles, including Settings */
+
+  /* Dimensions at standard density. Containers can override density with data-tx-density. */
+  --tx-control: 28px;          /* Inputs and selects */
+  --tx-button: 28px;
+  --tx-button-sm: 24px;
+  --tx-row: 30px;              /* Table rows */
+  --tx-head-row: 28px;         /* Table headers */
+  --tx-pad: 14px;              /* Panel padding */
+  --tx-cell-pad: 8px;          /* Horizontal cell padding */
+  --tx-icon: 16px;
+  --tx-icon-sm: 14px;
+  --tx-icon-stroke: 2;         /* Stroke on a 24-unit grid, about 1.33px at 16px */
+  --tx-space-1: 4px;
+  --tx-space-2: 8px;
+  --tx-space-3: 12px;
+  --tx-space-4: 16px;
+  --tx-space-6: 24px;
+  --tx-space-8: 32px;
+
+  /* Larger surfaces have rounder corners. */
+  --tx-radius-xs: 4px;         /* Tags, tool buttons and shortcuts */
+  --tx-radius-sm: 6px;         /* Inputs and menu items */
+  --tx-radius: 10px;           /* Panels and cards */
+  --tx-radius-lg: 14px;        /* Drawers and dialogs */
+  --tx-radius-pill: 999px;     /* Buttons */
+
+  /* Motion */
+  --tx-ease: cubic-bezier(.22, 1, .36, 1);
+  --tx-fast: 120ms;
+  --tx-slow: 280ms;
+}
+
+/* Container density applies to descendant components. Compact suits chart toolbars and long tables. Spacious suits long chat messages. Standard restores the default inside a compact container. */
+[data-tx-density="compact"] {
+  --tx-size-2xs: 10px;
+  --tx-size-xs: 10.5px;
+  --tx-size-sm: 11.5px;
+  --tx-size: 12px;
+  --tx-size-button: 12px;
+  --tx-control: 24px;
+  --tx-button: 26px;
+  --tx-button-sm: 22px;
+  --tx-row: 24px;
+  --tx-head-row: 24px;
+  --tx-pad: 10px;
+  --tx-cell-pad: 6px;
+  --tx-icon: 16px;
+  --tx-icon-sm: 13px;
+  --tx-panel-head-height: 32px;
+  --tx-tabs-height: 30px;
+}
+[data-tx-density="standard"] {
+  --tx-size-2xs: 10.5px;
+  --tx-size-xs: 11px;
+  --tx-size-sm: 12px;
+  --tx-size: 13px;
+  --tx-size-button: 12.5px;
+  --tx-control: 28px;
+  --tx-button: 28px;
+  --tx-button-sm: 24px;
+  --tx-row: 30px;
+  --tx-head-row: 28px;
+  --tx-pad: 14px;
+  --tx-cell-pad: 8px;
+  --tx-icon: 16px;
+  --tx-icon-sm: 14px;
+  --tx-panel-head-height: 38px;
+  --tx-tabs-height: 36px;
+}
+[data-tx-density="comfortable"] {
+  --tx-size-2xs: 11px;
+  --tx-size-xs: 12px;
+  --tx-size-sm: 13px;
+  --tx-size: 14px;
+  --tx-size-button: 13px;
+  --tx-control: 34px;
+  --tx-button: 32px;
+  --tx-button-sm: 28px;
+  --tx-row: 40px;
+  --tx-head-row: 32px;
+  --tx-pad: 18px;
+  --tx-cell-pad: 12px;
+  --tx-icon: 16px;
+  --tx-icon-sm: 15px;
+  --tx-panel-head-height: 44px;
+  --tx-tabs-height: 40px;
+  --tx-leading: 1.55;
+}
+
+/* Global preference for red up and green down */
+:root[data-up-color="red-up"] {
+  --tx-up: var(--tx-red);
+  --tx-down: var(--tx-green);
+}
+
+/* Use opaque surfaces when the system requests reduced transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --tx-glass-blur: 0px;
+    --tx-glass-fill: var(--tx-glass-solid);
+  }
+}

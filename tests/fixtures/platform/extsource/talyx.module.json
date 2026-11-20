@@ -1,0 +1,6 @@
+{"manifestVersion": 5, "id": "extsource", "name": "Extension source", "version": "1.0.0",
+ "description": "A third-party data source for Market, implementing market.data_source",
+ "entries": {"backend": "backend.entry"}, "requires": {"market": {}},
+ "provides": {"market.data_source": [{"id": "extx", "descriptor": {
+   "name": "Extension test source", "sourceIds": ["extx"], "kinds": ["bars"], "assetClasses": ["equity"],
+   "credentials": "none", "paid": false, "supports": ["search", "history", "live"]}}]}}

@@ -1,0 +1,109 @@
+{
+  "provenance": {
+    "exchange": "gate",
+    "environment": "testnet",
+    "fillId": "1481660228",
+    "source": "Trade recorded account fill; public Gate BNB/USDT historical candle fetched for fee replay",
+    "feeScenario": "The recorded fill charged USDT. A BNB discount fee is overlaid only for conversion replay; it is not claimed as an exchange-charged BNB fee."
+  },
+  "fill": {
+    "accountId": "40e2a606eeb442118a4ffcb549bceef8",
+    "adapterId": "gate",
+    "environment": "testnet",
+    "fees": [
+      {
+        "amount": "0.003882605",
+        "currency": "USDT",
+        "usdValue": null
+      }
+    ],
+    "id": "1481660228",
+    "instrument": {
+      "active": null,
+      "adapterId": null,
+      "adjustmentEligible": false,
+      "assetClass": "crypto",
+      "base": "BTC",
+      "calendarId": "24_7",
+      "contractOrientation": "linear",
+      "contractSize": "0.0001",
+      "countryCode": null,
+      "currency": null,
+      "displaySymbol": "BTC/USDT:USDT",
+      "expiry": null,
+      "identityVersion": 1,
+      "instrumentId": "vi1_bb8cce67228bae5dd1c474720f6391f1bad144da90a468c801d24a98c43fa8e0",
+      "isOtc": null,
+      "marketType": "swap",
+      "mic": null,
+      "name": null,
+      "nativeId": null,
+      "optionSide": null,
+      "quote": "USDT",
+      "securityType": null,
+      "settle": "USDT",
+      "shareClass": null,
+      "sourceId": "gate",
+      "strike": null,
+      "symbol": "BTC/USDT:USDT",
+      "underlyingSymbol": null,
+      "venueId": "gate"
+    },
+    "orderId": "swap:USDT:82472172998522684",
+    "placedBy": {
+      "caller": "quant",
+      "kind": "module",
+      "label": "U5r recovery trial · BTC/USDT:USDT",
+      "panel": null,
+      "rootCallId": null,
+      "source": null,
+      "traderId": "quant:dep-4d87d112d6004383bb553d5c51cbaa58",
+      "workspaceId": "quant-u5r"
+    },
+    "price": "77652.1",
+    "product": "swap",
+    "quantity": "1.0",
+    "realizedPnl": null,
+    "side": "buy",
+    "timestamp": 1793472209599,
+    "walletId": "swap:USDT"
+  },
+  "fxBars": [
+    [
+      1793472120000,
+      707.1,
+      707.3,
+      707.1,
+      707.2,
+      7.577
+    ]
+  ],
+  "marketFx": {
+    "rate": "707.2",
+    "source": "gate",
+    "rateAt": 1793472180000,
+    "instrument": {
+      "instrumentId": "vi1_5890dd00edcee61186c33a22ddb0e7444e76aa8c8eda4bb34ba1d2d0b2cadb0c",
+      "identityVersion": 1,
+      "sourceId": "gate",
+      "venueId": "gate",
+      "symbol": "BNB/USDT",
+      "displaySymbol": "BNB/USDT",
+      "marketType": "spot",
+      "assetClass": "crypto",
+      "base": "BNB",
+      "quote": "USDT",
+      "settle": null,
+      "contractOrientation": "none",
+      "contractSize": null,
+      "expiry": null,
+      "strike": null,
+      "optionSide": null,
+      "underlyingSymbol": null,
+      "calendarId": "24_7",
+      "adjustmentEligible": false
+    },
+    "environment": "production",
+    "method": "minute_close"
+  }
+}

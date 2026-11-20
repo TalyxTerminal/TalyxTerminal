@@ -1,0 +1,231 @@
+/* Multi-workspace shell: the workspace menu, open-workspace switching and the
+   close/exit confirmation. Only design tokens here. */
+
+#talyx-layout-manager-candidate .tx-btn.talyx-workspace-switcher svg {
+  width: var(--tx-size-sm);
+  height: var(--tx-size-sm);
+  color: var(--tx-text-3);
+  transform: rotate(90deg);
+}
+
+/* Open workspaces beside the wordmark on Home, Workspaces, Community and News. */
+.talyx-shell-start {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-2-half);
+  min-width: 0;
+  max-width: 100%;
+}
+.talyx-open-workspaces {
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-1-half);
+  min-width: 0;
+  overflow: hidden;
+}
+.talyx-open-workspaces .tx-btn {
+  min-width: 0;
+  max-width: calc(var(--tx-menu-width) - var(--tx-space-6));
+  flex: 0 1 auto;
+}
+.talyx-open-workspaces .tx-btn > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The workspace name switches between open workspaces. */
+#talyx-layout-manager-candidate .tx-btn.talyx-workspace-switcher {
+  min-width: 0;
+  height: var(--tx-control);
+  margin-left: calc(-1 * var(--tx-space-1-half));
+  padding: 0 var(--tx-space-1-half);
+  gap: var(--tx-space-1-half);
+  border-radius: var(--tx-radius-sm);
+  color: var(--tx-text);
+}
+#talyx-layout-manager-candidate .tx-btn.talyx-workspace-switcher[data-state="open"] { background: var(--tx-white-06); }
+#talyx-layout-manager-candidate .workspace-name-line .tx-btn.talyx-workspace-switcher .workspace-name {
+  font-size: var(--tx-size);
+  font-weight: var(--tx-weight-medium);
+}
+#talyx-layout-manager-candidate .workspace-name-line { gap: var(--tx-space-1-half); }
+#talyx-layout-manager-candidate .workspace-name-line .save-state[data-save-state] {
+  flex: none;
+  font: inherit;
+  font-size: var(--tx-size-xs);
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--tx-text-3);
+}
+#talyx-layout-manager-candidate .workspace-name-line .save-state[data-save-state]::before { content: none; }
+#talyx-layout-manager-candidate .workspace-name-line .save-state[data-save-state="dirty"] { color: var(--tx-text-2); }
+#talyx-layout-manager-candidate .workspace-name-line .save-state[data-save-state="conflict"],
+#talyx-layout-manager-candidate .workspace-name-line .save-state[data-save-state="recovery"] { color: var(--tx-ember); }
+
+/* Close and exit confirmation: one dense, clickable list per workspace. */
+.talyx-activity-summary .talyx-activity-intro { margin: 0; color: var(--tx-text-2); line-height: var(--tx-leading); }
+.tx-alert + .talyx-activity-summary { margin-top: var(--tx-space-3); }
+.talyx-activity-summary .tx-section.talyx-activity-group {
+  margin-top: var(--tx-space-4);
+  padding: var(--tx-space-3) 0 0;
+  border-top: var(--tx-hairline) solid var(--tx-line);
+}
+.talyx-activity-summary .talyx-activity-group .tx-section-head { margin-bottom: 0; }
+.talyx-activity-summary .talyx-activity-group .tx-section-title { font-size: var(--tx-size); }
+.talyx-activity-summary .talyx-activity-group .tx-section-body { gap: 0; }
+.talyx-activity-summary .talyx-activity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-3);
+  min-height: var(--tx-control);
+  padding: var(--tx-space-1-half) 0;
+  color: var(--tx-text);
+  line-height: var(--tx-leading);
+}
+.talyx-activity-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.talyx-activity-detail { flex: none; color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+
+/* A module's panel status on its tab, seen even when the panel is behind
+   another tab: an ember dot asks for the user, a spinner means work is running. */
+#talyx-layout-manager-candidate .talyx-dock-tag:has(.talyx-dock-tag-status) .talyx-dock-tag-title { flex: 0 1 auto; }
+#talyx-layout-manager-candidate .talyx-dock-tag-status {
+  width: var(--tx-space-2-half);
+  height: var(--tx-space-2-half);
+  flex: none;
+  margin-right: auto;
+  display: grid;
+  place-items: center;
+}
+#talyx-layout-manager-candidate .talyx-dock-tag-status[data-state="attention"]::before {
+  content: "";
+  width: var(--tx-space-1-half);
+  height: var(--tx-space-1-half);
+  border-radius: 50%;
+  background: var(--tx-ember);
+  box-shadow: 0 0 var(--tx-space-2) var(--tx-ember-glow);
+}
+#talyx-layout-manager-candidate .talyx-dock-tag-status[data-state="running"]::before {
+  content: "";
+  width: var(--tx-space-2-half);
+  height: var(--tx-space-2-half);
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: var(--tx-stroke) solid var(--tx-line-3);
+  border-top-color: var(--tx-text-2);
+  animation: tx-spin var(--tx-spin-time) linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  #talyx-layout-manager-candidate .talyx-dock-tag-status[data-state="running"]::before { animation: none; }
+}
+
+/* The workspace menu: open workspaces with what runs in each, then the actions. */
+.tx-popover.talyx-workspace-menu { width: calc(var(--tx-menu-width) * 1.9); padding: var(--tx-space-1-half); }
+.talyx-activity-dot { width: var(--tx-space-1-half); height: var(--tx-space-1-half); flex: none; border-radius: 50%; background: var(--tx-text-2); }
+.talyx-activity-dot[data-state="waiting"] { background: var(--tx-ember); box-shadow: 0 0 var(--tx-space-2) var(--tx-ember-glow); }
+.talyx-wsmenu { display: flex; flex-direction: column; gap: var(--tx-hairline); }
+.talyx-wsmenu-label { padding: var(--tx-space-2) var(--tx-space-2-half) var(--tx-space-1); color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.talyx-wsmenu-sep { height: var(--tx-hairline); margin: var(--tx-space-1) var(--tx-space-1-half); background: var(--tx-line); }
+.talyx-wsmenu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tx-space-3);
+  min-height: var(--tx-button);
+  padding: 0 var(--tx-space-2-half);
+  border: 0;
+  border-radius: var(--tx-radius-sm);
+  background: transparent;
+  color: var(--tx-text);
+  font: inherit;
+  font-size: var(--tx-size);
+  text-align: left;
+  cursor: pointer;
+}
+.talyx-wsmenu-row:hover:not(:disabled), .talyx-wsmenu-row:focus-visible { background: var(--tx-white-06); outline: none; }
+.talyx-wsmenu-row:disabled { color: var(--tx-text-4); cursor: default; }
+.talyx-wsmenu-hint { color: var(--tx-text-3); font-family: var(--tx-font-mono); font-size: var(--tx-size-xs); }
+.talyx-wsmenu-ws { padding: 0; gap: 0; }
+.talyx-wsmenu-ws:hover { background: transparent; }
+.talyx-wsmenu-ws-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--tx-space-2);
+  min-width: 0;
+  min-height: var(--tx-button);
+  padding: 0 var(--tx-space-2-half) 0 var(--tx-space-1-half);
+  border: 0;
+  border-radius: var(--tx-radius-sm);
+  background: transparent;
+  color: var(--tx-text);
+  font: inherit;
+  font-size: var(--tx-size);
+  text-align: left;
+  cursor: pointer;
+}
+.talyx-wsmenu-ws-main:hover, .talyx-wsmenu-ws-main:focus-visible { background: var(--tx-white-06); outline: none; }
+.talyx-wsmenu-check { display: inline-flex; width: var(--tx-size); flex: none; color: var(--tx-ember); }
+.talyx-wsmenu-check .tx-icon { width: var(--tx-size); height: var(--tx-size); }
+.talyx-wsmenu-ws-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.talyx-wsmenu-counts { margin-left: auto; flex: none; color: var(--tx-text-3); font-family: var(--tx-font-mono); font-size: var(--tx-size-xs); }
+.talyx-wsmenu-counts[data-waiting] { color: var(--tx-ember-text); }
+.talyx-wsmenu-expand {
+  display: grid;
+  place-items: center;
+  width: var(--tx-button);
+  height: var(--tx-button);
+  flex: none;
+  border: 0;
+  border-radius: var(--tx-radius-sm);
+  background: transparent;
+  color: var(--tx-text-3);
+  cursor: pointer;
+}
+.talyx-wsmenu-expand:hover { background: var(--tx-white-06); color: var(--tx-text); }
+.talyx-wsmenu-expand .tx-icon { width: var(--tx-size-sm); height: var(--tx-size-sm); transition: transform var(--tx-fast) var(--tx-ease); }
+.talyx-wsmenu-expand[aria-expanded="true"] .tx-icon { transform: rotate(90deg); }
+.talyx-wsmenu-activities { display: flex; flex-direction: column; gap: var(--tx-space-1); margin: 0 0 var(--tx-space-1) var(--tx-space-5); padding-left: var(--tx-space-2); border-left: var(--tx-hairline) solid var(--tx-line); }
+.talyx-wsmenu-module { display: flex; flex-direction: column; }
+.talyx-wsmenu-module-name { padding: var(--tx-space-1) var(--tx-space-2) var(--tx-space-half); color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.talyx-wsmenu-activity {
+  display: flex;
+  align-items: center;
+  gap: var(--tx-space-2);
+  min-height: var(--tx-button-sm);
+  padding: 0 var(--tx-space-2);
+  border: 0;
+  border-radius: var(--tx-radius-sm);
+  background: transparent;
+  color: var(--tx-text-2);
+  font: inherit;
+  font-size: var(--tx-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.talyx-wsmenu-activity:hover:not(:disabled) { background: var(--tx-white-06); color: var(--tx-text); }
+.talyx-wsmenu-activity:disabled { cursor: default; }
+.talyx-wsmenu-dot { width: var(--tx-space-1-half); height: var(--tx-space-1-half); flex: none; border-radius: 50%; background: var(--tx-text-3); }
+.talyx-wsmenu-activity[data-state="watching"] .talyx-wsmenu-dot { background: var(--tx-text-2); }
+.talyx-wsmenu-activity[data-state="waiting"] .talyx-wsmenu-dot { background: var(--tx-ember); }
+.talyx-wsmenu-activity[data-state="paused"] .talyx-wsmenu-dot { background: var(--tx-text-4); }
+.talyx-wsmenu-activity-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.talyx-wsmenu-activity-state { margin-left: auto; flex: none; color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.talyx-wsmenu-activity[data-state="waiting"] .talyx-wsmenu-activity-state { color: var(--tx-ember-text); }
+.talyx-wsmenu-stop {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--tx-space-2) var(--tx-space-3);
+  margin: var(--tx-space-1) var(--tx-space-1-half);
+  padding: var(--tx-space-2) var(--tx-space-2-half);
+  border: var(--tx-hairline) solid var(--tx-line-2);
+  border-radius: var(--tx-radius-sm);
+  background: var(--tx-white-02);
+  color: var(--tx-text-3);
+  font-size: var(--tx-size-xs);
+  line-height: var(--tx-leading);
+}
+.talyx-wsmenu-error { grid-column: 1 / -1; margin: 0; padding: 0 var(--tx-space-2-half); color: var(--tx-ember-text); font-size: var(--tx-size-xs); }
+.talyx-mono-input { font-family: var(--tx-font-mono); }

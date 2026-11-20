@@ -1,0 +1,165 @@
+/* Home (output/home-mockups/v8 A): the time at the top left, two glass cards along the bottom, the stone moving behind
+   them. Values are --tx-* tokens; Home's own sizes are the local --talyx-home-* below. */
+#talyx-layout-manager-candidate .talyx-home {
+  --talyx-home-pad-top: clamp(26px, 4.4vh, 52px);
+  --talyx-home-pad-side: clamp(40px, 4.4vw, 80px);
+  --talyx-home-pad-bottom: clamp(30px, 5vh, 64px);
+  --talyx-home-clock-width: min(500px, 40vw);
+  --talyx-home-hm: clamp(64px, 10.5vh, 92px);
+  --talyx-home-sec: 20px;
+  --talyx-home-date: 15px;
+  --talyx-home-city-time: clamp(18px, 2.8vh, 22px);
+  --talyx-home-zones-gap: clamp(12px, 2.2vh, 20px);
+  --talyx-home-zones-top: clamp(16px, 2.8vh, 26px);
+  --talyx-home-zones-pad: clamp(14px, 2.4vh, 20px);
+  --talyx-home-cards-height: clamp(270px, 45vh, 470px);
+  --talyx-home-card-radius: 18px;
+  --talyx-home-head-height: 46px;
+  --talyx-home-name: 20px;
+  --talyx-home-plus: 52px;
+  --talyx-home-mini-radius: 8px;
+  --talyx-home-mini-tab: 22px;
+  --talyx-home-mini-tab-icon: 11px;
+  --talyx-home-mini-icon: 26px;
+  --talyx-home-community: 30px;
+  --talyx-home-arrow: 20px;
+  --talyx-home-tile: 64px;
+  --talyx-home-tile-radius: 15px;
+  --talyx-home-tile-gap: 14px;
+  --talyx-home-tile-icon: 26px;
+  --talyx-home-drift: 1.4s;
+  --talyx-home-brighten: .6s;
+  --talyx-home-tracking-clock: -.055em;
+  --talyx-home-tracking-title: -.035em;
+  --talyx-home-tracking-name: -.025em;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--tx-space-4);
+  height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--tx-topbar-height) + var(--talyx-home-pad-top)) var(--talyx-home-pad-side) var(--talyx-home-pad-bottom);
+  overflow: hidden;
+  font-family: var(--tx-font);
+  color: var(--tx-text);
+}
+.talyx-home-stone { position: absolute; inset: 0; z-index: -1; display: block; width: 100%; height: 100%; background: var(--tx-home-stone-fallback); }
+#talyx-layout-manager-candidate :where(.talyx-home button) {
+  font: inherit; color: inherit; text-align: left; letter-spacing: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+}
+#talyx-layout-manager-candidate .talyx-home button:focus-visible { outline: var(--tx-hairline) solid var(--tx-ember); outline-offset: var(--tx-space-3-quarter); }
+
+/* The clock */
+.talyx-home-clock { flex: none; width: var(--talyx-home-clock-width); padding-left: var(--tx-space-half); }
+.talyx-home-now { display: flex; align-items: flex-start; gap: var(--tx-space-1-half); font-variant-numeric: tabular-nums; }
+.talyx-home-hm { font-size: var(--talyx-home-hm); font-weight: var(--tx-weight); letter-spacing: var(--talyx-home-tracking-clock); line-height: .8; }
+.talyx-home-sec { margin-top: var(--tx-space-half); font-size: var(--talyx-home-sec); color: var(--tx-text-3); letter-spacing: var(--tx-tracking-heading); line-height: 1; }
+.talyx-home-today { display: flex; align-items: baseline; gap: var(--tx-space-2-half); margin-top: var(--tx-space-4); }
+.talyx-home-date { font-size: var(--talyx-home-date); font-weight: var(--tx-weight-medium); letter-spacing: var(--tx-tracking-tight); }
+.talyx-home-zone { font-size: var(--tx-size-sm); color: var(--tx-text-3); }
+.talyx-home-zones {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--talyx-home-zones-gap) var(--tx-space-4);
+  margin-top: var(--talyx-home-zones-top); padding-top: var(--talyx-home-zones-pad); border-top: var(--tx-hairline) solid var(--tx-line-2);
+}
+.talyx-home-city { display: flex; flex-direction: column; gap: var(--tx-space-1-half); min-width: 0; }
+.talyx-home-city-name { font-size: var(--tx-size-sm); color: var(--tx-text-2); white-space: nowrap; }
+.talyx-home-city-time { display: flex; align-items: baseline; gap: var(--tx-space-2); font-variant-numeric: tabular-nums; }
+.talyx-home-city-time > :first-child { font-size: var(--talyx-home-city-time); letter-spacing: var(--tx-tracking-heading); line-height: 1; }
+.talyx-home-city-note { font-size: var(--tx-size-xs); color: var(--tx-text-3); white-space: nowrap; }
+
+/* The two cards: glass, one layer, the stone showing through */
+.talyx-home-cards { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--tx-space-5); height: var(--talyx-home-cards-height); }
+#talyx-layout-manager-candidate .talyx-home-card {
+  position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
+  border-radius: var(--talyx-home-card-radius);
+  background: linear-gradient(180deg, var(--tx-glass-sheen), var(--tx-clear) 40%), var(--tx-glass-fill);
+  -webkit-backdrop-filter: blur(var(--tx-glass-blur)) saturate(var(--tx-glass-saturate));
+  backdrop-filter: blur(var(--tx-glass-blur)) saturate(var(--tx-glass-saturate));
+  border: var(--tx-hairline) solid var(--tx-glass-edge);
+  box-shadow: inset 0 var(--tx-hairline) 0 var(--tx-white-08), var(--tx-glass-shadow);
+  transition: border-color var(--tx-slow) var(--tx-ease);
+}
+
+/* Workspace card: the top row goes to all workspaces, the body opens the workspace; each lights on its own */
+#talyx-layout-manager-candidate .talyx-home-head {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--tx-space-3);
+  height: var(--talyx-home-head-height); padding: 0 var(--tx-space-4) 0 var(--tx-space-5);
+  border-bottom: var(--tx-hairline) solid var(--tx-line); transition: background var(--tx-fast) var(--tx-ease);
+}
+.talyx-home-head-title { font-size: var(--tx-size); font-weight: var(--tx-weight-strong); }
+.talyx-home-all { display: inline-flex; align-items: center; gap: var(--tx-space-1); font-size: var(--tx-size-sm); color: var(--tx-text-3); transition: color var(--tx-fast) var(--tx-ease); }
+.talyx-home-all > svg { width: var(--tx-icon-sm); height: var(--tx-icon-sm); transition: transform var(--tx-fast) var(--tx-ease); }
+#talyx-layout-manager-candidate .talyx-home-head:hover { background: var(--tx-white-025); }
+.talyx-home-head:hover .talyx-home-all { color: var(--tx-text); }
+.talyx-home-head:hover .talyx-home-all > svg { transform: translateX(var(--tx-space-half)); }
+
+#talyx-layout-manager-candidate .talyx-home-body {
+  flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--tx-space-4);
+  padding: var(--tx-space-4-half) var(--tx-space-5); transition: background var(--tx-fast) var(--tx-ease);
+}
+#talyx-layout-manager-candidate .talyx-home-body[data-new] { grid-template-rows: 1fr; }
+#talyx-layout-manager-candidate .talyx-home-body:hover { background: var(--tx-white-02); }
+.talyx-home-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--tx-space-4); min-width: 0; }
+.talyx-home-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--talyx-home-name); font-weight: var(--tx-weight-strong); letter-spacing: var(--talyx-home-tracking-name); line-height: 1.15; }
+.talyx-home-saved { flex: none; font-size: var(--tx-size-sm); color: var(--tx-text-3); }
+.talyx-home-modules { display: block; margin-top: var(--tx-space-1-quarter); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tx-size-sm); color: var(--tx-text-3); }
+
+/* The miniature: the saved layout drawn the way a workspace looks */
+.talyx-home-mini {
+  position: relative; display: block; width: 100%; height: 100%; overflow: hidden; border-radius: var(--talyx-home-mini-radius); background: var(--tx-line-2);
+  box-shadow: 0 0 0 var(--tx-hairline) var(--tx-line-2), 0 18px 40px -18px var(--tx-black-50);
+  transition: transform var(--tx-slow) var(--tx-ease), box-shadow var(--tx-slow) var(--tx-ease);
+}
+.talyx-home-mini-panel { position: absolute; display: flex; flex-direction: column; background: var(--tx-panel); transition: background var(--tx-slow) var(--tx-ease); }
+.talyx-home-mini-tab { flex: none; display: flex; align-items: stretch; height: var(--talyx-home-mini-tab); padding: 0 var(--tx-space-2); border-bottom: var(--tx-hairline) solid var(--tx-line); overflow: hidden; }
+.talyx-home-mini-tab > span { display: flex; align-items: center; gap: var(--tx-space-1-quarter); font-size: var(--tx-size-2xs); color: var(--tx-text-3); white-space: nowrap; }
+.talyx-home-mini-tab svg { width: var(--talyx-home-mini-tab-icon); height: var(--talyx-home-mini-tab-icon); }
+.talyx-home-mini-body { flex: 1; min-height: 0; display: grid; place-items: center; color: var(--tx-white-07); }
+.talyx-home-mini-body svg { width: var(--talyx-home-mini-icon); height: var(--talyx-home-mini-icon); }
+.talyx-home-body:hover .talyx-home-mini { transform: translateY(calc(-1 * var(--tx-space-half))); box-shadow: 0 0 0 var(--tx-hairline) var(--tx-line-3), 0 26px 50px -20px var(--tx-black-50); }
+.talyx-home-body:hover .talyx-home-mini-panel { background: var(--tx-card); }
+
+/* No workspace saved yet: the body makes a new one */
+.talyx-home-new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tx-space-3); color: var(--tx-text-2); }
+.talyx-home-new > b { font-size: var(--talyx-home-date); font-weight: var(--tx-weight-medium); color: var(--tx-text); }
+.talyx-home-new > span:last-child { font-size: var(--tx-size-sm); color: var(--tx-text-3); }
+.talyx-home-plus {
+  display: grid; place-items: center; width: var(--talyx-home-plus); height: var(--talyx-home-plus); border-radius: var(--tx-radius-pill);
+  border: var(--tx-hairline) dashed var(--tx-line-3); transition: border-color var(--tx-fast) var(--tx-ease), background var(--tx-fast) var(--tx-ease);
+}
+.talyx-home-plus > svg { width: var(--talyx-home-arrow); height: var(--talyx-home-arrow); }
+.talyx-home-body:hover .talyx-home-plus { border-color: var(--tx-text-3); background: var(--tx-white-04); }
+
+/* Community: one entry; its surface is a tilted plane of the installed modules' icons, texture rather than a list */
+#talyx-layout-manager-candidate .talyx-home-community:hover { border-color: var(--tx-white-16); }
+.talyx-home-plane-clip {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  -webkit-mask-image: linear-gradient(105deg, var(--tx-clear) 22%, var(--tx-bg) 62%); mask-image: linear-gradient(105deg, var(--tx-clear) 22%, var(--tx-bg) 62%);
+}
+.talyx-home-plane {
+  position: absolute; left: 8%; top: 50%; display: grid; grid-template-columns: repeat(10, var(--talyx-home-tile)); gap: var(--talyx-home-tile-gap);
+  transform: translate(0, -50%) perspective(1100px) rotateX(50deg) rotateZ(-32deg); transform-style: preserve-3d;
+  transition: transform var(--talyx-home-drift) var(--tx-ease);
+}
+.talyx-home-community:hover .talyx-home-plane { transform: translate(-18px, -54%) perspective(1100px) rotateX(46deg) rotateZ(-30deg); }
+.talyx-home-tile {
+  display: grid; place-items: center; width: var(--talyx-home-tile); height: var(--talyx-home-tile); border-radius: var(--talyx-home-tile-radius); color: var(--tx-text-3);
+  background: linear-gradient(180deg, var(--tx-white-07), var(--tx-white-02));
+  box-shadow: inset 0 var(--tx-hairline) 0 var(--tx-white-10), inset 0 0 0 var(--tx-hairline) var(--tx-white-05);
+  transition: color var(--talyx-home-brighten) var(--tx-ease);
+}
+.talyx-home-tile > svg { width: var(--talyx-home-tile-icon); height: var(--talyx-home-tile-icon); }
+.talyx-home-community:hover .talyx-home-tile { color: var(--tx-text-2); }
+.talyx-home-community::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(75% 60% at 0% 100%, var(--tx-black-50), var(--tx-clear) 72%); }
+.talyx-home-community-text { position: absolute; z-index: 1; left: var(--tx-space-6); right: var(--tx-space-5); bottom: var(--tx-space-5-half); }
+.talyx-home-community-title { display: flex; align-items: center; gap: var(--tx-space-3); font-size: var(--talyx-home-community); font-weight: var(--tx-weight-medium); letter-spacing: var(--talyx-home-tracking-title); line-height: 1; }
+.talyx-home-community-title > svg {
+  width: var(--talyx-home-arrow); height: var(--talyx-home-arrow); color: var(--tx-text-3);
+  transition: color var(--tx-fast) var(--tx-ease), transform var(--tx-fast) var(--tx-ease);
+}
+.talyx-home-community:hover .talyx-home-community-title > svg { color: var(--tx-text); transform: translate(var(--tx-space-3-quarter), calc(-1 * var(--tx-space-3-quarter))); }
+.talyx-home-community-sub { display: block; margin-top: var(--tx-space-2-quarter); font-size: var(--tx-size-sm); color: var(--tx-text-3); }
+/* Inside the workspace card the ring is drawn inside the row, which the card's rounded clip would cut. */
+#talyx-layout-manager-candidate .talyx-home-card :is(.talyx-home-head, .talyx-home-body):focus-visible { outline-offset: calc(-2 * var(--tx-hairline)); }

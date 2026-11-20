@@ -1,0 +1,58 @@
+.developer-workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; background: var(--tx-panel); color: var(--tx-text); }
+.developer-workspace-toolbar { display: flex; align-items: center; gap: var(--tx-space-2); padding: var(--tx-space-1-half) var(--tx-space-3); border-bottom: var(--tx-hairline) solid var(--tx-line); flex: none; min-width: 0; }
+.developer-switch { min-width: 0; max-width: 40%; }
+.developer-switch > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.developer-switch-chevron { color: var(--tx-text-3); }
+.developer-delivery { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
+.developer-delivery-head { display: flex; align-items: center; justify-content: space-between; gap: var(--tx-space-2); padding: var(--tx-space-2) var(--tx-space-3); border-bottom: var(--tx-hairline) solid var(--tx-line); }
+.developer-delivery-head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.developer-delivery-body { overflow: auto; min-height: 0; }
+.developer-delivery-content { display: flex; flex-direction: column; }
+.developer-delivery-alert { padding: var(--tx-space-3) var(--tx-space-3) 0; }
+/* Preview readout in the toolbar: state, the version it serves, and the link to it. */
+.developer-preview-status { display: flex; align-items: center; gap: var(--tx-space-2); min-width: 0; }
+.developer-preview-meta { color: var(--tx-text-3); font-size: var(--tx-size-xs); white-space: nowrap; }
+/* Problems in the author's files, compiler style; the list scrolls past four rows. */
+.developer-preview-problems { flex: none; padding: var(--tx-space-2) var(--tx-space-3) 0; }
+.developer-problems { flex-basis: 100%; min-width: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--tx-space-half); max-height: calc(var(--tx-row) * 4); overflow: auto; }
+.developer-problems > li { display: flex; align-items: center; gap: var(--tx-space-2); min-width: 0; }
+.developer-problem-row, .developer-problem { flex: 1; min-width: 0; white-space: normal; text-align: left; }
+.developer-problem-row { flex-direction: column; align-items: flex-start; gap: 0; }
+.developer-problem { display: flex; flex-direction: column; padding: var(--tx-space-2) var(--tx-space-2-half); }
+.developer-problems .tx-cell-sub { overflow-wrap: anywhere; }
+.developer-form-options { display: grid; gap: var(--tx-space-3); }
+.developer-operation-result { display: flex; align-items: start; gap: var(--tx-space-3); padding: var(--tx-space-2) var(--tx-space-3); }
+.developer-support-result { display: flex; flex-direction: column; gap: var(--tx-space-2); min-width: 0; width: 100%; }
+.developer-operation-result { max-height: 30%; overflow: auto; }
+.developer-result-actions { display: flex; gap: var(--tx-space-2); flex-wrap: wrap; }
+.developer-result-state, .developer-result-links { display: flex; align-items: center; gap: var(--tx-space-2); flex-wrap: wrap; min-width: 0; }
+.developer-result-links { gap: var(--tx-space-1); }
+@media (max-width: 800px) { .developer-project-fields { grid-template-columns: minmax(0, 1fr); } }
+.developer-project-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.developer-project-summary { display: grid; gap: 8px; }
+.developer-project-summary > div { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: 12px; }
+.developer-project-summary dd { margin: 0; overflow-wrap: anywhere; }
+.developer-project-options { display: flex; flex-wrap: wrap; gap: 12px; padding-block: 12px; }
+.developer-project-output { white-space: pre-wrap; max-height: 18rem; overflow: auto; }
+.developer-recovery-list .tx-section { padding-inline: 0; }
+.developer-recovery-list .tx-settings-row { gap: var(--tx-space-2); }
+.developer-recovery-list .tx-settings-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.developer-recovery-review .tx-settings-row { flex-wrap: wrap; justify-content: flex-start; }
+.developer-recovery-review .tx-settings-copy { flex-basis: 100%; }
+[data-module-view] { height: 100%; min-height: 0; }
+/* Project files: one quiet row per entry, folders open in place. */
+.developer-tree { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.developer-tree-head { display: flex; align-items: center; justify-content: space-between; gap: var(--tx-space-2); padding: var(--tx-space-1-half) var(--tx-space-2) var(--tx-space-1-half) var(--tx-space-3); border-bottom: var(--tx-hairline) solid var(--tx-line); color: var(--tx-text-2); }
+.developer-tree-head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.developer-tree-rows { flex: 1; min-height: 0; overflow: auto; padding-block: var(--tx-space-1); }
+.developer-tree-row { width: 100%; flex-direction: row; align-items: center; justify-content: flex-start; gap: var(--tx-space-1-half); white-space: nowrap; }
+.developer-tree-row > span { overflow: hidden; text-overflow: ellipsis; }
+.developer-tree-icon { flex: none; color: var(--tx-text-3); }
+.developer-tree-open { transform: rotate(90deg); }
+/* Editor: tabs of open files above one Monaco editor. */
+.developer-editor-pane { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; background: var(--tx-panel); }
+.developer-tabs { flex: none; min-width: 0; background: var(--tx-bg); }
+.developer-editor-notice { display: flex; align-items: center; gap: var(--tx-space-2); flex: none; padding: var(--tx-space-1-half) var(--tx-space-3); border-bottom: var(--tx-hairline) solid var(--tx-line); color: var(--tx-text-2); }
+.developer-editor-host { flex: 1; min-height: 0; }
+.developer-editor-pane > .tx-empty { margin: auto; }
+.developer-compare { height: 60vh; min-height: 240px; }

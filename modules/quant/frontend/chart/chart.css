@@ -1,0 +1,32 @@
+/* Quant's charts (Plot.tsx): the box, the platform read-out laid over Plotly's, the crosshair and marks, and the key beside a section's title. */
+.qc-plot { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.qc-plot-area { position: absolute; inset: 0; }
+/* Lines keep their width while the wheel stretches the drawn layers (see Plot). */
+.qc-plot .scatterlayer .js-line { vector-effect: non-scaling-stroke; }
+.qc-plot .hoverlayer .hovertext, .qc-plot .hoverlayer .axistext { display: none; }
+.qc-plot .hoverlayer .xspike, .qc-plot .hoverlayer .yspike { display: none; }
+/* Plotly draws a spike as a white halo (3px) under the thin line: only the thin muted line stays. */
+.qc-plot .hoverlayer .spikeline[stroke="rgb(255, 255, 255)"] { stroke-opacity: 0; }
+/* The span being dragged to zoom: the rest of the plot dims a little; no corner handles, no Plotly hint. */
+.qc-plot .zoomlayer .zoombox { fill: var(--tx-black-40) !important; }
+.qc-plot .zoomlayer .zoombox-corners { display: none; }
+.qc-plot-shade { position: absolute; display: none; background: var(--tx-white-04); pointer-events: none; }
+.qc-plot-cross { position: absolute; display: none; width: 0; border-left: 1px solid var(--tx-text-4); pointer-events: none; }
+.qc-plot-marks > i { position: absolute; display: none; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; box-shadow: 0 0 0 2px var(--tx-panel); pointer-events: none; }
+.qc-plot-keys { position: absolute; top: 2px; left: 8px; z-index: 2; display: flex; align-items: center; gap: 12px; }
+.qc-keys { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.tx-regionhead .tx-regionkeys .qc-keys { flex-wrap: wrap; justify-content: flex-end; row-gap: 2px; }
+.qc-key { display: inline-flex; align-items: center; gap: 5px; font-size: var(--tx-size-xs); color: var(--tx-text-3); white-space: nowrap; }
+.qc-key i { display: inline-block; width: 14px; border-top: 2px solid var(--tx-text); border-radius: 1px; }
+.qc-key i[data-mark="dash"] { border-top-style: dashed; }
+.qc-key i[data-mark="dot"] { border-top: 2px dotted; }
+.qc-key i[data-mark="box"] { width: 8px; height: 8px; border: 0; border-radius: 2px; }
+.qc-key[data-weak] { color: var(--tx-text-4); }
+.qc-plot-tip { position: absolute; z-index: 3; display: none; pointer-events: none; padding: 8px 10px; border: 1px solid var(--tx-line-2); border-radius: var(--tx-radius-sm); background: var(--tx-raised); box-shadow: 0 18px 40px -12px var(--tx-black-50); font-size: var(--tx-size-sm); white-space: nowrap; }
+.qc-plot-tip .qc-tip-h { color: var(--tx-text-3); font-size: var(--tx-size-xs); margin-bottom: 4px; }
+.qc-plot-tip .qc-tip-r { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 150px; line-height: 19px; color: var(--tx-text-2); }
+.qc-plot-tip .qc-tip-r i { display: inline-block; width: 8px; height: 2px; margin-right: 7px; vertical-align: 3px; border-radius: 1px; }
+.qc-plot-tip .qc-tip-r i[data-dashed] { background: none !important; border-top: 1.5px dashed; }
+.qc-plot-tip .qc-tip-r b { font-family: var(--tx-font-mono); font-weight: var(--tx-weight-medium); color: var(--tx-text); }
+.qc-plot-tip .qc-tip-r[data-weak] b { color: var(--tx-text-2); }
+.qc-plot-note { margin: 0; padding: 8px 0; color: var(--tx-text-3); font-size: var(--tx-size-xs); }

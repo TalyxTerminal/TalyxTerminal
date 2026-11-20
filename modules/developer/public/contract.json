@@ -1,0 +1,3118 @@
+{
+ "contractVersion": 5,
+ "module": "developer",
+ "deleteWorkspace": true,
+ "actions": {
+  "documents.create": {
+   "description": "Create a new UTF-8 file in an open project and open it; an existing file fails with conflict. Example:\n{\"projectId\":\"<id>\",\"relativePath\":\"backend/tools.py\",\"content\":\"...\"}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CreateDocumentInput"
+   },
+   "output": {
+    "$ref": "#/$defs/DocumentReceipt"
+   },
+   "examples": [
+    {
+     "projectId": "<id>",
+     "relativePath": "backend/tools.py",
+     "content": "..."
+    }
+   ],
+   "errors": [
+    "conflict",
+    "permission_denied",
+    "source_replaced",
+    "source_unavailable"
+   ]
+  },
+  "documents.create_checkpoint": {
+   "description": "Keep the current content of these documents (each at the version you read) as a checkpoint, to restore later\nwith documents.restore_checkpoint. The same submissionId always gives the same checkpoint. Example:\n{\"submissionId\":\"save-1\",\"documents\":[{\"documentId\":\"document:1a2b\",\"expectedVersion\":4}]}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CreateCheckpointInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Checkpoint"
+   },
+   "examples": [
+    {
+     "submissionId": "save-1",
+     "documents": [
+      {
+       "documentId": "document:1a2b",
+       "expectedVersion": 4
+      }
+     ]
+    }
+   ],
+   "errors": [
+    "conflict",
+    "checkpoint_failed"
+   ]
+  },
+  "documents.edit": {
+   "description": "Change a shared document's buffer at the version you read (a stale one fails with conflict): edits replaces\nline ranges (startLine..endLine, both included, numbered as in the version you read; text \"\" deletes them;\nthe line ending is kept), content replaces the whole text. Nothing is written to disk until documents.save.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/EditDocumentInput"
+   },
+   "output": {
+    "$ref": "#/$defs/DocumentReceipt"
+   },
+   "examples": [
+    {
+     "documentId": "document:1a2b",
+     "expectedVersion": 3,
+     "edits": [
+      {
+       "startLine": 12,
+       "endLine": 13,
+       "text": "WINDOW = 60"
+      }
+     ]
+    },
+    {
+     "documentId": "document:1a2b",
+     "expectedVersion": 3,
+     "content": "print(\"hello\")\n"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found",
+    "permission_denied"
+   ]
+  },
+  "documents.list": {
+   "description": "The shared documents open under these folders (file URIs), with their version and whether they are unsaved or\nin conflict. Omit rootUris to list every unsaved document in Recovery, including module-provided sources. nextCursor pages on. Example: {\"rootUris\":[\"file:///d%3A/work/strategy\"]}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ListDocumentsInput"
+   },
+   "output": {
+    "$ref": "#/$defs/DocumentList"
+   },
+   "examples": [
+    {
+     "rootUris": [
+      "file:///d%3A/work/strategy"
+     ]
+    }
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input"
+   ]
+  },
+  "documents.open": {
+   "description": "Open a file (its folder becomes a project unless it is inside one) or a module's document as a shared document:\nevery editor and caller of the same source shares one buffer. Returns its documentId and version; read it with\ndocuments.read. Example: {\"source\":{\"kind\":\"file\",\"uri\":\"file:///d%3A/work/strategy/main.py\"}}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/OpenDocumentInput"
+   },
+   "output": {
+    "$ref": "#/$defs/DocumentReceipt"
+   },
+   "examples": [
+    {
+     "source": {
+      "kind": "file",
+      "uri": "file:///d%3A/work/strategy/main.py"
+     }
+    }
+   ],
+   "errors": [
+    "binary_resource",
+    "invalid_input",
+    "not_found",
+    "resource_too_large",
+    "source_replaced",
+    "source_unavailable",
+    "unavailable"
+   ]
+  },
+  "documents.read": {
+   "description": "A shared document a page of whole lines at a time: the buffer (content) from startLine, totalLines, version,\nwhether it is unsaved (dirty) or changed on disk under unsaved edits (conflict, with the saved text in baseContent).\nnextCursor continues; startLine and lineCount read a chosen part. full:true returns the whole document in one\nanswer (for editors). expectedVersion fails with conflict when it moved on.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadDocumentInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Document"
+   },
+   "examples": [
+    {
+     "documentId": "document:1a2b"
+    },
+    {
+     "documentId": "document:1a2b",
+     "startLine": 400,
+     "lineCount": 50
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found"
+   ]
+  },
+  "documents.read_checkpoint": {
+   "description": "List the documents in a checkpoint, or read one sourceKey's captured buffer and saved baseline.\nContinue the list with nextCursor, or the text by passing nextChar as startChar.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadCheckpointInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/CheckpointList"
+     },
+     {
+      "$ref": "#/$defs/CheckpointText"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "checkpoint": {
+      "checkpointId": "<id>",
+      "digest": "<digest>"
+     }
+    }
+   ],
+   "errors": [
+    "checkpoint_damaged",
+    "source_unavailable",
+    "invalid_input"
+   ]
+  },
+  "documents.read_source": {
+   "description": "The shared document of a source that exists, without opening a new project for it (a file in an open project,\nor a module's document), paged like documents.read.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadSourceInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Document"
+   },
+   "examples": [
+    {
+     "source": {
+      "kind": "contribution",
+      "providerId": "chart:indicator-docs",
+      "sourceKey": "guide"
+     }
+    }
+   ],
+   "errors": [
+    "binary_resource",
+    "resource_too_large",
+    "source_replaced",
+    "source_unavailable",
+    "unavailable"
+   ]
+  },
+  "documents.read_versions": {
+   "description": "Compare the unsaved buffer (content), its saved baseline and the current external content at the same character\noffset. Continue at nextChar. version and sourceVersion identify the buffer and external source for resolve.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/VersionsInput"
+   },
+   "output": {
+    "$ref": "#/$defs/VersionsPage"
+   },
+   "examples": [
+    {
+     "documentId": "document:1a2b"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "source_unavailable"
+   ]
+  },
+  "documents.resolve": {
+   "description": "Resolve the versions you compared with documents.read_versions. external replaces the buffer with the external\ntext. mine keeps the buffer against that external version; use documents.save to write it. Stale versions conflict.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ResolveInput"
+   },
+   "output": {
+    "$ref": "#/$defs/DocumentReceipt"
+   },
+   "examples": [
+    {
+     "documentId": "document:1a2b",
+     "mode": "mine",
+     "expectedVersion": 2,
+     "expectedSourceVersion": "<digest>"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "permission_denied",
+    "not_found"
+   ]
+  },
+  "documents.restore_checkpoint": {
+   "description": "Put a checkpoint's content back into its documents' buffers. A document changed since (status conflict) keeps\nits content unless a resolution names its current version; then what it had is kept in preservedCheckpoint.\nExample: {\"checkpoint\":{\"checkpointId\":\"<id>\",\"digest\":\"<digest>\"}}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RestoreCheckpointInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Restored"
+   },
+   "examples": [
+    {
+     "checkpoint": {
+      "checkpointId": "<id>",
+      "digest": "<digest>"
+     }
+    }
+   ],
+   "errors": [
+    "checkpoint_damaged",
+    "not_found",
+    "source_unavailable"
+   ]
+  },
+  "documents.save": {
+   "description": "Write a shared document's buffer to its source. status saved, clean (nothing to write) or conflict (the file\nchanged on disk since it was read: compare first; nothing is overwritten). Saving runs no code. Example:\n{\"documentId\":\"document:1a2b\",\"expectedVersion\":4}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SaveDocumentInput"
+   },
+   "output": {
+    "$ref": "#/$defs/SaveResult"
+   },
+   "examples": [
+    {
+     "documentId": "document:1a2b",
+     "expectedVersion": 4
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found",
+    "permission_denied"
+   ]
+  },
+  "help": {
+   "description": "List the SDK and development support references shown in Help. Read an entry with documents.read_source.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ListProjectsInput"
+   },
+   "output": {
+    "$ref": "#/$defs/HelpPage"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "projects.create_module": {
+   "description": "Create a new TALYX module from Developer's template (one action, greet, and a panel that calls it) in the folder\nof the user's installed modules, and open it as a project. First select its project in Developer and click\nUse in TALYX to install and start it. After a\nchange, reloading it regenerates its contract and restarts only it. Example: {\"name\":\"Signals\"}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CreateModuleInput"
+   },
+   "output": {
+    "$ref": "#/$defs/CreatedModule"
+   },
+   "examples": [
+    {
+     "name": "Signals"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input",
+    "invalid_module"
+   ]
+  },
+  "projects.file_history": {
+   "description": "List the file's saved revisions newest first, or read one revisionId. Continue its text at nextChar.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/FileRevisionInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/RevisionList"
+     },
+     {
+      "$ref": "#/$defs/RevisionText"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "projectId": "<id>",
+     "path": "main.py"
+    }
+   ]
+  },
+  "projects.instructions": {
+   "description": "The project's AGENTS.md (how to work in it), a part at a time: startLine, lineCount, nextLine. Example:\n{\"projectId\":\"<id>\"}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/InstructionsInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Instructions"
+   },
+   "examples": [
+    {
+     "projectId": "<id>"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "source_replaced",
+    "source_unavailable"
+   ]
+  },
+  "projects.list": {
+   "description": "The folders open in Developer as projects. Continue a long directory with nextCursor.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ListProjectsInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ProjectList"
+   },
+   "examples": [
+    {}
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input"
+   ]
+  },
+  "projects.module_status": {
+   "description": "The project's module manifest and TALYX runtime status. module is null for an ordinary project; runtime is null\nbefore installation. A module stored in TALYX's modules folder still needs Use in TALYX on first installation.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ProjectId"
+   },
+   "output": {
+    "$ref": "#/$defs/ProjectModuleState"
+   },
+   "examples": [
+    {
+     "projectId": "<id>"
+    }
+   ]
+  },
+  "projects.open": {
+   "description": "Open a folder as a project (a folder inside an open project gives that project). Example:\n{\"directory\":\"D:/work/strategy\",\"name\":\"Strategy\"}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/OpenProjectInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Project"
+   },
+   "examples": [
+    {
+     "directory": "D:/work/strategy",
+     "name": "Strategy"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "source_unavailable"
+   ]
+  },
+  "projects.read_tree": {
+   "description": "The files and folders in one folder of a project (path relative to its root, \"\" for the root); nextCursor\npages on. Example: {\"projectId\":\"<id>\",\"path\":\"backend\"}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadTreeInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Tree"
+   },
+   "examples": [
+    {
+     "projectId": "<id>",
+     "path": "backend"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "permission_denied",
+    "source_replaced",
+    "source_unavailable"
+   ]
+  },
+  "projects.remove": {
+   "description": "Remove a project listing (forget), or also move the project folder to the Windows Recycle Bin (trash).\nUse rootUri and rootIdentity from projects.list or projects.open. Save or discard unsaved project files first.",
+   "effects": [
+    "delete"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RemoveProjectInput"
+   },
+   "output": {
+    "$ref": "#/$defs/RemovedProject"
+   },
+   "examples": [
+    {
+     "projectId": "<id>",
+     "mode": "forget",
+     "expectedRootUri": "file:///D:/work",
+     "rootIdentity": "<identity>"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "unavailable",
+    "permission_denied",
+    "recycle_failed"
+   ]
+  },
+  "projects.restore_revision": {
+   "description": "Write a saved revision to the file if its disk version still matches. Take expectedVersion from documents.read's\nsourceVersion. Resolve or save unsaved edits first. A changed disk version returns status conflict.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RestoreRevisionInput"
+   },
+   "output": {
+    "$ref": "#/$defs/RevisionSaveResult"
+   },
+   "examples": [
+    {
+     "projectId": "<id>",
+     "path": "main.py",
+     "revisionId": "<id>",
+     "expectedVersion": "<current file digest>"
+    }
+   ],
+   "errors": [
+    "source_unavailable",
+    "permission_denied",
+    "conflict"
+   ]
+  }
+ },
+ "streams": {},
+ "events": {
+  "document_changed": {
+   "description": "A shared document's buffer, saved text or state changed.",
+   "payload": {
+    "$ref": "#/$defs/DocumentChanged"
+   }
+  },
+  "projects_changed": {
+   "description": "The registered project list or a project in it changed.",
+   "payload": {
+    "$ref": "#/$defs/Empty"
+   }
+  }
+ },
+ "extensionPoints": {
+  "development_support": {
+   "description": "Help for documents a module knows: guides and examples listed in Developer's Help, and with the language capability the Python a matching file is analysed against.",
+   "descriptor": {
+    "$ref": "#/$defs/DevelopmentSupport"
+   },
+   "actions": {
+    "invoke": {
+     "description": "{capability, command, document, project}: for language, command environment answers {environment: {python: {interpreterPath, environmentPath}}, languageMaterials}.",
+     "input": {
+      "type": "object",
+      "additionalProperties": true
+     },
+     "output": {
+      "type": "object",
+      "additionalProperties": true
+     }
+    }
+   },
+   "streams": {}
+  },
+  "document_source": {
+   "description": "Documents a module serves itself, opened in Developer's editor by {kind: contribution, providerId: 'module:id', sourceKey}.",
+   "descriptor": {
+    "$ref": "#/$defs/DocumentSourceDescriptor"
+   },
+   "actions": {
+    "read": {
+     "description": "{sourceKey, target}: {name, content, version, language, readOnly, context}.",
+     "input": {
+      "type": "object",
+      "additionalProperties": true
+     },
+     "output": {
+      "type": "object",
+      "additionalProperties": true
+     }
+    },
+    "write": {
+     "description": "{sourceKey, target, content, expectedVersion}: {status, version, message}.",
+     "input": {
+      "type": "object",
+      "additionalProperties": true
+     },
+     "output": {
+      "type": "object",
+      "additionalProperties": true
+     }
+    }
+   },
+   "streams": {}
+  }
+ },
+ "settings": {},
+ "$defs": {
+  "AppliesTo": {
+   "additionalProperties": false,
+   "properties": {
+    "sourceKinds": {
+     "default": [],
+     "items": {
+      "enum": [
+       "file",
+       "contribution"
+      ],
+      "type": "string"
+     },
+     "title": "Sourcekinds",
+     "type": "array"
+    },
+    "filePatterns": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Filepatterns",
+     "type": "array"
+    },
+    "providerIds": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Providerids",
+     "type": "array"
+    },
+    "projectKinds": {
+     "default": [],
+     "items": {
+      "enum": [
+       "local",
+       "reference"
+      ],
+      "type": "string"
+     },
+     "title": "Projectkinds",
+     "type": "array"
+    }
+   },
+   "title": "AppliesTo",
+   "type": "object"
+  },
+  "Checkpoint": {
+   "additionalProperties": false,
+   "properties": {
+    "checkpoint": {
+     "$ref": "#/$defs/CheckpointReference"
+    },
+    "documents": {
+     "items": {
+      "$ref": "#/$defs/CheckpointDocument"
+     },
+     "title": "Documents",
+     "type": "array"
+    }
+   },
+   "required": [
+    "checkpoint",
+    "documents"
+   ],
+   "title": "Checkpoint",
+   "type": "object"
+  },
+  "CheckpointDocument": {
+   "additionalProperties": false,
+   "properties": {
+    "capturedDocumentId": {
+     "title": "Captureddocumentid",
+     "type": "string"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/FileSource"
+      },
+      {
+       "$ref": "#/$defs/ContributionSource"
+      }
+     ],
+     "title": "Source"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "sourceVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Sourceversion"
+    },
+    "sourceKey": {
+     "title": "Sourcekey",
+     "type": "string"
+    },
+    "contentDigest": {
+     "title": "Contentdigest",
+     "type": "string"
+    }
+   },
+   "required": [
+    "capturedDocumentId",
+    "source",
+    "name",
+    "version",
+    "sourceVersion",
+    "sourceKey",
+    "contentDigest"
+   ],
+   "title": "CheckpointDocument",
+   "type": "object"
+  },
+  "CheckpointList": {
+   "additionalProperties": false,
+   "properties": {
+    "checkpoint": {
+     "$ref": "#/$defs/CheckpointReference"
+    },
+    "documents": {
+     "items": {
+      "$ref": "#/$defs/CheckpointDocument"
+     },
+     "title": "Documents",
+     "type": "array"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "checkpoint",
+    "documents",
+    "nextCursor"
+   ],
+   "title": "CheckpointList",
+   "type": "object"
+  },
+  "CheckpointReference": {
+   "additionalProperties": false,
+   "properties": {
+    "checkpointId": {
+     "title": "Checkpointid",
+     "type": "string"
+    },
+    "digest": {
+     "title": "Digest",
+     "type": "string"
+    }
+   },
+   "required": [
+    "checkpointId",
+    "digest"
+   ],
+   "title": "CheckpointReference",
+   "type": "object"
+  },
+  "CheckpointSelection": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "title": "Expectedversion",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "documentId",
+    "expectedVersion"
+   ],
+   "title": "CheckpointSelection",
+   "type": "object"
+  },
+  "CheckpointText": {
+   "additionalProperties": false,
+   "properties": {
+    "content": {
+     "title": "Content",
+     "type": "string"
+    },
+    "startChar": {
+     "title": "Startchar",
+     "type": "integer"
+    },
+    "nextChar": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextchar"
+    },
+    "baseContent": {
+     "title": "Basecontent",
+     "type": "string"
+    },
+    "sourceKey": {
+     "title": "Sourcekey",
+     "type": "string"
+    }
+   },
+   "required": [
+    "content",
+    "startChar",
+    "nextChar",
+    "baseContent",
+    "sourceKey"
+   ],
+   "title": "CheckpointText",
+   "type": "object"
+  },
+  "ContributionSource": {
+   "additionalProperties": false,
+   "description": "A document another module provides at ``developer.document_source`` (``providerId`` is ``module:id``).",
+   "properties": {
+    "kind": {
+     "const": "contribution",
+     "title": "Kind",
+     "type": "string"
+    },
+    "providerId": {
+     "title": "Providerid",
+     "type": "string"
+    },
+    "sourceKey": {
+     "title": "Sourcekey",
+     "type": "string"
+    },
+    "target": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Target"
+    }
+   },
+   "required": [
+    "kind",
+    "providerId",
+    "sourceKey"
+   ],
+   "title": "ContributionSource",
+   "type": "object"
+  },
+  "CreateCheckpointInput": {
+   "additionalProperties": false,
+   "properties": {
+    "submissionId": {
+     "title": "Submissionid",
+     "type": "string"
+    },
+    "documents": {
+     "items": {
+      "$ref": "#/$defs/CheckpointSelection"
+     },
+     "title": "Documents",
+     "type": "array"
+    }
+   },
+   "required": [
+    "submissionId",
+    "documents"
+   ],
+   "title": "CreateCheckpointInput",
+   "type": "object"
+  },
+  "CreateDocumentInput": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "relativePath": {
+     "title": "Relativepath",
+     "type": "string"
+    },
+    "content": {
+     "title": "Content",
+     "type": "string"
+    }
+   },
+   "required": [
+    "projectId",
+    "relativePath",
+    "content"
+   ],
+   "title": "CreateDocumentInput",
+   "type": "object"
+  },
+  "CreateModuleInput": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "maxLength": 80,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "moduleId": {
+     "anyOf": [
+      {
+       "pattern": "^[a-z][a-z0-9_]{0,63}$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Defaults to the name in lowercase with underscores.",
+     "title": "Moduleid"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "CreateModuleInput",
+   "type": "object"
+  },
+  "CreatedModule": {
+   "additionalProperties": false,
+   "properties": {
+    "moduleId": {
+     "title": "Moduleid",
+     "type": "string"
+    },
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "rootUri": {
+     "title": "Rooturi",
+     "type": "string"
+    },
+    "directory": {
+     "title": "Directory",
+     "type": "string"
+    }
+   },
+   "required": [
+    "moduleId",
+    "projectId",
+    "name",
+    "rootUri",
+    "directory"
+   ],
+   "title": "CreatedModule",
+   "type": "object"
+  },
+  "DevelopmentSupport": {
+   "additionalProperties": false,
+   "description": "A module's help for documents it knows: guides and examples listed in Developer's Help, and (``language``) the\nPython a file is analysed against.",
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "capabilities": {
+     "default": [],
+     "items": {
+      "const": "language",
+      "type": "string"
+     },
+     "title": "Capabilities",
+     "type": "array"
+    },
+    "appliesTo": {
+     "$ref": "#/$defs/AppliesTo",
+     "default": {
+      "sourceKinds": [],
+      "filePatterns": [],
+      "providerIds": [],
+      "projectKinds": []
+     }
+    },
+    "documentation": {
+     "default": [],
+     "items": {
+      "$ref": "#/$defs/Documentation"
+     },
+     "title": "Documentation",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "DevelopmentSupport",
+   "type": "object"
+  },
+  "Document": {
+   "additionalProperties": false,
+   "description": "One shared document: the source's saved text (``baseContent`` at ``sourceVersion``) and the edit buffer on top.",
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "uri": {
+     "title": "Uri",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/FileSource"
+      },
+      {
+       "$ref": "#/$defs/ContributionSource"
+      }
+     ],
+     "title": "Source"
+    },
+    "context": {
+     "$ref": "#/$defs/DocumentContext"
+    },
+    "content": {
+     "title": "Content",
+     "type": "string"
+    },
+    "baseContent": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "The saved text; null on a page of a document without unsaved edits (the same as content).",
+     "title": "Basecontent"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "sourceVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Sourceversion"
+    },
+    "language": {
+     "title": "Language",
+     "type": "string"
+    },
+    "dirty": {
+     "title": "Dirty",
+     "type": "boolean"
+    },
+    "conflict": {
+     "title": "Conflict",
+     "type": "boolean"
+    },
+    "readOnly": {
+     "title": "Readonly",
+     "type": "boolean"
+    },
+    "externalState": {
+     "enum": [
+      "present",
+      "deleted"
+     ],
+     "title": "Externalstate",
+     "type": "string"
+    },
+    "error": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Error"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Nextcursor"
+    },
+    "startLine": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Startline"
+    },
+    "totalLines": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Totallines"
+    },
+    "nextLine": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Nextline"
+    },
+    "startChar": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Startchar"
+    },
+    "nextChar": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Nextchar"
+    }
+   },
+   "required": [
+    "documentId",
+    "uri",
+    "name",
+    "source",
+    "context",
+    "content",
+    "baseContent",
+    "version",
+    "sourceVersion",
+    "language",
+    "dirty",
+    "conflict",
+    "readOnly",
+    "externalState",
+    "error"
+   ],
+   "title": "Document",
+   "type": "object"
+  },
+  "DocumentChanged": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "kind": {
+     "enum": [
+      "opened",
+      "changed",
+      "saved",
+      "resolved"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "origin": {
+     "description": "Who changed it: ``user``, ``ai``, ``code``, a module's id, ``disk`` or ``source`` (its provider).",
+     "title": "Origin",
+     "type": "string"
+    },
+    "externalState": {
+     "enum": [
+      "present",
+      "deleted"
+     ],
+     "title": "Externalstate",
+     "type": "string"
+    }
+   },
+   "required": [
+    "documentId",
+    "version",
+    "kind",
+    "origin",
+    "externalState"
+   ],
+   "title": "DocumentChanged",
+   "type": "object"
+  },
+  "DocumentContext": {
+   "additionalProperties": false,
+   "description": "Where a document belongs: its project (none for a provider's document) and what a language support adds.",
+   "properties": {
+    "contextId": {
+     "title": "Contextid",
+     "type": "string"
+    },
+    "projectId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Projectid"
+    },
+    "rootUri": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Rooturi"
+    },
+    "languageMaterials": {
+     "default": [],
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Languagematerials",
+     "type": "array"
+    }
+   },
+   "required": [
+    "contextId",
+    "projectId",
+    "rootUri"
+   ],
+   "title": "DocumentContext",
+   "type": "object"
+  },
+  "DocumentList": {
+   "additionalProperties": false,
+   "properties": {
+    "documents": {
+     "items": {
+      "$ref": "#/$defs/ListedDocument"
+     },
+     "title": "Documents",
+     "type": "array"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "documents",
+    "nextCursor"
+   ],
+   "title": "DocumentList",
+   "type": "object"
+  },
+  "DocumentReceipt": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "uri": {
+     "title": "Uri",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "dirty": {
+     "title": "Dirty",
+     "type": "boolean"
+    },
+    "conflict": {
+     "title": "Conflict",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "documentId",
+    "uri",
+    "name",
+    "version",
+    "dirty",
+    "conflict"
+   ],
+   "title": "DocumentReceipt",
+   "type": "object"
+  },
+  "DocumentSourceDescriptor": {
+   "additionalProperties": false,
+   "description": "Documents a module serves itself (read, and written unless ``readOnly``).",
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "readOnly": {
+     "default": false,
+     "title": "Readonly",
+     "type": "boolean"
+    },
+    "watch": {
+     "default": false,
+     "title": "Watch",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "DocumentSourceDescriptor",
+   "type": "object"
+  },
+  "Documentation": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/FileSource"
+      },
+      {
+       "$ref": "#/$defs/ContributionSource"
+      }
+     ],
+     "title": "Source"
+    }
+   },
+   "required": [
+    "name",
+    "source"
+   ],
+   "title": "Documentation",
+   "type": "object"
+  },
+  "EditDocumentInput": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "title": "Expectedversion",
+     "type": "integer"
+    },
+    "content": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Content"
+    },
+    "edits": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/LineEdit"
+       },
+       "minItems": 1,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Edits"
+    }
+   },
+   "required": [
+    "documentId",
+    "expectedVersion"
+   ],
+   "title": "EditDocumentInput",
+   "type": "object"
+  },
+  "Empty": {
+   "additionalProperties": false,
+   "properties": {},
+   "title": "Empty",
+   "type": "object"
+  },
+  "FileRevisionInput": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "revisionId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Revisionid"
+    },
+    "startChar": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Startchar",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "projectId",
+    "path"
+   ],
+   "title": "FileRevisionInput",
+   "type": "object"
+  },
+  "FileSource": {
+   "additionalProperties": false,
+   "description": "A file on disk: its file URI; ``projectId`` picks the project when folders are nested.",
+   "properties": {
+    "kind": {
+     "const": "file",
+     "title": "Kind",
+     "type": "string"
+    },
+    "uri": {
+     "title": "Uri",
+     "type": "string"
+    },
+    "projectId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Projectid"
+    }
+   },
+   "required": [
+    "kind",
+    "uri"
+   ],
+   "title": "FileSource",
+   "type": "object"
+  },
+  "HelpItem": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/FileSource"
+      },
+      {
+       "$ref": "#/$defs/ContributionSource"
+      }
+     ],
+     "title": "Source"
+    },
+    "support": {
+     "title": "Support",
+     "type": "string"
+    }
+   },
+   "required": [
+    "name",
+    "source",
+    "support"
+   ],
+   "title": "HelpItem",
+   "type": "object"
+  },
+  "HelpPage": {
+   "additionalProperties": false,
+   "properties": {
+    "entries": {
+     "items": {
+      "$ref": "#/$defs/HelpItem"
+     },
+     "title": "Entries",
+     "type": "array"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "entries",
+    "nextCursor"
+   ],
+   "title": "HelpPage",
+   "type": "object"
+  },
+  "Instructions": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "uri": {
+     "title": "Uri",
+     "type": "string"
+    },
+    "exists": {
+     "title": "Exists",
+     "type": "boolean"
+    },
+    "digest": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Digest"
+    },
+    "content": {
+     "title": "Content",
+     "type": "string"
+    },
+    "startLine": {
+     "title": "Startline",
+     "type": "integer"
+    },
+    "nextLine": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextline"
+    },
+    "startChar": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Startchar"
+    },
+    "nextChar": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Nextchar"
+    }
+   },
+   "required": [
+    "projectId",
+    "uri",
+    "exists",
+    "digest",
+    "content",
+    "startLine",
+    "nextLine"
+   ],
+   "title": "Instructions",
+   "type": "object"
+  },
+  "InstructionsInput": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "startLine": {
+     "default": 1,
+     "minimum": 1,
+     "title": "Startline",
+     "type": "integer"
+    },
+    "lineCount": {
+     "default": 200,
+     "maximum": 2000,
+     "minimum": 1,
+     "title": "Linecount",
+     "type": "integer"
+    },
+    "expectedDigest": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Expecteddigest"
+    },
+    "startChar": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Startchar"
+    }
+   },
+   "required": [
+    "projectId"
+   ],
+   "title": "InstructionsInput",
+   "type": "object"
+  },
+  "LineEdit": {
+   "additionalProperties": false,
+   "properties": {
+    "startLine": {
+     "minimum": 1,
+     "title": "Startline",
+     "type": "integer"
+    },
+    "endLine": {
+     "minimum": 1,
+     "title": "Endline",
+     "type": "integer"
+    },
+    "text": {
+     "title": "Text",
+     "type": "string"
+    }
+   },
+   "required": [
+    "startLine",
+    "endLine",
+    "text"
+   ],
+   "title": "LineEdit",
+   "type": "object"
+  },
+  "ListDocumentsInput": {
+   "additionalProperties": false,
+   "properties": {
+    "rootUris": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Omit for all unsaved documents, including contributions. Supply folders to list their open file buffers.",
+     "title": "Rooturis"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Cursor"
+    },
+    "limit": {
+     "default": 50,
+     "maximum": 200,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "ListDocumentsInput",
+   "type": "object"
+  },
+  "ListProjectsInput": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Cursor"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 200,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    }
+   },
+   "title": "ListProjectsInput",
+   "type": "object"
+  },
+  "ListedDocument": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "uri": {
+     "title": "Uri",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "dirty": {
+     "title": "Dirty",
+     "type": "boolean"
+    },
+    "conflict": {
+     "title": "Conflict",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "documentId",
+    "uri",
+    "version",
+    "dirty",
+    "conflict"
+   ],
+   "title": "ListedDocument",
+   "type": "object"
+  },
+  "OpenDocumentInput": {
+   "additionalProperties": false,
+   "properties": {
+    "source": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/FileSource"
+      },
+      {
+       "$ref": "#/$defs/ContributionSource"
+      }
+     ],
+     "title": "Source"
+    },
+    "reference": {
+     "default": false,
+     "description": "Open a file outside every project read-only, instead of opening its folder as a project.",
+     "title": "Reference",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "source"
+   ],
+   "title": "OpenDocumentInput",
+   "type": "object"
+  },
+  "OpenProjectInput": {
+   "additionalProperties": false,
+   "properties": {
+    "directory": {
+     "title": "Directory",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Shown instead of the folder's name; opening the folder again updates it.",
+     "title": "Name"
+    }
+   },
+   "required": [
+    "directory"
+   ],
+   "title": "OpenProjectInput",
+   "type": "object"
+  },
+  "Project": {
+   "additionalProperties": false,
+   "properties": {
+    "rootIdentity": {
+     "title": "Rootidentity",
+     "type": "string"
+    },
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "rootUri": {
+     "title": "Rooturi",
+     "type": "string"
+    },
+    "contextId": {
+     "title": "Contextid",
+     "type": "string"
+    },
+    "status": {
+     "enum": [
+      "available",
+      "unavailable",
+      "replaced",
+      "reference"
+     ],
+     "title": "Status",
+     "type": "string"
+    }
+   },
+   "required": [
+    "rootIdentity",
+    "projectId",
+    "name",
+    "rootUri",
+    "contextId",
+    "status"
+   ],
+   "title": "Project",
+   "type": "object"
+  },
+  "ProjectId": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "projectId"
+   ],
+   "title": "ProjectId",
+   "type": "object"
+  },
+  "ProjectList": {
+   "additionalProperties": false,
+   "properties": {
+    "projects": {
+     "items": {
+      "$ref": "#/$defs/Project"
+     },
+     "title": "Projects",
+     "type": "array"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "projects"
+   ],
+   "title": "ProjectList",
+   "type": "object"
+  },
+  "ProjectModule": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "directory": {
+     "title": "Directory",
+     "type": "string"
+    },
+    "installed": {
+     "description": "Whether the source directory is in TALYX's modules folder.",
+     "title": "Installed",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "directory",
+    "installed"
+   ],
+   "title": "ProjectModule",
+   "type": "object"
+  },
+  "ProjectModuleState": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ProjectModule"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "runtime": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/RuntimeState"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "module",
+    "runtime"
+   ],
+   "title": "ProjectModuleState",
+   "type": "object"
+  },
+  "ReadCheckpointInput": {
+   "additionalProperties": false,
+   "properties": {
+    "checkpoint": {
+     "$ref": "#/$defs/CheckpointReference"
+    },
+    "sourceKey": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Omit to list the captured documents. Select a sourceKey to read its captured text.",
+     "title": "Sourcekey"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Cursor"
+    },
+    "startChar": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Startchar",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "checkpoint"
+   ],
+   "title": "ReadCheckpointInput",
+   "type": "object"
+  },
+  "ReadDocumentInput": {
+   "additionalProperties": false,
+   "properties": {
+    "full": {
+     "default": false,
+     "title": "Full",
+     "type": "boolean"
+    },
+    "startLine": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Startline"
+    },
+    "lineCount": {
+     "anyOf": [
+      {
+       "maximum": 2000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Linecount"
+    },
+    "startChar": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Continue inside a line longer than one page (nextChar).",
+     "title": "Startchar"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "pattern": "^[0-9]+(:[0-9]+)?$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page.",
+     "title": "Cursor"
+    },
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Expectedversion"
+    }
+   },
+   "required": [
+    "documentId"
+   ],
+   "title": "ReadDocumentInput",
+   "type": "object"
+  },
+  "ReadSourceInput": {
+   "additionalProperties": false,
+   "properties": {
+    "full": {
+     "default": false,
+     "title": "Full",
+     "type": "boolean"
+    },
+    "startLine": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Startline"
+    },
+    "lineCount": {
+     "anyOf": [
+      {
+       "maximum": 2000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Linecount"
+    },
+    "startChar": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Continue inside a line longer than one page (nextChar).",
+     "title": "Startchar"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "pattern": "^[0-9]+(:[0-9]+)?$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "nextCursor of the previous page.",
+     "title": "Cursor"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/FileSource"
+      },
+      {
+       "$ref": "#/$defs/ContributionSource"
+      }
+     ],
+     "title": "Source"
+    }
+   },
+   "required": [
+    "source"
+   ],
+   "title": "ReadSourceInput",
+   "type": "object"
+  },
+  "ReadTreeInput": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "path": {
+     "default": "",
+     "title": "Path",
+     "type": "string"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Cursor"
+    },
+    "limit": {
+     "default": 50,
+     "maximum": 200,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "projectId"
+   ],
+   "title": "ReadTreeInput",
+   "type": "object"
+  },
+  "RemoveProjectInput": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "mode": {
+     "enum": [
+      "forget",
+      "trash"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "expectedRootUri": {
+     "title": "Expectedrooturi",
+     "type": "string"
+    },
+    "rootIdentity": {
+     "title": "Rootidentity",
+     "type": "string"
+    }
+   },
+   "required": [
+    "projectId",
+    "mode",
+    "expectedRootUri",
+    "rootIdentity"
+   ],
+   "title": "RemoveProjectInput",
+   "type": "object"
+  },
+  "RemovedProject": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "mode": {
+     "enum": [
+      "forget",
+      "trash"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "removed": {
+     "title": "Removed",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "projectId",
+    "mode",
+    "removed"
+   ],
+   "title": "RemovedProject",
+   "type": "object"
+  },
+  "Resolution": {
+   "additionalProperties": false,
+   "properties": {
+    "sourceKey": {
+     "title": "Sourcekey",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "title": "Expectedversion",
+     "type": "integer"
+    },
+    "expectedSourceVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Expectedsourceversion"
+    }
+   },
+   "required": [
+    "sourceKey",
+    "expectedVersion",
+    "expectedSourceVersion"
+   ],
+   "title": "Resolution",
+   "type": "object"
+  },
+  "ResolveInput": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "mode": {
+     "enum": [
+      "mine",
+      "external"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "title": "Expectedversion",
+     "type": "integer"
+    },
+    "expectedSourceVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Expectedsourceversion"
+    }
+   },
+   "required": [
+    "documentId",
+    "mode",
+    "expectedVersion",
+    "expectedSourceVersion"
+   ],
+   "title": "ResolveInput",
+   "type": "object"
+  },
+  "RestoreCheckpointInput": {
+   "additionalProperties": false,
+   "properties": {
+    "checkpoint": {
+     "$ref": "#/$defs/CheckpointReference"
+    },
+    "sourceKeys": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Sourcekeys"
+    },
+    "resolutions": {
+     "default": [],
+     "items": {
+      "$ref": "#/$defs/Resolution"
+     },
+     "title": "Resolutions",
+     "type": "array"
+    }
+   },
+   "required": [
+    "checkpoint"
+   ],
+   "title": "RestoreCheckpointInput",
+   "type": "object"
+  },
+  "RestoreRevisionInput": {
+   "additionalProperties": false,
+   "properties": {
+    "projectId": {
+     "title": "Projectid",
+     "type": "string"
+    },
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "revisionId": {
+     "title": "Revisionid",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Current file digest on disk, or null if the file is absent.",
+     "title": "Expectedversion"
+    }
+   },
+   "required": [
+    "projectId",
+    "path",
+    "revisionId",
+    "expectedVersion"
+   ],
+   "title": "RestoreRevisionInput",
+   "type": "object"
+  },
+  "Restored": {
+   "additionalProperties": false,
+   "properties": {
+    "checkpoint": {
+     "$ref": "#/$defs/CheckpointReference"
+    },
+    "documents": {
+     "items": {
+      "$ref": "#/$defs/RestoredDocument"
+     },
+     "title": "Documents",
+     "type": "array"
+    }
+   },
+   "required": [
+    "checkpoint",
+    "documents"
+   ],
+   "title": "Restored",
+   "type": "object"
+  },
+  "RestoredDocument": {
+   "additionalProperties": false,
+   "properties": {
+    "sourceKey": {
+     "title": "Sourcekey",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "documentId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Documentid"
+    },
+    "version": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Version"
+    },
+    "sourceVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Sourceversion"
+    },
+    "status": {
+     "enum": [
+      "restored",
+      "unchanged",
+      "conflict",
+      "read_only",
+      "unavailable"
+     ],
+     "title": "Status",
+     "type": "string"
+    },
+    "message": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Message"
+    },
+    "preservedCheckpoint": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/CheckpointReference"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "sourceKey",
+    "name",
+    "documentId",
+    "version",
+    "sourceVersion",
+    "status",
+    "message",
+    "preservedCheckpoint"
+   ],
+   "title": "RestoredDocument",
+   "type": "object"
+  },
+  "Revision": {
+   "additionalProperties": false,
+   "properties": {
+    "revisionId": {
+     "title": "Revisionid",
+     "type": "string"
+    },
+    "createdAt": {
+     "title": "Createdat",
+     "type": "string"
+    },
+    "reason": {
+     "title": "Reason",
+     "type": "string"
+    },
+    "size": {
+     "title": "Size",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "revisionId",
+    "createdAt",
+    "reason",
+    "size"
+   ],
+   "title": "Revision",
+   "type": "object"
+  },
+  "RevisionList": {
+   "additionalProperties": false,
+   "properties": {
+    "sourceId": {
+     "title": "Sourceid",
+     "type": "string"
+    },
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "revisions": {
+     "items": {
+      "$ref": "#/$defs/Revision"
+     },
+     "title": "Revisions",
+     "type": "array"
+    },
+    "warnings": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Warnings",
+     "type": "array"
+    }
+   },
+   "required": [
+    "sourceId",
+    "path",
+    "revisions",
+    "warnings"
+   ],
+   "title": "RevisionList",
+   "type": "object"
+  },
+  "RevisionSaveResult": {
+   "additionalProperties": false,
+   "properties": {
+    "status": {
+     "enum": [
+      "saved",
+      "conflict"
+     ],
+     "title": "Status",
+     "type": "string"
+    },
+    "version": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Version"
+    },
+    "message": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Message"
+    },
+    "historyWarning": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Historywarning"
+    }
+   },
+   "required": [
+    "status",
+    "version"
+   ],
+   "title": "RevisionSaveResult",
+   "type": "object"
+  },
+  "RevisionText": {
+   "additionalProperties": false,
+   "properties": {
+    "content": {
+     "title": "Content",
+     "type": "string"
+    },
+    "startChar": {
+     "title": "Startchar",
+     "type": "integer"
+    },
+    "nextChar": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextchar"
+    },
+    "version": {
+     "title": "Version",
+     "type": "string"
+    }
+   },
+   "required": [
+    "content",
+    "startChar",
+    "nextChar",
+    "version"
+   ],
+   "title": "RevisionText",
+   "type": "object"
+  },
+  "RuntimeState": {
+   "additionalProperties": false,
+   "properties": {
+    "enabled": {
+     "title": "Enabled",
+     "type": "boolean"
+    },
+    "state": {
+     "title": "State",
+     "type": "string"
+    },
+    "problem": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Problem"
+    },
+    "source": {
+     "title": "Source",
+     "type": "string"
+    }
+   },
+   "required": [
+    "enabled",
+    "state",
+    "problem",
+    "source"
+   ],
+   "title": "RuntimeState",
+   "type": "object"
+  },
+  "SaveDocumentInput": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Expectedversion"
+    }
+   },
+   "required": [
+    "documentId"
+   ],
+   "title": "SaveDocumentInput",
+   "type": "object"
+  },
+  "SaveResult": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "status": {
+     "enum": [
+      "saved",
+      "clean",
+      "conflict"
+     ],
+     "title": "Status",
+     "type": "string"
+    },
+    "message": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Message"
+    }
+   },
+   "required": [
+    "documentId",
+    "version",
+    "status",
+    "message"
+   ],
+   "title": "SaveResult",
+   "type": "object"
+  },
+  "Tree": {
+   "additionalProperties": false,
+   "properties": {
+    "entries": {
+     "items": {
+      "$ref": "#/$defs/TreeEntry"
+     },
+     "title": "Entries",
+     "type": "array"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "entries",
+    "nextCursor"
+   ],
+   "title": "Tree",
+   "type": "object"
+  },
+  "TreeEntry": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "uri": {
+     "title": "Uri",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "file",
+      "directory",
+      "missing",
+      "unavailable"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "size": {
+     "title": "Size",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "path",
+    "uri",
+    "kind",
+    "size"
+   ],
+   "title": "TreeEntry",
+   "type": "object"
+  },
+  "VersionsInput": {
+   "additionalProperties": false,
+   "properties": {
+    "documentId": {
+     "title": "Documentid",
+     "type": "string"
+    },
+    "startChar": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Startchar",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "documentId"
+   ],
+   "title": "VersionsInput",
+   "type": "object"
+  },
+  "VersionsPage": {
+   "additionalProperties": false,
+   "properties": {
+    "content": {
+     "title": "Content",
+     "type": "string"
+    },
+    "startChar": {
+     "title": "Startchar",
+     "type": "integer"
+    },
+    "nextChar": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextchar"
+    },
+    "baseContent": {
+     "title": "Basecontent",
+     "type": "string"
+    },
+    "externalContent": {
+     "title": "Externalcontent",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "sourceVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Sourceversion"
+    },
+    "baseVersion": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Baseversion"
+    }
+   },
+   "required": [
+    "content",
+    "startChar",
+    "nextChar",
+    "baseContent",
+    "externalContent",
+    "version",
+    "sourceVersion",
+    "baseVersion"
+   ],
+   "title": "VersionsPage",
+   "type": "object"
+  }
+ },
+ "changes": true
+}

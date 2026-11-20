@@ -1,0 +1,8 @@
+/* The code area (shared/CodeArea.tsx): a bar over Developer's project view. */
+.qx-codearea { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; }
+.qx-codearea-bar { flex: none; display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 6px; border-bottom: 1px solid var(--tx-line-2); font-size: var(--tx-size-xs); }
+.qx-codearea-count { color: var(--tx-ember-text); }
+.qx-codearea-view { flex: 1; min-height: 0; min-width: 0; }
+.qx-codearea-foot { flex: none; display: flex; align-items: center; gap: 12px; min-height: 24px; padding: 0 10px; border-top: 1px solid var(--tx-line-2); color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.qx-codearea-foot .tx-spacer { flex: 1; }
+.qx-codearea-foot .attn { color: var(--tx-ember-text); }

@@ -1,0 +1,854 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://talyx.local/vocab/v2",
+  "title": "Vocabulary",
+  "description": "TALYX vocabulary v2. Nanoseconds and exact decimals are strings. Time ranges are half-open. Schemas describe wire structure; identity and finance semantics are validated by both language implementations.",
+  "$defs": {
+    "TaskState": {
+      "type": "string",
+      "enum": [
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ]
+    },
+    "Decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+      "description": "Exact decimal, no exponent or binary floating point conversion"
+    },
+    "TimestampNs": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "description": "Unix epoch nanoseconds as a decimal string"
+    },
+    "Instrument": {
+      "type": "object",
+      "properties": {
+        "instrumentId": {
+          "type": "string",
+          "pattern": "^(vi1_[a-f0-9]{64}|vi2_[a-f0-9]{32})$"
+        },
+        "identityVersion": {
+          "enum": [
+            1,
+            2
+          ],
+          "description": "1: venue contract; id = hash of the contract fields. The hash material keeps the key sourceId and fills both sourceId and venueId with the venue id, so existing crypto ids do not change. venueId: CCXT exchange id for crypto; ISO 10383 MIC of the listing exchange for futures and their options (XCME, XCBT, XNYM, XEUR, ...); fixed codes OPRA for US listed equity options and IDEALPRO for IB spot FX. The same contract from IB and Databento is one instrument. 2: listing assigned by Market (stocks, ETFs, funds, indices, warrants, bonds, source composites such as Yahoo FX or yields, CoinGecko coins); survives renames and code changes. A derived value series with scope single lives on a version-1 instrument with venueId = the data source id, symbol = the key, marketType unknown, assetClass unknown, calendarId 24_7."
+        },
+        "venueId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Version 1: exchange id (binance). Version 2: listing market (US, CN, HK, FX, COIN)."
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Version 1: venue contract symbol. Version 2: the current code (AAPL, BRK.B, 600519.SH, 00700.HK)."
+        },
+        "displaySymbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "How the instrument is shown: TradingView-style (BTCUSDT, BTCUSDT.P, BTCUSDTZ2026; listings keep their code). Presentation only; identity is instrumentId."
+        },
+        "marketType": {
+          "enum": [
+            "spot",
+            "swap",
+            "future",
+            "option",
+            "unknown"
+          ]
+        },
+        "assetClass": {
+          "enum": [
+            "crypto",
+            "equity",
+            "tokenized_equity",
+            "fund",
+            "index",
+            "fixed_income",
+            "warrant",
+            "fx",
+            "precious_metal",
+            "commodity",
+            "rate",
+            "unknown"
+          ]
+        },
+        "base": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quote": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "settle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contractOrientation": {
+          "enum": [
+            "none",
+            "linear",
+            "inverse",
+            "quanto",
+            "unknown"
+          ]
+        },
+        "contractSize": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expiry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimestampNs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strike": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "optionSide": {
+          "enum": [
+            "call",
+            "put",
+            null
+          ]
+        },
+        "underlyingSymbol": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retiredAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimestampNs"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Version 1 only: UTC day of the last bar with real trades of an earlier contract whose symbol the venue later reused (Binance spot LUNA/USDT until 2022-05-13), not the last day in the venue's files: zero-volume bars with open = high = low = close after it are recorded as source_has_none, never as prices. Assigned once, stored in Market's identity table and never recomputed. Null for the current contract; hashed only when set, so current ids do not change."
+        },
+        "calendarId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "adjustmentEligible": {
+          "type": "boolean"
+        },
+        "adapterId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "nativeId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "securityType": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "shareClass": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "venueName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64,
+          "description": "The exchange's display name (Binance, OKX, NASDAQ, HKEX). Presentation only."
+        },
+        "countryCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 16
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 16
+        },
+        "mic": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 16,
+          "description": "Version 2: current primary listing exchange; descriptive."
+        },
+        "listedFrom": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimestampNs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "delistedAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimestampNs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "instrumentId",
+        "identityVersion",
+        "venueId",
+        "symbol",
+        "displaySymbol",
+        "marketType",
+        "assetClass",
+        "contractOrientation",
+        "calendarId",
+        "adjustmentEligible"
+      ],
+      "additionalProperties": false
+    },
+    "SeriesId": {
+      "type": "object",
+      "properties": {
+        "seriesId": {
+          "type": "string",
+          "pattern": "^vs1_[a-f0-9]{64}$"
+        },
+        "identityVersion": {
+          "const": 1
+        },
+        "instrumentId": {
+          "type": "string"
+        },
+        "capability": {
+          "enum": [
+            "ohlcv",
+            "reference",
+            "ticker",
+            "trades",
+            "order_book",
+            "funding_rate",
+            "open_interest",
+            "liquidations",
+            "option_metrics",
+            "long_short_account_ratio",
+            "top_trader_account_ratio",
+            "top_trader_position_ratio",
+            "taker_volume",
+            "derived_value"
+          ]
+        },
+        "timeframe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeframe"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "priceBasis": {
+          "enum": [
+            "last",
+            "mark",
+            "index",
+            "premium",
+            "settlement",
+            "reference"
+          ]
+        },
+        "sessionScope": {
+          "enum": [
+            "continuous",
+            "regular",
+            "extended",
+            "all"
+          ]
+        },
+        "adjustment": {
+          "enum": [
+            "not_applicable",
+            "raw",
+            "split",
+            "split_dividend",
+            "provider_adjusted"
+          ],
+          "description": "provider_adjusted only for imported datasets that arrived adjusted."
+        },
+        "adjustmentAnchor": {
+          "enum": [
+            "latest",
+            "earliest",
+            null
+          ],
+          "description": "split and split_dividend only. latest (forward adjusted, newest price unchanged) is the default and is written as null, so it never enters the hash; earliest keeps the first price unchanged and enters the hash."
+        },
+        "importId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64,
+          "description": "An imported dataset; null for the source Market selects."
+        },
+        "referenceKind": {
+          "enum": [
+            "exchange_rate",
+            "yield",
+            "commodity_price",
+            null
+          ]
+        },
+        "valueUnit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "seriesId",
+        "identityVersion",
+        "instrumentId",
+        "capability",
+        "timeframe",
+        "priceBasis",
+        "sessionScope",
+        "adjustment"
+      ],
+      "additionalProperties": false,
+      "description": "Never names a source. Hash recipe unchanged; optional fields enter the hash only when set."
+    },
+    "Timeframe": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*(s|m|h|d|w|M|mo|y)$",
+      "description": "s seconds, m minutes, h hours, d days, w weeks, M or mo calendar months, y calendar years; aligned UTC unless instrument calendar specifies otherwise"
+    },
+    "TimeRange": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Unix epoch nanoseconds as a decimal string"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Unix epoch nanoseconds as a decimal string"
+        },
+        "unit": {
+          "const": "ns"
+        },
+        "bounds": {
+          "const": "[)"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "unit",
+        "bounds"
+      ],
+      "additionalProperties": false
+    },
+    "Bar": {
+      "type": "object",
+      "properties": {
+        "seriesId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Unix epoch nanoseconds as a decimal string"
+        },
+        "timeUnit": {
+          "const": "ns"
+        },
+        "open": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "description": "Exact decimal, no exponent or binary floating point conversion"
+        },
+        "high": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "description": "Exact decimal, no exponent or binary floating point conversion"
+        },
+        "low": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "description": "Exact decimal, no exponent or binary floating point conversion"
+        },
+        "close": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "description": "Exact decimal, no exponent or binary floating point conversion"
+        },
+        "volume": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "description": "Exact decimal, no exponent or binary floating point conversion"
+        },
+        "closed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "seriesId",
+        "time",
+        "timeUnit",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "closed"
+      ],
+      "additionalProperties": false
+    },
+    "BarColumns": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimestampNs"
+          },
+          "description": "Period start; for 1d and longer on an exchange calendar, the trading date's local 00:00 as UTC."
+        },
+        "closeTime": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimestampNs"
+          }
+        },
+        "open": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Decimal"
+          }
+        },
+        "high": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Decimal"
+          }
+        },
+        "low": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Decimal"
+          }
+        },
+        "close": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Decimal"
+          }
+        },
+        "volume": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Decimal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "time",
+        "closeTime",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "additionalProperties": false,
+      "description": "Closed bars only, ascending, all arrays equally long. When a bar became available is closeTime plus the source's publish delay (coverage/describe); exports write it as a knownAt column."
+    },
+    "Marker": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "seriesId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "eventTime": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Unix epoch nanoseconds as a decimal string"
+        },
+        "knownAt": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Unix epoch nanoseconds as a decimal string"
+        },
+        "timeUnit": {
+          "const": "ns"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "description": "Exact decimal, no exponent or binary floating point conversion"
+        },
+        "text": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "id",
+        "seriesId",
+        "eventTime",
+        "knownAt",
+        "timeUnit",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "DrawingPoint": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Unix epoch nanoseconds as a decimal string"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "description": "Exact decimal, no exponent or binary floating point conversion"
+        }
+      },
+      "required": [
+        "time",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "Drawing": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "seriesId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "enum": [
+            "trendline",
+            "horizontal",
+            "vertical",
+            "rectangle",
+            "polyline"
+          ]
+        },
+        "timeUnit": {
+          "const": "ns"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DrawingPoint"
+          },
+          "minItems": 1,
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "id",
+        "seriesId",
+        "kind",
+        "timeUnit",
+        "points"
+      ],
+      "additionalProperties": false
+    },
+    "Summary": {
+      "x-talyx-vocabulary": "https://talyx.local/vocab/v2#/$defs/Summary",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "openTarget": {
+          "type": "object",
+          "properties": {
+            "module": {
+              "type": "string"
+            },
+            "panelType": {
+              "type": "string"
+            },
+            "objectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "module",
+            "panelType",
+            "objectId"
+          ],
+          "additionalProperties": false
+        },
+        "keyNumbers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              },
+              "direction": {
+                "enum": [
+                  "up",
+                  "down",
+                  "none"
+                ]
+              }
+            },
+            "required": [
+              "label",
+              "value",
+              "unit",
+              "direction"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "title",
+        "subtitle",
+        "openTarget",
+        "keyNumbers"
+      ],
+      "additionalProperties": false
+    },
+    "TableColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "unit"
+      ]
+    },
+    "FileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "x-unit": "bytes"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes"
+      ]
+    },
+    "TablePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "columns",
+        "rows",
+        "total",
+        "nextCursor"
+      ]
+    },
+    "TableFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "$ref": "#/$defs/FileRef"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "file",
+        "columns",
+        "total"
+      ]
+    },
+    "Symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Market instrument spelling accepted by public actions: AAPL, 600519.SH, 0700.HK, US:DASH, USDCNY=X, binance:BTC/USDT, okx:BTC/USDT:USDT, or the instrumentId for a delisted or reassigned code."
+    }
+  }
+}

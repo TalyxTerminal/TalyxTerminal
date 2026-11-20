@@ -1,0 +1,230 @@
+{
+  "manifestVersion": 5,
+  "id": "agent",
+  "name": "Agent",
+  "version": "2.0.0",
+  "ai": {"guide": "GUIDE.md", "docs": [{"topic": "skills", "title": "Write an Agent skill (SKILL.md) or workspace instructions (AGENTS.md)", "file": "docs/skills.md"}]},
+  "description": "Workspace conversations and tool-capable AI assistance.",
+  "entries": {
+    "backend": "backend.entry",
+    "frontend": "frontend/module.ts"
+  },
+  "panels": {
+    "chat": {
+      "title": "Agent",
+      "icon": "message",
+      "launcher": true,
+      "description": "Ask about what you're looking at, or hand off a task. Open targets: objectId is a conversation id.",
+      "actions": {
+        "navigate_conversation": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "messageId": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "conversationId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "views": {
+    "general_settings": {
+      "description": "General",
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "enum": [
+              "global",
+              "workspace"
+            ]
+          }
+        }
+      }
+    },
+    "chats_settings": {
+      "description": "Chats",
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "enum": [
+              "global",
+              "workspace"
+            ]
+          }
+        }
+      }
+    },
+    "bots_settings": {
+      "description": "Bots",
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "enum": [
+              "global",
+              "workspace"
+            ]
+          }
+        }
+      }
+    },
+    "personalization_settings": {
+      "description": "Personalization",
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "enum": [
+              "global",
+              "workspace"
+            ]
+          }
+        }
+      }
+    },
+    "models_settings": {
+      "description": "Models",
+      "props": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "search_settings": {
+      "description": "Search",
+      "props": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "skills_settings": {
+      "description": "Skills",
+      "props": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "knowledge_settings": {
+      "description": "Knowledge",
+      "props": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "usage_settings": {
+      "description": "Usage",
+      "props": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "limit_settings": {
+      "description": "Spending limit",
+      "props": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    }
+  },
+  "provides": {
+    "platform.settings_section": [
+      {
+        "id": "general",
+        "descriptor": {
+          "title": "General",
+          "view": "general_settings",
+          "workspace": true
+        }
+      },
+      {
+        "id": "chats",
+        "descriptor": {
+          "title": "Chats",
+          "view": "chats_settings",
+          "workspace": true
+        }
+      },
+      {
+        "id": "bots",
+        "descriptor": {
+          "title": "Bots",
+          "view": "bots_settings",
+          "workspace": true
+        }
+      },
+      {
+        "id": "personalization",
+        "descriptor": {
+          "title": "Personalization",
+          "view": "personalization_settings",
+          "workspace": true
+        }
+      },
+      {
+        "id": "models",
+        "descriptor": {
+          "title": "Models",
+          "view": "models_settings"
+        }
+      },
+      {
+        "id": "search",
+        "descriptor": {
+          "title": "Search",
+          "view": "search_settings"
+        }
+      },
+      {
+        "id": "skills",
+        "descriptor": {
+          "title": "Skills",
+          "view": "skills_settings"
+        }
+      },
+      {
+        "id": "knowledge",
+        "descriptor": {
+          "title": "Knowledge",
+          "view": "knowledge_settings"
+        }
+      },
+      {
+        "id": "usage",
+        "descriptor": {
+          "title": "Usage",
+          "view": "usage_settings"
+        }
+      },
+      {
+        "id": "limit",
+        "descriptor": {
+          "title": "Spending limit",
+          "view": "limit_settings"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+nautilus-trader @ file:./modules/quant/runtime/wheels/nautilus_trader-2.0.0rc8%2Btalyx.20-cp313-cp313-win_amd64.whl
+numpy==2.4.6
+pandas==3.0.5
+pyarrow==25.0.1
+python-dateutil==2.9.0.post0
+six==1.17.0
+tzdata==2026.2
+plotly==6.9.0

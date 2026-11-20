@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://talyx.local/schemas/manifest_v5.schema.json",
+  "title": "TALYX module manifest, version 5 (hand-written; the contract is generated from code)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifestVersion", "id", "name", "version", "entries"],
+  "properties": {
+    "manifestVersion": {"const": 5},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$", "not": {"const": "platform"}},
+    "name": {"type": "string", "minLength": 1, "maxLength": 80},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"},
+    "description": {"type": "string", "maxLength": 2000},
+    "ai": {
+      "type": "object", "additionalProperties": false, "required": ["guide"],
+      "properties": {
+        "guide": {"type": "string", "minLength": 1, "description": "Markdown guide inside the module with name and description frontmatter."},
+        "docs": {
+          "type": "array", "maxItems": 20,
+          "description": "How to write code the module runs. AI clients list these documents and read one by topic.",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["topic", "title", "file"],
+            "properties": {
+              "topic": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,39}$"},
+              "title": {"type": "string", "minLength": 1, "maxLength": 80, "description": "What the document helps the reader write, in one line."},
+              "file": {"type": "string", "minLength": 1, "description": "A Markdown file inside the module."}
+            }
+          }
+        }
+      }
+    },
+    "entries": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "backend": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                    "description": "Python module (dotted, inside the module's folder) whose `module` is the declaration."},
+        "frontend": {"type": "string", "minLength": 1, "description": "The frontend entry exporting activate(ctx)."}
+      }
+    },
+    "requires": {
+      "type": "object", "description": "Modules this one calls, by id. An optional one may be missing or stopped.",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "properties": {"optional": {"type": "boolean"}}
+      }
+    },
+    "python": {
+      "type": "object", "additionalProperties": false,
+      "properties": {"requirements": {"type": "array", "items": {"type": "string", "minLength": 1}}},
+      "description": "Extra packages: the module then gets its own environment on top of TALYX's."
+    },
+    "panels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false, "required": ["title"],
+        "properties": {
+          "title": {"type": "string", "minLength": 1}, "icon": {"type": "string"},
+          "launcher": {"type": "boolean"}, "description": {"type": "string"},
+          "visibility": {"enum": ["public", "private"]},
+          "actions": {"type": "object", "description": "Panel actions with their input schemas (frontend-only)."}
+        }
+      }
+    },
+    "views": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "properties": {
+          "description": {"type": "string"},
+          "props": {"type": "object", "description": "JSON Schema of the props."},
+          "emits": {"type": "object", "additionalProperties": {"type": "object"}, "description": "Event name to payload schema."}
+        }
+      }
+    },
+    "provides": {
+      "type": "object",
+      "description": "What this module puts at others' points (owner.point): implementations and places in the window.",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"},
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object", "additionalProperties": false, "required": ["id", "descriptor"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "descriptor": {"type": "object", "description": "As the point's owner declares it in its contract."}
+          }
+        }
+      }
+    }
+  }
+}

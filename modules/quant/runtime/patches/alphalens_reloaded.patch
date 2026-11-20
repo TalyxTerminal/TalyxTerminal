@@ -1,0 +1,75 @@
+--- a/alphalens/performance.py
++++ b/alphalens/performance.py
+@@ -283,6 +283,7 @@
+     demeaned=True,
+     group_adjust=False,
+     equal_weight=False,
++    annualization=252,
+ ):
+     """
+     Compute the alpha (excess returns), alpha t-stat (alpha significance),
+@@ -348,7 +349,7 @@
+             alpha_beta.loc["Ann. alpha", period] = np.nan
+             alpha_beta.loc["beta", period] = np.nan
+         else:
+-            freq_adjust = pd.Timedelta("252Days") / pd.Timedelta(period)
++            freq_adjust = pd.Timedelta(days=annualization) / pd.Timedelta(period)
+ 
+             alpha_beta.loc["Ann. alpha", period] = (1 + alpha) ** freq_adjust - 1
+             alpha_beta.loc["beta", period] = beta
+--- a/alphalens/tears.py
++++ b/alphalens/tears.py
+@@ -59,7 +59,7 @@
+ 
+ 
+ @plotting.customize
+-def create_summary_tear_sheet(factor_data, long_short=True, group_neutral=False):
++def create_summary_tear_sheet(factor_data, long_short=True, group_neutral=False, annualization=252):
+     """
+     Creates a small summary tear sheet with returns, information, and turnover
+     analysis.
+@@ -111,7 +111,7 @@
+     )
+ 
+     alpha_beta = perf.factor_alpha_beta(
+-        factor_data, demeaned=long_short, group_adjust=group_neutral
++        factor_data, demeaned=long_short, group_adjust=group_neutral, annualization=annualization
+     )
+ 
+     mean_ret_spread_quant, std_spread_quant = perf.compute_mean_returns_spread(
+@@ -176,7 +176,7 @@
+ 
+ @plotting.customize
+ def create_returns_tear_sheet(
+-    factor_data, long_short=True, group_neutral=False, by_group=False
++    factor_data, long_short=True, group_neutral=False, by_group=False, annualization=252
+ ):
+     """
+     Creates a tear sheet for returns analysis of a factor.
+@@ -235,7 +235,7 @@
+     )
+ 
+     alpha_beta = perf.factor_alpha_beta(
+-        factor_data, factor_returns, long_short, group_neutral
++        factor_data, factor_returns, long_short, group_neutral, annualization=annualization
+     )
+ 
+     mean_ret_spread_quant, std_spread_quant = perf.compute_mean_returns_spread(
+@@ -472,7 +472,7 @@
+ 
+ @plotting.customize
+ def create_full_tear_sheet(
+-    factor_data, long_short=True, group_neutral=False, by_group=False
++    factor_data, long_short=True, group_neutral=False, by_group=False, annualization=252
+ ):
+     """
+     Creates a full tear sheet for analysis and evaluating single
+@@ -502,7 +502,7 @@
+ 
+     plotting.plot_quantile_statistics_table(factor_data)
+     create_returns_tear_sheet(
+-        factor_data, long_short, group_neutral, by_group, set_context=False
++        factor_data, long_short, group_neutral, by_group, annualization=annualization, set_context=False
+     )
+     create_information_tear_sheet(
+         factor_data, group_neutral, by_group, set_context=False

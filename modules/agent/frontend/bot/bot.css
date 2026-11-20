@@ -1,0 +1,289 @@
+/* The Bot panel, copied from Grok Bot (sidebar with pinned tiles, bubbles,
+   the rail of routines and settings) in TALYX's black and orange. Tokens
+   only; library parts get layout only. Shares chat.css for the cards and the
+   message box. */
+
+.bot-panel { position: relative; height: 100%; min-height: 0; display: flex; container-type: inline-size; background: var(--tx-panel); color: var(--tx-text); }
+.bot-spacer { flex: 1; }
+.bot-section-title { color: var(--tx-text-3); font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); }
+
+/* Pictures: the user palette, eyes in the text colour */
+.bot-avatar { position: relative; flex: none; display: inline-grid; width: calc(var(--tx-row) + var(--tx-space-1)); height: calc(var(--tx-row) + var(--tx-space-1)); }
+.bot-avatar[data-size="xs"] { width: var(--tx-icon); height: var(--tx-icon); }
+.bot-avatar[data-size="sm"] { width: var(--tx-button-sm); height: var(--tx-button-sm); }
+.bot-avatar[data-size="lg"] { width: calc(var(--tx-row) * 1.5); height: calc(var(--tx-row) * 1.5); }
+.bot-avatar[data-size="xl"] { width: calc(var(--tx-row) * 2.6); height: calc(var(--tx-row) * 2.6); }
+.bot-avatar > svg { width: 100%; height: 100%; overflow: visible; }
+.bot-avatar-body { fill: currentColor; stroke: none; }
+.bot-avatar-edge { stroke: currentColor; }
+.bot-avatar-eyes { fill: none; stroke: var(--tx-text); stroke-width: 2.6; stroke-linecap: round; }
+.bot-avatar[data-state="paused"] > svg { opacity: .45; }
+.bot-avatar[data-tint="brown"], .bot-tint-dot[data-tint="brown"] { color: var(--tx-user-palette-15); }
+.bot-avatar[data-tint="red"], .bot-tint-dot[data-tint="red"] { color: var(--tx-user-palette-5); }
+.bot-avatar[data-tint="yellow"], .bot-tint-dot[data-tint="yellow"] { color: var(--tx-user-palette-7); }
+.bot-avatar[data-tint="green"], .bot-tint-dot[data-tint="green"] { color: var(--tx-user-palette-8); }
+.bot-avatar[data-tint="teal"], .bot-tint-dot[data-tint="teal"] { color: var(--tx-user-palette-9); }
+.bot-avatar[data-tint="blue"], .bot-tint-dot[data-tint="blue"] { color: var(--tx-user-palette-11); }
+.bot-avatar[data-tint="purple"], .bot-tint-dot[data-tint="purple"] { color: var(--tx-user-palette-13); }
+.bot-avatar[data-tint="pink"], .bot-tint-dot[data-tint="pink"] { color: var(--tx-user-palette-14); }
+.bot-avatar[data-tint="grey"], .bot-tint-dot[data-tint="grey"] { color: var(--tx-user-palette-3); }
+/* Running or paused: a small badge on the corner, where Grok Bot puts its green "working" dot */
+.bot-badge { position: absolute; right: calc(-1 * var(--tx-space-half)); bottom: calc(-1 * var(--tx-space-half)); width: var(--tx-icon); height: var(--tx-icon); display: grid; place-items: center; box-sizing: border-box; border: var(--tx-space-half) solid var(--tx-panel); border-radius: 50%; background: var(--tx-raised); color: var(--tx-text-2); }
+.bot-badge > .tx-icon { width: calc(var(--tx-icon) - var(--tx-space-1-half)); height: calc(var(--tx-icon) - var(--tx-space-1-half)); }
+.bot-spin { color: var(--tx-ember); animation: bot-rotate var(--tx-spin-time) linear infinite; }
+.bot-avatar[data-size="xl"] .bot-badge { width: var(--tx-button-sm); height: var(--tx-button-sm); }
+/* Unread (quiet) or needs you (orange) on the top corner, like Grok Bot's dot; stays when the sidebar folds to pictures */
+.bot-avatar-dot { position: absolute; top: calc(-1 * var(--tx-space-half)); right: calc(-1 * var(--tx-space-half)); z-index: 1; width: var(--tx-space-2-half); height: var(--tx-space-2-half); box-sizing: content-box; border: var(--tx-space-half) solid var(--tx-panel); border-radius: 50%; background: var(--tx-text); }
+.bot-avatar-dot[data-tone="act"] { background: var(--tx-ember); }
+.bot-row:hover .bot-avatar-dot, .bot-pin:hover .bot-avatar-dot { border-color: var(--tx-hover); }
+/* An uploaded picture (mock: no real image, a filled disc) */
+.bot-avatar-photo { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(140deg, var(--tx-user-palette-11), var(--tx-user-palette-13)); }
+.bot-group-avatar { position: relative; flex: none; width: calc(var(--tx-row) + var(--tx-space-1)); height: calc(var(--tx-row) + var(--tx-space-1)); }
+.bot-group-avatar[data-size="sm"] { width: var(--tx-icon); height: var(--tx-icon); }
+.bot-group-avatar > .bot-avatar { position: absolute; width: 58%; height: 58%; }
+.bot-group-avatar-1 { left: 0; top: 0; }
+.bot-group-avatar-2 { right: 0; top: 18%; }
+.bot-group-avatar-3 { left: 22%; bottom: 0; }
+
+/* Sidebar */
+.bot-side { position: relative; width: calc(var(--tx-menu-width) + var(--tx-space-8)); flex: none; display: flex; flex-direction: column; gap: var(--tx-space-2); min-height: 0; padding: var(--tx-space-2); box-sizing: border-box; border-right: var(--tx-hairline) solid var(--tx-line); }
+.bot-mode { display: flex; }
+.bot-mode > .tx-seg { display: flex; flex: 1; }
+.bot-mode > .tx-seg > button { flex: 1; justify-content: center; }
+.bot-head-mode { display: none; flex: none; margin-right: var(--tx-space-1); }
+.bot-side-head { display: flex; align-items: center; gap: var(--tx-space-1); }
+.bot-search { flex: 1; }
+.bot-side-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--tx-space-3); }
+.bot-pins { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--tx-space-1); }
+.bot-pin.tx-btn { position: relative; height: auto; flex-direction: column; align-items: center; justify-content: flex-start; gap: var(--tx-space-1-half); padding: var(--tx-space-2) var(--tx-space-1) var(--tx-space-1-half); }
+.bot-pin-name { max-width: 100%; overflow: hidden; color: var(--tx-text-2); font-size: var(--tx-size-xs); white-space: nowrap; text-overflow: ellipsis; }
+.bot-pin[aria-current] .bot-pin-name { color: var(--tx-text); }
+.bot-rows { display: flex; flex-direction: column; gap: var(--tx-space-half); }
+.bot-row.tx-btn { width: 100%; height: auto; justify-content: flex-start; align-items: center; gap: var(--tx-space-2-half); padding: var(--tx-space-1-half) var(--tx-space-2); }
+.bot-row-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tx-space-half); text-align: left; }
+.bot-row-top, .bot-row-bottom { display: flex; align-items: center; gap: var(--tx-space-2); min-width: 0; }
+.bot-row-name { flex: 1; min-width: 0; overflow: hidden; color: var(--tx-text); font-size: var(--tx-size); font-weight: var(--tx-weight-medium); white-space: nowrap; text-overflow: ellipsis; }
+.bot-row-time { flex: none; color: var(--tx-text-3); font-size: var(--tx-size-xs); font-variant-numeric: tabular-nums; }
+.bot-row-text { flex: 1; min-width: 0; overflow: hidden; color: var(--tx-text-3); font-size: var(--tx-size-sm); font-weight: var(--tx-weight); white-space: nowrap; text-overflow: ellipsis; }
+.bot-row[data-unread] .bot-row-text { color: var(--tx-text-2); }
+.bot-new-mark { flex: none; width: calc(var(--tx-row) + var(--tx-space-1)); height: calc(var(--tx-row) + var(--tx-space-1)); display: grid; place-items: center; border-radius: 50%; background: var(--tx-raised); color: var(--tx-text-2); }
+.bot-side-none { margin: 0; padding: var(--tx-space-2); color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.bot-side-empty { text-align: center; padding-top: var(--tx-space-6); }
+/* The user's sections, as in Grok Bot: a small heading that folds, "…" on hover to rename or delete */
+.bot-section { display: flex; flex-direction: column; gap: var(--tx-space-half); }
+.bot-section-head { position: relative; display: flex; align-items: center; }
+.bot-section-toggle { flex: 1; min-width: 0; justify-content: flex-start; gap: var(--tx-space-1); padding: 0 var(--tx-space-2); }
+.bot-section-toggle > .bot-section-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bot-fold-indicator { display:inline-flex; width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; opacity: 0; }
+.bot-section-head:hover .bot-fold-indicator, .bot-section-toggle[aria-expanded="false"] > .bot-fold-indicator { opacity: 1; }
+.bot-section-more { position: absolute; right: var(--tx-space-1-half); opacity: 0; transition: opacity var(--tx-fast) var(--tx-ease); }
+.bot-section-head:hover .bot-section-more, .bot-section-more:focus-within, .bot-section-more:has([data-state="open"]) { opacity: 1; }
+.bot-section-rename { margin: 0 var(--tx-space-1); }
+/* Grok Bot's "More unreads": a pill over the foot of the list while an unread entry is below the fold */
+.bot-side-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.bot-more-unreads { position: absolute; inset-inline: 0; bottom: var(--tx-space-2); width: max-content; margin-inline: auto; border-radius: var(--tx-radius-pill); background: var(--tx-raised); box-shadow: var(--tx-glass-shadow); white-space: nowrap; }
+/* The "…" on an entry: on hover, over the time, like the chat panel */
+.bot-entry { position: relative; }
+.bot-more { position: absolute; top: var(--tx-space-1-half); right: var(--tx-space-1-half); opacity: 0; transition: opacity var(--tx-fast) var(--tx-ease); }
+.bot-entry:hover .bot-more, .bot-more:focus-within, .bot-more:has([data-state="open"]) { opacity: 1; }
+.bot-entry:hover .bot-row-time, .bot-entry:has(.bot-more [data-state="open"]) .bot-row-time { visibility: hidden; }
+.bot-pin-entry .bot-more { top: var(--tx-space-1); right: var(--tx-space-1); }
+.bot-renaming { display: flex; align-items: center; gap: var(--tx-space-2-half); padding: var(--tx-space-1-half) var(--tx-space-2); }
+.bot-rename { flex: 1; min-width: 0; }
+.bot-hidden { display: flex; flex-direction: column; gap: var(--tx-space-half); margin-top: auto; padding-top: var(--tx-space-2); border-top: var(--tx-hairline) solid var(--tx-line); }
+.bot-hidden-head.tx-btn { width: 100%; justify-content: space-between; padding: 0 var(--tx-space-2); }
+
+/* Narrow: the sidebar folds to a column of pictures, like Grok Bot's compact sidebar */
+@container (max-width: 760px) {
+  .bot-side { width: calc(var(--tx-row) * 2); max-width: calc(var(--tx-row) * 2); padding: var(--tx-space-2) var(--tx-space-1); align-items: center; }
+  .bot-side-head { flex-direction: column; }
+  .bot-side > .agent-edge, .bot-search, .bot-pin-name, .bot-row-copy, .bot-hidden-head > span:first-child, .bot-more, .bot-mode, .bot-side-none, .bot-more-unreads { display: none; }
+  .bot-section-head { display: none; }
+  .bot-section { padding-top: var(--tx-space-2); border-top: var(--tx-hairline) solid var(--tx-line); }
+  .bot-head-mode { display: inline-flex; }
+  .bot-pins { grid-template-columns: 1fr; padding-bottom: var(--tx-space-2); border-bottom: var(--tx-hairline) solid var(--tx-line); }
+  .bot-pin .bot-avatar[data-size="lg"] { width: calc(var(--tx-row) + var(--tx-space-1)); height: calc(var(--tx-row) + var(--tx-space-1)); }
+  .bot-pin.tx-btn, .bot-row.tx-btn { padding: var(--tx-space-1); justify-content: center; }
+  .bot-hidden-head.tx-btn { justify-content: center; padding: 0; }
+}
+
+/* Head: picture and name (opens Settings or Members), then Pause, the rail; Stop is in the message box */
+.bot-main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bot-head { height: var(--tx-panel-head-height); flex: none; box-sizing: border-box; display: flex; align-items: center; gap: var(--tx-space-1); padding: 0 var(--tx-space-2); border-bottom: var(--tx-hairline) solid var(--tx-line); }
+.bot-head > .tx-icon { color: var(--tx-text-3); margin-left: var(--tx-space-1); }
+.bot-title.tx-btn { min-width: 0; gap: var(--tx-space-2); }
+.bot-title-static { display: inline-flex; align-items: center; min-width: 0; gap: var(--tx-space-2); padding: 0 var(--tx-space-2); }
+.bot-title-name { min-width: 0; overflow: hidden; color: var(--tx-text); font-size: var(--tx-size); font-weight: var(--tx-weight-medium); white-space: nowrap; text-overflow: ellipsis; }
+.bot-head-state { color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.bot-body { position: relative; flex: 1; min-height: 0; display: flex; }
+.bot-center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* Stream: time and what woke the run on a centred line, bot bubbles on the left */
+.bot-stream { flex: 1; min-height: 0; overflow-y: auto; }
+.bot-column { width: 100%; max-width: calc(var(--tx-row) * 25); box-sizing: border-box; margin-inline: auto; padding-inline: var(--tx-space-4); }
+.bot-stream > .bot-column { display: flex; flex-direction: column; gap: var(--tx-space-2); padding-block: var(--tx-space-4) var(--tx-space-6); }
+.bot-empty { margin: var(--tx-space-8) 0; color: var(--tx-text-3); font-size: var(--tx-size-sm); text-align: center; }
+.bot-mark { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--tx-space-1-half); margin: var(--tx-space-3) 0 var(--tx-space-1); color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.bot-mark > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); }
+.bot-mention { display: inline-flex; align-items: center; gap: var(--tx-space-1); color: var(--tx-text); font-weight: var(--tx-weight-medium); vertical-align: bottom; }
+.bot-said { display: flex; align-items: flex-end; gap: var(--tx-space-2); }
+.bot-said-avatar { margin-bottom: var(--tx-space-half); }
+.bot-said-items { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--tx-space-1-half); }
+.bot-said-name { padding-left: var(--tx-space-3); color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+/* Reply and copy beside a bot's bubble on hover, like Grok Bot's message actions */
+.bot-bubble-wrap { width: 100%; display: flex; align-items: flex-end; gap: var(--tx-space-1); }
+.bot-bubble-actions { flex: none; display: flex; gap: var(--tx-space-half); opacity: 0; transition: opacity var(--tx-fast) var(--tx-ease); }
+.bot-bubble-wrap:hover .bot-bubble-actions, .bot-bubble-actions:focus-within { opacity: 1; }
+/* What a sent message replies to: one quiet line over its bubble */
+.bot-quote { display: flex; align-items: center; justify-content: flex-end; gap: var(--tx-space-1-half); max-width: 80%; min-width: 0; margin-left: auto; color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.bot-quote > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; }
+.bot-quote-name { flex: none; color: var(--tx-text-2); font-weight: var(--tx-weight-medium); }
+.bot-quote-text, .bot-replying-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bot-replying { max-width: 100%; min-width: 0; }
+.bot-replying-text { color: var(--tx-text-3); }
+.bot-all-hidden { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tx-space-3); }
+.bot-all-hidden-title { margin: 0; color: var(--tx-text-2); font-size: var(--tx-size); }
+.bot-dialog-text { margin: 0; color: var(--tx-text-2); font-size: var(--tx-size-sm); line-height: var(--tx-leading); }
+.bot-bubble { max-width: 86%; box-sizing: border-box; gap: var(--tx-space-2); padding: var(--tx-space-2) var(--tx-space-3); border: var(--tx-hairline) solid var(--tx-line); border-radius: var(--tx-radius-lg); background: var(--tx-card); }
+.bot-item { width: 86%; }
+.bot-item[data-kind="work"] { width: 100%; }
+.bot-said .chat-worked { border-bottom: 0; padding-bottom: 0; }
+.bot-foot { position: relative; flex: none; padding-bottom: var(--tx-space-3); }
+
+/* Rail, like Grok Bot's: quiet sections, pages behind a back arrow */
+.bot-rail { position: relative; width: calc(var(--tx-row) * 11.5); flex: none; display: flex; flex-direction: column; min-height: 0; border-left: var(--tx-hairline) solid var(--tx-line); background: var(--tx-panel); }
+.bot-rail-head { height: var(--tx-panel-head-height); flex: none; display: flex; align-items: center; gap: var(--tx-space-2); padding: 0 var(--tx-space-2); }
+.bot-rail-gap { width: var(--tx-button-sm); }
+.bot-rail-title { flex: 1; color: var(--tx-text); font-size: var(--tx-size); font-weight: var(--tx-weight-medium); text-align: center; }
+.bot-rail-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--tx-space-5); padding: var(--tx-space-3) var(--tx-space-3) var(--tx-space-6); }
+.bot-rail-head + .bot-rail-body { padding-top: var(--tx-space-1); }
+.bot-rail-section { display: flex; flex-direction: column; gap: var(--tx-space-1); }
+.bot-rail-section-head { display: flex; align-items: center; justify-content: space-between; min-height: var(--tx-button-sm); padding-left: var(--tx-space-1); }
+.bot-rail-none { margin: 0; padding: var(--tx-space-1) var(--tx-space-1); color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.bot-line.tx-btn { width: 100%; height: auto; align-items: flex-start; justify-content: flex-start; gap: var(--tx-space-2-half); padding: var(--tx-space-1-half) var(--tx-space-1); }
+.bot-line > .tx-icon { width: var(--tx-icon); height: var(--tx-icon); flex: none; margin-top: var(--tx-space-half); color: var(--tx-text-3); }
+.bot-line[data-off] { opacity: .5; }
+.bot-line-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tx-space-half); text-align: left; }
+.bot-line-title { min-width: 0; overflow: hidden; color: var(--tx-text); font-size: var(--tx-size-sm); white-space: nowrap; text-overflow: ellipsis; }
+.bot-line-sub { min-width: 0; overflow: hidden; color: var(--tx-text-3); font-size: var(--tx-size-xs); font-weight: var(--tx-weight); white-space: nowrap; text-overflow: ellipsis; }
+.bot-routine-row { display: flex; align-items: center; gap: var(--tx-space-2); padding-right: var(--tx-space-1); }
+.bot-routine-row > .bot-line { flex: 1; min-width: 0; }
+.bot-routine-row[data-off] > .bot-line { opacity: .55; }
+.bot-member-row { position: relative; }
+.bot-member-remove { position: absolute; top: 50%; right: var(--tx-space-1); transform: translateY(-50%); opacity: 0; transition: opacity var(--tx-fast) var(--tx-ease); }
+.bot-member-row:hover .bot-member-remove, .bot-member-remove:focus-within { opacity: 1; }
+.bot-member.tx-btn { align-items: center; }
+.bot-add.tx-btn { align-items: center; }
+.bot-runs { display: flex; flex-direction: column; }
+.bot-run { display: flex; align-items: flex-start; gap: var(--tx-space-2-half); padding: var(--tx-space-1-half) var(--tx-space-1); }
+.bot-run-mark { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; margin-top: var(--tx-space-half); color: var(--tx-text-3); }
+.bot-run[data-outcome="running"] .bot-run-mark { color: var(--tx-ember); animation: bot-rotate var(--tx-spin-time) linear infinite; }
+.bot-run[data-outcome="waiting"] .bot-run-mark { color: var(--tx-ember); }
+.bot-run[data-outcome="failed"] .bot-run-mark { color: var(--tx-ember-text); }
+.bot-run[data-outcome="done"] .bot-run-mark { color: var(--tx-text-2); }
+.bot-run-wake { display: flex; align-items: center; gap: var(--tx-space-1); }
+.bot-run-wake > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; }
+.bot-run-figures { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--tx-space-half); color: var(--tx-text-2); font-size: var(--tx-size-sm); font-variant-numeric: tabular-nums; }
+/* A quiet run that left changes or memories: the count on its row, which opens to them, each with Undo */
+.bot-run-open.tx-btn { align-items: flex-start; gap: var(--tx-space-2-half); padding: var(--tx-space-1-half) var(--tx-space-1); }
+.bot-run-notice { color: var(--tx-state-watch); }
+.bot-settings-link .bot-line-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bot-run-left { display: flex; align-items: center; gap: var(--tx-space-1); color: var(--tx-text-2); font-size: var(--tx-size-xs); }
+.bot-run-left > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; color: var(--tx-text-3); }
+.bot-effects { display: flex; flex-direction: column; margin: 0 0 var(--tx-space-1) calc(var(--tx-icon-sm) + var(--tx-space-2-half) + var(--tx-space-1)); padding-left: var(--tx-space-2); border-left: var(--tx-hairline) solid var(--tx-line-2); }
+.bot-effect { display: flex; align-items: center; gap: var(--tx-space-2); padding: var(--tx-space-1) 0; }
+.bot-effect[data-undone] .bot-effect-label { color: var(--tx-text-3); text-decoration: line-through; }
+.bot-memory-edit { padding: var(--tx-space-2) var(--tx-space-3); }
+.bot-memory-actions { display: flex; gap: var(--tx-space-half); }.bot-spend { display: flex; align-items: baseline; gap: var(--tx-space-2); padding: 0 var(--tx-space-1); }
+.bot-spend-total { color: var(--tx-text); font-size: var(--tx-size-num); font-weight: var(--tx-weight-medium); font-variant-numeric: tabular-nums; }
+.bot-meter { margin: var(--tx-space-1) var(--tx-space-1) 0; }
+.bot-spend-parts { display: flex; flex-direction: column; margin-top: var(--tx-space-1); }
+.bot-spend-part { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: var(--tx-space-3); padding: var(--tx-space-1) var(--tx-space-1); }
+.bot-spend-amount { color: var(--tx-text-2); font-size: var(--tx-size-sm); font-variant-numeric: tabular-nums; }
+
+/* Settings and routine pages */
+.bot-settings { display: flex; flex-direction: column; gap: var(--tx-space-4); }
+.bot-settings-picture { display: flex; justify-content: center; padding: var(--tx-space-2) 0; }
+.bot-picture.tx-btn { position: relative; width: auto; height: auto; padding: var(--tx-space-1); }
+/* The picture is the way in to changing it: a pencil on its top corner, as on Grok Bot's and ChatGPT's pictures
+   (the bottom corner is the running badge's) */
+.bot-picture-edit { position: absolute; top: 0; right: 0; width: var(--tx-button-sm); height: var(--tx-button-sm); display: grid; place-items: center; box-sizing: border-box; border: var(--tx-space-half) solid var(--tx-panel); border-radius: 50%; background: var(--tx-raised); color: var(--tx-text-2); }
+.bot-picture-edit > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); }
+.bot-picture:hover .bot-picture-edit, .bot-picture[data-state="open"] .bot-picture-edit { color: var(--tx-text); }
+.bot-field { display: flex; flex-direction: column; gap: var(--tx-space-1-half); color: var(--tx-text-3); font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); }
+.bot-field-value { color: var(--tx-text); font-size: var(--tx-size-sm); font-weight: var(--tx-weight); }
+.bot-card { gap: 0; }
+.bot-card .tx-settings-row { padding-inline: var(--tx-space-3); }
+.bot-card .tx-select { width: auto; max-width: 55%; }
+.bot-limit { width: calc(var(--tx-row) * 4.5); }
+.bot-drill.tx-btn { width: 100%; height: auto; min-height: calc(var(--tx-row) + var(--tx-space-3)); justify-content: flex-start; gap: var(--tx-space-2); padding: 0 var(--tx-space-3); }
+.bot-drill-title { flex: 1; color: var(--tx-text); font-size: var(--tx-size); font-weight: var(--tx-weight-medium); text-align: left; }
+.bot-drill > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); color: var(--tx-text-3); }
+.bot-danger.tx-btn { align-self: flex-start; }
+.bot-routine-top { display: flex; align-items: center; gap: var(--tx-space-2); }
+.bot-when { display: flex; flex-direction: column; padding: var(--tx-space-1); border: var(--tx-hairline) solid var(--tx-line-2); border-radius: var(--tx-radius); }
+.bot-when-row { display: flex; align-items: center; gap: var(--tx-space-2); padding: var(--tx-space-1-half) var(--tx-space-2); color: var(--tx-text); font-size: var(--tx-size-sm); font-weight: var(--tx-weight); }
+.bot-when-row > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; color: var(--tx-text-3); }
+.bot-when-add.tx-btn { width: 100%; justify-content: flex-start; gap: var(--tx-space-2); padding: 0 var(--tx-space-2); }
+.bot-notes { display: flex; flex-direction: column; gap: var(--tx-space-2); }
+.bot-note-text { color: var(--tx-text); font-size: var(--tx-size-sm); line-height: var(--tx-leading); }
+/* What a bot is given (skills, knowledge): the picked ones in a box with the way to add more at its foot, like Grok Bot's
+   "When to run" box; remove on hover */
+.bot-picks { display: flex; flex-direction: column; padding: var(--tx-space-1); border: var(--tx-hairline) solid var(--tx-line-2); border-radius: var(--tx-radius); }
+.bot-pick { position: relative; display: flex; align-items: center; gap: var(--tx-space-2); min-height: var(--tx-row); padding: var(--tx-space-1-half) var(--tx-space-2); }
+.bot-pick > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; color: var(--tx-text-3); }
+.bot-pick-remove { flex: none; opacity: 0; transition: opacity var(--tx-fast) var(--tx-ease); }
+.bot-pick:hover .bot-pick-remove, .bot-pick-remove:focus-within { opacity: 1; }
+.bot-picks-foot { display: flex; align-items: center; }
+.bot-picks-foot > .bot-when-add.tx-btn { width: auto; }
+.bot-picks-foot > .bot-upload-add.tx-btn { margin-left: auto; }
+.bot-memory-none { padding: var(--tx-space-3); }
+.bot-more-settings { display: flex; flex-direction: column; gap: var(--tx-space-2); }
+.bot-more-toggle.tx-btn { align-self: flex-start; gap: var(--tx-space-1); }
+/* Adding skills or knowledge, after Grok Bot's Plugins dialog: a search, then the library in groups with Add on each row */
+.bot-library { display: flex; flex-direction: column; gap: var(--tx-space-3); }
+.bot-library-group { display: flex; flex-direction: column; }
+.bot-library-head { padding: var(--tx-space-1) 0; }
+.bot-library-row { display: flex; align-items: center; gap: var(--tx-space-3); padding: var(--tx-space-2) 0; }
+.bot-library-row > .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); flex: none; color: var(--tx-text-3); }
+.bot-allowed { display: flex; align-items: center; gap: var(--tx-space-2); padding: var(--tx-space-1-half) var(--tx-space-1) var(--tx-space-1-half) var(--tx-space-3); border: var(--tx-hairline) solid var(--tx-line-2); border-radius: var(--tx-radius); }
+
+/* Picking a picture: colours over shapes */
+.bot-look { display: flex; flex-direction: column; align-items: center; gap: var(--tx-space-2); width: calc(var(--tx-row) * 11); max-width: 100%; }
+.bot-look > .tx-tabs { align-self: stretch; margin-bottom: var(--tx-space-1); }
+.bot-upload, .bot-upload-done { align-self: stretch; display: flex; align-items: center; gap: var(--tx-space-3); min-height: calc(var(--tx-row) * 3); box-sizing: border-box; padding: var(--tx-space-3); border: var(--tx-hairline) dashed var(--tx-line-2); border-radius: var(--tx-radius); }
+.bot-upload { flex-direction: column; justify-content: center; gap: var(--tx-space-2); color: var(--tx-text-3); }
+.bot-upload-done { border-style: solid; }
+.bot-upload-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tx-space-half); }
+.bot-look-pop { padding: var(--tx-space-3); }
+.bot-look-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tx-space-1); }
+.bot-tint.tx-btn, .bot-shape.tx-btn { width: var(--tx-button); height: var(--tx-button); padding: 0; justify-content: center; }
+.bot-tint-dot { width: var(--tx-icon); height: var(--tx-icon); border-radius: 50%; background: currentColor; }
+.bot-tint[aria-pressed="true"] .bot-tint-dot { outline: var(--tx-stroke) solid var(--tx-text); outline-offset: var(--tx-space-half); }
+
+/* New bot, new group: Grok Bot's centred form, then presets */
+.bot-create { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--tx-space-8); padding: var(--tx-space-8) var(--tx-space-4); }
+.bot-create-form { display: flex; flex-direction: column; align-items: center; gap: var(--tx-space-4); width: 100%; max-width: calc(var(--tx-row) * 13); margin: auto auto 0; }
+.bot-create-form > .bot-field { align-self: stretch; }
+.bot-presets { display: flex; flex-direction: column; gap: var(--tx-space-2); width: 100%; max-width: calc(var(--tx-row) * 25); margin: 0 auto; }
+.bot-preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--tx-row) * 8), 1fr)); gap: var(--tx-space-2); }
+.bot-preset-card { border: var(--tx-hairline) solid var(--tx-line-2); border-radius: var(--tx-radius); background: var(--tx-card); overflow: hidden; }
+.bot-preset.tx-btn { width: 100%; height: 100%; justify-content: flex-start; align-items: center; gap: var(--tx-space-3); padding: var(--tx-space-3) var(--tx-space-4); }
+.bot-preset-copy { min-width: 0; display: flex; flex-direction: column; gap: var(--tx-space-half); text-align: left; }
+.bot-preset-name { color: var(--tx-text); font-size: var(--tx-size); font-weight: var(--tx-weight-medium); }
+.bot-preset-intro { color: var(--tx-text-3); font-size: var(--tx-size-sm); font-weight: var(--tx-weight); white-space: normal; }
+.bot-group-form { display: flex; flex-direction: column; gap: var(--tx-space-4); width: 100%; max-width: calc(var(--tx-row) * 20); margin: 0 auto; }
+.bot-to { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tx-space-1-half); padding: var(--tx-space-1) var(--tx-space-2); border-bottom: var(--tx-hairline) solid var(--tx-line-2); }
+.bot-to-label { color: var(--tx-text-3); font-size: var(--tx-size); }
+.bot-to-chip { display: inline-flex; align-items: center; gap: var(--tx-space-1-half); height: var(--tx-button-sm); padding: 0 0 0 var(--tx-space-2); border-radius: var(--tx-radius-pill); background: var(--tx-raised); color: var(--tx-text); font-size: var(--tx-size-sm); }
+/* The "To:" picker: chips on the line, the name field under it, matches dropping down under that */
+.bot-picker { display: flex; flex-direction: column; gap: var(--tx-space-2); }
+.bot-to { min-height: var(--tx-button); }
+.bot-to-chip > .tx-icon-btn { margin-right: var(--tx-space-half); }
+.bot-to-input { align-self: stretch; }
+.bot-pick-drop { display: flex; flex-direction: column; max-height: calc(var(--tx-row) * 9); overflow-y: auto; margin-top: calc(-1 * var(--tx-space-1)); padding: var(--tx-space-1); border: var(--tx-hairline) solid var(--tx-line-2); border-radius: var(--tx-radius); background: var(--tx-raised); box-shadow: var(--tx-glass-shadow); }
+.bot-pick-row.tx-btn { width: 100%; height: auto; justify-content: flex-start; align-items: center; gap: var(--tx-space-3); padding: var(--tx-space-1-half) var(--tx-space-2); }
+.bot-group-actions { display: flex; justify-content: flex-end; }
+
+@keyframes bot-rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .bot-spin, .bot-run-mark { animation: none; } .bot-more, .bot-section-more, .bot-bubble-actions, .bot-member-remove, .bot-pick-remove { transition: none; } }

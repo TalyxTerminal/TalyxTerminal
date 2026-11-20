@@ -1,0 +1,2 @@
+Remove this file after the module UI redesign.
+While present, this file exempts the module from web/src/design/moduleUiRules.test.ts. The redesigned UI must pass that test.

@@ -1,0 +1,52 @@
+{
+  "python": "3.12",
+  "qlibCommit": "54355232463878d2eebb91fe0ee5fa7fa1f5976c",
+  "qlib": {
+    "path": "wheels/pyqlib-0.9.8-1talyx-cp312-cp312-win_amd64.whl",
+    "sha256": "ae0cbc72787ede42ccb295d2eaf369b1660a77402708e536b4b4e3f09950d9b1",
+    "upstreamSha256": "0fe9fc04f39b224079c66de08978365e053697270819a7b722c640fdf69b6c79"
+  },
+  "alphalens": {
+    "path": "wheels/alphalens_reloaded-0.5.1-1talyx-py3-none-any.whl",
+    "sha256": "0bb2a8ac932420f6f83591c233676e7bf4c7071f7e92ecddc12a615c86bfa238",
+    "upstreamSha256": "1455c630a8a5822bcbc605c08d6ddab37360f27a317c8b64e936be6bc1d50c66"
+  },
+  "source": {
+    "commit": "54355232463878d2eebb91fe0ee5fa7fa1f5976c",
+    "version": "0.9.8",
+    "source_sha256": "2630d3b12feaef95665c2f2127814768593e6850847a88bf4a7ddf8b4dbadec1",
+    "exit_code": 0,
+    "elapsed_seconds": 29.93,
+    "compiler": "MSVC 14.44.35207 Hostx64/x64 (tools/native-build/assets.lock.json)",
+    "wheel": [
+      {
+        "file": "pyqlib-0.9.8-cp312-cp312-win_amd64.whl",
+        "sha256": "0fe9fc04f39b224079c66de08978365e053697270819a7b722c640fdf69b6c79"
+      }
+    ]
+  },
+  "skfolio": {
+    "version": "1.8.1",
+    "source": "https://github.com/skfolio/skfolio/tree/v1.8.1",
+    "wheel": {
+      "path": "upstream/skfolio-1.8.1-py3-none-any.whl",
+      "sha256": "5ad89bcd52513b1e400ed1fe840db99d0a86af0ca9842c0e790e3618fe234852",
+      "url": "https://files.pythonhosted.org/packages/9c/75/eac312c38935bba39f4aaedd0d557f9802b8b8611223b86646ca913979d8/skfolio-1.8.1-py3-none-any.whl"
+    },
+    "patches": []
+  },
+  "quantlib": {
+    "QuantLib": "1.43",
+    "ORE": "1.8.16.0",
+    "oreSource": {
+      "commit": "b1f239332fdd51e5c514dd6de34a665fe0ff8326"
+    },
+    "licenses": [
+      "licenses/QuantLib-SWIG-1.43-LICENSE.txt",
+      "licenses/open-source-risk-engine-1.8.16.0-WHEEL-LICENSE.txt",
+      "licenses/ORE-1.8.16.0-LICENSE.txt",
+      "MINPACK acknowledgment and complete original notice in the fixed wheel"
+    ],
+    "patches": []
+  }
+}

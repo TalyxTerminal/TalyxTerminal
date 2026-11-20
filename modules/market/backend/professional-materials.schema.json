@@ -1,0 +1,1042 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "TimePoint": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "precision": {
+              "const": "date"
+            },
+            "value": {
+              "type": "string",
+              "format": "date"
+            },
+            "timezone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "precision",
+            "value",
+            "timezone"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "precision": {
+              "const": "instant"
+            },
+            "value": {
+              "$ref": "vocab:TimestampNs"
+            }
+          },
+          "required": [
+            "precision",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "Availability": {
+      "type": "object",
+      "properties": {
+        "publishedAt": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "revisedAt": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "revisionHistory": {
+          "enum": [
+            "complete",
+            "unknown"
+          ]
+        },
+        "reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "publishedAt",
+        "revisedAt",
+        "revisionHistory",
+        "reference"
+      ],
+      "additionalProperties": false
+    },
+    "Coverage": {
+      "type": "object",
+      "properties": {
+        "requestedMembers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "returnedMembers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "missingMembers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "completeness": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeRanges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "member": {
+                "type": "string",
+                "minLength": 1
+              },
+              "start": {
+                "$ref": "#/$defs/TimePoint"
+              },
+              "end": {
+                "$ref": "#/$defs/TimePoint"
+              }
+            },
+            "required": [
+              "member",
+              "start",
+              "end"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "requestedMembers",
+        "returnedMembers",
+        "missingMembers",
+        "completeness",
+        "statement",
+        "timeRanges"
+      ],
+      "additionalProperties": false
+    },
+    "BondTerms": {
+      "type": "object",
+      "properties": {
+        "unitFaceValue": {
+          "type": "string",
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        },
+        "couponType": {
+          "enum": [
+            "fixed",
+            "floating",
+            "zero"
+          ]
+        },
+        "couponRate": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "floatingIndex": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "paymentSchedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimePoint"
+          }
+        },
+        "resetSchedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimePoint"
+          }
+        },
+        "calendar": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dayCount": {
+          "type": "string",
+          "minLength": 1
+        },
+        "businessDayConvention": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maturity": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "issuer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "settlementDays": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "issueDate": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "scheduleRules": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "end": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "tenor": {
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            },
+            "terminationConvention": {
+              "type": "string"
+            },
+            "endOfMonth": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "start",
+            "end",
+            "tenor",
+            "rule",
+            "terminationConvention",
+            "endOfMonth"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "unitFaceValue",
+        "currency",
+        "couponType",
+        "couponRate",
+        "floatingIndex",
+        "paymentSchedule",
+        "resetSchedule",
+        "calendar",
+        "dayCount",
+        "businessDayConvention",
+        "maturity"
+      ],
+      "additionalProperties": false
+    },
+    "OptionTerms": {
+      "type": "object",
+      "properties": {
+        "underlying": {
+          "type": "object"
+        },
+        "strike": {
+          "type": "string",
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        },
+        "style": {
+          "enum": [
+            "european",
+            "american",
+            "bermudan"
+          ]
+        },
+        "settlement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deliverable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "multiplier": {
+          "type": "string",
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+        },
+        "expiry": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "optionType": {
+          "enum": [
+            "call",
+            "put"
+          ]
+        },
+        "payoffAtExpiry": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "underlying",
+        "strike",
+        "currency",
+        "style",
+        "settlement",
+        "deliverable",
+        "multiplier",
+        "expiry",
+        "optionType"
+      ],
+      "additionalProperties": false
+    },
+    "FutureTerms": {
+      "type": "object",
+      "properties": {
+        "contractMonth": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}$"
+        },
+        "multiplier": {
+          "type": "string",
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+        },
+        "lastTradingDate": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "deliveryDate": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "contractFamily": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settlement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "contractMonth",
+        "multiplier",
+        "lastTradingDate",
+        "deliveryDate",
+        "contractFamily",
+        "settlement",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "InstrumentTermRow": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "instrument": {
+              "type": "object"
+            },
+            "effectiveFrom": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "effectiveUntil": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "termType": {
+              "const": "bond"
+            },
+            "terms": {
+              "$ref": "#/$defs/BondTerms"
+            }
+          },
+          "required": [
+            "instrument",
+            "effectiveFrom",
+            "effectiveUntil",
+            "termType",
+            "terms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "instrument": {
+              "type": "object"
+            },
+            "effectiveFrom": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "effectiveUntil": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "termType": {
+              "const": "option"
+            },
+            "terms": {
+              "$ref": "#/$defs/OptionTerms"
+            }
+          },
+          "required": [
+            "instrument",
+            "effectiveFrom",
+            "effectiveUntil",
+            "termType",
+            "terms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "instrument": {
+              "type": "object"
+            },
+            "effectiveFrom": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "effectiveUntil": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "termType": {
+              "const": "future"
+            },
+            "terms": {
+              "$ref": "#/$defs/FutureTerms"
+            }
+          },
+          "required": [
+            "instrument",
+            "effectiveFrom",
+            "effectiveUntil",
+            "termType",
+            "terms"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "QuoteSubject": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "instrument": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "instrument"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "namespace",
+            "key"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "QuoteRow": {
+      "type": "object",
+      "properties": {
+        "quoteId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quoteType": {
+          "enum": [
+            "price",
+            "bid",
+            "ask",
+            "yield",
+            "rate",
+            "discount_factor",
+            "forward_points",
+            "volatility",
+            "settlement",
+            "open_interest",
+            "greek"
+          ]
+        },
+        "subject": {
+          "$ref": "#/$defs/QuoteSubject"
+        },
+        "observedAt": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dimensions": {
+          "type": "object",
+          "properties": {
+            "tenor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expiry": {
+              "$ref": "#/$defs/TimePoint"
+            },
+            "strike": {
+              "type": "string",
+              "minLength": 1
+            },
+            "side": {
+              "enum": [
+                "call",
+                "put",
+                "bid",
+                "ask",
+                "mid"
+              ]
+            },
+            "volType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dayCount": {
+              "type": "string",
+              "minLength": 1
+            },
+            "calendar": {
+              "type": "string",
+              "minLength": 1
+            },
+            "businessDayConvention": {
+              "type": "string",
+              "minLength": 1
+            },
+            "index": {
+              "type": "string",
+              "minLength": 1
+            },
+            "contractMonth": {
+              "type": "string",
+              "minLength": 1
+            },
+            "priceBasis": {
+              "type": "string",
+              "minLength": 1
+            },
+            "greekName": {
+              "enum": [
+                "delta",
+                "gamma",
+                "theta",
+                "vega",
+                "rho"
+              ]
+            },
+            "unitSemantics": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sourceDocumentation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sourceEventTimeNs": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "sourceReceivedTimeNs": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "sourceReferenceTimeNs": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "dataset": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "providerInstrumentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "publisherId": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sourceRawSymbol": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "recordFlags": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tradeSide": {
+              "type": "string",
+              "minLength": 1
+            },
+            "statType": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "statFlags": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "updateAction": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "size": {
+              "type": "string",
+              "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+            },
+            "bidSize": {
+              "type": "string",
+              "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+            },
+            "askSize": {
+              "type": "string",
+              "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+            },
+            "sourceFields": {
+              "type": "object",
+              "description": "Original provider record fields; integers/decimals exceeding JSON numeric precision remain strings."
+            },
+            "referenceDate": {
+              "$ref": "#/$defs/TimePoint"
+            }
+          },
+          "additionalProperties": false
+        },
+        "sourceKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "quoteId",
+        "quoteType",
+        "subject",
+        "observedAt",
+        "value",
+        "unit",
+        "currency",
+        "dimensions",
+        "sourceKey"
+      ],
+      "additionalProperties": false
+    },
+    "ProfessionalRow": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/InstrumentTermRow"
+        },
+        {
+          "$ref": "#/$defs/QuoteRow"
+        },
+        {
+          "$ref": "#/$defs/InstrumentDefinitionRow"
+        }
+      ]
+    },
+    "Descriptor": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "instrument_terms",
+            "quote_set",
+            "instrument_definitions"
+          ]
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "formatVersion": {
+          "const": "talyx.market.professional.v1"
+        },
+        "coverage": {
+          "$ref": "#/$defs/Coverage"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "sourceId",
+        "sourceVersion",
+        "availability",
+        "formatVersion",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
+    "File": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "enum": [
+            "source",
+            "rows",
+            "source_response"
+          ]
+        },
+        "filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byteSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "format": {
+          "enum": [
+            "json",
+            "csv"
+          ]
+        }
+      },
+      "required": [
+        "role",
+        "filename",
+        "sha256",
+        "byteSize",
+        "rowCount",
+        "format"
+      ],
+      "additionalProperties": false
+    },
+    "Material": {
+      "type": "object",
+      "properties": {
+        "materialId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "instrument_terms",
+            "quote_set",
+            "instrument_definitions"
+          ]
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acquiredAt": {
+          "$ref": "vocab:TimestampNs"
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "formatVersion": {
+          "const": "talyx.market.professional.v1"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/File"
+          }
+        },
+        "coverage": {
+          "$ref": "#/$defs/Coverage"
+        }
+      },
+      "required": [
+        "materialId",
+        "version",
+        "name",
+        "kind",
+        "sourceId",
+        "sourceVersion",
+        "acquiredAt",
+        "availability",
+        "formatVersion",
+        "files",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
+    "ListInput": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "instrument_terms",
+            "quote_set",
+            "instrument_definitions"
+          ]
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument": {
+          "type": "object"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ListOutput": {
+      "type": "object",
+      "properties": {
+        "materials": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Material"
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "nextAfter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "materials",
+        "hasMore",
+        "nextAfter"
+      ],
+      "additionalProperties": false
+    },
+    "ReadInput": {
+      "type": "object",
+      "properties": {
+        "materialId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "instrument": {
+          "type": "object"
+        },
+        "quoteType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "materialId",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "ReadOutput": {
+      "type": "object",
+      "properties": {
+        "material": {
+          "$ref": "#/$defs/Material"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProfessionalRow"
+          }
+        },
+        "coverage": {
+          "$ref": "#/$defs/Coverage"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "nextAfter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "material",
+        "rows",
+        "coverage",
+        "hasMore",
+        "nextAfter"
+      ],
+      "additionalProperties": false
+    },
+    "InstrumentDefinitionRow": {
+      "description": "Exact provider contract directory record. Unresolved economic terms stay explicit; this is not a complete pricing contract.",
+      "type": "object",
+      "properties": {
+        "definitionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument": {
+          "type": "object"
+        },
+        "effectiveFrom": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "effectiveUntil": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "sourceExpiry": {
+          "$ref": "#/$defs/TimePoint"
+        },
+        "sourceFields": {
+          "type": "object"
+        },
+        "unresolvedTerms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "definitionId",
+        "instrument",
+        "effectiveFrom",
+        "effectiveUntil",
+        "sourceFields",
+        "unresolvedTerms"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

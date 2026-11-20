@@ -1,0 +1,938 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 8e424fc..f3031e9 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1655,15 +1655,6 @@ dependencies = [
+  "cpufeatures 0.3.1",
+ ]
+ 
+-[[package]]
+-name = "block-buffer"
+-version = "0.9.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
+-dependencies = [
+- "generic-array",
+-]
+-
+ [[package]]
+ name = "block-buffer"
+ version = "0.10.4"
+@@ -2282,36 +2273,6 @@ version = "1.0.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
+ 
+-[[package]]
+-name = "cosmos-sdk-proto"
+-version = "0.27.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "95ac39be7373404accccaede7cc1ec942ccef14f0ca18d209967a756bf1dbb1f"
+-dependencies = [
+- "prost 0.13.5",
+- "tendermint-proto",
+- "tonic",
+-]
+-
+-[[package]]
+-name = "cosmrs"
+-version = "0.22.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "34e74fa7a22930fe0579bef560f2d64b78415d4c47b9dd976c0635136809471d"
+-dependencies = [
+- "cosmos-sdk-proto",
+- "ecdsa",
+- "eyre",
+- "k256",
+- "rand_core 0.6.4",
+- "serde",
+- "serde_json",
+- "signature 2.2.0",
+- "subtle-encoding",
+- "tendermint",
+- "thiserror 1.0.69",
+-]
+-
+ [[package]]
+ name = "cpufeatures"
+ version = "0.2.17"
+@@ -2549,19 +2510,6 @@ dependencies = [
+  "syn 2.0.119",
+ ]
+ 
+-[[package]]
+-name = "curve25519-dalek-ng"
+-version = "4.1.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "1c359b7249347e46fb28804470d071c921156ad62b3eef5d34e2ba867533dec8"
+-dependencies = [
+- "byteorder",
+- "digest 0.9.0",
+- "rand_core 0.6.4",
+- "subtle-ng",
+- "zeroize",
+-]
+-
+ [[package]]
+ name = "darling"
+ version = "0.14.4"
+@@ -3255,7 +3203,7 @@ dependencies = [
+  "indexmap 2.14.2",
+  "itertools 0.15.0",
+  "parking_lot 0.12.5",
+- "petgraph 0.8.3",
++ "petgraph",
+  "tokio",
+ ]
+ 
+@@ -3648,22 +3596,6 @@ version = "1.0.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+ 
+-[[package]]
+-name = "dydx-proto"
+-version = "0.4.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "945e74a43dd3e251849f5a87169aaa457d70d6506a27adf365a7d418c71c42d1"
+-dependencies = [
+- "cosmos-sdk-proto",
+- "prost 0.13.5",
+- "prost-build",
+- "prost-types",
+- "regex",
+- "tonic",
+- "tonic-buf-build",
+- "tonic-build",
+-]
+-
+ [[package]]
+ name = "dyn-clone"
+ version = "1.0.20"
+@@ -3685,16 +3617,6 @@ dependencies = [
+  "spki",
+ ]
+ 
+-[[package]]
+-name = "ed25519"
+-version = "2.2.3"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
+-dependencies = [
+- "pkcs8",
+- "signature 2.2.0",
+-]
+-
+ [[package]]
+ name = "ed25519"
+ version = "3.0.0"
+@@ -3704,19 +3626,6 @@ dependencies = [
+  "signature 3.0.0",
+ ]
+ 
+-[[package]]
+-name = "ed25519-consensus"
+-version = "2.1.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3c8465edc8ee7436ffea81d21a019b16676ee3db267aa8d5a8d729581ecf998b"
+-dependencies = [
+- "curve25519-dalek-ng",
+- "hex",
+- "rand_core 0.6.4",
+- "sha2 0.9.9",
+- "zeroize",
+-]
+-
+ [[package]]
+ name = "ed25519-dalek"
+ version = "3.0.0"
+@@ -3724,7 +3633,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "6ebaa1a2bf1290ab3bfe5a7b771d050ebffab2711c19a81691c683a5144a25de"
+ dependencies = [
+  "curve25519-dalek",
+- "ed25519 3.0.0",
++ "ed25519",
+  "sha2 0.11.1",
+  "subtle",
+  "zeroize",
+@@ -3872,17 +3781,6 @@ dependencies = [
+  "pin-project-lite",
+ ]
+ 
+-[[package]]
+-name = "eyre"
+-version = "0.6.14"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c08309dbcc659c5549a24ddb9b27027640641b282ef5768267c7e675558986a3"
+-dependencies = [
+- "autocfg",
+- "indenter",
+- "once_cell",
+-]
+-
+ [[package]]
+ name = "fallible-streaming-iterator"
+ version = "0.1.9"
+@@ -4003,15 +3901,6 @@ dependencies = [
+  "zlib-rs",
+ ]
+ 
+-[[package]]
+-name = "flex-error"
+-version = "0.4.4"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c606d892c9de11507fa0dcffc116434f94e105d0bbdc4e405b61519464c49d7b"
+-dependencies = [
+- "paste",
+-]
+-
+ [[package]]
+ name = "flume"
+ version = "0.12.0"
+@@ -4550,19 +4439,6 @@ dependencies = [
+  "tower-service",
+ ]
+ 
+-[[package]]
+-name = "hyper-timeout"
+-version = "0.5.2"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "2b90d566bffbce6a75bd8b09a05aa8c2cb1fabb6cb348f8840c9e4c90a0d83b0"
+-dependencies = [
+- "hyper",
+- "hyper-util",
+- "pin-project-lite",
+- "tokio",
+- "tower-service",
+-]
+-
+ [[package]]
+ name = "hyper-util"
+ version = "0.1.21"
+@@ -4725,7 +4601,7 @@ dependencies = [
+  "byteorder",
+  "futures",
+  "log",
+- "prost 0.14.4",
++ "prost",
+  "serde",
+  "serde_json",
+  "thiserror 2.0.21",
+@@ -4933,12 +4809,6 @@ version = "2.1.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "4bc19a565321de8ddf10b34f7f877a55e737210219c3dc353cb1b487ae370a30"
+ 
+-[[package]]
+-name = "indenter"
+-version = "0.3.4"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "964de6e86d545b246d84badc0fef527924ace5134f30641c203ef52ba83f58d5"
+-
+ [[package]]
+ name = "indexmap"
+ version = "1.9.3"
+@@ -5584,12 +5454,6 @@ dependencies = [
+  "windows-sys 0.61.2",
+ ]
+ 
+-[[package]]
+-name = "multimap"
+-version = "0.10.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
+-
+ [[package]]
+ name = "naive-timer"
+ version = "0.2.0"
+@@ -5902,29 +5766,6 @@ dependencies = [
+  "zeroize",
+ ]
+ 
+-[[package]]
+-name = "nautilus-cli"
+-version = "0.67.0"
+-dependencies = [
+- "anyhow",
+- "clap",
+- "dotenvy",
+- "log",
+- "mimalloc",
+- "nautilus-blockchain",
+- "nautilus-common",
+- "nautilus-core",
+- "nautilus-infrastructure",
+- "nautilus-model",
+- "nautilus-persistence",
+- "rstest",
+- "serde_json",
+- "tempfile",
+- "tokio",
+- "tokio-util",
+- "ustr",
+-]
+-
+ [[package]]
+ name = "nautilus-coinapi"
+ version = "0.67.0"
+@@ -6278,85 +6119,6 @@ dependencies = [
+  "zeroize",
+ ]
+ 
+-[[package]]
+-name = "nautilus-dydx"
+-version = "0.67.0"
+-dependencies = [
+- "ahash",
+- "anyhow",
+- "arc-swap",
+- "async-stream",
+- "async-trait",
+- "axum",
+- "base64 0.23.1",
+- "bon",
+- "codspeed-criterion-compat",
+- "cosmrs",
+- "dashmap",
+- "derive_builder",
+- "dotenvy",
+- "dydx-proto",
+- "futures-util",
+- "jiff",
+- "log",
+- "nautilus-common",
+- "nautilus-core",
+- "nautilus-live",
+- "nautilus-model",
+- "nautilus-network",
+- "nautilus-system",
+- "nautilus-testkit",
+- "nautilus-trading",
+- "parking_lot 0.13.0",
+- "pyo3",
+- "pyo3-async-runtimes",
+- "pyo3-stub-gen",
+- "rstest",
+- "rust_decimal",
+- "rust_decimal_macros",
+- "rustls",
+- "serde",
+- "serde_json",
+- "strum 0.28.0",
+- "thiserror 2.0.21",
+- "tokio",
+- "tokio-tungstenite 0.30.0",
+- "tokio-util",
+- "toml 1.1.8+spec-1.1.0",
+- "tonic",
+- "ustr",
+- "zeroize",
+-]
+-
+-[[package]]
+-name = "nautilus-event-store"
+-version = "0.67.0"
+-dependencies = [
+- "ahash",
+- "anyhow",
+- "async-trait",
+- "blake3",
+- "bytes",
+- "codspeed-criterion-compat",
+- "indexmap 2.14.2",
+- "log",
+- "nautilus-common",
+- "nautilus-core",
+- "nautilus-execution",
+- "nautilus-model",
+- "nautilus-persistence",
+- "nautilus-system",
+- "parking_lot 0.13.0",
+- "proptest",
+- "redb",
+- "rmp-serde",
+- "rstest",
+- "serde",
+- "tempfile",
+- "thiserror 2.0.21",
+- "ustr",
+-]
+-
+ [[package]]
+ name = "nautilus-execution"
+ version = "0.67.0"
+@@ -6885,16 +6647,6 @@ dependencies = [
+  "url",
+ ]
+ 
+-[[package]]
+-name = "nautilus-plugin"
+-version = "0.67.0"
+-dependencies = [
+- "log",
+- "nautilus-core",
+- "nautilus-model",
+- "rstest",
+-]
+-
+ [[package]]
+ name = "nautilus-polymarket"
+ version = "0.67.0"
+@@ -6993,7 +6745,6 @@ dependencies = [
+  "nautilus-databento",
+  "nautilus-deribit",
+  "nautilus-derive",
+- "nautilus-dydx",
+  "nautilus-execution",
+  "nautilus-hyperliquid",
+  "nautilus-indicators",
+@@ -7219,15 +6970,6 @@ dependencies = [
+  "ustr",
+ ]
+ 
+-[[package]]
+-name = "nautilus-trader"
+-version = "0.67.0"
+-dependencies = [
+- "nautilus-common",
+- "nautilus-core",
+- "nautilus-model",
+-]
+-
+ [[package]]
+ name = "nautilus-trading"
+ version = "0.67.0"
+@@ -7257,21 +6999,6 @@ dependencies = [
+  "ustr",
+ ]
+ 
+-[[package]]
+-name = "nautilus-tutorials"
+-version = "0.67.0"
+-dependencies = [
+- "dotenvy",
+- "nautilus-common",
+- "nautilus-core",
+- "nautilus-databento",
+- "nautilus-lighter",
+- "nautilus-live",
+- "nautilus-model",
+- "nautilus-trading",
+- "tokio",
+-]
+-
+ [[package]]
+ name = "nix"
+ version = "0.31.3"
+@@ -7533,12 +7260,6 @@ version = "11.1.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
+ 
+-[[package]]
+-name = "opaque-debug"
+-version = "0.3.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
+-
+ [[package]]
+ name = "openssl-probe"
+ version = "0.2.1"
+@@ -7752,16 +7473,6 @@ dependencies = [
+  "ucd-trie",
+ ]
+ 
+-[[package]]
+-name = "petgraph"
+-version = "0.7.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3672b37090dbd86368a4145bc067582552b29c27377cad4e0a306c97f9bd7772"
+-dependencies = [
+- "fixedbitset",
+- "indexmap 2.14.2",
+-]
+-
+ [[package]]
+ name = "petgraph"
+ version = "0.8.3"
+@@ -8024,16 +7735,6 @@ dependencies = [
+  "unarray",
+ ]
+ 
+-[[package]]
+-name = "prost"
+-version = "0.13.5"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "2796faa41db3ec313a31f7624d9286acf277b52de526150b7e69f3debf891ee5"
+-dependencies = [
+- "bytes",
+- "prost-derive 0.13.5",
+-]
+-
+ [[package]]
+ name = "prost"
+ version = "0.14.4"
+@@ -8041,40 +7742,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "528ac67416ff8646872a3c02cad9cc4ee5dc9f9540c9b10771855c95cb2e5ae1"
+ dependencies = [
+  "bytes",
+- "prost-derive 0.14.4",
+-]
+-
+-[[package]]
+-name = "prost-build"
+-version = "0.13.5"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
+-dependencies = [
+- "heck",
+- "itertools 0.14.0",
+- "log",
+- "multimap",
+- "once_cell",
+- "petgraph 0.7.1",
+- "prettyplease",
+- "prost 0.13.5",
+- "prost-types",
+- "regex",
+- "syn 2.0.119",
+- "tempfile",
+-]
+-
+-[[package]]
+-name = "prost-derive"
+-version = "0.13.5"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
+-dependencies = [
+- "anyhow",
+- "itertools 0.14.0",
+- "proc-macro2",
+- "quote",
+- "syn 2.0.119",
++ "prost-derive",
+ ]
+ 
+ [[package]]
+@@ -8090,15 +7758,6 @@ dependencies = [
+  "syn 2.0.119",
+ ]
+ 
+-[[package]]
+-name = "prost-types"
+-version = "0.13.5"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
+-dependencies = [
+- "prost 0.13.5",
+-]
+-
+ [[package]]
+ name = "psm"
+ version = "0.1.24"
+@@ -8506,15 +8165,6 @@ dependencies = [
+  "yasna",
+ ]
+ 
+-[[package]]
+-name = "redb"
+-version = "4.4.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "39178e0a867f9e3eaa6292a4ab1dd3613f2519c5b564341e1e7b29b270736cc4"
+-dependencies = [
+- "libc",
+-]
+-
+ [[package]]
+ name = "redis"
+ version = "1.8.0"
+@@ -8743,15 +8393,6 @@ dependencies = [
+  "windows-sys 0.52.0",
+ ]
+ 
+-[[package]]
+-name = "ripemd"
+-version = "0.1.3"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
+-dependencies = [
+- "digest 0.10.7",
+-]
+-
+ [[package]]
+ name = "rlp"
+ version = "0.5.2"
+@@ -9302,16 +8943,6 @@ dependencies = [
+  "xml-rs",
+ ]
+ 
+-[[package]]
+-name = "serde_bytes"
+-version = "0.11.19"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+-dependencies = [
+- "serde",
+- "serde_core",
+-]
+-
+ [[package]]
+ name = "serde_core"
+ version = "1.0.229"
+@@ -9434,19 +9065,6 @@ dependencies = [
+  "syn 3.0.9",
+ ]
+ 
+-[[package]]
+-name = "serde_yaml"
+-version = "0.9.34+deprecated"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+-dependencies = [
+- "indexmap 2.14.2",
+- "itoa",
+- "ryu",
+- "serde",
+- "unsafe-libyaml",
+-]
+-
+ [[package]]
+ name = "serdect"
+ version = "0.2.0"
+@@ -9479,19 +9097,6 @@ dependencies = [
+  "digest 0.11.3",
+ ]
+ 
+-[[package]]
+-name = "sha2"
+-version = "0.9.9"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800"
+-dependencies = [
+- "block-buffer 0.9.0",
+- "cfg-if",
+- "cpufeatures 0.2.17",
+- "digest 0.9.0",
+- "opaque-debug",
+-]
+-
+ [[package]]
+ name = "sha2"
+ version = "0.10.9"
+@@ -9993,21 +9598,6 @@ version = "2.6.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+ 
+-[[package]]
+-name = "subtle-encoding"
+-version = "0.5.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "7dcb1ed7b8330c5eed5441052651dd7a12c75e2ed88f2ec024ae1fa3a5e59945"
+-dependencies = [
+- "zeroize",
+-]
+-
+-[[package]]
+-name = "subtle-ng"
+-version = "2.5.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
+-
+ [[package]]
+ name = "syn"
+ version = "1.0.109"
+@@ -10166,51 +9756,6 @@ dependencies = [
+  "windows-sys 0.61.2",
+ ]
+ 
+-[[package]]
+-name = "tendermint"
+-version = "0.40.4"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "fc997743ecfd4864bbca8170d68d9b2bee24653b034210752c2d883ef4b838b1"
+-dependencies = [
+- "bytes",
+- "digest 0.10.7",
+- "ed25519 2.2.3",
+- "ed25519-consensus",
+- "flex-error",
+- "futures",
+- "k256",
+- "num-traits",
+- "once_cell",
+- "prost 0.13.5",
+- "ripemd",
+- "serde",
+- "serde_bytes",
+- "serde_json",
+- "serde_repr",
+- "sha2 0.10.9",
+- "signature 2.2.0",
+- "subtle",
+- "subtle-encoding",
+- "tendermint-proto",
+- "time",
+- "zeroize",
+-]
+-
+-[[package]]
+-name = "tendermint-proto"
+-version = "0.40.4"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "d2c40e13d39ca19082d8a7ed22de7595979350319833698f8b1080f29620a094"
+-dependencies = [
+- "bytes",
+- "flex-error",
+- "prost 0.13.5",
+- "serde",
+- "serde_bytes",
+- "subtle-encoding",
+- "time",
+-]
+-
+ [[package]]
+ name = "terminal_size"
+ version = "0.4.4"
+@@ -10552,61 +10097,6 @@ version = "1.1.3+spec-1.1.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
+ 
+-[[package]]
+-name = "tonic"
+-version = "0.13.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "7e581ba15a835f4d9ea06c55ab1bd4dce26fc53752c69a04aac00703bfb49ba9"
+-dependencies = [
+- "async-trait",
+- "base64 0.22.1",
+- "bytes",
+- "http",
+- "http-body",
+- "http-body-util",
+- "hyper",
+- "hyper-timeout",
+- "hyper-util",
+- "percent-encoding",
+- "pin-project",
+- "prost 0.13.5",
+- "tokio",
+- "tokio-rustls",
+- "tokio-stream",
+- "tower",
+- "tower-layer",
+- "tower-service",
+- "tracing",
+- "webpki-roots 0.26.11",
+-]
+-
+-[[package]]
+-name = "tonic-buf-build"
+-version = "0.3.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "39018a5b437322acf53301ed58ce4768c8f263e2547fb73e47b81c805fa59395"
+-dependencies = [
+- "scopeguard",
+- "serde",
+- "serde_yaml",
+- "tonic-build",
+- "uuid",
+-]
+-
+-[[package]]
+-name = "tonic-build"
+-version = "0.13.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "eac6f67be712d12f0b41328db3137e0d0757645d8904b4cb7d51cd9c2279e847"
+-dependencies = [
+- "prettyplease",
+- "proc-macro2",
+- "prost-build",
+- "prost-types",
+- "quote",
+- "syn 2.0.119",
+-]
+-
+ [[package]]
+ name = "tower"
+ version = "0.5.3"
+@@ -10615,15 +10105,11 @@ checksum = "ebe5ef63511595f1344e2d5cfa636d973292adc0eec1f0ad45fae9f0851ab1d4"
+ dependencies = [
+  "futures-core",
+  "futures-util",
+- "indexmap 2.14.2",
+  "pin-project-lite",
+- "slab",
+  "sync_wrapper",
+  "tokio",
+- "tokio-util",
+  "tower-layer",
+  "tower-service",
+- "tracing",
+ ]
+ 
+ [[package]]
+@@ -10967,12 +10453,6 @@ dependencies = [
+  "rand 0.8.8",
+ ]
+ 
+-[[package]]
+-name = "unsafe-libyaml"
+-version = "0.2.11"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+-
+ [[package]]
+ name = "untrusted"
+ version = "0.7.1"
+@@ -11031,7 +10511,6 @@ checksum = "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
+ dependencies = [
+  "getrandom 0.4.3",
+  "js-sys",
+- "rand 0.10.3",
+  "serde_core",
+  "wasm-bindgen",
+ ]
+diff --git a/Cargo.toml b/Cargo.toml
+index c28c1b6..2b157f5 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,6 +1,7 @@
+ [workspace]
++exclude = ["crates/adapters/dydx"]
+ resolver = "2"
+-members = ["crates/adapters/architect_ax", "crates/adapters/betfair", "crates/adapters/binance", "crates/adapters/blockchain", "crates/adapters/bybit", "crates/adapters/coinapi", "crates/adapters/coinbase", "crates/adapters/databento", "crates/adapters/deribit", "crates/adapters/derive", "crates/adapters/dydx", "crates/adapters/hyperliquid", "crates/adapters/interactive_brokers", "crates/adapters/kraken", "crates/adapters/lighter", "crates/adapters/okx", "crates/adapters/polymarket", "crates/adapters/sandbox", "crates/adapters/tardis", "crates/analysis", "crates/backtest", "crates/common", "crates/core", "crates/cryptography", "crates/data", "crates/execution", "crates/indicators", "crates/infrastructure", "crates/live", "crates/macros", "crates/model", "crates/network", "crates/persistence", "crates/portfolio", "crates/pyo3", "crates/risk", "crates/serialization", "crates/system", "crates/testkit", "crates/trading"]
++members = ["crates/adapters/architect_ax", "crates/adapters/betfair", "crates/adapters/binance", "crates/adapters/blockchain", "crates/adapters/bybit", "crates/adapters/coinapi", "crates/adapters/coinbase", "crates/adapters/databento", "crates/adapters/deribit", "crates/adapters/derive", "crates/adapters/hyperliquid", "crates/adapters/interactive_brokers", "crates/adapters/kraken", "crates/adapters/lighter", "crates/adapters/okx", "crates/adapters/polymarket", "crates/adapters/sandbox", "crates/adapters/tardis", "crates/analysis", "crates/backtest", "crates/common", "crates/core", "crates/cryptography", "crates/data", "crates/execution", "crates/indicators", "crates/infrastructure", "crates/live", "crates/macros", "crates/model", "crates/network", "crates/persistence", "crates/portfolio", "crates/pyo3", "crates/risk", "crates/serialization", "crates/system", "crates/testkit", "crates/trading"]
+ 
+ [workspace.package]
+ version = "0.67.0"
+@@ -57,7 +58,6 @@ nautilus-coinbase = { path = "crates/adapters/coinbase", version = "0.67.0", def
+ nautilus-databento = { path = "crates/adapters/databento", version = "0.67.0", default-features = false }
+ nautilus-deribit = { path = "crates/adapters/deribit", version = "0.67.0", default-features = false }
+ nautilus-derive = { path = "crates/adapters/derive", version = "0.67.0", default-features = false }
+-nautilus-dydx = { path = "crates/adapters/dydx", version = "0.67.0", default-features = false }
+ nautilus-hyperliquid = { path = "crates/adapters/hyperliquid", version = "0.67.0", default-features = false }
+ nautilus-interactive-brokers = { path = "crates/adapters/interactive_brokers", version = "0.67.0" }
+ nautilus-kraken = { path = "crates/adapters/kraken", version = "0.67.0", default-features = false }
+@@ -294,7 +294,6 @@ bzip2 = "0.6.1"
+ cosmrs = { version = "0.22.0", default-features = false }
+ csv = "1.4.0"
+ databento = { version = "0.63.0" }
+-dydx-proto = { version = "0.4.0", default-features = false }
+ fallible-streaming-iterator = "0.1.9"
+ hypersync-client = { version = "1.4.1" }
+ ibapi = "=5.0.0"
+diff --git a/crates/core/build.rs b/crates/core/build.rs
+index e989b26..ac6a124 100644
+--- a/crates/core/build.rs
++++ b/crates/core/build.rs
+@@ -23,7 +23,7 @@ use std::path::PathBuf;
+ fn main() {
+     println!("cargo:rerun-if-changed=build.rs");
+     println!("cargo:rerun-if-changed=Cargo.toml");
+-    println!("cargo:rerun-if-changed=../Cargo.toml");
++    println!("cargo:rerun-if-changed=../../Cargo.toml");
+     println!("cargo:rerun-if-changed=../../python/pyproject.toml");
+ 
+     // The Python manifest is unavailable when this crate builds from a published package
+diff --git a/crates/pyo3/Cargo.toml b/crates/pyo3/Cargo.toml
+index a9aacdf..5f33413 100644
+--- a/crates/pyo3/Cargo.toml
++++ b/crates/pyo3/Cargo.toml
+@@ -31,7 +31,6 @@ adapters = [
+   "dep:nautilus-databento",
+   "dep:nautilus-deribit",
+   "dep:nautilus-derive",
+-  "dep:nautilus-dydx",
+   "dep:nautilus-hyperliquid",
+   "dep:nautilus-interactive-brokers",
+   "dep:nautilus-kraken",
+@@ -74,7 +73,6 @@ extension-module = [
+   "nautilus-databento?/extension-module",
+   "nautilus-deribit?/extension-module",
+   "nautilus-derive?/extension-module",
+-  "nautilus-dydx?/extension-module",
+   "nautilus-execution/extension-module",
+   "nautilus-hyperliquid?/extension-module",
+   "nautilus-indicators/extension-module",
+@@ -107,7 +105,6 @@ high-precision = [
+   "nautilus-databento?/high-precision",
+   "nautilus-deribit?/high-precision",
+   "nautilus-derive?/high-precision",
+-  "nautilus-dydx?/high-precision",
+   "nautilus-hyperliquid?/high-precision",
+   "nautilus-kraken?/high-precision",
+   "nautilus-lighter?/high-precision",
+@@ -174,7 +171,6 @@ nautilus-databento = { workspace = true, optional = true, features = [
+ ] }
+ nautilus-deribit = { workspace = true, optional = true, features = ["python"] }
+ nautilus-derive = { workspace = true, optional = true, features = ["python"] }
+-nautilus-dydx = { workspace = true, optional = true, features = ["python"] }
+ nautilus-hyperliquid = { workspace = true, optional = true, features = [
+   "python",
+ ] }
+diff --git a/crates/pyo3/src/lib.rs b/crates/pyo3/src/lib.rs
+index 322bc73..cc61c4a 100644
+--- a/crates/pyo3/src/lib.rs
++++ b/crates/pyo3/src/lib.rs
+@@ -95,6 +95,8 @@ pub fn register_embedded_module() {
+ /// See <https://github.com/PyO3/pyo3/issues/2644>.
+ #[pymodule] // The name of the function must match `lib.name` in `Cargo.toml`
+ fn _libnautilus(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
++    // Private engineering helper delegates the existing Rust inventory generator.
++    m.add_function(pyo3::wrap_pyfunction!(_generate_type_stubs, m)?)?;
+     #[cfg(feature = "mimalloc")]
+     nautilus_common::logging::headers::register_allocator_mimalloc();
+ 
+@@ -280,14 +282,6 @@ fn _libnautilus(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+         sys_modules.set_item(format!("{module_name}.{n}"), m.getattr(n)?)?;
+     }
+ 
+-    #[cfg(feature = "adapters")]
+-    {
+-        let n = "dydx";
+-        let submodule = pyo3::wrap_pymodule!(nautilus_dydx::python::dydx);
+-        m.add_wrapped(submodule)?;
+-        sys_modules.set_item(format!("{module_name}.{n}"), m.getattr(n)?)?;
+-    }
+-
+     #[cfg(feature = "adapters")]
+     {
+         let n = "hyperliquid";
+@@ -399,3 +393,17 @@ pub fn stub_info() -> pyo3_stub_gen::Result<pyo3_stub_gen::StubInfo> {
+ 
+     pyo3_stub_gen::StubInfo::from_pyproject_toml(&pyproject_path)
+ }
++
++#[pyo3::pyfunction]
++#[pyo3(signature = (pyproject_path=None))]
++fn _generate_type_stubs(pyproject_path: Option<String>) -> PyResult<()> {
++    // Engineering packaging may direct inventory typing into a separate output
++    // tree, preserving the immutable complete compilation candidate.
++    let info = match pyproject_path {
++        Some(path) => pyo3_stub_gen::StubInfo::from_pyproject_toml(path),
++        None => stub_info(),
++    }
++    .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))?;
++    info.generate()
++        .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))
++}
+diff --git a/pyproject.toml b/pyproject.toml
+index 43ec94d..68e692f 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -43,6 +43,7 @@ requires = ["maturin==1.15.0", "patchelf"]
+ build-backend = "maturin"
+ 
+ [tool.maturin]
++exclude = ["nautilus_trader/adapters/dydx/**", "crates/adapters/dydx/**"]
+ module-name = "nautilus_trader._libnautilus"
+ python-source = "."
+ features = [
+diff --git a/python/pyproject.toml b/python/pyproject.toml
+index 7cab4c0..87ada89 100644
+--- a/python/pyproject.toml
++++ b/python/pyproject.toml
+@@ -43,6 +43,7 @@ requires = ["maturin==1.15.0", "patchelf"]
+ build-backend = "maturin"
+ 
+ [tool.maturin]
++exclude = ["nautilus_trader/adapters/dydx/**", "crates/adapters/dydx/**"]
+ manifest-path = "../crates/pyo3/Cargo.toml"
+ module-name = "nautilus_trader._libnautilus"
+ python-source = "."

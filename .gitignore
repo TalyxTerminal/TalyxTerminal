@@ -1,0 +1,47 @@
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# The daily Host keeps personal workspaces, module files and installed modules here.
+/user/
+
+# editor / os
+.DS_Store
+.zcode/
+
+# secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.log
+
+# frontend (web workspace lands at M2a)
+node_modules/
+web/node_modules/
+web/dist/
+/data/
+__pycache__/
+
+# Local caches and acceptance outputs; curated evidence stays under scripts/.
+.vite/
+*.tsbuildinfo
+/output/
+/.local-backups/
+/tmp-ro-check/
+/basket-partial.json
+/strategy-partial.json
+/dsr_*
+/mi1_*
+# Quant build inputs and the superseded development wheel remain local.
+modules/quant/runtime/wheels/riskfolio_lib-7.4.0-cp312-cp312-win_amd64.whl
+modules/quant/runtime/wheels/riskfolio_lib-7.4.0+talyx.1-cp312-cp312-win_amd64.whl
+
+# Native wheels and source archives are build artifacts, never tracked.
+modules/quant/runtime/wheels/nautilus_trader-*.whl
+modules/quant/runtime/upstream/nautilus-trader-*.tar.gz
+web/vite.config.ts.timestamp-*

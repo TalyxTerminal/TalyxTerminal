@@ -1,0 +1,2 @@
+{"manifestVersion": 5, "id": "market", "name": "Market (test)", "version": "2.0.0", "description": "Stands in for Market in platform tests: one crypto instrument whose minute bars the test pushes",
+ "entries": {"backend": "backend.entry"}, "requires": {}}

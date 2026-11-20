@@ -1,0 +1,107 @@
+{
+  "format": "talyx.quant.execution-toolchain.v1",
+  "scope": "private build tools only, not shipped in the runtime wheel",
+  "archives": [
+    {
+      "id": "rustc",
+      "version": "1.99.1",
+      "filename": "rustc-1.99.1-x86_64-pc-windows-msvc.tar.xz",
+      "url": "https://static.rust-lang.org/dist/2026-10-15/rustc-1.99.1-x86_64-pc-windows-msvc.tar.xz",
+      "digest": "7da83c2af1f209606b0160f25174d2867c7c7b73667c32c9e5fbcef4f5f45348"
+    },
+    {
+      "id": "cargo",
+      "version": "1.99.1",
+      "filename": "cargo-1.99.1-x86_64-pc-windows-msvc.tar.xz",
+      "url": "https://static.rust-lang.org/dist/2026-10-15/cargo-1.99.1-x86_64-pc-windows-msvc.tar.xz",
+      "digest": "4adb46c3707dee790682f7769d86983841148111695f561c843c33daa2af0c9b"
+    },
+    {
+      "id": "rust-std",
+      "version": "1.99.1",
+      "filename": "rust-std-1.99.1-x86_64-pc-windows-msvc.tar.xz",
+      "url": "https://static.rust-lang.org/dist/2026-10-15/rust-std-1.99.1-x86_64-pc-windows-msvc.tar.xz",
+      "digest": "4fe09430ded40b8b3092b49f0a651178eb1f8154ef4d1f1a73f2a3595b2d956f"
+    },
+    {
+      "id": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.base",
+      "version": "14.44.35229",
+      "filename": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.base.vsix",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/aa209763-134c-427b-9960-9ca54ccc1734/f4ad3cee4ef18e9f36382399261de27be6910ab3467178d7e687377ec841306d/Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.base.vsix",
+      "digest": "f4ad3cee4ef18e9f36382399261de27be6910ab3467178d7e687377ec841306d"
+    },
+    {
+      "id": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.Res.base",
+      "version": "14.44.35229",
+      "filename": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.Res.base.enu.vsix",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/aa209763-134c-427b-9960-9ca54ccc1734/603375e4d6d639bc6e0a7d0d657b17e0c3b72e52450f78eb41e987f40c3b5305/Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.Res.base.enu.vsix",
+      "digest": "603375e4d6d639bc6e0a7d0d657b17e0c3b72e52450f78eb41e987f40c3b5305"
+    },
+    {
+      "id": "Microsoft.VC.14.44.17.14.CRT.Headers.base",
+      "version": "14.44.35220",
+      "filename": "Microsoft.VC.14.44.17.14.CRT.Headers.base.vsix",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/c610cd8c-801b-44b8-a80a-82cc382aeb43/852382a9aa73502b7849c1bcadfb603ba7175c4e8b60e6aba03c7de711d4ece5/Microsoft.VC.14.44.17.14.CRT.Headers.base.vsix",
+      "digest": "852382a9aa73502b7849c1bcadfb603ba7175c4e8b60e6aba03c7de711d4ece5"
+    },
+    {
+      "id": "Microsoft.VC.14.44.17.14.CRT.x64.Desktop.base",
+      "version": "14.44.35226",
+      "filename": "Microsoft.VC.14.44.17.14.CRT.x64.Desktop.base.vsix",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/67cf767c-5e71-47c2-a54a-cd5631e28942/f01f701a7bcd9587a340898c851424f6a52bb913a70c185ff0d5bf0288c5831a/Microsoft.VC.14.44.17.14.CRT.x64.Desktop.base.vsix",
+      "digest": "f01f701a7bcd9587a340898c851424f6a52bb913a70c185ff0d5bf0288c5831a"
+    },
+    {
+      "id": "microsoft.windows.sdk.cpp",
+      "version": "10.0.26100.1742",
+      "filename": "microsoft.windows.sdk.cpp.10.0.26100.1742.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.windows.sdk.cpp/10.0.26100.1742/microsoft.windows.sdk.cpp.10.0.26100.1742.nupkg",
+      "algorithm": "sha512",
+      "digest": "c2ee226fd821c3984f57d8e02d0860bef32c54f602e95f4b906ada35908bfc56d11d5733b19bc36640b98d9b6b698fb84d2127222bcc02b2d079f978abb3200a"
+    },
+    {
+      "id": "microsoft.windows.sdk.cpp.x64",
+      "version": "10.0.26100.1742",
+      "filename": "microsoft.windows.sdk.cpp.x64.10.0.26100.1742.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.windows.sdk.cpp.x64/10.0.26100.1742/microsoft.windows.sdk.cpp.x64.10.0.26100.1742.nupkg",
+      "algorithm": "sha512",
+      "digest": "ef4cf98269c84012d5b7972a8c493f5e705cfa795491cc05f7b07db8665810f1698191c5a7b6849f99b115ce17e5ccde0a228d75f09ed9f39c788dbf04f94b53"
+    },
+    {
+      "id": "cmake",
+      "version": "3.31.9",
+      "filename": "cmake-3.31.9-windows-x86_64.zip",
+      "url": "https://github.com/Kitware/CMake/releases/download/v3.31.9/cmake-3.31.9-windows-x86_64.zip",
+      "digest": "dc16867d0c0ffb35026976aff119335d5b47def44e76ae82ffafdc1f98b3d59d"
+    },
+    {
+      "id": "maturin",
+      "version": "1.15.0",
+      "filename": "maturin-1.15.0-py3-none-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/40/dc/4e90da594986ba78dd3bc8a5921ecdcdb11085b22b02a412caab3b225601/maturin-1.15.0-py3-none-win_amd64.whl",
+      "digest": "552c2be4afd43fe8d5c9f3ec8d4c4756d973b8dcbe94c14084390301f50243e1"
+    },
+    {
+      "id": "nasm",
+      "version": "2.16.03",
+      "filename": "nasm-2.16.03-win64.zip",
+      "url": "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip",
+      "digest": "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6",
+      "hashProvenance": "SHA256 of the original fixed vendor HTTPS download; vendor did not publish a separate checksum file"
+    },
+    {
+      "id": "Microsoft.VC.14.44.17.14.CRT.x64.Store.base",
+      "version": "14.44.35226",
+      "filename": "Microsoft.VC.14.44.17.14.CRT.x64.Store.base.vsix",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/67cf767c-5e71-47c2-a54a-cd5631e28942/9135b03c0df53c7a0aa9bef7230a1c2ff4263a0ee7baa7e419d034f484f6bb56/Microsoft.VC.14.44.17.14.CRT.x64.Store.base.vsix",
+      "digest": "9135b03c0df53c7a0aa9bef7230a1c2ff4263a0ee7baa7e419d034f484f6bb56"
+    }
+  ],
+  "metadataSources": {
+    "rustManifest": "https://static.rust-lang.org/dist/channel-rust-1.99.1.toml",
+    "vsChannel": "https://aka.ms/vs/17/release/channel",
+    "vsCatalogResponseSha256": "f0a50ea157222c29abd5ea6ff01bfc3c33b04e011c5e45ee2ca38ef0778e5643",
+    "vsChannelCatalogExpectedSha256": "6e470016e4324c84c255ffd0beb3767d17ec89cc8561e9409ee3e1f6d29400f5",
+    "vsCatalogHashMismatch": "Response metadata retained for provenance; selected binary payloads must match their individual vendor hashes and cl/link must pass Microsoft Authenticode validation"
+  }
+}

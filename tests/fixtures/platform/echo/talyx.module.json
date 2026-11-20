@@ -1,0 +1,3 @@
+{"manifestVersion": 5, "id": "echo", "name": "Echo", "version": "1.0.0", "description": "Platform test module",
+ "entries": {"backend": "backend.entry"}, "requires": {},
+ "provides": {"echo.greeter": [{"id": "own", "descriptor": {}}]}}

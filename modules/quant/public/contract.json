@@ -1,0 +1,9309 @@
+{
+ "contractVersion": 5,
+ "module": "quant",
+ "deleteWorkspace": true,
+ "actions": {
+  "add_allocation_shock": {
+   "description": "Add a shock to a finished allocation run's Scenarios table: an asset or group moves pct percent (-20 is a 20%\nfall) and the portfolio's move follows by the covariance.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/AddAllocationShockInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Shock"
+   },
+   "examples": [
+    {
+     "runId": "<runId>",
+     "target": "SPY",
+     "pct": -20
+    }
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "apply_run": {
+   "description": "Put an object back to what a run used: without cell, the run's code and all its settings; with cell (a cell of a\nstrategy or factor sweep), only that combination's values. For a model or allocation batch, give the member run's\nrunId. Returns the object as read_object shows it.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ApplyRun"
+   },
+   "output": {
+    "$ref": "#/$defs/ObjectSummary"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    },
+    {
+     "runId": "<runId>",
+     "cell": 4
+    }
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "archive_library_version": {
+   "description": "Archive a stopped library version that nothing uses: its stored values, window models and frozen environment\nare deleted, which cannot be undone; its record, code and published figures stay.",
+   "effects": [
+    "delete",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ArchiveLibraryVersionInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ArchivedVersion"
+   },
+   "examples": [
+    {
+     "versionId": "<versionId>"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found"
+   ]
+  },
+  "build_results": {
+   "description": "Build the detailed report of a run when read_run says it is not built: a factor run's Results (an older run, or\none sweep cell with cell) or a model run's portfolio backtest. Then read its parts with read_run.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CellOfRun"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    },
+    {
+     "runId": "<runId>",
+     "cell": 3
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "cancel_library_update": {
+   "description": "Stop the update of this library version that runs now; nothing is added, it is tried again at the next\ncheck.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CancelLibraryUpdateInput"
+   },
+   "output": {
+    "$ref": "#/$defs/CancelUpdate"
+   },
+   "examples": [
+    {
+     "versionId": "<versionId>"
+    }
+   ],
+   "errors": [
+    "conflict"
+   ]
+  },
+  "cancel_run": {
+   "description": "Stop a running or queued run, batch or publication; what finished stays and the state becomes cancelled.\nModel trainings, strategy sweeps and walk-forwards can go on with resume_run.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/modules__quant__backend__public_inputs__RunId"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "check_model": {
+   "description": "Check a model's saved settings in seconds, without training: training rows per window, each input's coverage\nand start, inputs nearly the same (correlation above 0.95), the label, look-ahead, gaps, the windows' time axis,\nand each group's memory against what is free. vary checks the batch start_sweep would train (its time and\nmemory).",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CheckModel"
+   },
+   "output": {
+    "$ref": "#/$defs/ModelCheck"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    },
+    {
+     "objectId": "<objectId>",
+     "vary": [
+      {
+       "name": "lgb_lr",
+       "values": [
+        0.05,
+        0.1,
+        0.2
+       ]
+      }
+     ]
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "check_parameters": {
+   "description": "Check parameter declarations in proposed source without saving or running it.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ParameterSource"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "code": "lookback = q.param(\"lookback\", 20)"
+    }
+   ]
+  },
+  "combine_model_runs": {
+   "description": "A new model experiment: the mean of these runs' predictions, each ranked within its day (same data and\nwindows); it can be published. Returns runId; the result comes when it ends.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CombineModelRunsInput"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "runIds": [
+      "<runId>",
+      "<runId>"
+     ]
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "control_notebook_kernel": {
+   "description": "Check the kernel status, interrupt a running cell, stop the kernel, or restart it with a fresh namespace.",
+   "effects": [
+    "read",
+    "write"
+   ],
+   "effectBranches": {
+    "path": "op",
+    "branches": {
+     "status": {
+      "effects": [
+       "read"
+      ]
+     },
+     "interrupt": {
+      "effects": [
+       "write"
+      ],
+      "target": "objectId"
+     },
+     "stop": {
+      "effects": [
+       "write"
+      ],
+      "target": "objectId"
+     },
+     "restart": {
+      "effects": [
+       "write"
+      ],
+      "target": "objectId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/KernelControl"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "op": "status"
+    }
+   ]
+  },
+  "create_object": {
+   "description": "Create a strategy, factor, model, allocation or notebook and, in the same call, set its code, data, params, run,\nformula and libraryInputs (checked exactly as update_object checks them; nothing is created if they are refused).\nStart empty, from a preset, or from one source: copyOf (a strategy), fromRun, fromVersion or fromNotebook.\nCreating does not run it: start_run {objectId} next. Returns the object as read_object shows it; from a notebook\nalso notTaken (what the cells use that the object does not take).",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/NewObject"
+   },
+   "output": {
+    "$ref": "#/$defs/ObjectSummary"
+   },
+   "examples": [
+    {
+     "kind": "strategy",
+     "name": "BTC 20/100 crossover",
+     "preset": "crossover",
+     "data": {
+      "symbols": [
+       "binance:BTC/USDT"
+      ],
+      "timeframe": "1d",
+      "start": "2020-01-01"
+     },
+     "params": {
+      "fast": 20,
+      "slow": 100
+     }
+    },
+    {
+     "kind": "factor",
+     "name": "5-day reversal",
+     "formula": "-($close/Ref($close,5)-1)",
+     "data": {
+      "index": {
+       "symbol": "^GSPC"
+      },
+      "timeframe": "1d",
+      "start": "2018-01-01"
+     },
+     "run": {
+      "holding": 5
+     }
+    },
+    {
+     "kind": "allocation",
+     "name": "Risk parity",
+     "data": {
+      "symbols": [
+       "SPY",
+       "TLT",
+       "GLD"
+      ],
+      "timeframe": "1d",
+      "start": "2016-01-01"
+     },
+     "params": {
+      "objective": "risk_parity",
+      "maxWeightPct": 40
+     }
+    },
+    {
+     "kind": "strategy",
+     "copyOf": "<objectId>",
+     "name": "Crossover with shorts",
+     "params": {
+      "shorts": true
+     }
+    },
+    {
+     "kind": "model",
+     "fromRun": "<runId>"
+    },
+    {
+     "kind": "strategy",
+     "name": "RSI reversion",
+     "code": "<the whole strategy.py>",
+     "data": {
+      "symbols": [
+       "binance:BTC/USDT"
+      ],
+      "timeframe": "1d",
+      "start": "2022-01-01"
+     }
+    }
+   ],
+   "errors": [
+    "invalid_input"
+   ]
+  },
+  "create_object_folder": {
+   "description": "Create a folder for one kind of object; folders are shared by every workspace. Put an object in it with\nupdate_object {objectId, folder}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CreateObjectFolderInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Folder"
+   },
+   "examples": [
+    {
+     "kind": "factor",
+     "name": "Momentum"
+    }
+   ],
+   "errors": [
+    "invalid_input"
+   ]
+  },
+  "create_research_list": {
+   "description": "Create a research list of instruments; an object uses it with update_object {data: {list: <listId>}}.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/NewResearchList"
+   },
+   "output": {
+    "$ref": "#/$defs/ResearchList"
+   },
+   "examples": [
+    {
+     "name": "US funds",
+     "symbols": [
+      "SPY",
+      "TLT",
+      "GLD"
+     ]
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "delete_object": {
+   "description": "Delete a Quant object (a notebook, factor, model, allocation or strategy): its code and settings go, and the\nlibrary versions it pinned no longer list it among their users.",
+   "effects": [
+    "delete",
+    "write"
+   ],
+   "target": "objectId",
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/DeleteObjectInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ObjectDeleted"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "delete_object_folder": {
+   "description": "Delete an empty folder; one that still holds objects of any workspace is refused with conflict.",
+   "effects": [
+    "delete",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/DeleteObjectFolderInput"
+   },
+   "output": {
+    "$ref": "#/$defs/FolderDeleted"
+   },
+   "examples": [
+    {
+     "kind": "factor",
+     "name": "Momentum"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found"
+   ]
+  },
+  "delete_research_list": {
+   "description": "Delete a research list; refused with conflict while an object uses it.",
+   "effects": [
+    "delete",
+    "write"
+   ],
+   "target": "listId",
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/DeleteResearchListInput"
+   },
+   "output": {
+    "$ref": "#/$defs/DeletedList"
+   },
+   "examples": [
+    {
+     "listId": "<listId>"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found"
+   ]
+  },
+  "estimate_sweep": {
+   "description": "Estimate combinations, time, concurrency and machine budget before a strategy sweep or walk-forward (kind walk).",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/Sweep"
+     },
+     {
+      "$ref": "#/$defs/EstimateWalk"
+     }
+    ]
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "axes": [
+      {
+       "name": "slow",
+       "values": [
+        60,
+        100
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "inspect_model_input": {
+   "description": "One model input's distribution before and after processing and its missing share each week, on the windows'\ntraining segments only, with mean, std, skew and the share beyond 3 MAD.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/InspectModelInputInput"
+   },
+   "output": {
+    "$ref": "#/$defs/InspectedInput"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "input": "i1"
+    },
+    {
+     "objectId": "<objectId>",
+     "input": "i1",
+     "feature": "KMID"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "install_deep_environment": {
+   "description": "Download and install the deep-learning environment with the chosen PyTorch build (cpu, cuda or xpu;\nread_environments says which this machine can use). A long task: the answer comes when it is installed.",
+   "effects": [
+    "code",
+    "external",
+    "write"
+   ],
+   "task": true,
+   "input": {
+    "$ref": "#/$defs/InstallDeepEnvironmentInput"
+   },
+   "output": {
+    "$ref": "#/$defs/DeepEnvironment"
+   },
+   "examples": [
+    {
+     "variant": "cpu"
+    }
+   ]
+  },
+  "list_common_code": {
+   "description": "List the shared Quant source directory and files. Pass the directory to developer.projects.open to edit the project.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "list_library": {
+   "description": "The library: one row per item (factor, model, allocation, data) with its versions, problems first. Narrow by\nkind, a name query or state (\"attention\" for items that need a hand). Paged.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ListLibrary"
+   },
+   "output": {
+    "$ref": "#/$defs/LibraryCatalog"
+   },
+   "examples": [
+    {
+     "state": "attention"
+    },
+    {
+     "kind": "factor",
+     "query": "momentum"
+    }
+   ]
+  },
+  "list_objects": {
+   "description": "List research objects (strategies, factors, models, allocations, notebooks), each with its representative run\n(published, else starred, else the newest successful) and that run's numbers as fractions. Lists this workspace;\nscope \"all\" lists every workspace. Narrow by kind, folder or a name query (case-insensitive substring).",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ListObjects"
+   },
+   "output": {
+    "$ref": "#/$defs/Objects"
+   },
+   "examples": [
+    {
+     "kind": "strategy"
+    },
+    {
+     "scope": "all",
+     "query": "momentum"
+    }
+   ]
+  },
+  "list_presets": {
+   "description": "List the strategy, model and factor presets with their descriptions. Use an id with create_object.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "list_research_lists": {
+   "description": "List the research lists: named sets of instruments every workspace can use; an object reads one with\ndata.list set to its listId. Paged.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Page-Input"
+   },
+   "output": {
+    "$ref": "#/$defs/Page-Output"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "list_runs": {
+   "description": "List an object's runs, newest first: runId, number, runKind, state, numbers (fractions), tested start and end,\nthe values a batch cell used, note and star. Runs started in this workspace; scope \"all\" lists every workspace.\nNarrow by runKind, state, starred or batch. One run in depth: read_run.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ListRuns"
+   },
+   "output": {
+    "$ref": "#/$defs/Page-Output"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    },
+    {
+     "objectId": "<objectId>",
+     "runKind": "sweep",
+     "starred": true
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "manage_package_install": {
+   "description": "Install the research requirements, or cancel an active research or deep environment installation. Read progress with read_environments.",
+   "effects": [
+    "code",
+    "external",
+    "write"
+   ],
+   "effectBranches": {
+    "path": "op",
+    "branches": {
+     "install": {
+      "effects": [
+       "code",
+       "external",
+       "write"
+      ]
+     },
+     "cancel": {
+      "effects": [
+       "write"
+      ]
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/PackageInstall"
+     },
+     {
+      "$ref": "#/$defs/CancelInstall"
+     }
+    ]
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "op": "install",
+     "environment": "research"
+    },
+    {
+     "op": "cancel",
+     "environment": "deep"
+    }
+   ]
+  },
+  "open_run_in_notebook": {
+   "description": "Open (or reuse) the notebook made for a run; its first cell reads that run.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/OpenRunInNotebookInput"
+   },
+   "output": {
+    "$ref": "#/$defs/NotebookFromRun"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "plan_held_out": {
+   "description": "What validating a run on its held-out span involves, before doing it: the span (start, end), what is computed\nagain, and how often that span was already looked at. Reads only. The span starts at run.heldOutFrom, set with\nupdate_object before tuning.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/modules__quant__backend__public_inputs__RunId"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "plan_publication": {
+   "description": "Before publish_run: the next version, checks not passed, the comparison with the previous version, who uses\nthe item, the most similar library items, and whether it would be refused. For a completed factor, model or\nallocation run (strategies are not published); name defaults to the run's object name.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PlanPublication"
+   },
+   "output": {
+    "$ref": "#/$defs/PublicationPlan"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    },
+    {
+     "runId": "<runId>",
+     "name": "S&P 500 reversal"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "preview_notebook_extract": {
+   "description": "Preview code, data settings and omissions before creating a research object from notebook cells.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ExtractPreview"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "notebookId": "<objectId>",
+     "cells": [
+      "<cellId>"
+     ],
+     "kind": "factor"
+    }
+   ]
+  },
+  "promote_model_run": {
+   "description": "Move a queued model training run to the front of the queue.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/modules__quant__backend__public_inputs__RunId"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    }
+   ]
+  },
+  "publish_library_values": {
+   "description": "Publish your own dated per-instrument values as a library data item called name, which strategies and models\nthen read like any library item. Each row has date (YYYY-MM-DD) or time (ISO with timezone), symbol, field and\nvalue.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PublishValues"
+   },
+   "output": {
+    "$ref": "#/$defs/PublishedValues"
+   },
+   "examples": [
+    {
+     "name": "EPS estimate",
+     "kind": "data",
+     "rows": [
+      {
+       "date": "2025-01-02",
+       "symbol": "AAPL",
+       "field": "eps",
+       "value": 2.35
+      },
+      {
+       "date": "2025-01-02",
+       "symbol": "MSFT",
+       "field": "eps",
+       "value": 3.1
+      }
+     ]
+    }
+   ],
+   "errors": [
+    "invalid_input"
+   ]
+  },
+  "publish_run": {
+   "description": "Publish a completed factor, model or allocation run to the library as a version of the item called name; a\nmodel's publication first checks for look-ahead by training again. autoUpdate (default true) makes the version\nadd new values each period. Returns runId at once; the result comes when it ends.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PublishRun"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "runId": "<runId>",
+     "name": "S&P 500 reversal"
+    },
+    {
+     "runId": "<runId>",
+     "name": "S&P 500 LightGBM",
+     "autoUpdate": false
+    }
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "read_environments": {
+   "description": "The environments notebooks and code run in: the research and deep-learning kernels and whether each is\ninstalled, which PyTorch builds this machine can use, and installation progress. part packages lists extension packages and the install job.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadDeepEnvironmentInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/Environments"
+     },
+     {
+      "type": "object",
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      }
+     }
+    ]
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "read_library_item": {
+   "description": "One library item by itemId or name: its state and what to do, each version's numbers at publication and since,\nthe selected version (versionId, default the newest producing one) with its settings, data, inputs and users,\nrecent periods and failures. compareTo (another versionId) adds the two versions' comparison.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/LibraryItem-Input"
+   },
+   "output": {
+    "$ref": "#/$defs/LibraryItem-Output"
+   },
+   "examples": [
+    {
+     "name": "S&P 500 reversal"
+    },
+    {
+     "itemId": "<itemId>",
+     "versionId": "<versionId>",
+     "compareTo": "<versionId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "read_library_log": {
+   "description": "One library version's production record, a row per period (result, times, failed tries). Paged.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/LibraryLog"
+   },
+   "output": {
+    "$ref": "#/$defs/TablePage"
+   },
+   "examples": [
+    {
+     "versionId": "<versionId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "read_library_material": {
+   "description": "Read a frozen library report, list or read source files, retrieve a named report file, or query a report table. Large JSON results and files return a file reference.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/LibraryReport"
+     },
+     {
+      "$ref": "#/$defs/LibrarySource"
+     },
+     {
+      "$ref": "#/$defs/LibraryFile-Input"
+     },
+     {
+      "$ref": "#/$defs/LibraryTable"
+     }
+    ]
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "versionId": "<versionId>",
+     "part": "report"
+    }
+   ]
+  },
+  "read_library_model": {
+   "description": "A published model's frozen files and entries, for code to load.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadLibraryModelInput"
+   },
+   "output": {
+    "$ref": "#/$defs/PublishedModel"
+   },
+   "examples": [
+    {
+     "name": "S&P 500 LightGBM"
+    },
+    {
+     "name": "S&P 500 LightGBM",
+     "version": 2
+    }
+   ],
+   "errors": [
+    "not_found",
+    "model_not_callable",
+    "input_retired"
+   ]
+  },
+  "read_library_values": {
+   "description": "Values a library version produced: name (its newest version, or version n) or versionId. History: start and end\n(inclusive) give a long table of date, symbol, instrumentId, field, value, availableAt, recordedAt; with end the\nvalues are those known by the end of that day unless asOf (an ISO time) sets another cutoff. Cross section: date\ngives one day ranked by order (top, bottom, missing), not combined with start, end or asOf. symbols and field\nnarrow either; format \"file\" returns every row as Parquet.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/LibraryValues"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/LibraryPage"
+     },
+     {
+      "$ref": "#/$defs/LibraryFile-Output"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "name": "Momentum",
+     "start": "2024-01-01",
+     "end": "2024-06-30",
+     "symbols": [
+      "AAPL",
+      "MSFT"
+     ]
+    },
+    {
+     "name": "Momentum",
+     "date": "2024-06-28",
+     "order": "top",
+     "limit": 20
+    },
+    {
+     "versionId": "<versionId>",
+     "format": "file"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "read_model_figures": {
+   "description": "Read model figures by runId and optional keys and comparison run. Supply runIds for a test IC overlay of up to four runs. Large figures return a JSON file.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/ModelFigures"
+     },
+     {
+      "$ref": "#/$defs/ModelOverlay"
+     }
+    ]
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "runIds": [
+      "<runId>",
+      "<otherRunId>"
+     ]
+    }
+   ]
+  },
+  "read_notebook_variables": {
+   "description": "List kernel variables and their last defining cell, or pass name to read its table (large tables return a JSON file).",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadNotebookVariablesInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/NotebookVariables"
+     },
+     {
+      "type": "object",
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      }
+     }
+    ]
+   },
+   "examples": [
+    {
+     "notebookId": "<objectId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "read_object": {
+   "description": "Read one object by objectId, from any workspace. part \"summary\" (default): name, version, the saved settings\n{data, params, run} in the shape update_object takes (only what was set), the effective values the next run uses,\ncodeErrors (what the code's check finds: file, line, message), pinned library inputs, the representative and last\nrun. part \"options\": every settable item with type, range, default and unit, the code's errors, and what the kind\noffers (strategy run settings and library inputs, model algorithms and inputs, allocation objectives, factor\nfields and functions). part code reads paged source. part notebook reads the whole model and document version.\npart dataDefaults previews venue, fees and account defaults.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadObject"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/ObjectSummary"
+     },
+     {
+      "$ref": "#/$defs/ObjectOptions"
+     },
+     {
+      "$ref": "#/$defs/CodePage"
+     },
+     {
+      "type": "object",
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      }
+     }
+    ]
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    },
+    {
+     "objectId": "<objectId>",
+     "part": "options"
+    },
+    {
+     "objectId": "<objectId>",
+     "part": "code"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "read_quant_attention": {
+   "description": "What needs a hand now, across workspaces: library versions that failed, miss periods or lack an input (an input\nthat failed is listed alone), allocation periods to review, research objects on a stopped version. Each row names\nthe Quant action to call and its complete input. Paged.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Page-Input"
+   },
+   "output": {
+    "$ref": "#/$defs/Attention"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "read_queue": {
+   "description": "Running and queued Quant work in every workspace: each run's object, workspace, stage, progress and what it\nwaits for (memory, GPU), and the library's production. Paged.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Page-Input"
+   },
+   "output": {
+    "$ref": "#/$defs/Queue"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "read_research_bars": {
+   "description": "Freeze bars of many instruments into one Parquet file for code: an index's historical members (each only while\nit was a member), a research list (by name) or symbols; info.json gives each instrument and who was left out and\nwhy. A long task; the answer has both file references and the coverage. A few named instruments' bars to read\ndirectly: market.read_data.",
+   "effects": [
+    "read"
+   ],
+   "task": true,
+   "input": {
+    "$ref": "#/$defs/ResearchBars-Input"
+   },
+   "output": {
+    "$ref": "#/$defs/ResearchBars-Output"
+   },
+   "examples": [
+    {
+     "index": {
+      "symbol": "^GSPC"
+     },
+     "timeframe": "1d",
+     "start": "2018-01-01"
+    },
+    {
+     "list": "US funds",
+     "timeframe": "1d",
+     "start": "2020-01-01",
+     "end": "2024-12-31",
+     "adjustment": "split_dividend"
+    },
+    {
+     "symbols": [
+      "AAPL",
+      "MSFT",
+      "NVDA"
+     ],
+     "timeframe": "1h",
+     "start": "2025-01-01"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "no_data",
+    "unavailable"
+   ]
+  },
+  "read_research_list": {
+   "description": "Read one research list with its members as symbols.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadResearchListInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ResearchList"
+   },
+   "examples": [
+    {
+     "listId": "<listId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "read_run": {
+   "description": "Read one run, one part at a time. part \"summary\" (default, and what a finished start_* delivers): state, key\nnumbers, tested start and end (the days actually tested), the requested span, heldOutFrom, symbols set, used and\ndropped, the settings it ran with, what changed since the previous run, and its parts and tables. Other parts:\nstrategy statistics, equity, periods, rolling, longShort, tradeStats, orderStats, account, sectors,\ninstruments, style, costs, crisis; factor returns, ic, industry, style, turnover, costs, event; model returns,\ninformation, turnover, inputs, robustness; allocation weights, risk, returns, style, robust; each also settings,\nchartLayer for strategy, factor and model (pass data.layer to chart.write_chart create layers),\nand code (not allocations; paged by cursor). Sweeps and walk-forwards have summary and settings; held-out and\npublish runs summary. compareTo (a run of the same kind) adds what changed in settings, data and code and each\nnumber's difference. Rows and daily series: read_run_table.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadRun"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/RunSummary"
+     },
+     {
+      "$ref": "#/$defs/RunChartSection"
+     },
+     {
+      "$ref": "#/$defs/RunSection"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    },
+    {
+     "runId": "<runId>",
+     "part": "statistics"
+    },
+    {
+     "runId": "<runId>",
+     "compareTo": "<runId>"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "invalid_input",
+    "too_large"
+   ]
+  },
+  "read_run_materials": {
+   "description": "The files a run froze, for code to read: the bars and instrument information (paths), the tables behind its\nreport, model files, with the run's settings and numbers.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/modules__quant__backend__public_inputs__RunId"
+   },
+   "output": {
+    "$ref": "#/$defs/Materials"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "read_run_table": {
+   "description": "A run's rows as a table (columns with units, rows, total, nextCursor), or the whole table as a Parquet file with\nformat \"file\". Tables: strategy trades, orders, rebalances, daily (equity, benchmark, drawdown, return, riskFree);\nfactor crossSection, daily; model windows, values, daily; allocation periods, daily; a sweep cells; every run log.\nstart and end (inclusive) select daily, trades, orders, rebalances and periods; date picks one day of\ncrossSection, values or rebalances. filter: trades {side, exit, losing}, orders {status}, rebalances {only:\nchanged (default), unfilled or all}, cells {state}, log {stream: stderr (default), stdout, environment_stdout,\nenvironment_stderr}. The run's parts: read_run.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReadRunTable"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/TablePage"
+     },
+     {
+      "$ref": "#/$defs/TableFile"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "runId": "<runId>",
+     "table": "trades",
+     "start": "2022-01-01",
+     "end": "2022-06-30"
+    },
+    {
+     "runId": "<runId>",
+     "table": "crossSection",
+     "date": "2024-03-01"
+    },
+    {
+     "runId": "<runId>",
+     "table": "daily",
+     "format": "file"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "rename_object_folder": {
+   "description": "Rename a folder of one kind; its objects, in every workspace, move with it.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RenameObjectFolderInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Folder"
+   },
+   "examples": [
+    {
+     "kind": "factor",
+     "from": "Momentum",
+     "name": "Trend"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input"
+   ]
+  },
+  "reset_model": {
+   "description": "Return a model to the standard pipeline and reset its parameters.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ObjectId"
+   },
+   "output": {
+    "$ref": "#/$defs/ObjectSummary"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    }
+   ]
+  },
+  "resume_run": {
+   "description": "Continue a cancelled, interrupted or failed run: a model training from its finished windows (override sets params\nfor the windows left, such as nn_batch; epoch continues a neural network from its saved checkpoint), a strategy sweep from the combinations that did not complete, a walk-forward from its first window\nthat did not run, or a factor that failed during data preparation. Returns runId; the result comes when it ends.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ResumeRun"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    },
+    {
+     "runId": "<runId>",
+     "override": {
+      "nn_batch": 400
+     }
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found"
+   ]
+  },
+  "retry_library_version": {
+   "description": "Try a failed, missing or waiting library version now, ahead of the queue.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RetryLibraryVersionInput"
+   },
+   "output": {
+    "$ref": "#/$defs/RetryVersion"
+   },
+   "examples": [
+    {
+     "versionId": "<versionId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "review_allocation_period": {
+   "description": "The monthly review of a published allocation's newest period: accept it as computed, or apply a one-off\nadjustment (every asset's weight and a reason) that applies to that period only.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ReviewAllocationPeriodInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ReviewedPeriod"
+   },
+   "examples": [
+    {
+     "versionId": "<versionId>",
+     "period": "2025-04-01",
+     "how": "accept"
+    },
+    {
+     "versionId": "<versionId>",
+     "period": "2025-04-01",
+     "how": "one_off",
+     "weights": {
+      "SPY": 0.5,
+      "TLT": 0.3,
+      "GLD": 0.2
+     },
+     "reason": "Rate decision this week"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "run_cell": {
+   "description": "Run one saved code cell, starting its workspace kernel when needed. Outputs are saved with the cell and\nreturned as text (images and rich displays name their type). Waits up to timeoutSeconds (default 120);\na cell still running then is reported unavailable and\nkeeps running. Write the cell first with write_cell.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RunCellInput"
+   },
+   "output": {
+    "$ref": "#/$defs/CellOutput"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "cellId": "<cellId>"
+    },
+    {
+     "objectId": "<objectId>",
+     "cellId": "<cellId>",
+     "timeoutSeconds": 600
+    }
+   ],
+   "errors": [
+    "not_found",
+    "conflict",
+    "unavailable"
+   ]
+  },
+  "save_notebook": {
+   "description": "Save the entire notebook, including cell order, metadata, attachments and outputs. Read part notebook of read_object for the model and document version.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SaveNotebook"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "expectedVersion": 1,
+     "notebook": {
+      "cells": [],
+      "metadata": {}
+     }
+    }
+   ]
+  },
+  "select_sweep_cell": {
+   "description": "Save the selected completed combination on a strategy sweep. apply_run separately copies its settings to a strategy.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SweepSelection"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "examples": [
+    {
+     "runId": "<runId>",
+     "cell": 0
+    }
+   ]
+  },
+  "set_model_concurrency": {
+   "description": "How many model runs train at once; each gets the cores divided among them, all within the memory budget.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SetModelConcurrencyInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Concurrency"
+   },
+   "examples": [
+    {
+     "count": 2
+    }
+   ],
+   "errors": [
+    "invalid_input"
+   ]
+  },
+  "set_notebook_kernel": {
+   "description": "Switch a notebook's kernel environment (research or deep); the kernel restarts and its variables are cleared.\ndeep must be installed first (install_deep_environment).",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SetNotebookKernelInput"
+   },
+   "output": {
+    "$ref": "#/$defs/KernelSelected"
+   },
+   "examples": [
+    {
+     "notebookId": "<objectId>",
+     "environment": "deep"
+    }
+   ],
+   "errors": [
+    "deep_not_installed",
+    "not_found"
+   ]
+  },
+  "start_notebook_backtest": {
+   "description": "Backtest a strategy (by name) from code, the way q.backtest does: params apply to this run only and are not\nsaved; signal makes the strategy read your values in place of one library input. The run is tagged Notebook and\nnever represents the object. Returns runId and number at once; the result comes when it ends. To run an object as\nsaved, use start_run.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/StartNotebookBacktestInput"
+   },
+   "output": {
+    "$ref": "#/$defs/NotebookBacktest"
+   },
+   "examples": [
+    {
+     "strategy": "BTC 20/100 crossover"
+    },
+    {
+     "strategy": "BTC 20/100 crossover",
+     "params": {
+      "slow": 150
+     }
+    },
+    {
+     "strategy": "Top N by signal",
+     "signal": {
+      "param": "signal",
+      "path": "scores.parquet"
+     }
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "start_run": {
+   "description": "Run an object exactly as saved (code, data, params, run settings): a strategy backtest, a factor test, one model\ntraining or an allocation backtest. Returns runId at once; the result (read_run's summary: key numbers, tested\nstart and end, symbols used and dropped) reaches you when the run ends, so do not poll. To try another value,\nupdate_object then start_run; to compare several values without changing the object, start_sweep. A notebook runs\ncell by cell (run_cell); code in a notebook backtests a strategy with start_notebook_backtest.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ObjectId"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found",
+    "unavailable"
+   ]
+  },
+  "start_sweep": {
+   "description": "Run one ordinary run per combination of the axes' values, without changing the object. Returns one runId at\nonce; the result (each cell's state and numbers, the top 20 by the kind's main number, the best cell) comes when\nevery cell has ended. Axes are the declared params (read_object part options); a strategy also takes @costMultiple\n(0-10), @fill (nextOpen or nextClose), @capital and @period ({start, end}); a factor holding, groups, costBps and\ndelay. At most: strategy 200 combinations, factor 48, allocation 25 (1 or 2 axes of 2+ values), model 20.\nStrategy only: metric ranks the cells (sharpe default, cagr, totalReturn, maxDrawdown, trades, profitFactor,\nwinRate); of starts from a completed backtest's code and values. Keep a cell with apply_run.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Sweep"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "axes": [
+      {
+       "name": "slow",
+       "values": [
+        100,
+        150,
+        200
+       ]
+      }
+     ]
+    },
+    {
+     "objectId": "<objectId>",
+     "axes": [
+      {
+       "name": "fast",
+       "values": [
+        10,
+        20
+       ]
+      },
+      {
+       "name": "@costMultiple",
+       "values": [
+        1,
+        2
+       ]
+      }
+     ],
+     "metric": "cagr"
+    },
+    {
+     "objectId": "<objectId>",
+     "axes": [
+      {
+       "name": "holding",
+       "values": [
+        1,
+        5,
+        20
+       ]
+      }
+     ]
+    }
+   ],
+   "errors": [
+    "case_over_budget",
+    "invalid_input",
+    "not_found",
+    "too_many_combinations",
+    "value_outside_declared"
+   ]
+  },
+  "start_walk_forward": {
+   "description": "Walk-forward validation of a strategy: each window picks the best combination of the axes over pickOn months\n(by pickBy, default sharpe) and trades it for the next trade months (defaults 12 and 3); at least 3 windows must\nfit before the held-out start. Axes as in start_sweep, at most 200 combinations. Returns runId at once; the\nresult (stitched out-of-sample numbers against fixed values, efficiency, the windows) comes when it ends.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/StartStrategyWalkForwardInput"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "axes": [
+      {
+       "name": "lookback",
+       "values": [
+        24,
+        48,
+        96
+       ]
+      }
+     ],
+     "pickOn": 12,
+     "trade": 3
+    }
+   ],
+   "errors": [
+    "case_over_budget",
+    "not_found",
+    "too_few_windows",
+    "too_many_combinations",
+    "value_outside_declared"
+   ]
+  },
+  "trial_allocation": {
+   "description": "Fit an allocation's newest rebalance under its saved settings, with changes on top, and return each asset's\nweight, risk share and the limit that binds, in about a second once the research process is up. Nothing is saved\nand no run is made; to keep the changes use update_object. Of overlapping requests only the newest is answered\n(the others say superseded).",
+   "effects": [
+    "code"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/TrialAllocationInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/AllocationTrial"
+     },
+     {
+      "$ref": "#/$defs/SupersededTrial"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    },
+    {
+     "objectId": "<objectId>",
+     "changes": {
+      "lookback": 126,
+      "maxWeightPct": 30
+     }
+    },
+    {
+     "objectId": "<objectId>",
+     "runId": "<runId>",
+     "pin": {
+      "asset": "GLD",
+      "weight": 0.1
+     }
+    }
+   ],
+   "errors": [
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "update_library_version": {
+   "description": "Stop or resume a library version's production (producing) and turn its automatic update each period on or off\n(autoUpdate); only the given fields change. dryRun with producing false shows what stopping would affect,\nwithout stopping.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/EditVersion"
+   },
+   "output": {
+    "$ref": "#/$defs/StopVersion"
+   },
+   "examples": [
+    {
+     "versionId": "<versionId>",
+     "producing": false
+    },
+    {
+     "versionId": "<versionId>",
+     "producing": false,
+     "dryRun": true
+    },
+    {
+     "versionId": "<versionId>",
+     "autoUpdate": true
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found"
+   ]
+  },
+  "update_object": {
+   "description": "Change an object's name, folder, settings or code. Changes merge: given keys replace, null resets a key to its\ndefault (params null resets every param), absent keys stay. A given array replaces the old one; data.symbols and\nparams.inputs also take {add, remove}. Giving one of data.symbols, index, list or universe clears the other three.\ncode replaces the code file's whole text and is checked without running: codeErrors lists each error with its\nfile and line; fix them before start_run. A key the object's kind does not take is refused with invalid_input\nnaming it. Returns the object as read_object shows it, plus changed [{path, from, to}]. Nothing runs: start_run\nafter.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/EditObject"
+   },
+   "output": {
+    "$ref": "#/$defs/ObjectSummary"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "params": {
+      "slow": 150
+     }
+    },
+    {
+     "objectId": "<objectId>",
+     "data": {
+      "symbols": {
+       "add": [
+        "binance:ETH/USDT"
+       ],
+       "remove": [
+        "binance:BTC/USDT"
+       ]
+      }
+     }
+    },
+    {
+     "objectId": "<objectId>",
+     "data": {
+      "start": "2018-01-01",
+      "end": null
+     }
+    },
+    {
+     "objectId": "<objectId>",
+     "run": {
+      "heldOutFrom": "2024-11-01",
+      "costs": {
+       "feePct": 0.05
+      }
+     }
+    },
+    {
+     "objectId": "<objectId>",
+     "formula": "-($close/Ref($close,10)-1)"
+    },
+    {
+     "objectId": "<objectId>",
+     "libraryInputs": {
+      "Momentum": "<versionId>"
+     }
+    },
+    {
+     "objectId": "<objectId>",
+     "code": "<the whole file>"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "invalid_input",
+    "not_found"
+   ]
+  },
+  "update_research_list": {
+   "description": "Rename a research list, replace its members (symbols) or add and remove some (add, remove; not together with\nsymbols). Returns the list and changed.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/EditResearchList"
+   },
+   "output": {
+    "$ref": "#/$defs/ResearchList"
+   },
+   "examples": [
+    {
+     "listId": "<listId>",
+     "add": [
+      "QQQ"
+     ],
+     "remove": [
+      "TLT"
+     ]
+    },
+    {
+     "listId": "<listId>",
+     "name": "US core funds",
+     "symbols": [
+      "SPY",
+      "QQQ",
+      "IEF"
+     ]
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "update_run": {
+   "description": "Star a run or write its note; only the given fields change. A starred run represents its object when none is\npublished.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/AnnotateObjectRunInput"
+   },
+   "output": {
+    "$ref": "#/$defs/RunAnnotation"
+   },
+   "examples": [
+    {
+     "runId": "<runId>",
+     "starred": true
+    },
+    {
+     "runId": "<runId>",
+     "note": "Costs doubled: still positive"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "validate_factor_formula": {
+   "description": "Check a factor formula without running it, in milliseconds: the first mistake with its kind (function, field,\nbrackets, future, syntax), at and length (character offsets), a message and a fix for a misspelt function; null\nwhen it reads. With objectId the fields are checked against that factor's data.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ValidateFactorFormulaInput"
+   },
+   "output": {
+    "$ref": "#/$defs/FormulaCheck"
+   },
+   "examples": [
+    {
+     "formula": "-($close/Ref($close,5)-1)"
+    },
+    {
+     "formula": "Mean($close, 5) / Mean($close, 20) - 1",
+     "objectId": "<objectId>"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "validate_held_out": {
+   "description": "Score a completed run on its held-out span (from run.heldOutFrom), once, at the end of the research: a held-out\nrun whose result puts the in-sample and held-out numbers side by side. Returns runId at once; the result comes\nwhen it ends. The same run validated again returns its earlier held-out run, not a new one.",
+   "effects": [
+    "code",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/modules__quant__backend__public_inputs__RunId"
+   },
+   "output": {
+    "$ref": "#/$defs/RunReceipt"
+   },
+   "examples": [
+    {
+     "runId": "<runId>"
+    }
+   ],
+   "errors": [
+    "no_held_out_period",
+    "not_found"
+   ]
+  },
+  "write_as_code": {
+   "description": "Turn a formula factor, a standard model or a standard allocation into editable Python code in the object's\nproject; from then on the object runs that code. For a factor, formula converts that formula instead of the saved\none. Other objects are refused.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WriteAsCode"
+   },
+   "output": {
+    "$ref": "#/$defs/ObjectSummary"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>"
+    },
+    {
+     "objectId": "<objectId>",
+     "formula": "Mean($close, 5) / Mean($close, 20) - 1"
+    }
+   ],
+   "errors": [
+    "not_found"
+   ]
+  },
+  "write_cell": {
+   "description": "Change one cell of a notebook and save it, as the notebook panel does: op=add a code (or markdown) cell after\nanother or at the end, op=replace a cell's text (its outputs are cleared), op=delete. Returns the cell's id and\nevery cell in order. Run a code cell with run_cell. Cell ids come from read_object {part:\"code\"}.",
+   "effects": [
+    "write"
+   ],
+   "target": "objectId",
+   "task": false,
+   "input": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/CellAdd"
+     },
+     {
+      "$ref": "#/$defs/CellReplace"
+     },
+     {
+      "$ref": "#/$defs/CellDelete"
+     }
+    ]
+   },
+   "output": {
+    "$ref": "#/$defs/CellWritten"
+   },
+   "examples": [
+    {
+     "objectId": "<objectId>",
+     "op": "add",
+     "source": "import talyx_quant as q\nq.data().close.tail()"
+    },
+    {
+     "objectId": "<objectId>",
+     "op": "replace",
+     "cellId": "<cellId>",
+     "source": "print(1 + 1)"
+    },
+    {
+     "objectId": "<objectId>",
+     "op": "delete",
+     "cellId": "<cellId>"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "not_found",
+    "invalid_input"
+   ]
+  }
+ },
+ "streams": {
+  "library_facts": {
+   "description": "Library facts of the caller's workspace (a version failed, missed periods, weakened or recovered), from a\ncursor.",
+   "cursor": true,
+   "trigger": true,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "type": "object",
+    "additionalProperties": true
+   }
+  },
+  "research_facts": {
+   "description": "Research facts of the caller's workspace (a run completed, failed or was published), from a cursor.",
+   "cursor": true,
+   "trigger": true,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "type": "object",
+    "additionalProperties": true
+   }
+  }
+ },
+ "events": {
+  "library_changed": {
+   "description": "A library item or version was added, updated, changed state, used or delisted.",
+   "payload": {
+    "$ref": "#/$defs/LibraryChangedEvent"
+   }
+  },
+  "library_update_failed": {
+   "description": "library_update_failed",
+   "payload": {
+    "$ref": "#/$defs/LibraryUpdateFailedEvent"
+   }
+  },
+  "object_changed": {
+   "description": "A Quant object or folder changed.",
+   "payload": {
+    "$ref": "#/$defs/ObjectChangedEvent"
+   }
+  },
+  "object_run_changed": {
+   "description": "A Quant object run changed state or stage.",
+   "payload": {
+    "$ref": "#/$defs/ObjectRunChangedEvent"
+   }
+  },
+  "packages_changed": {
+   "description": "A package installation ended: the environments notebooks and strategies run in may have changed, so a running kernel may need a restart.",
+   "payload": {
+    "$ref": "#/$defs/PackagesChangedEvent"
+   }
+  },
+  "research_completed": {
+   "description": "research_completed",
+   "payload": {
+    "$ref": "#/$defs/ResearchCompletedEvent"
+   }
+  },
+  "research_lists_changed": {
+   "description": "A research list was created, changed or deleted.",
+   "payload": {
+    "$ref": "#/$defs/ResearchListsChangedEvent"
+   }
+  }
+ },
+ "extensionPoints": {},
+ "settings": {
+  "longRuns": {
+   "title": "Long runs finished",
+   "description": "A run, sweep, held-out validation or publication that took over a minute finished or failed.",
+   "globalOnly": false,
+   "group": "Notifications: Runs",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  },
+  "libraryFailures": {
+   "title": "Library failures",
+   "description": "A published version's code failed on the new data.",
+   "globalOnly": false,
+   "group": "Notifications: Library",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  },
+  "libraryMissing": {
+   "title": "Library missing periods",
+   "description": "The source gave no bar, or an input had no value, for a version's newest period.",
+   "globalOnly": false,
+   "group": "Notifications: Library",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  },
+  "libraryWeakening": {
+   "title": "Library weakening",
+   "description": "A factor or model fell under a quarter of its published figure or flipped sign; an allocation drifted from its published risk.",
+   "globalOnly": false,
+   "group": "Notifications: Library",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  },
+  "libraryRecovered": {
+   "title": "Library recovered",
+   "description": "A version that failed or missed periods is producing again.",
+   "globalOnly": false,
+   "group": "Notifications: Library",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  }
+ },
+ "$defs": {
+  "AddAllocationShockInput": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "description": "A finished allocation run's id, from start_run or list_runs.",
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "target": {
+     "description": "An asset's column or a group's name in the pool.",
+     "minLength": 1,
+     "title": "Target",
+     "type": "string"
+    },
+    "pct": {
+     "description": "The move in percent: -20 is a 20% fall.",
+     "exclusiveMinimum": -100.0,
+     "title": "Pct",
+     "type": "number"
+    }
+   },
+   "required": [
+    "runId",
+    "target",
+    "pct"
+   ],
+   "title": "AddAllocationShockInput",
+   "type": "object"
+  },
+  "AllocationTrial": {
+   "properties": {
+    "computedAt": {
+     "title": "Computedat",
+     "type": "integer"
+    },
+    "fullRun": {
+     "title": "Fullrun",
+     "type": "boolean"
+    },
+    "wall": {
+     "title": "Wall",
+     "type": "number"
+    }
+   },
+   "required": [
+    "computedAt",
+    "fullRun",
+    "wall"
+   ],
+   "title": "AllocationTrial",
+   "type": "object"
+  },
+  "AnnotateObjectRunInput": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "description": "Run id from start_run or list_runs.",
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "note": {
+     "anyOf": [
+      {
+       "maxLength": 2000,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The run's note; replaces the old one.",
+     "title": "Note"
+    },
+    "starred": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Starred"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "AnnotateObjectRunInput",
+   "type": "object"
+  },
+  "ApplyRun": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "cell": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A sweep cell's number (from the sweep's result or read_run_table cells).",
+     "title": "Cell"
+    },
+    "expectedVersion": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The object's version read_object gave; refused with conflict if it changed since.",
+     "title": "Expectedversion"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "ApplyRun",
+   "type": "object"
+  },
+  "ArchiveLibraryVersionInput": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "description": "Library version id from read_library_item.",
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "versionId"
+   ],
+   "title": "ArchiveLibraryVersionInput",
+   "type": "object"
+  },
+  "ArchivedVersion": {
+   "properties": {
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "rows": {
+     "title": "Rows",
+     "type": "integer"
+    },
+    "archived": {
+     "title": "Archived",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "versionId",
+    "rows",
+    "archived"
+   ],
+   "title": "ArchivedVersion",
+   "type": "object"
+  },
+  "Attention": {
+   "properties": {
+    "total": {
+     "title": "Total",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    },
+    "items": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Items",
+     "type": "array"
+    },
+    "watchInLibrary": {
+     "title": "Watchinlibrary",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "total",
+    "nextCursor",
+    "items",
+    "watchInLibrary"
+   ],
+   "title": "Attention",
+   "type": "object"
+  },
+  "Axe": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "A declared parameter of the code, or a run setting: @costMultiple (a number 0-10), @fill (nextOpen or nextClose), @capital (a number), @period (an object {start, end} of days).",
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "values": {
+     "description": "The values this axis takes; a number parameter's values must lie within the min and max the code declares.",
+     "items": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "boolean"
+       },
+       {
+        "additionalProperties": {
+         "type": "string"
+        },
+        "type": "object"
+       }
+      ]
+     },
+     "maxItems": 200,
+     "minItems": 1,
+     "title": "Values",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "values"
+   ],
+   "title": "Axe",
+   "type": "object"
+  },
+  "Axis": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "A declared param, or a run setting the kind sweeps (see start_sweep).",
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "values": {
+     "items": {},
+     "maxItems": 200,
+     "minItems": 1,
+     "title": "Values",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "values"
+   ],
+   "title": "Axis",
+   "type": "object"
+  },
+  "CancelInstall": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "cancel",
+     "title": "Op",
+     "type": "string"
+    },
+    "environment": {
+     "default": "research",
+     "enum": [
+      "research",
+      "deep"
+     ],
+     "title": "Environment",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "CancelInstall",
+   "type": "object"
+  },
+  "CancelLibraryUpdateInput": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "description": "Library version id from read_library_item.",
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "versionId"
+   ],
+   "title": "CancelLibraryUpdateInput",
+   "type": "object"
+  },
+  "CancelUpdate": {
+   "properties": {
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "cancelled": {
+     "title": "Cancelled",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "versionId",
+    "cancelled"
+   ],
+   "title": "CancelUpdate",
+   "type": "object"
+  },
+  "CellAdd": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "op": {
+     "const": "add",
+     "title": "Op",
+     "type": "string"
+    },
+    "source": {
+     "title": "Source",
+     "type": "string"
+    },
+    "type": {
+     "default": "code",
+     "enum": [
+      "code",
+      "markdown"
+     ],
+     "title": "Type",
+     "type": "string"
+    },
+    "after": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The cell to put it after; at the end when absent.",
+     "title": "After"
+    }
+   },
+   "required": [
+    "objectId",
+    "op",
+    "source"
+   ],
+   "title": "CellAdd",
+   "type": "object"
+  },
+  "CellDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "op": {
+     "const": "delete",
+     "title": "Op",
+     "type": "string"
+    },
+    "cellId": {
+     "minLength": 1,
+     "title": "Cellid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId",
+    "op",
+    "cellId"
+   ],
+   "title": "CellDelete",
+   "type": "object"
+  },
+  "CellOfRun": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "cell": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A sweep cell's number (from the sweep's result or read_run_table cells).",
+     "title": "Cell"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "CellOfRun",
+   "type": "object"
+  },
+  "CellOutput": {
+   "properties": {
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "cellId": {
+     "title": "Cellid",
+     "type": "string"
+    },
+    "codeIdentity": {
+     "title": "Codeidentity",
+     "type": "string"
+    },
+    "status": {
+     "title": "Status",
+     "type": "string"
+    },
+    "executionCount": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Executioncount"
+    },
+    "outputs": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Outputs",
+     "type": "array"
+    }
+   },
+   "required": [
+    "objectId",
+    "cellId",
+    "codeIdentity",
+    "status",
+    "executionCount",
+    "outputs"
+   ],
+   "title": "CellOutput",
+   "type": "object"
+  },
+  "CellRef": {
+   "properties": {
+    "cellId": {
+     "title": "Cellid",
+     "type": "string"
+    },
+    "type": {
+     "title": "Type",
+     "type": "string"
+    }
+   },
+   "required": [
+    "cellId",
+    "type"
+   ],
+   "title": "CellRef",
+   "type": "object"
+  },
+  "CellReplace": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "op": {
+     "const": "replace",
+     "title": "Op",
+     "type": "string"
+    },
+    "cellId": {
+     "minLength": 1,
+     "title": "Cellid",
+     "type": "string"
+    },
+    "source": {
+     "description": "The cell's whole new text; its outputs are cleared.",
+     "title": "Source",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId",
+    "op",
+    "cellId",
+    "source"
+   ],
+   "title": "CellReplace",
+   "type": "object"
+  },
+  "CellWritten": {
+   "properties": {
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "cellId": {
+     "title": "Cellid",
+     "type": "string"
+    },
+    "version": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "string"
+      }
+     ],
+     "title": "Version"
+    },
+    "cells": {
+     "items": {
+      "$ref": "#/$defs/CellRef"
+     },
+     "title": "Cells",
+     "type": "array"
+    }
+   },
+   "required": [
+    "objectId",
+    "cellId",
+    "version",
+    "cells"
+   ],
+   "title": "CellWritten",
+   "type": "object"
+  },
+  "Change": {
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "from": {
+     "$ref": "#/$defs/JsonValue"
+    },
+    "to": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "required": [
+    "path",
+    "from",
+    "to"
+   ],
+   "title": "Change",
+   "type": "object"
+  },
+  "CheckModel": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "vary": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/Axis"
+       },
+       "maxItems": 4,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The axes of a batch to check, as start_sweep takes them.",
+     "title": "Vary"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "CheckModel",
+   "type": "object"
+  },
+  "CodePage": {
+   "properties": {
+    "entryUri": {
+     "title": "Entryuri",
+     "type": "string"
+    },
+    "files": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Files",
+     "type": "array"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    },
+    "total": {
+     "title": "Total",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "entryUri",
+    "files",
+    "nextCursor",
+    "total"
+   ],
+   "title": "CodePage",
+   "type": "object"
+  },
+  "CombineModelRunsInput": {
+   "additionalProperties": false,
+   "properties": {
+    "runIds": {
+     "description": "2 to 20 completed model runs on the same data and windows.",
+     "items": {
+      "$ref": "#/$defs/modules__quant__backend__models__RunId"
+     },
+     "maxItems": 20,
+     "minItems": 2,
+     "title": "Runids",
+     "type": "array"
+    }
+   },
+   "required": [
+    "runIds"
+   ],
+   "title": "CombineModelRunsInput",
+   "type": "object"
+  },
+  "Concurrency": {
+   "properties": {
+    "concurrency": {
+     "title": "Concurrency",
+     "type": "integer"
+    },
+    "cpus": {
+     "title": "Cpus",
+     "type": "integer"
+    },
+    "memoryUsed": {
+     "title": "Memoryused",
+     "type": "number"
+    },
+    "memoryTotal": {
+     "title": "Memorytotal",
+     "type": "number"
+    },
+    "budget": {
+     "title": "Budget",
+     "type": "number"
+    },
+    "running": {
+     "title": "Running",
+     "type": "integer"
+    },
+    "waiting": {
+     "title": "Waiting",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "concurrency",
+    "cpus",
+    "memoryUsed",
+    "memoryTotal",
+    "budget",
+    "running",
+    "waiting"
+   ],
+   "title": "Concurrency",
+   "type": "object"
+  },
+  "CreateObjectFolderInput": {
+   "additionalProperties": false,
+   "properties": {
+    "kind": {
+     "description": "The kind of object the folder holds; each kind has its own folders.",
+     "enum": [
+      "notebook",
+      "factor",
+      "model",
+      "allocation",
+      "strategy",
+      "library"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "name": {
+     "description": "The folder's name.",
+     "maxLength": 120,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "name"
+   ],
+   "title": "CreateObjectFolderInput",
+   "type": "object"
+  },
+  "DeepEnvironment": {
+   "properties": {
+    "installed": {
+     "title": "Installed",
+     "type": "boolean"
+    },
+    "variant": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Variant"
+    },
+    "offer": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Offer",
+     "type": "object"
+    },
+    "installing": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Installing"
+    },
+    "devices": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Devices",
+     "type": "array"
+    },
+    "newCard": {
+     "$ref": "#/$defs/JsonValue"
+    },
+    "failure": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "required": [
+    "installed",
+    "variant",
+    "offer",
+    "installing",
+    "devices",
+    "newCard",
+    "failure"
+   ],
+   "title": "DeepEnvironment",
+   "type": "object"
+  },
+  "DeleteObjectFolderInput": {
+   "additionalProperties": false,
+   "properties": {
+    "kind": {
+     "description": "The kind of object the folder holds; each kind has its own folders.",
+     "enum": [
+      "notebook",
+      "factor",
+      "model",
+      "allocation",
+      "strategy",
+      "library"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "name": {
+     "description": "The folder's name.",
+     "maxLength": 120,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "name"
+   ],
+   "title": "DeleteObjectFolderInput",
+   "type": "object"
+  },
+  "DeleteObjectInput": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "description": "Quant object id from list_objects.",
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "DeleteObjectInput",
+   "type": "object"
+  },
+  "DeleteResearchListInput": {
+   "additionalProperties": false,
+   "properties": {
+    "listId": {
+     "description": "Research list id from list_research_lists.",
+     "minLength": 1,
+     "title": "Listid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "listId"
+   ],
+   "title": "DeleteResearchListInput",
+   "type": "object"
+  },
+  "DeletedList": {
+   "properties": {
+    "listId": {
+     "title": "Listid",
+     "type": "string"
+    },
+    "deleted": {
+     "title": "Deleted",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "listId",
+    "deleted"
+   ],
+   "title": "DeletedList",
+   "type": "object"
+  },
+  "Direction": {
+   "enum": [
+    "up",
+    "down",
+    "none"
+   ],
+   "title": "Direction",
+   "type": "string"
+  },
+  "EditObject": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 120,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "folder": {
+     "anyOf": [
+      {
+       "maxLength": 120,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Folder name; null takes the object out of its folder.",
+     "title": "Folder"
+    },
+    "data": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Data settings. Instruments, one of: symbols ([\"AAPL\", \"binance:BTC/USDT\"], or {add, remove}), index ({symbol: \"^GSPC\", at?}: its historical members), list (a research listId), universe (\"code\": the code picks them; not strategies). timeframe: 1m 5m 15m 30m 1h 4h 1d. start, end: YYYY-MM-DD, both inclusive; no end = latest close. adjustment: raw, split or split_dividend (strategy prices are fixed).",
+     "title": "Data"
+    },
+    "params": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Declared params by name (read_object part options lists names, ranges, units); null resets one, params: null resets all. Standard allocation percentages end in Pct (maxWeightPct: 40 is 40%).",
+     "title": "Params"
+    },
+    "run": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Run settings (read_object part options): strategy capital, costs {feePct, halfSpreadBps...}, fill, shorting, benchmark...; factor holding, delay, grouping...; model costBps (a trade), topN. All kinds: heldOutFrom (YYYY-MM-DD), kept out of runs until validate_held_out.",
+     "title": "Run"
+    },
+    "code": {
+     "anyOf": [
+      {
+       "maxLength": 1000000,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The whole code file, saved as the editor saves it (a formula factor or standard model becomes code); the\nanswer's codeErrors is its check. How: platform.ai.guide quant strategy or research.",
+     "title": "Code"
+    },
+    "formula": {
+     "anyOf": [
+      {
+       "maxLength": 4000,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Formula factors only, e.g. -($close/Ref($close,5)-1).",
+     "title": "Formula"
+    },
+    "libraryInputs": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Pin library inputs: {<item name>: <versionId>}.",
+     "title": "Libraryinputs"
+    },
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The version read_object gave; refused with conflict if the object changed since.",
+     "title": "Expectedversion"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "EditObject",
+   "type": "object"
+  },
+  "EditResearchList": {
+   "additionalProperties": false,
+   "properties": {
+    "listId": {
+     "minLength": 1,
+     "title": "Listid",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "symbols": {
+     "anyOf": [
+      {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The whole new member list.",
+     "title": "Symbols"
+    },
+    "add": {
+     "anyOf": [
+      {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Add"
+    },
+    "remove": {
+     "anyOf": [
+      {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Remove"
+    }
+   },
+   "required": [
+    "listId"
+   ],
+   "title": "EditResearchList",
+   "type": "object"
+  },
+  "EditVersion": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    },
+    "producing": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "false stops production, true resumes it.",
+     "title": "Producing"
+    },
+    "autoUpdate": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Add new values each period automatically.",
+     "title": "Autoupdate"
+    },
+    "dryRun": {
+     "default": false,
+     "description": "With producing false: show what stopping would affect, change nothing.",
+     "title": "Dryrun",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "versionId"
+   ],
+   "title": "EditVersion",
+   "type": "object"
+  },
+  "Empty": {
+   "additionalProperties": false,
+   "description": "No input.",
+   "properties": {},
+   "title": "Empty",
+   "type": "object"
+  },
+  "Environments": {
+   "properties": {
+    "deep": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Deep",
+     "type": "object"
+    },
+    "kernels": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Kernels",
+     "type": "array"
+    }
+   },
+   "required": [
+    "deep",
+    "kernels"
+   ],
+   "title": "Environments",
+   "type": "object"
+  },
+  "EstimateWalk": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "axes": {
+     "items": {
+      "$ref": "#/$defs/Axis"
+     },
+     "maxItems": 8,
+     "minItems": 1,
+     "title": "Axes",
+     "type": "array"
+    },
+    "metric": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Strategy only: the number that ranks the cells; default sharpe.",
+     "title": "Metric"
+    },
+    "of": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Strategy only: a completed backtest whose code and values the cells start from.",
+     "title": "Of"
+    },
+    "kind": {
+     "const": "walk",
+     "title": "Kind",
+     "type": "string"
+    },
+    "pickOn": {
+     "default": 12,
+     "maximum": 120,
+     "minimum": 1,
+     "title": "Pickon",
+     "type": "integer"
+    },
+    "trade": {
+     "default": 3,
+     "maximum": 60,
+     "minimum": 1,
+     "title": "Trade",
+     "type": "integer"
+    },
+    "pickBy": {
+     "default": "sharpe",
+     "enum": [
+      "sharpe",
+      "cagr",
+      "calmar"
+     ],
+     "title": "Pickby",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId",
+    "axes",
+    "kind"
+   ],
+   "title": "EstimateWalk",
+   "type": "object"
+  },
+  "ExtractPreview": {
+   "additionalProperties": false,
+   "properties": {
+    "notebookId": {
+     "minLength": 1,
+     "title": "Notebookid",
+     "type": "string"
+    },
+    "cells": {
+     "items": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "minItems": 1,
+     "title": "Cells",
+     "type": "array"
+    },
+    "kind": {
+     "enum": [
+      "strategy",
+      "factor",
+      "allocation",
+      "model"
+     ],
+     "title": "Kind",
+     "type": "string"
+    }
+   },
+   "required": [
+    "notebookId",
+    "cells",
+    "kind"
+   ],
+   "title": "ExtractPreview",
+   "type": "object"
+  },
+  "FileRef": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "sha256": {
+     "pattern": "^[a-f0-9]{64}$",
+     "title": "Sha256",
+     "type": "string"
+    },
+    "bytes": {
+     "minimum": 0,
+     "title": "Bytes",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "path",
+    "sha256",
+    "bytes"
+   ],
+   "title": "FileRef",
+   "type": "object"
+  },
+  "Folder": {
+   "properties": {
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "name"
+   ],
+   "title": "Folder",
+   "type": "object"
+  },
+  "FolderDeleted": {
+   "properties": {
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "deleted": {
+     "title": "Deleted",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "kind",
+    "name",
+    "deleted"
+   ],
+   "title": "FolderDeleted",
+   "type": "object"
+  },
+  "FormulaCheck": {
+   "properties": {
+    "error": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Error"
+    }
+   },
+   "required": [
+    "error"
+   ],
+   "title": "FormulaCheck",
+   "type": "object"
+  },
+  "Index": {
+   "additionalProperties": false,
+   "properties": {
+    "symbol": {
+     "description": "The index, e.g. ^GSPC.",
+     "minLength": 1,
+     "title": "Symbol",
+     "type": "string"
+    },
+    "at": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD: that day's members over the whole span; default each day's own members.",
+     "title": "At"
+    }
+   },
+   "required": [
+    "symbol"
+   ],
+   "title": "Index",
+   "type": "object"
+  },
+  "InspectModelInputInput": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "description": "The model's object id.",
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "input": {
+     "description": "Input id from check_model's inputs (i1, i2, ...).",
+     "minLength": 1,
+     "title": "Input",
+     "type": "string"
+    },
+    "feature": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "One feature of a built-in set, e.g. KMID of Alpha158.",
+     "title": "Feature"
+    }
+   },
+   "required": [
+    "objectId",
+    "input"
+   ],
+   "title": "InspectModelInputInput",
+   "type": "object"
+  },
+  "InspectedInput": {
+   "properties": {
+    "ok": {
+     "title": "Ok",
+     "type": "boolean"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "input": {
+     "title": "Input",
+     "type": "string"
+    },
+    "features": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Features",
+     "type": "array"
+    },
+    "before": {
+     "items": {
+      "type": "integer"
+     },
+     "title": "Before",
+     "type": "array"
+    },
+    "after": {
+     "items": {
+      "type": "integer"
+     },
+     "title": "After",
+     "type": "array"
+    },
+    "edges": {
+     "items": {
+      "type": "number"
+     },
+     "title": "Edges",
+     "type": "array"
+    },
+    "afterEdges": {
+     "items": {
+      "type": "number"
+     },
+     "title": "Afteredges",
+     "type": "array"
+    },
+    "missing": {
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "title": "Missing",
+     "type": "array"
+    },
+    "stats": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Stats",
+     "type": "array"
+    },
+    "note": {
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "ok",
+    "name",
+    "input",
+    "features",
+    "before",
+    "after",
+    "edges",
+    "afterEdges",
+    "missing",
+    "stats",
+    "note"
+   ],
+   "title": "InspectedInput",
+   "type": "object"
+  },
+  "InstallDeepEnvironmentInput": {
+   "additionalProperties": false,
+   "properties": {
+    "variant": {
+     "description": "The PyTorch build; read_environments says which this machine can use.",
+     "enum": [
+      "cpu",
+      "cuda",
+      "xpu"
+     ],
+     "title": "Variant",
+     "type": "string"
+    }
+   },
+   "required": [
+    "variant"
+   ],
+   "title": "InstallDeepEnvironmentInput",
+   "type": "object"
+  },
+  "JsonValue": {},
+  "KernelControl": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "op": {
+     "enum": [
+      "status",
+      "stop",
+      "interrupt",
+      "restart"
+     ],
+     "title": "Op",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId",
+    "op"
+   ],
+   "title": "KernelControl",
+   "type": "object"
+  },
+  "KernelSelected": {
+   "properties": {
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "environment": {
+     "title": "Environment",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId",
+    "environment"
+   ],
+   "title": "KernelSelected",
+   "type": "object"
+  },
+  "KeyNumber": {
+   "additionalProperties": false,
+   "properties": {
+    "label": {
+     "title": "Label",
+     "type": "string"
+    },
+    "value": {
+     "title": "Value",
+     "type": "string"
+    },
+    "unit": {
+     "title": "Unit",
+     "type": "string"
+    },
+    "direction": {
+     "$ref": "#/$defs/Direction"
+    }
+   },
+   "required": [
+    "label",
+    "value",
+    "unit",
+    "direction"
+   ],
+   "title": "KeyNumber",
+   "type": "object"
+  },
+  "LayerAttribution": {
+   "properties": {
+    "net": {
+     "title": "Net",
+     "type": "number"
+    },
+    "remainder": {
+     "title": "Remainder",
+     "type": "number"
+    },
+    "currency": {
+     "title": "Currency",
+     "type": "string"
+    }
+   },
+   "required": [
+    "net",
+    "remainder",
+    "currency"
+   ],
+   "title": "LayerAttribution",
+   "type": "object"
+  },
+  "LayerContributor": {
+   "properties": {
+    "instrumentId": {
+     "title": "Instrumentid",
+     "type": "string"
+    },
+    "symbol": {
+     "title": "Symbol",
+     "type": "string"
+    },
+    "key": {
+     "title": "Key",
+     "type": "string"
+    },
+    "sector": {
+     "title": "Sector",
+     "type": "string"
+    },
+    "pnl": {
+     "title": "Pnl",
+     "type": "number"
+    },
+    "trades": {
+     "title": "Trades",
+     "type": "integer"
+    },
+    "weight": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Weight"
+    }
+   },
+   "required": [
+    "instrumentId",
+    "symbol",
+    "key",
+    "sector",
+    "pnl",
+    "trades",
+    "weight"
+   ],
+   "title": "LayerContributor",
+   "type": "object"
+  },
+  "LayerInstrument": {
+   "properties": {
+    "instrumentId": {
+     "title": "Instrumentid",
+     "type": "string"
+    },
+    "symbol": {
+     "title": "Symbol",
+     "type": "string"
+    },
+    "key": {
+     "title": "Key",
+     "type": "string"
+    }
+   },
+   "required": [
+    "instrumentId",
+    "symbol",
+    "key"
+   ],
+   "title": "LayerInstrument",
+   "type": "object"
+  },
+  "LayerSignal": {
+   "properties": {
+    "instrumentId": {
+     "title": "Instrumentid",
+     "type": "string"
+    },
+    "symbol": {
+     "title": "Symbol",
+     "type": "string"
+    },
+    "key": {
+     "title": "Key",
+     "type": "string"
+    },
+    "latest": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Latest"
+    }
+   },
+   "required": [
+    "instrumentId",
+    "symbol",
+    "key",
+    "latest"
+   ],
+   "title": "LayerSignal",
+   "type": "object"
+  },
+  "LayerWindow": {
+   "properties": {
+    "from": {
+     "title": "From",
+     "type": "string"
+    },
+    "to": {
+     "title": "To",
+     "type": "string"
+    }
+   },
+   "required": [
+    "from",
+    "to"
+   ],
+   "title": "LayerWindow",
+   "type": "object"
+  },
+  "LibraryCatalog": {
+   "properties": {
+    "items": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Items",
+     "type": "array"
+    },
+    "total": {
+     "title": "Total",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    },
+    "archivable": {
+     "items": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Archivable",
+     "type": "array"
+    },
+    "needsAttention": {
+     "title": "Needsattention",
+     "type": "integer"
+    },
+    "nextRound": {
+     "$ref": "#/$defs/JsonValue"
+    },
+    "production": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Production"
+    }
+   },
+   "required": [
+    "items",
+    "total",
+    "nextCursor",
+    "archivable",
+    "needsAttention",
+    "nextRound",
+    "production"
+   ],
+   "title": "LibraryCatalog",
+   "type": "object"
+  },
+  "LibraryChangedEvent": {
+   "additionalProperties": false,
+   "properties": {
+    "itemId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Itemid"
+    },
+    "versionId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Versionid"
+    }
+   },
+   "required": [
+    "itemId",
+    "versionId"
+   ],
+   "title": "LibraryChangedEvent",
+   "type": "object"
+  },
+  "LibraryFile-Input": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    },
+    "part": {
+     "const": "file",
+     "title": "Part",
+     "type": "string"
+    },
+    "name": {
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "versionId",
+    "part",
+    "name"
+   ],
+   "title": "LibraryFile",
+   "type": "object"
+  },
+  "LibraryFile-Output": {
+   "additionalProperties": false,
+   "properties": {
+    "file": {
+     "$ref": "#/$defs/FileRef"
+    },
+    "columns": {
+     "items": {
+      "$ref": "#/$defs/TableColumn"
+     },
+     "title": "Columns",
+     "type": "array"
+    },
+    "total": {
+     "minimum": 0,
+     "title": "Total",
+     "type": "integer"
+    },
+    "meta": {
+     "$ref": "#/$defs/LibraryMetadata"
+    }
+   },
+   "required": [
+    "file",
+    "columns",
+    "total",
+    "meta"
+   ],
+   "title": "LibraryFile",
+   "type": "object"
+  },
+  "LibraryItem-Input": {
+   "additionalProperties": false,
+   "properties": {
+    "itemId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Give itemId or name.",
+     "title": "Itemid"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "versionId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The version to show; default the newest producing one.",
+     "title": "Versionid"
+    },
+    "compareTo": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Another versionId to compare with.",
+     "title": "Compareto"
+    }
+   },
+   "title": "LibraryItem",
+   "type": "object"
+  },
+  "LibraryItem-Output": {
+   "properties": {
+    "compare": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Compare",
+     "type": "object"
+    },
+    "versionId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Versionid"
+    },
+    "versions": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Versions",
+     "type": "array"
+    },
+    "failureCount": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Failurecount"
+    },
+    "failures": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Failures"
+    },
+    "feeds": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Feeds"
+    },
+    "figures": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Figures"
+    },
+    "files": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Files"
+    },
+    "inputs": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Inputs"
+    },
+    "issue": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Issue"
+    },
+    "item": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Item"
+    },
+    "nextDue": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextdue"
+    },
+    "oneOff": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Oneoff"
+    },
+    "origin": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Origin"
+    },
+    "overview": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Overview"
+    },
+    "periods": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Periods"
+    },
+    "read": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Read"
+    },
+    "summary": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Summary"
+    },
+    "users": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Users"
+    }
+   },
+   "required": [
+    "versionId",
+    "versions"
+   ],
+   "title": "LibraryItem",
+   "type": "object"
+  },
+  "LibraryLog": {
+   "additionalProperties": false,
+   "properties": {
+    "limit": {
+     "default": 25,
+     "description": "Rows per page.",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The previous page's nextCursor.",
+     "title": "Cursor"
+    },
+    "versionId": {
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "versionId"
+   ],
+   "title": "LibraryLog",
+   "type": "object"
+  },
+  "LibraryMetadata": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "state": {
+     "title": "State",
+     "type": "string"
+    },
+    "publishedAt": {
+     "title": "Publishedat",
+     "type": "string"
+    },
+    "producedByRun": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Producedbyrun"
+    }
+   },
+   "required": [
+    "versionId",
+    "version",
+    "state",
+    "publishedAt",
+    "producedByRun"
+   ],
+   "title": "LibraryMetadata",
+   "type": "object"
+  },
+  "LibraryPage": {
+   "additionalProperties": false,
+   "properties": {
+    "columns": {
+     "items": {
+      "$ref": "#/$defs/TableColumn"
+     },
+     "title": "Columns",
+     "type": "array"
+    },
+    "rows": {
+     "items": {
+      "items": {},
+      "type": "array"
+     },
+     "title": "Rows",
+     "type": "array"
+    },
+    "total": {
+     "minimum": 0,
+     "title": "Total",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    },
+    "meta": {
+     "$ref": "#/$defs/LibraryMetadata"
+    }
+   },
+   "required": [
+    "columns",
+    "rows",
+    "total",
+    "nextCursor",
+    "meta"
+   ],
+   "title": "LibraryPage",
+   "type": "object"
+  },
+  "LibraryReport": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    },
+    "part": {
+     "const": "report",
+     "default": "report",
+     "title": "Part",
+     "type": "string"
+    }
+   },
+   "required": [
+    "versionId"
+   ],
+   "title": "LibraryReport",
+   "type": "object"
+  },
+  "LibrarySource": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    },
+    "part": {
+     "const": "source",
+     "title": "Part",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Omit to list the source files.",
+     "title": "Name"
+    }
+   },
+   "required": [
+    "versionId",
+    "part"
+   ],
+   "title": "LibrarySource",
+   "type": "object"
+  },
+  "LibraryTable": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    },
+    "part": {
+     "const": "table",
+     "title": "Part",
+     "type": "string"
+    },
+    "query": {
+     "$ref": "#/$defs/TableQuery"
+    }
+   },
+   "required": [
+    "versionId",
+    "part",
+    "query"
+   ],
+   "title": "LibraryTable",
+   "type": "object"
+  },
+  "LibraryUpdateFailedEvent": {
+   "additionalProperties": false,
+   "properties": {
+    "itemId": {
+     "minLength": 1,
+     "title": "Itemid",
+     "type": "string"
+    },
+    "versionId": {
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    },
+    "name": {
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "message": {
+     "title": "Message",
+     "type": "string"
+    }
+   },
+   "required": [
+    "itemId",
+    "versionId",
+    "name",
+    "version",
+    "message"
+   ],
+   "title": "LibraryUpdateFailedEvent",
+   "type": "object"
+  },
+  "LibraryValues": {
+   "additionalProperties": false,
+   "properties": {
+    "limit": {
+     "default": 25,
+     "description": "Rows per page.",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The previous page's nextCursor.",
+     "title": "Cursor"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The library item's name; or give versionId.",
+     "title": "Name"
+    },
+    "version": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "With name: the version number; default the newest.",
+     "title": "Version"
+    },
+    "versionId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Versionid"
+    },
+    "symbols": {
+     "anyOf": [
+      {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Only these instruments, e.g. [\"AAPL\", \"MSFT\"].",
+     "title": "Symbols"
+    },
+    "field": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Only this field.",
+     "title": "Field"
+    },
+    "start": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD, inclusive.",
+     "title": "Start"
+    },
+    "end": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD, inclusive.",
+     "title": "End"
+    },
+    "asOf": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "ISO time: values as they were known then; default the end of end.",
+     "title": "Asof"
+    },
+    "date": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD: one day's cross section.",
+     "title": "Date"
+    },
+    "order": {
+     "anyOf": [
+      {
+       "enum": [
+        "top",
+        "bottom",
+        "missing"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Cross section only; default top.",
+     "title": "Order"
+    },
+    "format": {
+     "default": "rows",
+     "description": "rows: a page; file: every row as a Parquet file.",
+     "enum": [
+      "rows",
+      "file"
+     ],
+     "title": "Format",
+     "type": "string"
+    }
+   },
+   "title": "LibraryValues",
+   "type": "object"
+  },
+  "ListLibrary": {
+   "additionalProperties": false,
+   "properties": {
+    "limit": {
+     "default": 25,
+     "description": "Rows per page.",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The previous page's nextCursor.",
+     "title": "Cursor"
+    },
+    "query": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Part of the name.",
+     "title": "Query"
+    },
+    "kind": {
+     "anyOf": [
+      {
+       "enum": [
+        "factor",
+        "model",
+        "allocation",
+        "data"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Kind"
+    },
+    "state": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "An item state, or attention: the items that need a hand.",
+     "title": "State"
+    }
+   },
+   "title": "ListLibrary",
+   "type": "object"
+  },
+  "ListObjects": {
+   "additionalProperties": false,
+   "properties": {
+    "limit": {
+     "default": 25,
+     "description": "Rows per page.",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The previous page's nextCursor.",
+     "title": "Cursor"
+    },
+    "kind": {
+     "anyOf": [
+      {
+       "enum": [
+        "notebook",
+        "factor",
+        "model",
+        "allocation",
+        "strategy"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Kind"
+    },
+    "folder": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Folder"
+    },
+    "query": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Part of the name.",
+     "title": "Query"
+    },
+    "scope": {
+     "default": "workspace",
+     "enum": [
+      "workspace",
+      "all"
+     ],
+     "title": "Scope",
+     "type": "string"
+    }
+   },
+   "title": "ListObjects",
+   "type": "object"
+  },
+  "ListRuns": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "limit": {
+     "default": 25,
+     "description": "Rows per page.",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The previous page's nextCursor.",
+     "title": "Cursor"
+    },
+    "runKind": {
+     "anyOf": [
+      {
+       "enum": [
+        "run",
+        "sweep",
+        "walkForward",
+        "heldOut",
+        "combine",
+        "publish"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Runkind"
+    },
+    "state": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A run state, e.g. completed, failed, cancelled.",
+     "title": "State"
+    },
+    "starred": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Starred"
+    },
+    "batch": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A batch id: the member runs of one model or allocation batch.",
+     "title": "Batch"
+    },
+    "scope": {
+     "default": "workspace",
+     "enum": [
+      "workspace",
+      "all"
+     ],
+     "title": "Scope",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "ListRuns",
+   "type": "object"
+  },
+  "Materials": {
+   "properties": {
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "object": {
+     "title": "Object",
+     "type": "string"
+    },
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "number": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Number"
+    },
+    "state": {
+     "title": "State",
+     "type": "string"
+    },
+    "settings": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Settings",
+     "type": "object"
+    },
+    "metrics": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Metrics",
+     "type": "object"
+    },
+    "dataTo": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Datato"
+    },
+    "failure": {
+     "$ref": "#/$defs/JsonValue"
+    },
+    "paths": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Paths",
+     "type": "object"
+    },
+    "data": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Data"
+    }
+   },
+   "required": [
+    "kind",
+    "object",
+    "runId",
+    "number",
+    "state",
+    "settings",
+    "metrics",
+    "dataTo",
+    "failure",
+    "paths",
+    "data"
+   ],
+   "title": "Materials",
+   "type": "object"
+  },
+  "ModelCheck": {
+   "properties": {
+    "ok": {
+     "title": "Ok",
+     "type": "boolean"
+    },
+    "checks": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Checks",
+     "type": "array"
+    },
+    "blocked": {
+     "title": "Blocked",
+     "type": "boolean"
+    },
+    "seconds": {
+     "title": "Seconds",
+     "type": "number"
+    },
+    "failure": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Failure",
+     "type": "object"
+    },
+    "axis": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Axis",
+     "type": "object"
+    },
+    "inputs": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Inputs",
+     "type": "array"
+    },
+    "features": {
+     "title": "Features",
+     "type": "integer"
+    },
+    "estimates": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Estimates",
+     "type": "array"
+    },
+    "windows": {
+     "title": "Windows",
+     "type": "integer"
+    },
+    "rowsPerWindow": {
+     "title": "Rowsperwindow",
+     "type": "integer"
+    },
+    "bars": {
+     "title": "Bars",
+     "type": "integer"
+    },
+    "names": {
+     "title": "Names",
+     "type": "integer"
+    },
+    "label": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Label",
+     "type": "object"
+    },
+    "engineParams": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Engineparams"
+    },
+    "batchDefault": {
+     "$ref": "#/$defs/JsonValue"
+    },
+    "batch": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Batch",
+     "type": "object"
+    },
+    "pins": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Pins",
+     "type": "array"
+    },
+    "dataKey": {
+     "title": "Datakey",
+     "type": "string"
+    },
+    "frozenData": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Frozendata",
+     "type": "object"
+    },
+    "blockedBy": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Blockedby"
+    }
+   },
+   "required": [
+    "ok",
+    "checks",
+    "blocked",
+    "seconds"
+   ],
+   "title": "ModelCheck",
+   "type": "object"
+  },
+  "ModelFigures": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "keys": {
+     "anyOf": [
+      {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Keys"
+    },
+    "compareTo": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Compareto"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "ModelFigures",
+   "type": "object"
+  },
+  "ModelOverlay": {
+   "additionalProperties": false,
+   "properties": {
+    "runIds": {
+     "items": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "maxItems": 4,
+     "minItems": 1,
+     "title": "Runids",
+     "type": "array"
+    }
+   },
+   "required": [
+    "runIds"
+   ],
+   "title": "ModelOverlay",
+   "type": "object"
+  },
+  "NewObject": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 120,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "folder": {
+     "anyOf": [
+      {
+       "maxLength": 120,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Folder name; null takes the object out of its folder.",
+     "title": "Folder"
+    },
+    "data": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Data settings. Instruments, one of: symbols ([\"AAPL\", \"binance:BTC/USDT\"], or {add, remove}), index ({symbol: \"^GSPC\", at?}: its historical members), list (a research listId), universe (\"code\": the code picks them; not strategies). timeframe: 1m 5m 15m 30m 1h 4h 1d. start, end: YYYY-MM-DD, both inclusive; no end = latest close. adjustment: raw, split or split_dividend (strategy prices are fixed).",
+     "title": "Data"
+    },
+    "params": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Declared params by name (read_object part options lists names, ranges, units); null resets one, params: null resets all. Standard allocation percentages end in Pct (maxWeightPct: 40 is 40%).",
+     "title": "Params"
+    },
+    "run": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Run settings (read_object part options): strategy capital, costs {feePct, halfSpreadBps...}, fill, shorting, benchmark...; factor holding, delay, grouping...; model costBps (a trade), topN. All kinds: heldOutFrom (YYYY-MM-DD), kept out of runs until validate_held_out.",
+     "title": "Run"
+    },
+    "code": {
+     "anyOf": [
+      {
+       "maxLength": 1000000,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The whole code file, saved as the editor saves it (a formula factor or standard model becomes code); the\nanswer's codeErrors is its check. How: platform.ai.guide quant strategy or research.",
+     "title": "Code"
+    },
+    "formula": {
+     "anyOf": [
+      {
+       "maxLength": 4000,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Formula factors only, e.g. -($close/Ref($close,5)-1).",
+     "title": "Formula"
+    },
+    "libraryInputs": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Pin library inputs: {<item name>: <versionId>}.",
+     "title": "Libraryinputs"
+    },
+    "kind": {
+     "enum": [
+      "notebook",
+      "factor",
+      "model",
+      "allocation",
+      "strategy"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "preset": {
+     "anyOf": [
+      {
+       "enum": [
+        "ranked",
+        "rebalance",
+        "signal",
+        "breakout",
+        "crossover",
+        "factor:Momentum",
+        "factor:Reversal",
+        "factor:Volatility",
+        "factor:Residual volatility",
+        "factor:Beta",
+        "factor:Liquidity",
+        "factor:Size",
+        "model:lgb-alpha158",
+        "model:lstm-alpha360",
+        "model:ridge-styles"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Strategy presets: crossover (params fast, slow, shorts), breakout (lookback, stop_atr, trail_atr, risk,\nshorts), ranked or signal (trade a library signal), rebalance (an allocation's weights). At most one of preset,\ncopyOf, fromRun, fromVersion, fromNotebook.",
+     "title": "Preset"
+    },
+    "copyOf": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A strategy's objectId: copies its code and settings.",
+     "title": "Copyof"
+    },
+    "fromRun": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A factor run starts a model or strategy; a model run a strategy.",
+     "title": "Fromrun"
+    },
+    "cell": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "With fromRun: a factor sweep's cell.",
+     "title": "Cell"
+    },
+    "fromVersion": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A library versionId for a new model, strategy, allocation or notebook.",
+     "title": "Fromversion"
+    },
+    "fromNotebook": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/NotebookSource"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "title": "NewObject",
+   "type": "object"
+  },
+  "NewResearchList": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "symbols": {
+     "description": "Market symbols, e.g. AAPL, 600519.SH, binance:BTC/USDT.",
+     "items": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "title": "Symbols",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "symbols"
+   ],
+   "title": "NewResearchList",
+   "type": "object"
+  },
+  "NotebookBacktest": {
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "number": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Number"
+    }
+   },
+   "required": [
+    "runId",
+    "number"
+   ],
+   "title": "NotebookBacktest",
+   "type": "object"
+  },
+  "NotebookFromRun": {
+   "properties": {
+    "notebookId": {
+     "title": "Notebookid",
+     "type": "string"
+    },
+    "created": {
+     "title": "Created",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "notebookId",
+    "created"
+   ],
+   "title": "NotebookFromRun",
+   "type": "object"
+  },
+  "NotebookModel": {
+   "additionalProperties": false,
+   "properties": {
+    "cells": {
+     "items": {
+      "$ref": "#/$defs/SavedCell"
+     },
+     "title": "Cells",
+     "type": "array"
+    },
+    "metadata": {
+     "additionalProperties": true,
+     "title": "Metadata",
+     "type": "object"
+    }
+   },
+   "required": [
+    "cells",
+    "metadata"
+   ],
+   "title": "NotebookModel",
+   "type": "object"
+  },
+  "NotebookSource": {
+   "additionalProperties": false,
+   "properties": {
+    "notebookId": {
+     "minLength": 1,
+     "title": "Notebookid",
+     "type": "string"
+    },
+    "cells": {
+     "items": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "minItems": 1,
+     "title": "Cells",
+     "type": "array"
+    }
+   },
+   "required": [
+    "notebookId",
+    "cells"
+   ],
+   "title": "NotebookSource",
+   "type": "object"
+  },
+  "NotebookVariables": {
+   "properties": {
+    "variables": {
+     "items": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Variables",
+     "type": "array"
+    },
+    "loaded": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "required": [
+    "variables",
+    "loaded"
+   ],
+   "title": "NotebookVariables",
+   "type": "object"
+  },
+  "ObjectChangedEvent": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "notebook",
+      "factor",
+      "model",
+      "allocation",
+      "strategy",
+      "library"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "workspaceId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Workspaceid"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "objectId",
+    "kind",
+    "workspaceId",
+    "version"
+   ],
+   "title": "ObjectChangedEvent",
+   "type": "object"
+  },
+  "ObjectDeleted": {
+   "properties": {
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "deleted": {
+     "title": "Deleted",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "objectId",
+    "deleted"
+   ],
+   "title": "ObjectDeleted",
+   "type": "object"
+  },
+  "ObjectId": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "ObjectId",
+   "type": "object"
+  },
+  "ObjectOptions": {
+   "properties": {
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "options": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Options",
+     "type": "object"
+    }
+   },
+   "required": [
+    "objectId",
+    "options"
+   ],
+   "title": "ObjectOptions",
+   "type": "object"
+  },
+  "ObjectRunChangedEvent": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "workspaceId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Workspaceid"
+    },
+    "state": {
+     "minLength": 1,
+     "title": "State",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId",
+    "objectId",
+    "workspaceId",
+    "state"
+   ],
+   "title": "ObjectRunChangedEvent",
+   "type": "object"
+  },
+  "ObjectSummary": {
+   "properties": {
+    "mode": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Mode"
+    },
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "folder": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Folder"
+    },
+    "workspaceId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Workspaceid"
+    },
+    "settings": {
+     "$ref": "#/$defs/Settings"
+    },
+    "effective": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Effective",
+     "type": "object"
+    },
+    "codeErrors": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Codeerrors",
+     "type": "array"
+    },
+    "formula": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Formula"
+    },
+    "libraryInputs": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Libraryinputs",
+     "type": "object"
+    },
+    "representative": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Representative"
+    },
+    "lastRun": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Lastrun"
+    },
+    "entryUri": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Entryuri"
+    },
+    "changed": {
+     "items": {
+      "$ref": "#/$defs/Change"
+     },
+     "title": "Changed",
+     "type": "array"
+    },
+    "notTaken": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Nottaken",
+     "type": "array"
+    },
+    "restore": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Restore",
+     "type": "object"
+    }
+   },
+   "required": [
+    "mode",
+    "objectId",
+    "name",
+    "kind",
+    "version",
+    "folder",
+    "workspaceId",
+    "settings",
+    "effective",
+    "codeErrors"
+   ],
+   "title": "ObjectSummary",
+   "type": "object"
+  },
+  "Objects": {
+   "properties": {
+    "items": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Items",
+     "type": "array"
+    },
+    "total": {
+     "title": "Total",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    },
+    "folders": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Folders",
+     "type": "array"
+    },
+    "counts": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Counts",
+     "type": "array"
+    }
+   },
+   "required": [
+    "items",
+    "total",
+    "nextCursor",
+    "folders",
+    "counts"
+   ],
+   "title": "Objects",
+   "type": "object"
+  },
+  "OpenRunInNotebookInput": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "description": "Run id from start_run or list_runs.",
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "OpenRunInNotebookInput",
+   "type": "object"
+  },
+  "OpenTarget": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "panelType": {
+     "title": "Paneltype",
+     "type": "string"
+    },
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "module",
+    "panelType",
+    "objectId"
+   ],
+   "title": "OpenTarget",
+   "type": "object"
+  },
+  "PackageInstall": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "install",
+     "title": "Op",
+     "type": "string"
+    },
+    "environment": {
+     "const": "research",
+     "default": "research",
+     "title": "Environment",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "PackageInstall",
+   "type": "object"
+  },
+  "PackagesChangedEvent": {
+   "additionalProperties": false,
+   "properties": {
+    "state": {
+     "enum": [
+      "completed",
+      "failed",
+      "cancelled"
+     ],
+     "title": "State",
+     "type": "string"
+    }
+   },
+   "required": [
+    "state"
+   ],
+   "title": "PackagesChangedEvent",
+   "type": "object"
+  },
+  "Page-Input": {
+   "additionalProperties": false,
+   "properties": {
+    "limit": {
+     "default": 25,
+     "description": "Rows per page.",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The previous page's nextCursor.",
+     "title": "Cursor"
+    }
+   },
+   "title": "Page",
+   "type": "object"
+  },
+  "Page-Output": {
+   "properties": {
+    "items": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Items",
+     "type": "array"
+    },
+    "total": {
+     "title": "Total",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "items",
+    "total",
+    "nextCursor"
+   ],
+   "title": "Page",
+   "type": "object"
+  },
+  "ParameterSource": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "code": {
+     "title": "Code",
+     "type": "string"
+    }
+   },
+   "required": [
+    "objectId",
+    "code"
+   ],
+   "title": "ParameterSource",
+   "type": "object"
+  },
+  "Pin": {
+   "additionalProperties": false,
+   "description": "Hold one asset at a weight (0 to 1); the rest are solved again.",
+   "properties": {
+    "asset": {
+     "title": "Asset",
+     "type": "string"
+    },
+    "weight": {
+     "title": "Weight",
+     "type": "number"
+    }
+   },
+   "required": [
+    "asset",
+    "weight"
+   ],
+   "title": "Pin",
+   "type": "object"
+  },
+  "PlanPublication": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The library item's name; default the run's object name.",
+     "title": "Name"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "PlanPublication",
+   "type": "object"
+  },
+  "PublicationPlan": {
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "alsoPublished": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Alsopublished"
+    },
+    "autoUpdate": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Autoupdate"
+    },
+    "blocked": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Blocked"
+    },
+    "checks": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Checks"
+    },
+    "checksToReview": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Checkstoreview"
+    },
+    "compare": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Compare"
+    },
+    "firstPeriod": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Firstperiod"
+    },
+    "futureDataCheck": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Futuredatacheck"
+    },
+    "measures": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Measures"
+    },
+    "number": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Number"
+    },
+    "paramsDiff": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Paramsdiff"
+    },
+    "pinned": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Pinned"
+    },
+    "previous": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Previous"
+    },
+    "produces": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Produces"
+    },
+    "runNumber": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Runnumber"
+    },
+    "schedule": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Schedule"
+    },
+    "users": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Users"
+    }
+   },
+   "required": [
+    "runId",
+    "name",
+    "version"
+   ],
+   "title": "PublicationPlan",
+   "type": "object"
+  },
+  "PublishRun": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "name": {
+     "description": "The library item's name.",
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "autoUpdate": {
+     "default": true,
+     "description": "Add new values each period.",
+     "title": "Autoupdate",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "runId",
+    "name"
+   ],
+   "title": "PublishRun",
+   "type": "object"
+  },
+  "PublishValues": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "The library data item's name.",
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "kind": {
+     "const": "data",
+     "title": "Kind",
+     "type": "string"
+    },
+    "rows": {
+     "items": {
+      "$ref": "#/$defs/ValueRow"
+     },
+     "minItems": 1,
+     "title": "Rows",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "kind",
+    "rows"
+   ],
+   "title": "PublishValues",
+   "type": "object"
+  },
+  "PublishedModel": {
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "trainingCutoff": {
+     "$ref": "#/$defs/JsonValue"
+    },
+    "model": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Model",
+     "type": "object"
+    }
+   },
+   "required": [
+    "name",
+    "versionId",
+    "version",
+    "trainingCutoff",
+    "model"
+   ],
+   "title": "PublishedModel",
+   "type": "object"
+  },
+  "PublishedValues": {
+   "properties": {
+    "itemId": {
+     "title": "Itemid",
+     "type": "string"
+    },
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "itemId",
+    "versionId",
+    "version"
+   ],
+   "title": "PublishedValues",
+   "type": "object"
+  },
+  "Queue": {
+   "properties": {
+    "total": {
+     "title": "Total",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    },
+    "jobs": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Jobs",
+     "type": "array"
+    },
+    "production": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Production",
+     "type": "object"
+    }
+   },
+   "required": [
+    "total",
+    "nextCursor",
+    "jobs",
+    "production"
+   ],
+   "title": "Queue",
+   "type": "object"
+  },
+  "ReadDeepEnvironmentInput": {
+   "additionalProperties": false,
+   "properties": {
+    "part": {
+     "default": "environments",
+     "enum": [
+      "environments",
+      "packages"
+     ],
+     "title": "Part",
+     "type": "string"
+    }
+   },
+   "title": "ReadDeepEnvironmentInput",
+   "type": "object"
+  },
+  "ReadLibraryModelInput": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "Library model name: its newest version unless version is given.",
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The version number.",
+     "title": "Version"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "ReadLibraryModelInput",
+   "type": "object"
+  },
+  "ReadNotebookVariablesInput": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A variable to inspect as a table; omit to list the variables.",
+     "title": "Name"
+    },
+    "notebookId": {
+     "description": "The notebook's object id.",
+     "minLength": 1,
+     "title": "Notebookid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "notebookId"
+   ],
+   "title": "ReadNotebookVariablesInput",
+   "type": "object"
+  },
+  "ReadObject": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "part": {
+     "default": "summary",
+     "enum": [
+      "summary",
+      "options",
+      "code",
+      "dataDefaults",
+      "notebook"
+     ],
+     "title": "Part",
+     "type": "string"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "part code: the previous page's nextCursor.",
+     "title": "Cursor"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "ReadObject",
+   "type": "object"
+  },
+  "ReadResearchListInput": {
+   "additionalProperties": false,
+   "properties": {
+    "listId": {
+     "description": "Research list id from list_research_lists.",
+     "minLength": 1,
+     "title": "Listid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "listId"
+   ],
+   "title": "ReadResearchListInput",
+   "type": "object"
+  },
+  "ReadRun": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "instrumentId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "chartLayer: select a run instrument.",
+     "title": "Instrumentid"
+    },
+    "around": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "chartLayer: center the price window on this ISO timestamp.",
+     "title": "Around"
+    },
+    "includeInstruments": {
+     "default": false,
+     "description": "chartLayer: also return the instrument list and portfolio contributions for a picker.",
+     "title": "Includeinstruments",
+     "type": "boolean"
+    },
+    "part": {
+     "default": "summary",
+     "description": "summary, or one of the parts the summary lists.",
+     "title": "Part",
+     "type": "string"
+    },
+    "compareTo": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "maxItems": 3,
+       "minItems": 1,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Another run of the same kind. Strategy chartLayer also accepts up to three comparison run IDs.",
+     "title": "Compareto"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "part code: the previous page's nextCursor.",
+     "title": "Cursor"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "ReadRun",
+   "type": "object"
+  },
+  "ReadRunTable": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "limit": {
+     "default": 25,
+     "description": "Rows per page.",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The previous page's nextCursor.",
+     "title": "Cursor"
+    },
+    "table": {
+     "description": "One of the tables the run's summary lists.",
+     "enum": [
+      "trades",
+      "orders",
+      "rebalances",
+      "daily",
+      "crossSection",
+      "windows",
+      "values",
+      "periods",
+      "cells",
+      "log"
+     ],
+     "title": "Table",
+     "type": "string"
+    },
+    "start": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD, inclusive.",
+     "title": "Start"
+    },
+    "end": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD, inclusive.",
+     "title": "End"
+    },
+    "date": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD: one day of crossSection, values or rebalances; values without it is the last test day whose\nreturns every name has realised.",
+     "title": "Date"
+    },
+    "filter": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Keys by table: trades side, exit, losing; orders status; rebalances only; cells state; log stream.",
+     "title": "Filter"
+    },
+    "format": {
+     "default": "rows",
+     "description": "rows: a page; file: every row as a Parquet file.",
+     "enum": [
+      "rows",
+      "file"
+     ],
+     "title": "Format",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId",
+    "table"
+   ],
+   "title": "ReadRunTable",
+   "type": "object"
+  },
+  "RenameObjectFolderInput": {
+   "additionalProperties": false,
+   "properties": {
+    "kind": {
+     "description": "The kind of object the folder holds; each kind has its own folders.",
+     "enum": [
+      "notebook",
+      "factor",
+      "model",
+      "allocation",
+      "strategy",
+      "library"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "from": {
+     "description": "The folder's current name.",
+     "maxLength": 120,
+     "minLength": 1,
+     "title": "From",
+     "type": "string"
+    },
+    "name": {
+     "description": "Its new name.",
+     "maxLength": 120,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "from",
+    "name"
+   ],
+   "title": "RenameObjectFolderInput",
+   "type": "object"
+  },
+  "ResearchBars-Input": {
+   "additionalProperties": false,
+   "properties": {
+    "symbols": {
+     "anyOf": [
+      {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Give one of symbols, index or list.",
+     "title": "Symbols"
+    },
+    "index": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Index"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "list": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A research list's name.",
+     "title": "List"
+    },
+    "timeframe": {
+     "description": "1m, 5m, 15m, 30m, 1h, 4h or 1d.",
+     "title": "Timeframe",
+     "type": "string"
+    },
+    "start": {
+     "description": "YYYY-MM-DD, inclusive.",
+     "title": "Start",
+     "type": "string"
+    },
+    "end": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD, inclusive; default the latest close.",
+     "title": "End"
+    },
+    "adjustment": {
+     "default": "split",
+     "enum": [
+      "raw",
+      "split",
+      "split_dividend"
+     ],
+     "title": "Adjustment",
+     "type": "string"
+    }
+   },
+   "required": [
+    "timeframe",
+    "start"
+   ],
+   "title": "ResearchBars",
+   "type": "object"
+  },
+  "ResearchBars-Output": {
+   "properties": {
+    "bars": {
+     "$ref": "#/$defs/FileRef"
+    },
+    "info": {
+     "$ref": "#/$defs/FileRef"
+    },
+    "coverage": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Coverage",
+     "type": "object"
+    }
+   },
+   "required": [
+    "bars",
+    "info",
+    "coverage"
+   ],
+   "title": "ResearchBars",
+   "type": "object"
+  },
+  "ResearchCompletedEvent": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "state": {
+     "minLength": 1,
+     "title": "State",
+     "type": "string"
+    },
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId",
+    "state",
+    "objectId"
+   ],
+   "title": "ResearchCompletedEvent",
+   "type": "object"
+  },
+  "ResearchList": {
+   "properties": {
+    "listId": {
+     "title": "Listid",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "symbols": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Symbols",
+     "type": "array"
+    },
+    "changed": {
+     "items": {
+      "$ref": "#/$defs/Change"
+     },
+     "title": "Changed",
+     "type": "array"
+    }
+   },
+   "required": [
+    "listId",
+    "name",
+    "symbols"
+   ],
+   "title": "ResearchList",
+   "type": "object"
+  },
+  "ResearchListsChangedEvent": {
+   "additionalProperties": false,
+   "properties": {
+    "listId": {
+     "minLength": 1,
+     "title": "Listid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "listId"
+   ],
+   "title": "ResearchListsChangedEvent",
+   "type": "object"
+  },
+  "ResumeRun": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "override": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Model training only: param values for the windows still to train.",
+     "title": "Override"
+    },
+    "epoch": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Neural network only: the epoch of the saved checkpoint to continue from.",
+     "title": "Epoch"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "ResumeRun",
+   "type": "object"
+  },
+  "RetryLibraryVersionInput": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "description": "Library version id from read_library_item.",
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "versionId"
+   ],
+   "title": "RetryLibraryVersionInput",
+   "type": "object"
+  },
+  "RetryVersion": {
+   "properties": {
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "started": {
+     "title": "Started",
+     "type": "boolean"
+    },
+    "running": {
+     "title": "Running",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "versionId",
+    "started",
+    "running"
+   ],
+   "title": "RetryVersion",
+   "type": "object"
+  },
+  "ReviewAllocationPeriodInput": {
+   "additionalProperties": false,
+   "properties": {
+    "versionId": {
+     "description": "Library version id of the allocation.",
+     "minLength": 1,
+     "title": "Versionid",
+     "type": "string"
+    },
+    "period": {
+     "description": "The rebalance date (YYYY-MM-DD).",
+     "title": "Period",
+     "type": "string"
+    },
+    "how": {
+     "description": "accept the period as computed, or apply a one-off adjustment.",
+     "enum": [
+      "accept",
+      "one_off"
+     ],
+     "title": "How",
+     "type": "string"
+    },
+    "weights": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "type": "number"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "one_off: every asset's weight (a fraction); they add up to the allocation's net.",
+     "title": "Weights"
+    },
+    "reason": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "one_off: why this period differs; required.",
+     "title": "Reason"
+    }
+   },
+   "required": [
+    "versionId",
+    "period",
+    "how"
+   ],
+   "title": "ReviewAllocationPeriodInput",
+   "type": "object"
+  },
+  "ReviewedPeriod": {
+   "properties": {
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "period": {
+     "$ref": "#/$defs/JsonValue"
+    },
+    "review": {
+     "$ref": "#/$defs/JsonValue"
+    }
+   },
+   "required": [
+    "versionId",
+    "period",
+    "review"
+   ],
+   "title": "ReviewedPeriod",
+   "type": "object"
+  },
+  "RunAnnotation": {
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "state": {
+     "title": "State",
+     "type": "string"
+    },
+    "starred": {
+     "title": "Starred",
+     "type": "boolean"
+    },
+    "note": {
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "state",
+    "starred",
+    "note"
+   ],
+   "title": "RunAnnotation",
+   "type": "object"
+  },
+  "RunCellInput": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "description": "The notebook's object id.",
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "cellId": {
+     "description": "The id of a code cell in the saved notebook.",
+     "minLength": 1,
+     "title": "Cellid",
+     "type": "string"
+    },
+    "timeoutSeconds": {
+     "anyOf": [
+      {
+       "maximum": 600,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "How long to wait for the cell; the default is 120.",
+     "title": "Timeoutseconds"
+    }
+   },
+   "required": [
+    "objectId",
+    "cellId"
+   ],
+   "title": "RunCellInput",
+   "type": "object"
+  },
+  "RunChartLayer": {
+   "properties": {
+    "layer": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/FileRef"
+      },
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      }
+     ],
+     "title": "Layer"
+    },
+    "instrumentId": {
+     "title": "Instrumentid",
+     "type": "string"
+    },
+    "label": {
+     "title": "Label",
+     "type": "string"
+    },
+    "timeframe": {
+     "title": "Timeframe",
+     "type": "string"
+    },
+    "adjustment": {
+     "title": "Adjustment",
+     "type": "string"
+    },
+    "window": {
+     "$ref": "#/$defs/LayerWindow"
+    },
+    "truncated": {
+     "title": "Truncated",
+     "type": "boolean"
+    },
+    "buys": {
+     "title": "Buys",
+     "type": "integer"
+    },
+    "sells": {
+     "title": "Sells",
+     "type": "integer"
+    },
+    "trades": {
+     "title": "Trades",
+     "type": "integer"
+    },
+    "openAtEnd": {
+     "title": "Openatend",
+     "type": "integer"
+    },
+    "instruments": {
+     "items": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/LayerContributor"
+       },
+       {
+        "$ref": "#/$defs/LayerSignal"
+       },
+       {
+        "$ref": "#/$defs/LayerInstrument"
+       }
+      ]
+     },
+     "title": "Instruments",
+     "type": "array"
+    },
+    "attribution": {
+     "$ref": "#/$defs/LayerAttribution"
+    }
+   },
+   "required": [
+    "layer",
+    "instrumentId",
+    "label",
+    "timeframe",
+    "adjustment",
+    "window",
+    "truncated",
+    "buys",
+    "sells"
+   ],
+   "title": "RunChartLayer",
+   "type": "object"
+  },
+  "RunChartSection": {
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "part": {
+     "const": "chartLayer",
+     "title": "Part",
+     "type": "string"
+    },
+    "data": {
+     "$ref": "#/$defs/RunChartLayer"
+    }
+   },
+   "required": [
+    "runId",
+    "part",
+    "data"
+   ],
+   "title": "RunChartSection",
+   "type": "object"
+  },
+  "RunReceipt": {
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "state": {
+     "title": "State",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId",
+    "state"
+   ],
+   "title": "RunReceipt",
+   "type": "object"
+  },
+  "RunSection": {
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "part": {
+     "title": "Part",
+     "type": "string"
+    },
+    "data": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Data",
+     "type": "object"
+    },
+    "compare": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Compare",
+     "type": "object"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "runId",
+    "part",
+    "data"
+   ],
+   "title": "RunSection",
+   "type": "object"
+  },
+  "RunSummary": {
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "state": {
+     "title": "State",
+     "type": "string"
+    },
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "objectName": {
+     "title": "Objectname",
+     "type": "string"
+    },
+    "number": {
+     "title": "Number",
+     "type": "integer"
+    },
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "runKind": {
+     "title": "Runkind",
+     "type": "string"
+    },
+    "summary": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Summary"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "tested": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Tested"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "requested": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Requested",
+     "type": "object"
+    },
+    "heldOutFrom": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Heldoutfrom"
+    },
+    "numbers": {
+     "additionalProperties": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "title": "Numbers",
+     "type": "object"
+    },
+    "symbols": {
+     "$ref": "#/$defs/SymbolCoverage"
+    },
+    "createdAt": {
+     "title": "Createdat",
+     "type": "string"
+    },
+    "endedAt": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Endedat"
+    },
+    "progress": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Progress"
+    },
+    "failure": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Failure"
+    },
+    "settings": {
+     "$ref": "#/$defs/Settings"
+    },
+    "checks": {
+     "items": {
+      "additionalProperties": {
+       "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+     },
+     "title": "Checks",
+     "type": "array"
+    },
+    "changed": {
+     "items": {
+      "$ref": "#/$defs/Change"
+     },
+     "title": "Changed",
+     "type": "array"
+    },
+    "parts": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Parts",
+     "type": "array"
+    },
+    "tables": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Tables",
+     "type": "array"
+    },
+    "batch": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Batch",
+     "type": "object"
+    },
+    "compare": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Compare",
+     "type": "object"
+    }
+   },
+   "required": [
+    "runId",
+    "state",
+    "objectId",
+    "objectName",
+    "number",
+    "kind",
+    "runKind",
+    "summary",
+    "tested",
+    "requested",
+    "heldOutFrom",
+    "numbers",
+    "symbols",
+    "createdAt",
+    "endedAt",
+    "progress",
+    "failure",
+    "settings",
+    "checks",
+    "changed",
+    "parts",
+    "tables"
+   ],
+   "title": "RunSummary",
+   "type": "object"
+  },
+  "SaveNotebook": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "expectedVersion": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "string"
+      }
+     ],
+     "description": "Document version from read_object part notebook.",
+     "title": "Expectedversion"
+    },
+    "notebook": {
+     "$ref": "#/$defs/NotebookModel"
+    }
+   },
+   "required": [
+    "objectId",
+    "expectedVersion",
+    "notebook"
+   ],
+   "title": "SaveNotebook",
+   "type": "object"
+  },
+  "SavedCell": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "type": {
+     "enum": [
+      "code",
+      "markdown",
+      "raw"
+     ],
+     "title": "Type",
+     "type": "string"
+    },
+    "source": {
+     "title": "Source",
+     "type": "string"
+    },
+    "metadata": {
+     "additionalProperties": true,
+     "title": "Metadata",
+     "type": "object"
+    },
+    "executionCount": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Executioncount"
+    },
+    "outputs": {
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Outputs",
+     "type": "array"
+    },
+    "attachments": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Attachments"
+    }
+   },
+   "required": [
+    "id",
+    "type",
+    "source",
+    "metadata",
+    "outputs"
+   ],
+   "title": "SavedCell",
+   "type": "object"
+  },
+  "SetModelConcurrencyInput": {
+   "additionalProperties": false,
+   "properties": {
+    "count": {
+     "description": "Model runs that train at once.",
+     "maximum": 64,
+     "minimum": 1,
+     "title": "Count",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "count"
+   ],
+   "title": "SetModelConcurrencyInput",
+   "type": "object"
+  },
+  "SetNotebookKernelInput": {
+   "additionalProperties": false,
+   "properties": {
+    "notebookId": {
+     "description": "The notebook's object id.",
+     "minLength": 1,
+     "title": "Notebookid",
+     "type": "string"
+    },
+    "environment": {
+     "description": "research, or deep (installed with install_deep_environment).",
+     "enum": [
+      "research",
+      "deep"
+     ],
+     "title": "Environment",
+     "type": "string"
+    }
+   },
+   "required": [
+    "notebookId",
+    "environment"
+   ],
+   "title": "SetNotebookKernelInput",
+   "type": "object"
+  },
+  "Settings": {
+   "properties": {
+    "data": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Data",
+     "type": "object"
+    },
+    "params": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Params",
+     "type": "object"
+    },
+    "run": {
+     "additionalProperties": {
+      "$ref": "#/$defs/JsonValue"
+     },
+     "title": "Run",
+     "type": "object"
+    }
+   },
+   "required": [
+    "data",
+    "params",
+    "run"
+   ],
+   "title": "Settings",
+   "type": "object"
+  },
+  "Shock": {
+   "properties": {
+    "scenario": {
+     "title": "Scenario",
+     "type": "string"
+    },
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "portfolio": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Portfolio"
+    },
+    "worst": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Worst"
+    }
+   },
+   "required": [
+    "scenario",
+    "kind"
+   ],
+   "title": "Shock",
+   "type": "object"
+  },
+  "Signal": {
+   "additionalProperties": false,
+   "description": "Values the strategy reads in place of one library input.",
+   "properties": {
+    "param": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Which library input the values replace; left out when the strategy has one.",
+     "title": "Param"
+    },
+    "path": {
+     "description": "A parquet file of datetime, instrument and value rows in the kernel's folder.",
+     "minLength": 1,
+     "title": "Path",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "title": "Signal",
+   "type": "object"
+  },
+  "StartNotebookBacktestInput": {
+   "additionalProperties": false,
+   "properties": {
+    "strategy": {
+     "description": "The strategy's name, as list_objects shows it.",
+     "minLength": 1,
+     "title": "Strategy",
+     "type": "string"
+    },
+    "params": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Param values for this run only, over the saved ones; nothing is saved.",
+     "title": "Params"
+    },
+    "signal": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Signal"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Values the strategy reads in place of one library input."
+    }
+   },
+   "required": [
+    "strategy"
+   ],
+   "title": "StartNotebookBacktestInput",
+   "type": "object"
+  },
+  "StartStrategyWalkForwardInput": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "description": "Strategy id from list_objects or create_object.",
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "axes": {
+     "description": "The swept axes; the combinations are every mix of their values, at most 200.",
+     "items": {
+      "$ref": "#/$defs/Axe"
+     },
+     "maxItems": 8,
+     "minItems": 1,
+     "title": "Axes",
+     "type": "array"
+    },
+    "of": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The completed backtest to start from: its values and settings are the base the axes change (a rerun at other costs or capital).",
+     "title": "Of"
+    },
+    "pickOn": {
+     "anyOf": [
+      {
+       "maximum": 120,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Months of each window to pick the values on. Default 12.",
+     "title": "Pickon"
+    },
+    "trade": {
+     "anyOf": [
+      {
+       "maximum": 60,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Months after it to trade them. Default 3.",
+     "title": "Trade"
+    },
+    "pickBy": {
+     "anyOf": [
+      {
+       "enum": [
+        "sharpe",
+        "cagr",
+        "calmar"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "What picks the values on a window. Default sharpe.",
+     "title": "Pickby"
+    }
+   },
+   "required": [
+    "objectId",
+    "axes"
+   ],
+   "title": "StartStrategyWalkForwardInput",
+   "type": "object"
+  },
+  "StopVersion": {
+   "properties": {
+    "state": {
+     "title": "State",
+     "type": "string"
+    },
+    "autoUpdate": {
+     "title": "Autoupdate",
+     "type": "boolean"
+    },
+    "versionId": {
+     "title": "Versionid",
+     "type": "string"
+    },
+    "consequence": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Consequence"
+    },
+    "lastDatetime": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Lastdatetime"
+    },
+    "producing": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Producing"
+    },
+    "stopped": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Stopped"
+    },
+    "users": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/JsonValue"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Users"
+    },
+    "version": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Version"
+    }
+   },
+   "required": [
+    "versionId"
+   ],
+   "title": "StopVersion",
+   "type": "object"
+  },
+  "Summary": {
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "subtitle": {
+     "title": "Subtitle",
+     "type": "string"
+    },
+    "openTarget": {
+     "$ref": "#/$defs/OpenTarget"
+    },
+    "keyNumbers": {
+     "items": {
+      "$ref": "#/$defs/KeyNumber"
+     },
+     "title": "Keynumbers",
+     "type": "array"
+    }
+   },
+   "required": [
+    "title",
+    "subtitle",
+    "openTarget",
+    "keyNumbers"
+   ],
+   "title": "Summary",
+   "type": "object",
+   "x-talyx-vocabulary": "https://talyx.local/vocab/v2#/$defs/Summary"
+  },
+  "SupersededTrial": {
+   "properties": {
+    "superseded": {
+     "title": "Superseded",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "superseded"
+   ],
+   "title": "SupersededTrial",
+   "type": "object"
+  },
+  "Sweep": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "axes": {
+     "items": {
+      "$ref": "#/$defs/Axis"
+     },
+     "maxItems": 8,
+     "minItems": 1,
+     "title": "Axes",
+     "type": "array"
+    },
+    "metric": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Strategy only: the number that ranks the cells; default sharpe.",
+     "title": "Metric"
+    },
+    "of": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Strategy only: a completed backtest whose code and values the cells start from.",
+     "title": "Of"
+    }
+   },
+   "required": [
+    "objectId",
+    "axes"
+   ],
+   "title": "Sweep",
+   "type": "object"
+  },
+  "SweepSelection": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    },
+    "cell": {
+     "minimum": 0,
+     "title": "Cell",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "runId",
+    "cell"
+   ],
+   "title": "SweepSelection",
+   "type": "object"
+  },
+  "SymbolCoverage": {
+   "properties": {
+    "set": {
+     "title": "Set",
+     "type": "integer"
+    },
+    "used": {
+     "title": "Used",
+     "type": "integer"
+    },
+    "dropped": {
+     "items": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object"
+     },
+     "title": "Dropped",
+     "type": "array"
+    },
+    "droppedTotal": {
+     "title": "Droppedtotal",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "set",
+    "used",
+    "dropped",
+    "droppedTotal"
+   ],
+   "title": "SymbolCoverage",
+   "type": "object"
+  },
+  "TableColumn": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "unit": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Unit"
+    }
+   },
+   "required": [
+    "name",
+    "unit"
+   ],
+   "title": "TableColumn",
+   "type": "object"
+  },
+  "TableFile": {
+   "additionalProperties": false,
+   "properties": {
+    "file": {
+     "$ref": "#/$defs/FileRef"
+    },
+    "columns": {
+     "items": {
+      "$ref": "#/$defs/TableColumn"
+     },
+     "title": "Columns",
+     "type": "array"
+    },
+    "total": {
+     "minimum": 0,
+     "title": "Total",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "file",
+    "columns",
+    "total"
+   ],
+   "title": "TableFile",
+   "type": "object"
+  },
+  "TableFilter": {
+   "additionalProperties": false,
+   "properties": {
+    "column": {
+     "title": "Column",
+     "type": "string"
+    },
+    "equals": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Equals"
+    }
+   },
+   "required": [
+    "column",
+    "equals"
+   ],
+   "title": "TableFilter",
+   "type": "object"
+  },
+  "TablePage": {
+   "additionalProperties": false,
+   "properties": {
+    "columns": {
+     "items": {
+      "$ref": "#/$defs/TableColumn"
+     },
+     "title": "Columns",
+     "type": "array"
+    },
+    "rows": {
+     "items": {
+      "items": {},
+      "type": "array"
+     },
+     "title": "Rows",
+     "type": "array"
+    },
+    "total": {
+     "minimum": 0,
+     "title": "Total",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "columns",
+    "rows",
+    "total",
+    "nextCursor"
+   ],
+   "title": "TablePage",
+   "type": "object"
+  },
+  "TablePredicate": {
+   "additionalProperties": false,
+   "properties": {
+    "column": {
+     "title": "Column",
+     "type": "string"
+    },
+    "operator": {
+     "enum": [
+      "eq",
+      "gte",
+      "lte",
+      "in"
+     ],
+     "title": "Operator",
+     "type": "string"
+    },
+    "value": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "number"
+      },
+      {
+       "items": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "boolean"
+         },
+         {
+          "type": "integer"
+         },
+         {
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "maxItems": 1000,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Value"
+    }
+   },
+   "required": [
+    "column",
+    "operator",
+    "value"
+   ],
+   "title": "TablePredicate",
+   "type": "object"
+  },
+  "TableQuery": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "observation": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Observation"
+    },
+    "filter": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/TableFilter"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "offset": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Offset"
+    },
+    "limit": {
+     "anyOf": [
+      {
+       "maximum": 10000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Limit"
+    },
+    "columns": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Columns"
+    },
+    "filters": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/TablePredicate"
+       },
+       "maxItems": 12,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Filters"
+    },
+    "sort": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/TableSort"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "TableQuery",
+   "type": "object"
+  },
+  "TableSort": {
+   "additionalProperties": false,
+   "properties": {
+    "column": {
+     "title": "Column",
+     "type": "string"
+    },
+    "descending": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Descending"
+    }
+   },
+   "required": [
+    "column"
+   ],
+   "title": "TableSort",
+   "type": "object"
+  },
+  "Tested": {
+   "properties": {
+    "start": {
+     "title": "Start",
+     "type": "string"
+    },
+    "end": {
+     "title": "End",
+     "type": "string"
+    },
+    "bars": {
+     "title": "Bars",
+     "type": "integer"
+    },
+    "timeframe": {
+     "title": "Timeframe",
+     "type": "string"
+    }
+   },
+   "required": [
+    "start",
+    "end",
+    "bars",
+    "timeframe"
+   ],
+   "title": "Tested",
+   "type": "object"
+  },
+  "TrialAllocationInput": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "description": "Allocation id from list_objects.",
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "changes": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Param values to try on top of the saved ones (percentages end in Pct, e.g. maxWeightPct: 30); nothing is saved.",
+     "title": "Changes"
+    },
+    "pin": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Pin"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Hold one asset at a weight (0 to 1); the rest are solved again."
+    },
+    "runId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The run the trial is compared with: its newest period is fitted again from what that run held going into it, so only the changed settings differ.",
+     "title": "Runid"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "TrialAllocationInput",
+   "type": "object"
+  },
+  "ValidateFactorFormulaInput": {
+   "additionalProperties": false,
+   "properties": {
+    "formula": {
+     "description": "The formula, e.g. -($close/Ref($close,5)-1).",
+     "maxLength": 8000,
+     "title": "Formula",
+     "type": "string"
+    },
+    "objectId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The factor whose data fields to check against.",
+     "title": "Objectid"
+    }
+   },
+   "required": [
+    "formula"
+   ],
+   "title": "ValidateFactorFormulaInput",
+   "type": "object"
+  },
+  "ValueRow": {
+   "additionalProperties": false,
+   "properties": {
+    "date": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "YYYY-MM-DD; or give time.",
+     "title": "Date"
+    },
+    "time": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "An ISO time with timezone.",
+     "title": "Time"
+    },
+    "symbol": {
+     "minLength": 1,
+     "title": "Symbol",
+     "type": "string"
+    },
+    "field": {
+     "minLength": 1,
+     "title": "Field",
+     "type": "string"
+    },
+    "value": {
+     "title": "Value",
+     "type": "number"
+    }
+   },
+   "required": [
+    "symbol",
+    "field",
+    "value"
+   ],
+   "title": "ValueRow",
+   "type": "object"
+  },
+  "WriteAsCode": {
+   "additionalProperties": false,
+   "properties": {
+    "objectId": {
+     "minLength": 1,
+     "title": "Objectid",
+     "type": "string"
+    },
+    "formula": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Factor only: the formula to convert instead of the saved one.",
+     "title": "Formula"
+    }
+   },
+   "required": [
+    "objectId"
+   ],
+   "title": "WriteAsCode",
+   "type": "object"
+  },
+  "modules__quant__backend__models__RunId": {
+   "minLength": 1,
+   "title": "RunId",
+   "type": "string"
+  },
+  "modules__quant__backend__public_inputs__RunId": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "minLength": 1,
+     "title": "Runid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "RunId",
+   "type": "object"
+  }
+ },
+ "changes": true
+}

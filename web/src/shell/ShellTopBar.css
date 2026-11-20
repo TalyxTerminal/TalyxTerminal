@@ -1,0 +1,242 @@
+/* The top bar, one for every place: in a workspace it carries the open workspaces, at Home and Community the four
+   places; height, mark, edges and right end are the same, so moving between them doesn't move the bar. On the desktop
+   the bar is the window's title bar: its empty space drags the window. Values are --tx-* tokens; the bar's own sizes
+   are the local --talyx-* below. */
+
+/* The bar itself is nearly clear: a light veil of the page colour and a blur, so what passes under it softens without
+   a dark strip. The glass is in the things on it (logo, capsules, settings), which float as liquid glass: a light tint,
+   a bright rim that catches light at the top, a faint glow along the bottom, and depth. It stays at the top (sticky)
+   and takes no room (the negative margin); the pages start their content one bar lower ("Under the bar" at the end). */
+.talyx-topbar {
+  --talyx-logo-size: 28px;
+  --talyx-window-button: 46px;
+  --talyx-ws-tab-max: 220px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  height: var(--tx-topbar-height);
+  margin-bottom: calc(-1 * var(--tx-topbar-height));
+  min-width: 0;
+  padding-left: var(--tx-space-2-half);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tx-bg) 55%, transparent), color-mix(in srgb, var(--tx-bg) 20%, transparent));
+  -webkit-backdrop-filter: blur(var(--tx-glass-blur)) saturate(var(--tx-glass-saturate));
+  backdrop-filter: blur(var(--tx-glass-blur)) saturate(var(--tx-glass-saturate));
+  font-family: var(--tx-font);
+  font-size: var(--tx-size);
+  line-height: normal;
+  color: var(--tx-text);
+  user-select: none;
+}
+
+/* Home and Community: mark and wordmark at the left, the places centered. */
+.talyx-topbar[data-place="home"] { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.talyx-brand { justify-self: start; display: inline-flex; align-items: center; gap: var(--tx-space-2-half); min-width: 0; }
+.talyx-wordmark {
+  --talyx-wordmark-tracking: .14em;
+  margin-right: calc(-1 * var(--talyx-wordmark-tracking));
+  font-family: var(--tx-font);
+  font-size: var(--tx-size);
+  font-weight: var(--tx-weight-strong);
+  letter-spacing: var(--talyx-wordmark-tracking);
+  color: var(--tx-text);
+}
+.talyx-topbar[data-place="home"] > .talyx-topbar-end { justify-self: end; }
+
+/* ── The mark: the original badge cut round, a hairline ring so the black disc reads on the dark bar ─────────── */
+.talyx-logo-trigger {
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--tx-radius-pill);
+  background: transparent;
+  cursor: default;
+}
+.talyx-logo-trigger:focus-visible { outline: var(--tx-hairline) solid var(--tx-ember); outline-offset: var(--tx-space-half); }
+.talyx-logo { position: relative; display: block; flex: none; line-height: 0; }
+.talyx-logo img {
+  display: block;
+  width: var(--talyx-logo-size);
+  height: var(--talyx-logo-size);
+  border-radius: var(--tx-radius-pill);
+  box-shadow: 0 0 0 var(--tx-hairline) var(--tx-line-2);
+  transition: box-shadow var(--tx-fast) var(--tx-ease);
+}
+.talyx-logo-trigger:hover .talyx-logo img,
+.talyx-logo-trigger[data-state="open"] .talyx-logo img { box-shadow: 0 0 0 var(--tx-hairline) var(--tx-line-3), 0 0 0 var(--tx-space-1) var(--tx-hover); }
+.talyx-logo-dot {
+  position: absolute;
+  top: calc(-1 * var(--tx-space-half));
+  right: calc(-1 * var(--tx-space-half));
+  width: var(--tx-space-2);
+  height: var(--tx-space-2);
+  border-radius: var(--tx-radius-pill);
+  background: var(--tx-ember);
+  box-shadow: 0 0 0 var(--tx-space-half) var(--tx-bg);
+}
+
+/* ── The capsule: the library's pill switch made of liquid glass. One look and one set of states for the workspaces
+   and the places: rest, hover, press, selected (and hover/press on the selected one). The glass is clear: what shows
+   it is the light on its rim and its depth, not a fill. The chosen one is a clear lens inside it, outlined by its own
+   lit rim, never a solid pill. No backdrop filter of its own: the bar's blur is its backdrop root, so a second filter
+   only reworked the bar's faint veil, and Chromium redrew it in strips when anything near the bar repainted (a band
+   across the capsule while the pointer moved over a dialog's list). */
+.tx-seg.talyx-capsule {
+  position: relative;
+  isolation: isolate;
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--tx-white-07), var(--tx-white-02) 50%, var(--tx-white-035));
+  box-shadow:
+    inset 0 var(--tx-hairline) 0 var(--tx-white-16),
+    inset 0 calc(-1 * var(--tx-space-2)) var(--tx-space-3) calc(-1 * var(--tx-space-2)) var(--tx-white-06),
+    0 var(--tx-space-2) var(--tx-space-6) calc(-1 * var(--tx-space-1-half)) var(--tx-black-50),
+    0 var(--tx-hairline) var(--tx-space-half) var(--tx-black-40);
+}
+/* A lit rim: brightest where light falls (top left), fading round the sides, a second catch at the bottom right. */
+.tx-seg.talyx-capsule::before,
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button[aria-pressed="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: var(--tx-hairline);
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--tx-white-22), var(--tx-white-06) 30%, var(--tx-white-02) 60%, var(--tx-white-14));
+  -webkit-mask: linear-gradient(var(--tx-text) 0 0) content-box, linear-gradient(var(--tx-text) 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(var(--tx-text) 0 0) content-box, linear-gradient(var(--tx-text) 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button { position: relative; isolation: isolate; color: var(--tx-text-2); background: transparent; }
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button:not(:disabled):not([aria-pressed="true"]):is(:hover, [data-state="open"]) {
+  color: var(--tx-text);
+  background: var(--tx-white-05);
+}
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button:not(:disabled):not([aria-pressed="true"]):active { background: var(--tx-white-08); }
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button[aria-pressed="true"] {
+  color: var(--tx-text);
+  background: linear-gradient(180deg, var(--tx-white-06), var(--tx-clear) 45%, var(--tx-white-04));
+  box-shadow:
+    inset 0 var(--tx-hairline) 0 var(--tx-white-20),
+    inset 0 calc(-1 * var(--tx-space-1)) var(--tx-space-2) calc(-1 * var(--tx-space-1)) var(--tx-white-08),
+    0 var(--tx-space-half) var(--tx-space-2) var(--tx-black-35);
+}
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button[aria-pressed="true"]::before {
+  background: linear-gradient(135deg, var(--tx-white-22), var(--tx-white-08) 35%, var(--tx-white-04) 60%, var(--tx-white-20));
+}
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button[aria-pressed="true"]:is(:hover, [data-state="open"]) {
+  background: linear-gradient(180deg, var(--tx-white-08), var(--tx-white-02) 45%, var(--tx-white-05));
+}
+#talyx-layout-manager-candidate .tx-seg.talyx-capsule button[aria-pressed="true"]:active { background: var(--tx-white-04); }
+
+/* Open workspaces, with "+" as the capsule's last item. When they don't fit they slide sideways (wheel), clipped
+   inside the capsule with a fade on the clipped side; "+" stays put. */
+.talyx-topbar-workspaces { display: flex; align-items: center; min-width: 0; margin-left: var(--tx-space-3); }
+.tx-seg.talyx-ws-row { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.talyx-ws-clip { display: flex; flex: 0 1 auto; min-width: 0; overflow: hidden; border-radius: var(--tx-radius-pill); }
+.talyx-ws-clip[data-fade="end"] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--tx-space-8)), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - var(--tx-space-8)), transparent);
+}
+.talyx-ws-clip[data-fade="start"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--tx-space-8));
+  mask-image: linear-gradient(90deg, transparent, #000 var(--tx-space-8));
+}
+.talyx-ws-clip[data-fade="start end"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--tx-space-8), #000 calc(100% - var(--tx-space-8)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--tx-space-8), #000 calc(100% - var(--tx-space-8)), transparent);
+}
+.talyx-ws-track { display: flex; gap: var(--tx-space-half); flex: none; transition: transform var(--tx-fast) var(--tx-ease); }
+.tx-seg.talyx-ws-row button.talyx-ws-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tx-space-1-half);
+  flex: none;
+  max-width: var(--talyx-ws-tab-max);
+}
+.talyx-ws-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talyx-ws-caret { flex: none; width: var(--tx-size-sm); height: var(--tx-size-sm); margin-right: calc(-1 * var(--tx-space-1)); color: var(--tx-text-3); }
+.tx-seg.talyx-ws-row button.talyx-ws-add { display: grid; place-items: center; flex: none; margin-left: var(--tx-space-half); padding: 0 var(--tx-space-2); }
+.tx-seg.talyx-ws-row button.talyx-ws-add svg { width: var(--tx-icon-sm); height: var(--tx-icon-sm); }
+
+/* After a workspace's name while something runs there: a spinner. */
+.talyx-ws-mark { flex: none; display: block; border-radius: var(--tx-radius-pill); }
+.talyx-ws-mark[data-status="running"] {
+  box-sizing: border-box;
+  width: var(--tx-space-2-half);
+  height: var(--tx-space-2-half);
+  border: var(--tx-stroke) solid var(--tx-white-14);
+  border-top-color: var(--tx-text-2);
+  animation: talyx-ws-spin var(--tx-spin-time) linear infinite;
+}
+@keyframes talyx-ws-spin { to { transform: rotate(1turn); } }
+
+.talyx-topbar-drag { flex: 1; align-self: stretch; min-width: var(--tx-space-8); }
+
+/* ── Right end: settings, then the window's own buttons, flush with the window's edge ─────────────────────────── */
+.talyx-topbar-end { display: flex; align-items: center; flex: none; align-self: stretch; }
+.talyx-topbar-end .talyx-platform-controls { display: flex; align-items: center; padding-right: var(--tx-space-1); }
+/* The gear's dot: a module reports an error. The same dot as the mark's. */
+.talyx-gear { position: relative; display: flex; align-items: center; align-self: stretch; }
+.talyx-gear-dot {
+  position: absolute;
+  top: calc(50% - var(--tx-space-3));
+  right: var(--tx-space-1-half);
+  width: var(--tx-space-2);
+  height: var(--tx-space-2);
+  border-radius: var(--tx-radius-pill);
+  background: var(--tx-ember);
+  box-shadow: 0 0 0 var(--tx-space-half) var(--tx-bg);
+  pointer-events: none;
+}
+
+/* The window's top edge and corners, over the bar's top: a press there resizes the window. */
+.talyx-window-edge { position: absolute; top: 0; z-index: 1; height: var(--tx-space-1); }
+.talyx-window-edge[data-edge="top"] { left: var(--tx-space-2); right: var(--tx-space-2); cursor: ns-resize; }
+.talyx-window-edge[data-edge="top-left"] { left: 0; width: var(--tx-space-2); cursor: nwse-resize; }
+.talyx-window-edge[data-edge="top-right"] { right: 0; width: var(--tx-space-2); cursor: nesw-resize; }
+.talyx-topbar-divider { flex: none; width: var(--tx-hairline); height: var(--tx-space-4); margin: 0 var(--tx-space-1); background: var(--tx-line-2); }
+.talyx-window-controls { display: flex; align-self: stretch; }
+.talyx-window-btn {
+  display: grid;
+  place-items: center;
+  width: var(--talyx-window-button);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tx-text-2);
+  cursor: default;
+  transition: background var(--tx-fast) var(--tx-ease), color var(--tx-fast) var(--tx-ease);
+}
+.talyx-window-btn svg { width: var(--tx-space-2-half); height: var(--tx-space-2-half); fill: none; stroke: currentColor; stroke-width: var(--tx-hairline); shape-rendering: crispEdges; }
+.talyx-window-btn[data-close] svg { shape-rendering: geometricPrecision; }
+.talyx-window-btn:hover { background: var(--tx-hover); color: var(--tx-text); }
+.talyx-window-btn:active { background: var(--tx-press); }
+.talyx-window-btn[data-close]:hover { background: var(--tx-red); color: var(--tx-text); }
+.talyx-window-btn:focus-visible { outline: var(--tx-hairline) solid var(--tx-ember); outline-offset: calc(-1 * var(--tx-space-1)); }
+
+/* ── Under the bar: the pages reach up to the window's top, so the glass has something to show ───────────────────
+   Their backgrounds start at the top (Home's warm light runs under the bar), their content one bar lower, and what
+   scrolls passes under the bar. `clip` rather than `hidden` on .product so the bar sticks to the page's scrolling.
+   A workspace doesn't scroll: under its bar is the same warm light, so the bar looks the same in both places. */
+#talyx-layout-manager-candidate div.product {
+  overflow: clip;
+  background: radial-gradient(circle at 50% calc(-3 * var(--tx-topbar-height)), var(--tx-ember-backdrop), var(--tx-clear) calc(10 * var(--tx-topbar-height))), var(--tx-bg);
+}
+#talyx-layout-manager-candidate .product > main > .screen > :is(.manager-shell, .news-shell) {
+  border-top: var(--tx-topbar-height) solid transparent;
+}
+#talyx-layout-manager-candidate[data-screen="workspace"] .product > main {
+  box-sizing: border-box;
+  padding-top: var(--tx-topbar-height);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talyx-ws-mark[data-status="running"] { animation-duration: calc(var(--tx-spin-time) * 3); }
+  .talyx-ws-track { transition: none; }
+}

@@ -1,0 +1,125 @@
+/* Chart settings (TradingView): a small dialog that leaves the chart undimmed, pages listed on the left, labels on the left
+   and controls on the right; every change shows on the chart at once, Cancel puts the chart's display back. The settings
+   live in the chart's display (the backend stores it and never reads it); a chart template keeps them under a name. */
+import { useRef, useState } from "react";
+import { TxButton, TxCheckbox, TxColorInput, TxDialog, TxField, TxSelect, type ModuleContext } from "@talyx/sdk";
+import { commit, openOverlay, useStore } from "../store";
+import { TemplateMenu } from "./TemplateMenu";
+import { chartColors, chartColorsWith } from "../engine/theme";
+import type { Appearance, Display } from "../wire";
+import { ZONES } from "./BottomBar";
+
+type Page = "symbol" | "status" | "scales" | "canvas" | "alerts";
+const PAGES: { id: Page; label: string }[] = [
+  { id: "symbol", label: "Symbol" }, { id: "status", label: "Status line" }, { id: "scales", label: "Scales and lines" }, { id: "canvas", label: "Canvas" }, { id: "alerts", label: "Alerts" },
+];
+/** What a chart template keeps: the look, not the time zone. */
+const TEMPLATE_KEYS = ["appearance", "precision", "scales", "statusLine", "alertLine"] as const;
+
+export function ChartSettings({ ctx, panelId, chartId }: { ctx: ModuleContext; panelId: string; chartId: string }) {
+  const display = useStore(state => state.charts[chartId]?.chart?.document.display);
+  const original = useRef(display);
+  const [page, setPage] = useState<Page>("symbol");
+  const close = () => openOverlay(panelId, null);
+  if (!display) return null;
+  const update = (patch: Partial<Display>) => void commit(ctx, chartId, [{ type: "display.update", patch }]);
+  const cancel = () => {
+    if (JSON.stringify(original.current) !== JSON.stringify(display)) void commit(ctx, chartId, [{ type: "display.replace", display: original.current! }]);
+    close();
+  };
+  return <TxDialog open dim={false} onOpenChange={open => { if (!open) cancel(); }} title="Chart settings"
+    footer={<>
+      <TemplateMenu ctx={ctx} chartId={chartId} kind="chart" apply={content => update(content as Partial<Display>)}
+        content={() => Object.fromEntries(TEMPLATE_KEYS.filter(key => display[key] !== undefined).map(key => [key, display[key]]))} />
+      <span className="chart-tb-spacer" />
+      <TxButton size="sm" onClick={cancel}>Cancel</TxButton>
+      <TxButton size="sm" variant="primary" onClick={close}>Ok</TxButton>
+    </>}>
+    <div className="chart-settings">
+      <nav className="chart-settings-nav" aria-label="Chart settings pages">
+        {PAGES.map(item => <TxButton key={item.id} variant="row" size="sm" aria-current={page === item.id} onClick={() => setPage(item.id)}>{item.label}</TxButton>)}
+      </nav>
+      <div className="chart-form chart-settings-page">
+        {page === "symbol" && <SymbolPage display={display} update={update} />}
+        {page === "status" && <Checks values={display.statusLine} onChange={statusLine => update({ statusLine })} items={[
+          ["title", "Symbol"], ["ohlc", "OHLC values"], ["change", "Bar change values"], ["volume", "Volume"],
+          ["indicatorArguments", "Indicator arguments"], ["indicatorValues", "Indicator values"],
+        ]} />}
+        {page === "scales" && <Checks values={display.scales} onChange={scales => update({ scales })} items={[
+          ["lastPriceLabel", "Symbol last price label"], ["lastPriceLine", "Symbol last price line"], ["countdown", "Countdown to bar close"],
+          ["indicatorLabels", "Indicator last value labels"],
+        ]} />}
+        {page === "canvas" && <CanvasPage display={display} update={update} />}
+        {page === "alerts" && <AlertsPage display={display} update={update} />}
+      </div>
+    </div>
+  </TxDialog>;
+}
+
+/** Checkboxes over one display group, each on unless turned off. */
+function Checks<K extends string>({ values, items, onChange }: { values: Partial<Record<K, boolean>> | undefined; items: [K, string][]; onChange(next: Partial<Record<K, boolean>>): void }) {
+  return <>{items.map(([key, label]) => <TxCheckbox key={key} label={label} checked={values?.[key] !== false} onCheckedChange={checked => onChange({ ...values, [key]: checked } as Partial<Record<K, boolean>>)} />)}</>;
+}
+
+function ColorPair({ label, up, down, onChange }: { label: string; up: string; down: string; onChange(up: string, down: string): void }) {
+  return <TxField label={label} layout="inline">
+    <span className="chart-style-row">
+      <TxColorInput aria-label={`${label} up`} value={up} onValueChange={value => onChange(value, down)} />
+      <TxColorInput aria-label={`${label} down`} value={down} onValueChange={value => onChange(up, value)} />
+    </span>
+  </TxField>;
+}
+
+function SymbolPage({ display, update }: { display: Display; update(patch: Partial<Display>): void }) {
+  const look = display.appearance ?? {}, colors = chartColorsWith(look);
+  const set = (change: Appearance) => update({ appearance: { ...look, ...change } });
+  const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return <>
+    <ColorPair label="Body" up={colors.up} down={colors.down} onChange={(up, down) => set({ up, down })} />
+    <ColorPair label="Borders" up={colors.borderUp} down={colors.borderDown} onChange={(borderUp, borderDown) => set({ borderUp, borderDown })} />
+    <ColorPair label="Wick" up={colors.wickUp} down={colors.wickDown} onChange={(wickUp, wickDown) => set({ wickUp, wickDown })} />
+    <TxField label="Precision" layout="inline">
+      <TxSelect aria-label="Precision" value={display.precision === null || display.precision === undefined ? "default" : String(display.precision)}
+        onChange={event => update({ precision: event.target.value === "default" ? null : Number(event.target.value) })}>
+        <option value="default">Default</option>
+        {Array.from({ length: 9 }, (_, decimals) => <option key={decimals} value={decimals}>{(10 ** -decimals).toFixed(decimals)}</option>)}
+      </TxSelect>
+    </TxField>
+    <TxField label="Time zone" layout="inline">
+      <TxSelect aria-label="Time zone" value={display.timeZone ?? "exchange"} onChange={event => update({ timeZone: event.target.value })}>
+        <option value="exchange">Exchange</option>
+        {[...new Set([local, ...ZONES])].map(zone => <option key={zone} value={zone}>{zone.replace(/_/g, " ")}</option>)}
+      </TxSelect>
+    </TxField>
+  </>;
+}
+
+function CanvasPage({ display, update }: { display: Display; update(patch: Partial<Display>): void }) {
+  const look = display.appearance ?? {}, colors = chartColorsWith(look);
+  const set = (change: Appearance) => update({ appearance: { ...look, ...change } });
+  return <>
+    <TxField label="Background" layout="inline"><TxColorInput aria-label="Background" value={colors.background} onValueChange={background => set({ background })} /></TxField>
+    <TxCheckbox label="Vertical grid lines" checked={look.vertGrid !== false} onCheckedChange={vertGrid => set({ vertGrid })} />
+    <TxCheckbox label="Horizontal grid lines" checked={look.horzGrid !== false} onCheckedChange={horzGrid => set({ horzGrid })} />
+    <TxCheckbox label="Symbol watermark" checked={look.watermark === true} onCheckedChange={watermark => set({ watermark })} />
+  </>;
+}
+
+/** TradingView's Alerts page: how the lines of alerts on this symbol are drawn, one control a row like the other pages. */
+function AlertsPage({ display, update }: { display: Display; update(patch: Partial<Display>): void }) {
+  const line = display.alertLine ?? {};
+  const set = (change: NonNullable<Display["alertLine"]>) => update({ alertLine: { ...line, ...change } });
+  return <>
+    <TxField label="Line color" layout="inline"><TxColorInput aria-label="Alert line color" value={line.color ?? chartColors().accent} onValueChange={color => set({ color })} /></TxField>
+    <TxField label="Line width" layout="inline">
+      <TxSelect aria-label="Alert line width" value={String(line.width ?? 1)} onChange={event => set({ width: Number(event.target.value) })}>
+        {[1, 2, 3, 4].map(width => <option key={width} value={width}>{width}px</option>)}
+      </TxSelect>
+    </TxField>
+    <TxField label="Line style" layout="inline">
+      <TxSelect aria-label="Alert line style" value={line.style ?? "dashed"} onChange={event => set({ style: event.target.value as "solid" | "dashed" | "dotted" })}>
+        <option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option>
+      </TxSelect>
+    </TxField>
+  </>;
+}

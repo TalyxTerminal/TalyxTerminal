@@ -1,0 +1,882 @@
+diff --git a/crates/execution/Cargo.toml b/crates/execution/Cargo.toml
+--- a/crates/execution/Cargo.toml
++++ b/crates/execution/Cargo.toml
+@@ -61,6 +61,7 @@
+ rust_decimal = { workspace = true }
+ rust_decimal_macros = { workspace = true }
+ serde = { workspace = true }
++serde_json = { workspace = true }
+ smallvec = { workspace = true }
+ ustr = { workspace = true }
+ uuid = { workspace = true }
+@@ -77,7 +78,6 @@
+ parking_lot = { workspace = true }
+ proptest = { workspace = true }
+ rstest = { workspace = true }
+-serde_json = { workspace = true }
+ 
+ [[bench]]
+ name = "matching"
+diff --git a/crates/execution/src/lib.rs b/crates/execution/src/lib.rs
+--- a/crates/execution/src/lib.rs
++++ b/crates/execution/src/lib.rs
+@@ -140,6 +140,7 @@
+ pub mod engine;
+ pub mod matching;
+ pub mod matching_engine;
++pub mod trading_conditions;
+ pub mod models;
+ pub mod order_emulator;
+ pub mod order_manager;
+diff --git a/crates/execution/src/trading_conditions.rs b/crates/execution/src/trading_conditions.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/execution/src/trading_conditions.rs
+@@ -0,0 +1,431 @@
++// Copyright (C) 2026 Nautech Systems Pty Ltd. LGPL-3.0-or-later.
++//! Generic simulated-venue trading conditions and their narrow recovery state.
++use std::{cell::RefCell, collections::BTreeMap, fmt, rc::Rc};
++
++use anyhow::ensure;
++use nautilus_common::{cache::Cache, clock::Clock};
++use nautilus_model::{data::Bar, instruments::{Instrument, InstrumentAny}, orders::{Order, OrderAny}, types::{Currency, Money, Price, Quantity}};
++use rust_decimal::Decimal;
++use serde::{Deserialize, Serialize};
++
++use crate::models::fee::{FeeModel, FeeModelHandle};
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct Commission {
++    pub rate: Decimal,
++    pub per_share: Decimal,
++    pub minimum: Decimal,
++    pub maximum_rate: Option<Decimal>,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct ExecutionBar {
++    pub open: Decimal,
++    pub high: Decimal,
++    pub low: Decimal,
++    pub close: Decimal,
++    pub volume: Decimal,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct Session {
++    pub date: String,
++    pub open_at: u64,
++    pub close_at: u64,
++    pub lower: Option<Decimal>,
++    pub upper: Option<Decimal>,
++    pub price_increment: Decimal,
++    pub price_origin: Decimal,
++    pub price_tolerance: Decimal,
++    pub buy_tax_rate: Decimal,
++    pub sell_tax_rate: Decimal,
++    pub input_price_scale: Decimal,
++    pub input_price_offset: Decimal,
++    pub input_price_increment: Option<Decimal>,
++    pub input_volume_scale: Decimal,
++    pub execution_bar: Option<ExecutionBar>,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct TradingRules {
++    pub minimum: Decimal,
++    pub increment: Decimal,
++    pub odd_lot_sell_all: bool,
++    pub sell_after_sessions: u8,
++    pub commission: Commission,
++    pub sessions: Vec<Session>,
++}
++
++impl TradingRules {
++    fn validate(&self) -> anyhow::Result<()> {
++        ensure!(self.minimum > Decimal::ZERO && self.increment > Decimal::ZERO, "Trading quantity minimum and increment must be positive");
++        ensure!(self.sell_after_sessions <= 1, "Only same-session or next-session resale is supported");
++        let fee = &self.commission;
++        ensure!(fee.rate >= Decimal::ZERO && fee.per_share >= Decimal::ZERO && fee.minimum >= Decimal::ZERO && fee.maximum_rate.is_none_or(|v| v >= Decimal::ZERO), "Trading commission cannot be negative");
++        let mut previous = None;
++        for session in &self.sessions {
++            ensure!(session.date.len() == 10 && session.open_at < session.close_at && session.price_increment > Decimal::ZERO && session.price_tolerance >= Decimal::ZERO, "Invalid trading session or price increment");
++            ensure!(session.lower.is_some() == session.upper.is_some() && session.lower.zip(session.upper).is_none_or(|(a,b)| a < b), "Price limits require an ordered pair or explicit no-limit");
++            ensure!(session.buy_tax_rate >= Decimal::ZERO && session.sell_tax_rate >= Decimal::ZERO, "Trading taxes cannot be negative");
++            ensure!(session.input_price_scale > Decimal::ZERO && session.input_volume_scale > Decimal::ZERO && session.input_price_increment.is_none_or(|value| value > Decimal::ZERO), "Invalid market input coordinate");
++            ensure!(previous.is_none_or(|end| end <= session.open_at), "Trading sessions must be ordered and disjoint");
++            if let Some(bar) = &session.execution_bar {
++                ensure!(bar.open > Decimal::ZERO && bar.low > Decimal::ZERO && bar.high >= bar.open && bar.high >= bar.close && bar.low <= bar.open && bar.low <= bar.close && bar.volume >= Decimal::ZERO, "Invalid execution observation");
++            }
++            previous = Some(session.close_at);
++        }
++        ensure!(!self.sessions.is_empty(), "Trading session evidence is empty");
++        Ok(())
++    }
++
++    fn session(&self, now: u64) -> anyhow::Result<&Session> {
++        self.sessions.iter().find(|session| session.open_at <= now && now <= session.close_at)
++            .ok_or_else(|| anyhow::anyhow!("No verified trading conditions at {now}"))
++    }
++}
++
++#[derive(Clone, Debug, Default, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct OrderBill {
++    pub quantity: Decimal,
++    pub size_quantity: Decimal,
++    pub notional: Decimal,
++    pub commission_paid: Decimal,
++    pub tax_accrued: Decimal,
++    pub tax_paid: Decimal,
++}
++
++#[derive(Clone, Debug, Default, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct TradingState {
++    pub session_date: Option<String>,
++    pub last_market_at: u64,
++    pub quantity: Decimal,
++    pub frozen: Decimal,
++    pub bills: BTreeMap<String, OrderBill>,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct RebuildOrder {
++    pub order_id: String,
++    pub side: String,
++    pub quantity: Decimal,
++}
++
++#[derive(Clone, Debug, Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++struct RebuildSeed { at: u64, price: Decimal }
++
++#[derive(Clone, Debug, Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++struct Input {
++    rules: TradingRules,
++    state: Option<TradingState>,
++    rebuild_orders: Vec<RebuildOrder>,
++    rebuild_seed: Option<RebuildSeed>,
++}
++
++#[derive(Clone, Debug)]
++pub(crate) struct Conditions {
++    rules: Rc<RefCell<TradingRules>>,
++    state: Rc<RefCell<TradingState>>,
++    rebuild: Rc<RefCell<BTreeMap<String, RebuildOrder>>>,
++    initial: TradingState,
++    initial_rebuild: BTreeMap<String, RebuildOrder>,
++    rebuild_seed: Option<RebuildSeed>,
++    last_update: Rc<RefCell<Option<Vec<u8>>>>,
++}
++
++#[derive(Clone, Debug)]
++struct Parts {
++    commission: Decimal,
++    tax: Decimal,
++    accrued: Decimal,
++    total: Money,
++}
++
++impl Conditions {
++    pub(crate) fn parse(raw: &str) -> anyhow::Result<Self> {
++        let input: Input = serde_json::from_str(raw)?;
++        input.rules.validate()?;
++        let state = input.state.unwrap_or_default();
++        ensure!(state.quantity >= Decimal::ZERO && state.frozen >= Decimal::ZERO && state.frozen <= state.quantity, "Invalid restored inventory/frozen quantity");
++        ensure!(state.bills.values().all(|bill| bill.quantity >= Decimal::ZERO && bill.size_quantity >= Decimal::ZERO && bill.notional >= Decimal::ZERO && bill.commission_paid >= Decimal::ZERO && bill.tax_accrued >= Decimal::ZERO && bill.tax_paid >= Decimal::ZERO), "Invalid restored order fee state");
++        let mut rebuild = BTreeMap::new();
++        let mut total = Decimal::ZERO;
++        for order in input.rebuild_orders {
++            ensure!(order.side == "BUY" && order.quantity > Decimal::ZERO, "Rebuilding requires exact pre-existing long inventory");
++            total += order.quantity;
++            ensure!(rebuild.insert(order.order_id.clone(), order).is_none(), "Duplicate authorized rebuild order");
++        }
++        ensure!(total <= state.quantity, "Rebuild quantity exceeds restored inventory");
++        ensure!(input.rebuild_seed.as_ref().is_none_or(|seed| seed.at > 0 && seed.price > Decimal::ZERO), "Invalid internal rebuild seed");
++        ensure!(rebuild.is_empty() || input.rebuild_seed.is_some(), "Authorized rebuild needs its exact seed observation");
++        Ok(Self { rules: Rc::new(RefCell::new(input.rules)), state: Rc::new(RefCell::new(state.clone())), rebuild: Rc::new(RefCell::new(rebuild.clone())), initial_rebuild: rebuild, rebuild_seed: input.rebuild_seed, initial: state, last_update: Rc::new(RefCell::new(None)) })
++    }
++
++    pub(crate) fn reset(&self) {
++        *self.state.borrow_mut() = self.initial.clone();
++        *self.rebuild.borrow_mut() = self.initial_rebuild.clone();
++    }
++
++    pub(crate) fn fee_model(&self, clock: Rc<RefCell<dyn Clock>>) -> FeeModelHandle {
++        FeeModelHandle::new(ConditionsFeeModel { conditions: self.clone(), clock })
++    }
++
++    pub(crate) fn synchronize(&self, cache: &Rc<RefCell<Cache>>, id: &str) -> anyhow::Result<()> {
++        if let Some(value) = cache.borrow().get(&format!("trading-conditions/rules/{id}"))? {
++            let bytes = value.to_vec();
++            if self.last_update.borrow().as_ref() != Some(&bytes) {
++                let rules: TradingRules = serde_json::from_slice(&bytes)?;
++                rules.validate()?;
++                *self.rules.borrow_mut() = rules;
++                *self.last_update.borrow_mut() = Some(bytes);
++            }
++        }
++        self.publish(cache, id)
++    }
++
++    pub(crate) fn observe(&self, now: u64) -> anyhow::Result<()> {
++        if now < self.state.borrow().last_market_at { return Ok(()); }
++        self.state.borrow_mut().last_market_at = now;
++        let rules = self.rules.borrow();
++        let session = rules.session(now)?;
++        let mut state = self.state.borrow_mut();
++        if state.session_date.as_ref().is_none_or(|day| day < &session.date) {
++            state.session_date = Some(session.date.clone());
++            state.frozen = Decimal::ZERO;
++        }
++        Ok(())
++    }
++
++    fn market_time(&self, fallback: u64) -> u64 {
++        let observed = self.state.borrow().last_market_at;
++        if observed == 0 { fallback } else { observed }
++    }
++
++    pub(crate) fn publish(&self, cache: &Rc<RefCell<Cache>>, id: &str) -> anyhow::Result<()> {
++        let value = serde_json::to_vec(&*self.state.borrow())?;
++        cache.borrow_mut().add(&format!("trading-conditions/state/{id}"), value.into())
++    }
++
++    pub(crate) fn input_bar(&self, bar: Bar) -> anyhow::Result<Bar> {
++        let mut result = bar;
++        if let Some(seed) = &self.rebuild_seed
++            && seed.at == bar.ts_event.as_u64() && !self.rebuild.borrow().is_empty() {
++            let price = Price::from_decimal_dp(seed.price, bar.close.precision)?;
++            result.open = price;
++            result.high = price;
++            result.low = price;
++            result.close = price;
++            let quantity: Decimal = self.rebuild.borrow().values().map(|order| order.quantity).sum();
++            result.volume = Quantity::from_decimal_dp(quantity * Decimal::from(4), bar.volume.precision)?;
++            return Ok(result);
++        }
++        let rules = self.rules.borrow();
++        let session = rules.session(bar.ts_event.as_u64())?;
++        if let Some(observed) = &session.execution_bar {
++            ensure!(bar.ts_event.as_u64() == session.close_at, "Execution observation timestamp mismatch");
++            result.open = Price::from_decimal_dp(observed.open, bar.open.precision)?;
++            result.high = Price::from_decimal_dp(observed.high, bar.high.precision)?;
++            result.low = Price::from_decimal_dp(observed.low, bar.low.precision)?;
++            result.close = Price::from_decimal_dp(observed.close, bar.close.precision)?;
++            result.volume = Quantity::from_decimal_dp(observed.volume, bar.volume.precision)?;
++        } else {
++            result.open = self.input_price(bar.open, bar.ts_event.as_u64())?;
++            result.high = self.input_price(bar.high, bar.ts_event.as_u64())?;
++            result.low = self.input_price(bar.low, bar.ts_event.as_u64())?;
++            result.close = self.input_price(bar.close, bar.ts_event.as_u64())?;
++            result.volume = self.input_quantity(bar.volume, bar.ts_event.as_u64())?;
++        }
++        Ok(result)
++    }
++
++    pub(crate) fn input_price(&self, price: Price, at: u64) -> anyhow::Result<Price> {
++        let rules = self.rules.borrow();
++        let session = rules.session(at)?;
++        let mut value = price.as_decimal() * session.input_price_scale + session.input_price_offset;
++        if let Some(increment) = session.input_price_increment {
++            value = (value / increment).round() * increment;
++        }
++        Ok(Price::from_decimal_dp(value, price.precision)?)
++    }
++
++    pub(crate) fn input_quantity(&self, quantity: Quantity, at: u64) -> anyhow::Result<Quantity> {
++        let rules = self.rules.borrow();
++        let value = quantity.as_decimal() * rules.session(at)?.input_volume_scale;
++        ensure!(value.fract().is_zero() || quantity.precision != 0, "Restored market volume is fractional");
++        Ok(Quantity::from_decimal_dp(value, quantity.precision)?)
++    }
++
++    fn rebuilding(&self, order: &OrderAny) -> bool {
++        self.rebuild.borrow().get(order.client_order_id().as_str()).is_some_and(|authorization| authorization.side == order.order_side().to_string())
++    }
++
++    pub(crate) fn validate_quantity(&self, order: &OrderAny, total: Quantity, filled: Quantity) -> anyhow::Result<()> {
++        if self.rebuilding(order) {
++            let authorized = self.rebuild.borrow();
++            ensure!(total.as_decimal() - filled.as_decimal() <= authorized[order.client_order_id().as_str()].quantity, "Order exceeds exact rebuild authorization");
++            return Ok(());
++        }
++        ensure!(self.rebuild.borrow().is_empty(), "Inventory rebuild has not finished");
++        let rules = self.rules.borrow();
++        let state = self.state.borrow();
++        let carried = state.bills.get(order.client_order_id().as_str()).map_or(Decimal::ZERO, |bill| (bill.size_quantity - filled.as_decimal()).max(Decimal::ZERO));
++        let quantity = total.as_decimal() + carried;
++        let remainder = (total.as_decimal() - filled.as_decimal()).max(Decimal::ZERO);
++        if order.is_sell() && rules.odd_lot_sell_all && remainder == state.quantity { return Ok(()); }
++        ensure!(quantity >= rules.minimum && (quantity - rules.minimum) % rules.increment == Decimal::ZERO, "Quantity {quantity} violates minimum {} / increment {}", rules.minimum, rules.increment);
++        ensure!(!order.is_sell() || remainder <= state.quantity, "Sell quantity exceeds owned inventory");
++        Ok(())
++    }
++
++    pub(crate) fn maximum_quantity(&self, order: &OrderAny, quantity: Quantity) -> anyhow::Result<Quantity> {
++        let available = if self.rebuilding(order) {
++            self.rebuild.borrow()[order.client_order_id().as_str()].quantity
++        } else if order.is_sell() {
++            let state = self.state.borrow();
++            (state.quantity - state.frozen).max(Decimal::ZERO)
++        } else { quantity.as_decimal() };
++        Ok(Quantity::from_decimal_dp(quantity.as_decimal().min(available), quantity.precision)?)
++    }
++
++    pub(crate) fn fill_quantity(&self, order: &OrderAny, price: Price, quantity: Quantity, now: u64) -> anyhow::Result<Option<Quantity>> {
++        if self.rebuilding(order) {
++            let authorized = self.rebuild.borrow()[order.client_order_id().as_str()].quantity;
++            return Ok(Some(Quantity::from_decimal_dp(quantity.as_decimal().min(authorized),quantity.precision)?));
++        }
++        let rules = self.rules.borrow();
++        let session = rules.session(self.market_time(now))?;
++        let price = price.as_decimal();
++        if order.is_buy() && session.upper.is_some_and(|upper| price >= upper - session.price_tolerance)
++            || order.is_sell() && session.lower.is_some_and(|lower| price <= lower + session.price_tolerance) { return Ok(None); }
++        let state = self.state.borrow();
++        let available = if order.is_sell() { (state.quantity - state.frozen).max(Decimal::ZERO) } else { quantity.as_decimal() };
++        let amount = quantity.as_decimal().min(available);
++        if amount <= Decimal::ZERO { return Ok(None); }
++        Ok(Some(Quantity::from_decimal_dp(amount, quantity.precision)?))
++    }
++
++    pub(crate) fn validate_prices(&self, order: &OrderAny, price: Option<Price>, trigger: Option<Price>, now: u64) -> anyhow::Result<()> {
++        if self.rebuilding(order) { return Ok(()); }
++        let rules = self.rules.borrow();
++        let session = rules.session(self.market_time(now))?;
++        for price in [price, trigger].into_iter().flatten() {
++            let value = price.as_decimal();
++            let rounded = ((value-session.price_origin)/session.price_increment).round()*session.price_increment+session.price_origin;
++            ensure!((value-rounded).abs() <= session.price_tolerance + Decimal::new(1,12), "Order price violates the session price increment");
++        }
++        Ok(())
++    }
++
++    fn parts(&self, order: &OrderAny, quantity: Quantity, price: Price, currency: Currency, now: u64) -> anyhow::Result<Parts> {
++        if self.rebuilding(order) {
++            return Ok(Parts { commission: Decimal::ZERO, tax: Decimal::ZERO, accrued: Decimal::ZERO, total: Money::from_decimal(Decimal::ZERO, currency)? });
++        }
++        let rules = self.rules.borrow();
++        let session = rules.session(self.market_time(now))?;
++        let state = self.state.borrow();
++        let zero = OrderBill::default();
++        let previous = state.bills.get(order.client_order_id().as_str()).unwrap_or(&zero);
++        let notional = quantity.as_decimal() * price.as_decimal();
++        let cumulative = previous.notional + notional;
++        let fee = &rules.commission;
++        let mut total = (cumulative * fee.rate + (previous.quantity + quantity.as_decimal()) * fee.per_share).max(fee.minimum);
++        if let Some(cap) = fee.maximum_rate { total = total.min(cumulative * cap); }
++        let commission = (Money::from_decimal(total, currency)?.as_decimal() - previous.commission_paid).max(Decimal::ZERO);
++        let accrued = previous.tax_accrued + notional * if order.is_buy() { session.buy_tax_rate } else { session.sell_tax_rate };
++        let tax = (Money::from_decimal(accrued, currency)?.as_decimal() - previous.tax_paid).max(Decimal::ZERO);
++        Ok(Parts { commission, tax, accrued, total: Money::from_decimal(commission + tax, currency)? })
++    }
++
++    pub(crate) fn record_fill(&self, order: &OrderAny, quantity: Quantity, price: Price, currency: Currency, now: u64) -> anyhow::Result<()> {
++        if self.rebuilding(order) {
++            let key = order.client_order_id().to_string();
++            let mut rebuild = self.rebuild.borrow_mut();
++            let authorized = rebuild.get_mut(&key).expect("checked rebuild authorization");
++            ensure!(quantity.as_decimal() <= authorized.quantity, "Rebuild fill exceeds authorization");
++            authorized.quantity -= quantity.as_decimal();
++            if authorized.quantity.is_zero() { rebuild.remove(&key); }
++            return Ok(());
++        }
++        let parts = self.parts(order, quantity, price, currency, now)?;
++        let mut state = self.state.borrow_mut();
++        let bill = state.bills.entry(order.client_order_id().to_string()).or_default();
++        bill.quantity += quantity.as_decimal();
++        bill.size_quantity += quantity.as_decimal();
++        bill.notional += quantity.as_decimal() * price.as_decimal();
++        bill.commission_paid += parts.commission;
++        bill.tax_accrued = parts.accrued;
++        bill.tax_paid += parts.tax;
++        if order.is_buy() {
++            state.quantity += quantity.as_decimal();
++            if self.rules.borrow().sell_after_sessions != 0 { state.frozen += quantity.as_decimal(); }
++        } else {
++            state.quantity -= quantity.as_decimal();
++        }
++        ensure!(state.quantity >= state.frozen && state.frozen >= Decimal::ZERO, "Trading settlement state would become inconsistent");
++        Ok(())
++    }
++}
++
++struct ConditionsFeeModel { conditions: Conditions, clock: Rc<RefCell<dyn Clock>> }
++impl fmt::Debug for ConditionsFeeModel {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str("TradingConditionsFeeModel") }
++}
++impl FeeModel for ConditionsFeeModel {
++    fn get_commission(&self, order: &OrderAny, quantity: Quantity, price: Price, instrument: &InstrumentAny) -> anyhow::Result<Money> {
++        Ok(self.conditions.parts(order, quantity, price, instrument.quote_currency(), self.clock.borrow().timestamp_ns().as_u64())?.total)
++    }
++}
++
++/// Estimate the remaining cash charge using the same model as final matching.
++///
++/// # Errors
++/// Returns an error for malformed conditions or an unverified session.
++pub fn estimate_order_fee(raw: &str, order: &OrderAny, quantity: Quantity, price: Price, currency: Currency, now: u64, state: Option<&[u8]>, rules: Option<&[u8]>) -> anyhow::Result<Money> {
++    let conditions = Conditions::parse(raw)?;
++    if let Some(state) = state { *conditions.state.borrow_mut() = serde_json::from_slice(state)?; }
++    if let Some(rules) = rules {
++        let parsed: TradingRules = serde_json::from_slice(rules)?;
++        parsed.validate()?;
++        *conditions.rules.borrow_mut() = parsed;
++    }
++    Ok(conditions.parts(order, quantity, price, currency, now)?.total)
++}
++
++/// Validate a serialized rules update before it enters a simulated venue.
++///
++/// # Errors
++/// Returns an error for missing fields, negative rates, or overlapping sessions.
++pub fn validate_rules(raw: &str) -> anyhow::Result<()> {
++    let rules: TradingRules = serde_json::from_str(raw)?;
++    rules.validate()
++}
++
++/// Map an observed market price to the simulated venue's execution coordinate.
++///
++/// # Errors
++/// Returns an error if the input coordinate or its dated evidence is invalid.
++pub fn estimate_input_price(raw: &str, price: Price, now: u64, state: Option<&[u8]>, rules: Option<&[u8]>) -> anyhow::Result<Price> {
++    let conditions = Conditions::parse(raw)?;
++    if let Some(state) = state { *conditions.state.borrow_mut() = serde_json::from_slice(state)?; }
++    if let Some(rules) = rules {
++        let parsed: TradingRules = serde_json::from_slice(rules)?;
++        parsed.validate()?;
++        *conditions.rules.borrow_mut() = parsed;
++    }
++    let at = conditions.market_time(now);
++    {
++        let rules = conditions.rules.borrow();
++        if let Some(bar) = &rules.session(at)?.execution_bar {
++            return Ok(Price::from_decimal_dp(bar.close, price.precision)?);
++        }
++    }
++    conditions.input_price(price, at)
++}
+diff --git a/crates/execution/src/matching_engine/mod.rs b/crates/execution/src/matching_engine/mod.rs
+--- a/crates/execution/src/matching_engine/mod.rs
++++ b/crates/execution/src/matching_engine/mod.rs
+@@ -94,6 +94,7 @@
+     },
+     protection::protection_price_calculate,
+     trailing::{store_trailing_stop_activation, trailing_stop_calculate},
++    trading_conditions::Conditions,
+ };
+ 
+ /// An order matching engine for a single market.
+@@ -120,6 +121,8 @@
+     book: OrderBook,
+     fill_model: FillModelHandle,
+     fee_model: FeeModelHandle,
++    conditions: Option<Conditions>,
++    conditions_error: Option<String>,
+     event_handler: Option<Rc<dyn Fn(OrderEventAny)>>,
+     inflight_orders: InflightOrders,
+     target_bid: Option<Price>,
+@@ -204,12 +207,25 @@
+             cache.clone(),
+         );
+ 
++        let parsed = instrument.info().and_then(|info| info.get_str("execution_conditions"))
++            .map(|raw| -> anyhow::Result<Conditions> {
++                let conditions = Conditions::parse(raw)?;
++                conditions.publish(&cache, &instrument.id().to_string())?;
++                Ok(conditions)
++            }).transpose();
++        let (conditions, conditions_error) = match parsed {
++            Ok(value) => (value, None),
++            Err(error) => (None, Some(error.to_string())),
++        };
++        let fee_model = conditions.as_ref().map_or(fee_model, |conditions| conditions.fee_model(clock.clone()));
+         Self {
+             venue: instrument.id().venue,
+             instrument,
+             raw_id,
+             fill_model,
+             fee_model,
++            conditions,
++            conditions_error,
+             event_handler: None,
+             inflight_orders: InflightOrders::default(),
+             book_type,
+@@ -304,6 +320,7 @@
+     /// internal components. This is typically used for backtesting scenarios
+     /// where the engine needs to be reset between test runs.
+     pub fn reset(&mut self) {
++        if let Some(conditions) = &self.conditions { conditions.reset(); }
+         self.book.reset();
+         self.execution_bar_types.clear();
+         self.execution_bar_deltas.clear();
+@@ -362,8 +379,17 @@
+         mut journal: Option<&mut ConsumptionJournal>,
+     ) -> Vec<(Price, Quantity)> {
+         if !self.config.liquidity_consumption {
+-            return fills;
+-        }
++            if self.conditions.is_none() { return fills; }
++            return match self.condition_fills(order, &fills) {
++                Ok(fills) => fills,
++                Err(error) => { self.conditions_error = Some(error.to_string()); Vec::new() },
++            };
++        }
++        let mut condition_remaining = match self.conditions.as_ref().map(|conditions| conditions.maximum_quantity(order, leaves_qty)).transpose() {
++            Ok(Some(quantity)) => quantity.raw(),
++            Ok(None) => leaves_qty.raw(),
++            Err(error) => { self.conditions_error = Some(error.to_string()); return Vec::new(); },
++        };
+ 
+         let mut adjusted_len = 0;
+ 
+@@ -378,7 +404,15 @@
+                 break;
+             }
+ 
+-            let (price, qty) = fills[fill_idx];
++            let (price, mut qty) = fills[fill_idx];
++            if let Some(conditions) = &self.conditions {
++                match conditions.fill_quantity(order, price, qty, self.clock.borrow().timestamp_ns().as_u64()) {
++                    Ok(Some(allowed)) => qty = Quantity::from_raw(allowed.raw().min(condition_remaining), qty.precision),
++                    Ok(None) => continue,
++                    Err(error) => { self.conditions_error = Some(error.to_string()); return Vec::new(); },
++                }
++                if qty.is_zero() { continue; }
++            }
+ 
+             // Use book_price for consumption tracking (original price before MAKER adjustment),
+             // but use price (potentially adjusted) for the output fill.
+@@ -399,6 +433,7 @@
+             }
+ 
+             remaining_qty -= adjusted_qty_raw;
++            condition_remaining = condition_remaining.saturating_sub(adjusted_qty_raw);
+             if trade_size.is_some() {
+                 self.trade_consumption += adjusted_qty_raw;
+             }
+@@ -1904,6 +1939,25 @@
+ 
+     /// Processes a quote tick to update the market state.
+     pub fn process_quote_tick(&mut self, quote: &QuoteTick) {
++        if let Err(error) = self.observe_conditions(quote.ts_event.as_u64()) {
++            log::warn!("Cannot match {}: {error}", self.instrument.id());
++            return;
++        }
++        let mapped;
++        let quote = if let Some(conditions) = &self.conditions {
++            let value = (|| -> anyhow::Result<QuoteTick> {
++                let mut value = *quote;
++                value.bid_price = conditions.input_price(value.bid_price, value.ts_event.as_u64())?;
++                value.ask_price = conditions.input_price(value.ask_price, value.ts_event.as_u64())?;
++                value.bid_size = conditions.input_quantity(value.bid_size, value.ts_event.as_u64())?;
++                value.ask_size = conditions.input_quantity(value.ask_size, value.ts_event.as_u64())?;
++                Ok(value)
++            })();
++            match value {
++                Ok(value) => { mapped = value; &mapped },
++                Err(error) => { self.conditions_error = Some(error.to_string()); log::warn!("Cannot map market input: {error}"); return; },
++            }
++        } else { quote };
+         log::debug!("Processing {quote}");
+ 
+         if let Err(e) = self.check_price_precision(quote.bid_price.precision, "bid_price") {
+@@ -1974,6 +2028,20 @@
+     /// Panics if:
+     /// - The bar type configuration is missing a time delta.
+     pub fn process_bar(&mut self, bar: &Bar) {
++        if let Err(error) = self.observe_conditions(bar.ts_event.as_u64()) {
++            log::warn!("Cannot match {}: {error}", self.instrument.id());
++            return;
++        }
++        let mapped;
++        let bar = if let Some(conditions) = &self.conditions {
++            let value = (|| -> anyhow::Result<Bar> {
++                conditions.input_bar(*bar)
++            })();
++            match value {
++                Ok(value) => { mapped = value; &mapped },
++                Err(error) => { self.conditions_error = Some(error.to_string()); log::warn!("Cannot map market input: {error}"); return; },
++            }
++        } else { bar };
+         log::debug!("Processing {bar}");
+ 
+         debug_assert!(
+@@ -2450,6 +2518,23 @@
+     /// tick does not match resting limit orders or trigger stops that use other trigger
+     /// types.
+     pub fn process_trade_tick(&mut self, trade: &TradeTick) {
++        if let Err(error) = self.observe_conditions(trade.ts_event.as_u64()) {
++            log::warn!("Cannot match {}: {error}", self.instrument.id());
++            return;
++        }
++        let mapped;
++        let trade = if let Some(conditions) = &self.conditions {
++            let value = (|| -> anyhow::Result<TradeTick> {
++                let mut value = *trade;
++                value.price = conditions.input_price(value.price, value.ts_event.as_u64())?;
++                value.size = conditions.input_quantity(value.size, value.ts_event.as_u64())?;
++                Ok(value)
++            })();
++            match value {
++                Ok(value) => { mapped = value; &mapped },
++                Err(error) => { self.conditions_error = Some(error.to_string()); log::warn!("Cannot map market input: {error}"); return; },
++            }
++        } else { trade };
+         log::debug!("Processing {trade}");
+ 
+         if let Err(e) = self.check_price_precision(trade.price.precision, "trade price") {
+@@ -3337,15 +3422,24 @@
+         account_id: AccountId,
+         released: bool,
+     ) {
++        self.account_ids.insert(order.trader_id(), account_id);
++        let validity = self.synchronize_conditions().and_then(|()| {
++            if let Some(conditions) = &self.conditions {
++                conditions.validate_quantity(order, order.quantity(), self.engine_filled_qty(order))?;
++                conditions.validate_prices(order, order.price(), order.trigger_price(), self.clock.borrow().timestamp_ns().as_u64())?;
++            }
++            Ok(())
++        });
++        if let Err(error) = validity {
++            self.generate_order_rejected(order, Ustr::from(&error.to_string()));
++            return;
++        }
+         // Validate inside a cache borrow scope, collecting any rejection
+         // reason rather than emitting events while the borrow is held.
+         // This avoids RefCell re-entrancy panics from synchronous event
+         // dispatch that calls back into the execution engine.
+         let reject_reason: Option<Ustr> = 'validate: {
+             let cache_borrow = self.cache.as_ref().borrow();
+-
+-            // Index identifiers
+-            self.account_ids.insert(order.trader_id(), account_id);
+ 
+             if self.pending_resolution {
+                 break 'validate Some(
+@@ -4198,6 +4292,12 @@
+         }
+ 
+         self.fill_market_order(order.client_order_id());
++        if self.conditions.is_some()
++            && let Some(current) = self.order_snapshot(order.client_order_id())
++            && !current.is_closed() && self.engine_filled_qty(&current).is_positive()
++            && self.engine_filled_qty(&current) < current.quantity() {
++            self.cancel_order(&current, None);
++        }
+     }
+ 
+     fn process_limit_order(&mut self, order: &mut OrderAny) {
+@@ -4291,6 +4391,7 @@
+         // Immediately fill marketable order
+         let client_order_id = order.client_order_id();
+         self.fill_market_order(client_order_id);
++        if self.conditions.is_some() && self.engine_filled_qty(order).is_zero() { return; }
+ 
+         // Check for remaining quantity to rest as limit order
+         let filled_qty = self
+@@ -4329,6 +4430,7 @@
+                 return;
+             }
+ 
++            if self.conditions.is_some() { self.accept_order(order); }
+             self.fill_market_order(order.client_order_id());
+             return;
+         }
+@@ -4370,6 +4472,7 @@
+                 return;
+             }
+ 
++            if self.conditions.is_some() { self.accept_order(order); }
+             self.fill_market_order(order.client_order_id());
+             return;
+         }
+@@ -5621,6 +5724,11 @@
+         protection_price: Option<Price>,
+         from_synthetic: bool,
+     ) -> anyhow::Result<()> {
++        let conditioned;
++        let fills = if self.conditions.is_some() {
++            conditioned = self.condition_fills(order, fills)?;
++            conditioned.as_slice()
++        } else { fills };
+         let mut reduce_only_remaining = self.reduce_only_remaining(order, position)?;
+         let required_qty = reduce_only_remaining.map_or(order.leaves_qty(), |remaining| {
+             order.leaves_qty().min(remaining)
+@@ -5632,6 +5740,8 @@
+         }
+ 
+         if fills.is_empty() {
++            if self.conditions.is_some() && !matches!(order.order_type(), OrderType::Market | OrderType::MarketToLimit)
++                && !matches!(order.time_in_force(), TimeInForce::Ioc | TimeInForce::Fok) { return Ok(()); }
+             match (order.status(), order.time_in_force()) {
+                 (OrderStatus::Initialized | OrderStatus::Submitted, time_in_force)
+                     if time_in_force != TimeInForce::Ioc =>
+@@ -6214,6 +6324,39 @@
+         }
+     }
+ 
++    fn condition_fills(&self, order: &OrderAny, fills: &[(Price, Quantity)]) -> anyhow::Result<Vec<(Price, Quantity)>> {
++        let Some(conditions) = &self.conditions else { return Ok(fills.to_vec()); };
++        let mut remaining = conditions.maximum_quantity(order, order.leaves_qty())?;
++        let mut result = Vec::new();
++        for &(price, quantity) in fills {
++            if let Some(allowed) = conditions.fill_quantity(order, price, quantity, self.clock.borrow().timestamp_ns().as_u64())? {
++                let quantity = allowed.min(remaining);
++                if quantity.is_positive() {
++                    result.push((price, quantity));
++                    remaining = remaining.saturating_sub(quantity);
++                }
++            }
++        }
++        Ok(result)
++    }
++
++    fn observe_conditions(&self, at: u64) -> anyhow::Result<()> {
++        self.synchronize_conditions()?;
++        if let Some(conditions) = &self.conditions {
++            conditions.observe(at)?;
++            conditions.publish(&self.cache, &self.instrument.id().to_string())?;
++        }
++        Ok(())
++    }
++
++    fn synchronize_conditions(&self) -> anyhow::Result<()> {
++        if let Some(error) = &self.conditions_error { anyhow::bail!("{error}"); }
++        if let Some(conditions) = &self.conditions {
++            conditions.synchronize(&self.cache, &self.instrument.id().to_string())?;
++        }
++        Ok(())
++    }
++
+     fn fill_order(
+         &mut self,
+         order: &OrderAny,
+@@ -6248,6 +6391,14 @@
+             return Ok(());
+         }
+ 
++        self.synchronize_conditions()?;
++        let allowed = if let Some(conditions) = &self.conditions {
++            conditions.fill_quantity(order, last_px, last_qty, self.clock.borrow().timestamp_ns().as_u64())?
++        } else { Some(last_qty) };
++        let Some(allowed) = allowed else { return Ok(()); };
++        let new_filled_qty = new_filled_qty.saturating_sub(last_qty) + allowed;
++        let last_qty = allowed;
++
+         let fee_order;
+ 
+         let commission_order = {
+@@ -6284,6 +6435,11 @@
+         let reduced_for_balance = affordable_qty < last_qty;
+         let new_filled_qty = new_filled_qty.saturating_sub(last_qty) + affordable_qty;
+         let last_qty = affordable_qty;
++
++        if let Some(conditions) = &self.conditions {
++            conditions.record_fill(order, last_qty, last_px, self.instrument.quote_currency(), self.clock.borrow().timestamp_ns().as_u64())?;
++            conditions.publish(&self.cache, &self.instrument.id().to_string())?;
++        }
+ 
+         // Resolve implicit membership before dispatch can close the cached position
+         let mut reduce_only_order_ids = position
+@@ -7335,6 +7491,18 @@
+         let update_contingencies = update_contingencies.unwrap_or(true);
+         let quantity = quantity.unwrap_or(order.quantity());
+ 
++        let validity = self.synchronize_conditions().and_then(|()| {
++            if let Some(conditions) = &self.conditions {
++                conditions.validate_quantity(order, quantity, self.engine_filled_qty(order))?;
++                conditions.validate_prices(order, price.or(order.price()), trigger_price.or(order.trigger_price()), self.clock.borrow().timestamp_ns().as_u64())?;
++            }
++            Ok(())
++        });
++        if let Err(error) = validity {
++            self.generate_order_modify_rejected(order.trader_id(), order.strategy_id(), order.instrument_id(), order.client_order_id(), Ustr::from(&error.to_string()), order.venue_order_id(), order.account_id());
++            return false;
++        }
++
+         let size_prec = self.instrument.size_precision();
+         let instrument_id = self.instrument.id();
+ 
+diff --git a/crates/risk/src/engine/mod.rs b/crates/risk/src/engine/mod.rs
+--- a/crates/risk/src/engine/mod.rs
++++ b/crates/risk/src/engine/mod.rs
+@@ -1590,12 +1590,21 @@
+ 
+         let cache = self.cache.borrow();
+ 
++        let map_price = |price| {
++            let Some(instrument) = cache.instrument(&instrument_id) else { return Some(price); };
++            let Some(raw) = instrument.info().and_then(|info| info.get_str("execution_conditions")) else { return Some(price); };
++            let state = cache.get(&format!("trading-conditions/state/{instrument_id}")).ok()?;
++            let rules = cache.get(&format!("trading-conditions/rules/{instrument_id}")).ok()?;
++            nautilus_execution::trading_conditions::estimate_input_price(raw, price, self.clock.borrow().timestamp_ns().as_u64(),
++                state.map(|value| value.as_ref()), rules.map(|value| value.as_ref())).ok()
++        };
++
+         if let Some(price) = cache.price(&instrument_id, price_type) {
+-            return Some(price);
++            return map_price(price);
+         }
+ 
+         if let Some(price) = cache.price(&instrument_id, PriceType::Last) {
+-            return Some(price);
++            return map_price(price);
+         }
+ 
+         let bar_price = |price_type| {
+@@ -1615,7 +1624,7 @@
+                 .map(|(_, _, price)| price)
+         };
+ 
+-        bar_price(price_type).or_else(|| bar_price(PriceType::Last))
++        bar_price(price_type).or_else(|| bar_price(PriceType::Last)).and_then(map_price)
+     }
+ 
+     #[allow(
+@@ -2842,7 +2851,7 @@
+                     // A cash account debits the commission together with the notional, so the
+                     // buy must be affordable with its estimated fee.
+                     let required = self
+-                        .with_estimated_fee(order, notional)
++                        .with_estimated_fee(order, quantity, price, notional)
+                         .map_err(|detail| {
+                             self.check.reject(
+                                 self.engine,
+@@ -2863,9 +2872,18 @@
+     // The notional of a cash-account buy plus the commission it is estimated to pay. The rate is
+     // the instrument's `info["taker_fee"]` decimal string (the venue's own fee rate, set by
+     // whoever defines the instrument); an instrument without it is estimated at no fee.
+-    fn with_estimated_fee(&self, order: &OrderAny, notional: Money) -> Result<Money, String> {
++    fn with_estimated_fee(&self, order: &OrderAny, quantity: Quantity, price: Price, notional: Money) -> Result<Money, String> {
+         if !order.is_buy() || !matches!(self.account, AccountAny::Cash(_)) {
+             return Ok(notional);
++        }
++
++        if let Some(raw) = self.instrument.info().and_then(|info| info.get_str("execution_conditions")) {
++            let cache = self.engine.cache.borrow();
++            let state = cache.get(&format!("trading-conditions/state/{}", self.instrument.id())).map_err(|error| error.to_string())?;
++            let rules = cache.get(&format!("trading-conditions/rules/{}", self.instrument.id())).map_err(|error| error.to_string())?;
++            let fee = nautilus_execution::trading_conditions::estimate_order_fee(raw, order, quantity, price, notional.currency,
++                self.engine.clock.borrow().timestamp_ns().as_u64(), state.map(|value| value.as_ref()), rules.map(|value| value.as_ref())).map_err(|error| error.to_string())?;
++            return Money::from_decimal(notional.as_decimal() + fee.as_decimal(), notional.currency).map_err(|error| error.to_string());
+         }
+ 
+         let Some(rate) = self
+@@ -2957,7 +2975,7 @@
+             self.instrument
+                 .try_calculate_notional_value(quantity, price, None)
+                 .map_err(|e| e.to_string())
+-                .and_then(|notional| self.with_estimated_fee(order, notional))
++                .and_then(|notional| self.with_estimated_fee(order, quantity, price, notional))
+         }
+         .map_err(|detail| {
+             self.check.reject(

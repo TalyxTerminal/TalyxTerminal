@@ -1,0 +1,2636 @@
+{
+ "contractVersion": 5,
+ "module": "agent",
+ "deleteWorkspace": true,
+ "actions": {
+  "bot": {
+   "description": "Manage workspace bots, groups, routines and runs. List for panel settings and spend, inspect by id for\na bot, group, event source or routine. Read a thread by id. Patch with changes (model, duty, knowledge, skills,\npermission, limit, section). To send files, use recipients for the conversation IDs, agent.chat operation attach_paths\nfor attachment IDs, then send with attachments keyed by bot ID. Upload adds base64 data to knowledge.\nOversized results return a JSON file reference. Save routines with botId or conversationId, name, instruction,\nwhen, and either zone + rrule or source + params.",
+   "effects": [
+    "read",
+    "write",
+    "delete",
+    "code",
+    "external"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "list": {
+      "effects": [
+       "read"
+      ]
+     },
+     "library": {
+      "effects": [
+       "read"
+      ]
+     },
+     "schedules": {
+      "effects": [
+       "read"
+      ]
+     },
+     "sources": {
+      "effects": [
+       "read"
+      ]
+     },
+     "read": {
+      "effects": [
+       "read"
+      ],
+      "target": "operation.id"
+     },
+     "inspect": {
+      "effects": [
+       "read"
+      ],
+      "target": "operation.id"
+     },
+     "stop": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.id"
+     },
+     "patch": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.id"
+     },
+     "recipients": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.id"
+     },
+     "upload": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.id"
+     },
+     "toggle_routine": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.id"
+     },
+     "delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.id"
+     },
+     "delete_routine": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.id"
+     },
+     "revert_run": {
+      "effects": [
+       "write",
+       "delete"
+      ],
+      "target": "operation.id"
+     },
+     "test_routine": {
+      "effects": [
+       "write",
+       "code",
+       "external"
+      ],
+      "target": "operation.id"
+     },
+     "send": {
+      "effects": [
+       "write",
+       "code",
+       "external"
+      ],
+      "target": "operation.id"
+     },
+     "retry": {
+      "effects": [
+       "write",
+       "code",
+       "external"
+      ],
+      "target": "operation.id"
+     },
+     "create": {
+      "effects": [
+       "write"
+      ]
+     },
+     "create_group": {
+      "effects": [
+       "write"
+      ]
+     },
+     "section": {
+      "effects": [
+       "write",
+       "delete"
+      ]
+     },
+     "save_routine": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.conversationId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/BotInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/OperationResult"
+     },
+     {
+      "$ref": "#/$defs/ResultFile"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "list"
+     }
+    }
+   ]
+  },
+  "chat": {
+   "description": "List, search, read, create, fork, update, export or delete this workspace's chats. Inspect file candidates,\nreferences, permission rules and child runs. Revert a turn's changes with conversationId, turnId and direction.\nExport writes Markdown in the workspace. Oversized results return a JSON file reference.",
+   "effects": [
+    "read",
+    "write",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "list": {
+      "effects": [
+       "read"
+      ]
+     },
+     "search": {
+      "effects": [
+       "read"
+      ]
+     },
+     "find_files": {
+      "effects": [
+       "read"
+      ]
+     },
+     "reference": {
+      "effects": [
+       "read"
+      ]
+     },
+     "create": {
+      "effects": [
+       "write"
+      ]
+     },
+     "read": {
+      "effects": [
+       "read"
+      ],
+      "target": "operation.conversationId"
+     },
+     "permission_rules": {
+      "effects": [
+       "read"
+      ],
+      "target": "operation.conversationId"
+     },
+     "export": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.conversationId"
+     },
+     "fork": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.conversationId"
+     },
+     "update": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.conversationId"
+     },
+     "attach_paths": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.conversationId"
+     },
+     "delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.conversationId"
+     },
+     "revert": {
+      "effects": [
+       "write",
+       "delete"
+      ],
+      "target": "operation.turnId"
+     },
+     "child_read": {
+      "effects": [
+       "read"
+      ],
+      "target": "operation.childRunId"
+     },
+     "child_stop": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.childRunId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ChatInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/OperationResult"
+     },
+     {
+      "$ref": "#/$defs/ResultFile"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "list"
+     }
+    }
+   ]
+  },
+  "configure": {
+   "description": "Read or change Agent connections, models, search, defaults, instructions, memories and budgets.\nread lists configured models and connections. profiles lists provider models, discover_models finds local models.\nscope selects global or workspace instructions and defaults. Memory edits require expectedRevision.\nEnter credentials in Settings. Oversized results return a JSON file reference.",
+   "effects": [
+    "read",
+    "write",
+    "external",
+    "delete"
+   ],
+   "effectBranches": {
+    "path": "operation.op",
+    "branches": {
+     "read": {
+      "effects": [
+       "read"
+      ]
+     },
+     "folders": {
+      "effects": [
+       "read"
+      ]
+     },
+     "spending": {
+      "effects": [
+       "read"
+      ]
+     },
+     "page": {
+      "effects": [
+       "read"
+      ]
+     },
+     "read_instructions": {
+      "effects": [
+       "read"
+      ]
+     },
+     "read_usage": {
+      "effects": [
+       "read"
+      ]
+     },
+     "memory_list": {
+      "effects": [
+       "read"
+      ]
+     },
+     "set_defaults": {
+      "effects": [
+       "write"
+      ]
+     },
+     "write_instructions": {
+      "effects": [
+       "write"
+      ]
+     },
+     "search": {
+      "effects": [
+       "write"
+      ]
+     },
+     "usage": {
+      "effects": [
+       "write"
+      ]
+     },
+     "profiles": {
+      "effects": [
+       "read",
+       "external"
+      ]
+     },
+     "discover_models": {
+      "effects": [
+       "read",
+       "external"
+      ]
+     },
+     "refresh_profiles": {
+      "effects": [
+       "write",
+       "external"
+      ]
+     },
+     "test_connection": {
+      "effects": [
+       "write",
+       "external"
+      ]
+     },
+     "put_connection": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.id"
+     },
+     "put_model": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.id"
+     },
+     "delete_connection": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.id"
+     },
+     "delete_model": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.id"
+     },
+     "memory_edit": {
+      "effects": [
+       "write"
+      ],
+      "target": "operation.memoryId"
+     },
+     "memory_delete": {
+      "effects": [
+       "delete"
+      ],
+      "target": "operation.memoryId"
+     }
+    }
+   },
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SettingsInput"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/OperationResult"
+     },
+     {
+      "$ref": "#/$defs/ResultFile"
+     }
+    ]
+   },
+   "examples": [
+    {
+     "operation": {
+      "op": "read"
+     }
+    }
+   ]
+  },
+  "search_web": {
+   "description": "Search current sources or read an exact HTTP(S) page. mode=search requires query and optionally objective;\nmode=page requires url. Uses the configured search source or supported provider search and records its actual\nusage; errors never switch sources. Cite observed URLs directly as Markdown links. Examples:\n{\"mode\":\"search\",\"query\":\"BTC market news\"}; {\"mode\":\"page\",\"url\":\"https://example.org/report\"}.",
+   "effects": [
+    "read",
+    "external"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SearchWebInput"
+   },
+   "output": {
+    "type": "object",
+    "additionalProperties": true
+   },
+   "examples": [
+    {
+     "mode": "search",
+     "query": "BTC market news"
+    }
+   ],
+   "errors": [
+    "invalid_input"
+   ]
+  }
+ },
+ "streams": {},
+ "events": {
+  "conversation_changed": {
+   "description": "A conversation got new events; read them from the conversation's event cursor.",
+   "payload": {
+    "$ref": "#/$defs/ConversationChanged"
+   }
+  },
+  "settings_changed": {
+   "description": "Agent's connections, models, credentials or defaults changed; read the settings again.",
+   "payload": {
+    "$ref": "#/$defs/Empty"
+   }
+  }
+ },
+ "extensionPoints": {
+  "open_file": {
+   "description": "Open a selected workspace file or attachment for the user.",
+   "descriptor": {
+    "$ref": "#/$defs/Empty"
+   },
+   "actions": {
+    "open": {
+     "description": "Open the file for viewing or editing.",
+     "input": {
+      "$ref": "#/$defs/OpenFile"
+     },
+     "output": {
+      "$ref": "#/$defs/Empty"
+     }
+    }
+   },
+   "streams": {}
+  }
+ },
+ "settings": {},
+ "$defs": {
+  "AttachPaths": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "attach_paths",
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "paths": {
+     "items": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "title": "Paths",
+     "type": "array"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId",
+    "paths"
+   ],
+   "title": "AttachPaths",
+   "type": "object"
+  },
+  "BotById": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "enum": [
+      "read",
+      "inspect",
+      "stop",
+      "delete",
+      "delete_routine",
+      "test_routine"
+     ],
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "id"
+   ],
+   "title": "BotById",
+   "type": "object"
+  },
+  "BotInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "discriminator": {
+      "mapping": {
+       "create": "#/$defs/CreateBot",
+       "create_group": "#/$defs/CreateGroup",
+       "delete": "#/$defs/BotById",
+       "delete_routine": "#/$defs/BotById",
+       "inspect": "#/$defs/BotById",
+       "library": "#/$defs/BotLists",
+       "list": "#/$defs/BotLists",
+       "patch": "#/$defs/PatchBot",
+       "read": "#/$defs/BotById",
+       "recipients": "#/$defs/Recipients",
+       "retry": "#/$defs/RetryBot",
+       "revert_run": "#/$defs/RevertRun",
+       "save_routine": "#/$defs/SaveRoutine",
+       "schedules": "#/$defs/BotLists",
+       "section": "#/$defs/Section",
+       "send": "#/$defs/SendBot",
+       "sources": "#/$defs/BotLists",
+       "stop": "#/$defs/BotById",
+       "test_routine": "#/$defs/BotById",
+       "toggle_routine": "#/$defs/ToggleRoutine",
+       "upload": "#/$defs/Upload"
+      },
+      "propertyName": "op"
+     },
+     "oneOf": [
+      {
+       "$ref": "#/$defs/BotLists"
+      },
+      {
+       "$ref": "#/$defs/BotById"
+      },
+      {
+       "$ref": "#/$defs/CreateBot"
+      },
+      {
+       "$ref": "#/$defs/CreateGroup"
+      },
+      {
+       "$ref": "#/$defs/PatchBot"
+      },
+      {
+       "$ref": "#/$defs/Section"
+      },
+      {
+       "$ref": "#/$defs/Recipients"
+      },
+      {
+       "$ref": "#/$defs/SendBot"
+      },
+      {
+       "$ref": "#/$defs/Upload"
+      },
+      {
+       "$ref": "#/$defs/RetryBot"
+      },
+      {
+       "$ref": "#/$defs/RevertRun"
+      },
+      {
+       "$ref": "#/$defs/SaveRoutine"
+      },
+      {
+       "$ref": "#/$defs/ToggleRoutine"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "BotInput",
+   "type": "object"
+  },
+  "BotLists": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "enum": [
+      "list",
+      "library",
+      "schedules",
+      "sources"
+     ],
+     "title": "Op",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "BotLists",
+   "type": "object"
+  },
+  "Budget": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "usage",
+     "title": "Op",
+     "type": "string"
+    },
+    "timezone": {
+     "minLength": 1,
+     "title": "Timezone",
+     "type": "string"
+    },
+    "monthlyLimit": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Monthlylimit"
+    },
+    "currency": {
+     "minLength": 1,
+     "title": "Currency",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "timezone",
+    "monthlyLimit",
+    "currency"
+   ],
+   "title": "Budget",
+   "type": "object"
+  },
+  "ChatById": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "enum": [
+      "export",
+      "delete",
+      "permission_rules"
+     ],
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId"
+   ],
+   "title": "ChatById",
+   "type": "object"
+  },
+  "ChatInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "discriminator": {
+      "mapping": {
+       "attach_paths": "#/$defs/AttachPaths",
+       "child_read": "#/$defs/ChildRead",
+       "child_stop": "#/$defs/ChildStop",
+       "create": "#/$defs/CreateChat",
+       "delete": "#/$defs/ChatById",
+       "export": "#/$defs/ChatById",
+       "find_files": "#/$defs/FindFiles",
+       "fork": "#/$defs/ForkChat",
+       "list": "#/$defs/ListChats",
+       "permission_rules": "#/$defs/ChatById",
+       "read": "#/$defs/ReadChat",
+       "reference": "#/$defs/Reference",
+       "revert": "#/$defs/RevertTurn",
+       "search": "#/$defs/SearchChats",
+       "update": "#/$defs/UpdateChat"
+      },
+      "propertyName": "op"
+     },
+     "oneOf": [
+      {
+       "$ref": "#/$defs/ListChats"
+      },
+      {
+       "$ref": "#/$defs/SearchChats"
+      },
+      {
+       "$ref": "#/$defs/CreateChat"
+      },
+      {
+       "$ref": "#/$defs/ReadChat"
+      },
+      {
+       "$ref": "#/$defs/ChatById"
+      },
+      {
+       "$ref": "#/$defs/ForkChat"
+      },
+      {
+       "$ref": "#/$defs/UpdateChat"
+      },
+      {
+       "$ref": "#/$defs/RevertTurn"
+      },
+      {
+       "$ref": "#/$defs/AttachPaths"
+      },
+      {
+       "$ref": "#/$defs/FindFiles"
+      },
+      {
+       "$ref": "#/$defs/Reference"
+      },
+      {
+       "$ref": "#/$defs/ChildRead"
+      },
+      {
+       "$ref": "#/$defs/ChildStop"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "ChatInput",
+   "type": "object"
+  },
+  "ChildRead": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "child_read",
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "childRunId": {
+     "minLength": 1,
+     "title": "Childrunid",
+     "type": "string"
+    },
+    "after": {
+     "default": 0,
+     "minimum": 0,
+     "title": "After",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId",
+    "childRunId"
+   ],
+   "title": "ChildRead",
+   "type": "object"
+  },
+  "ChildStop": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "child_stop",
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "childRunId": {
+     "minLength": 1,
+     "title": "Childrunid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId",
+    "childRunId"
+   ],
+   "title": "ChildStop",
+   "type": "object"
+  },
+  "Connection": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "maxLength": 160,
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "name": {
+     "maxLength": 160,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "providerId": {
+     "maxLength": 160,
+     "minLength": 1,
+     "title": "Providerid",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "official",
+      "relay",
+      "local"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "protocol": {
+     "enum": [
+      "openai",
+      "anthropic",
+      "google",
+      "ollama"
+     ],
+     "title": "Protocol",
+     "type": "string"
+    },
+    "baseUrl": {
+     "title": "Baseurl",
+     "type": "string"
+    },
+    "site": {
+     "anyOf": [
+      {
+       "enum": [
+        "domestic",
+        "international"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Site"
+    },
+    "op": {
+     "const": "put_connection",
+     "title": "Op",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "providerId",
+    "kind",
+    "protocol",
+    "baseUrl",
+    "op"
+   ],
+   "title": "Connection",
+   "type": "object"
+  },
+  "ConversationChanged": {
+   "additionalProperties": false,
+   "properties": {
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "workspaceId": {
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "seq": {
+     "minimum": 1,
+     "title": "Seq",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "conversationId",
+    "workspaceId",
+    "seq"
+   ],
+   "title": "ConversationChanged",
+   "type": "object"
+  },
+  "CreateBot": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "create",
+     "title": "Op",
+     "type": "string"
+    },
+    "name": {
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "intro": {
+     "default": "",
+     "title": "Intro",
+     "type": "string"
+    },
+    "duty": {
+     "default": "",
+     "title": "Duty",
+     "type": "string"
+    },
+    "model": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Model"
+    },
+    "skills": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Skills",
+     "type": "array"
+    },
+    "knowledge": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Knowledge",
+     "type": "array"
+    },
+    "look": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Look"
+    }
+   },
+   "required": [
+    "op",
+    "name"
+   ],
+   "title": "CreateBot",
+   "type": "object"
+  },
+  "CreateChat": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "create",
+     "title": "Op",
+     "type": "string"
+    },
+    "title": {
+     "default": "New conversation",
+     "maxLength": 160,
+     "minLength": 1,
+     "title": "Title",
+     "type": "string"
+    },
+    "modelId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Modelid"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "CreateChat",
+   "type": "object"
+  },
+  "CreateGroup": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "create_group",
+     "title": "Op",
+     "type": "string"
+    },
+    "members": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Members",
+     "type": "array"
+    }
+   },
+   "required": [
+    "op",
+    "members"
+   ],
+   "title": "CreateGroup",
+   "type": "object"
+  },
+  "Defaults": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "set_defaults",
+     "title": "Op",
+     "type": "string"
+    },
+    "scope": {
+     "default": "workspace",
+     "enum": [
+      "global",
+      "workspace"
+     ],
+     "title": "Scope",
+     "type": "string"
+    },
+    "kind": {
+     "default": "general",
+     "enum": [
+      "general",
+      "chat",
+      "bot"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "changes": {
+     "additionalProperties": true,
+     "default": {},
+     "title": "Changes",
+     "type": "object"
+    },
+    "reset": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Reset"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "Defaults",
+   "type": "object"
+  },
+  "DefaultsPage": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "page",
+     "title": "Op",
+     "type": "string"
+    },
+    "scope": {
+     "default": "workspace",
+     "enum": [
+      "global",
+      "workspace"
+     ],
+     "title": "Scope",
+     "type": "string"
+    },
+    "kind": {
+     "default": "general",
+     "enum": [
+      "general",
+      "chat",
+      "bot"
+     ],
+     "title": "Kind",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "DefaultsPage",
+   "type": "object"
+  },
+  "DeleteConfig": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "enum": [
+      "delete_connection",
+      "delete_model"
+     ],
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "id"
+   ],
+   "title": "DeleteConfig",
+   "type": "object"
+  },
+  "Discover": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "discover_models",
+     "title": "Op",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "ollama",
+      "lmstudio"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "baseUrl": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Baseurl"
+    }
+   },
+   "required": [
+    "op",
+    "kind"
+   ],
+   "title": "Discover",
+   "type": "object"
+  },
+  "Empty": {
+   "additionalProperties": false,
+   "properties": {},
+   "title": "Empty",
+   "type": "object"
+  },
+  "FileRef": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "sha256": {
+     "pattern": "^[a-f0-9]{64}$",
+     "title": "Sha256",
+     "type": "string"
+    },
+    "bytes": {
+     "minimum": 0,
+     "title": "Bytes",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "path",
+    "sha256",
+    "bytes"
+   ],
+   "title": "FileRef",
+   "type": "object"
+  },
+  "FindFiles": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "find_files",
+     "title": "Op",
+     "type": "string"
+    },
+    "query": {
+     "default": "",
+     "title": "Query",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "FindFiles",
+   "type": "object"
+  },
+  "ForkChat": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "fork",
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "itemId": {
+     "minLength": 1,
+     "title": "Itemid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId",
+    "itemId"
+   ],
+   "title": "ForkChat",
+   "type": "object"
+  },
+  "ListChats": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "list",
+     "title": "Op",
+     "type": "string"
+    },
+    "offset": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Offset",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "ListChats",
+   "type": "object"
+  },
+  "MemoryDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "memory_delete",
+     "title": "Op",
+     "type": "string"
+    },
+    "memoryId": {
+     "minLength": 1,
+     "title": "Memoryid",
+     "type": "string"
+    },
+    "expectedRevision": {
+     "title": "Expectedrevision",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op",
+    "memoryId",
+    "expectedRevision"
+   ],
+   "title": "MemoryDelete",
+   "type": "object"
+  },
+  "MemoryEdit": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "memory_edit",
+     "title": "Op",
+     "type": "string"
+    },
+    "memoryId": {
+     "minLength": 1,
+     "title": "Memoryid",
+     "type": "string"
+    },
+    "expectedRevision": {
+     "title": "Expectedrevision",
+     "type": "integer"
+    },
+    "body": {
+     "title": "Body",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "memoryId",
+    "expectedRevision",
+    "body"
+   ],
+   "title": "MemoryEdit",
+   "type": "object"
+  },
+  "MemoryList": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "memory_list",
+     "title": "Op",
+     "type": "string"
+    },
+    "status": {
+     "anyOf": [
+      {
+       "enum": [
+        "active",
+        "deleted"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Status"
+    },
+    "botId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Botid"
+    },
+    "offset": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Offset",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "MemoryList",
+   "type": "object"
+  },
+  "OpenFile": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "minLength": 1,
+     "title": "Path",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "title": "OpenFile",
+   "type": "object"
+  },
+  "OperationResult": {
+   "additionalProperties": false,
+   "properties": {
+    "result": {
+     "description": "The selected operation's result. Commands without a return value give null.",
+     "title": "Result"
+    }
+   },
+   "required": [
+    "result"
+   ],
+   "title": "OperationResult",
+   "type": "object"
+  },
+  "PatchBot": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "patch",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "changes": {
+     "additionalProperties": true,
+     "title": "Changes",
+     "type": "object"
+    }
+   },
+   "required": [
+    "op",
+    "id",
+    "changes"
+   ],
+   "title": "PatchBot",
+   "type": "object"
+  },
+  "Profiles": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "profiles",
+     "title": "Op",
+     "type": "string"
+    },
+    "provider": {
+     "minLength": 1,
+     "title": "Provider",
+     "type": "string"
+    },
+    "offset": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Offset",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "op",
+    "provider"
+   ],
+   "title": "Profiles",
+   "type": "object"
+  },
+  "PutModel": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "maxLength": 160,
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "connectionId": {
+     "minLength": 1,
+     "title": "Connectionid",
+     "type": "string"
+    },
+    "model": {
+     "maxLength": 256,
+     "minLength": 1,
+     "title": "Model",
+     "type": "string"
+    },
+    "profileProvider": {
+     "anyOf": [
+      {
+       "maxLength": 160,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Profileprovider"
+    },
+    "profileModel": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Profilemodel"
+    },
+    "contextWindow": {
+     "anyOf": [
+      {
+       "exclusiveMinimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Contextwindow"
+    },
+    "maxOutputTokens": {
+     "anyOf": [
+      {
+       "exclusiveMinimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Maxoutputtokens"
+    },
+    "tools": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Tools"
+    },
+    "images": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Images"
+    },
+    "pdf": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Pdf"
+    },
+    "thinking": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Thinking"
+    },
+    "price": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Price"
+    },
+    "priceMultiplier": {
+     "default": "1",
+     "title": "Pricemultiplier",
+     "type": "string"
+    },
+    "showPrice": {
+     "default": true,
+     "title": "Showprice",
+     "type": "boolean"
+    },
+    "searchMode": {
+     "default": "talyx",
+     "enum": [
+      "provider",
+      "talyx"
+     ],
+     "title": "Searchmode",
+     "type": "string"
+    },
+    "op": {
+     "const": "put_model",
+     "title": "Op",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "connectionId",
+    "model",
+    "op"
+   ],
+   "title": "PutModel",
+   "type": "object"
+  },
+  "ReadChat": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "read",
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "before": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Before"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId"
+   ],
+   "title": "ReadChat",
+   "type": "object"
+  },
+  "ReadInstructions": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "read_instructions",
+     "title": "Op",
+     "type": "string"
+    },
+    "scope": {
+     "default": "workspace",
+     "enum": [
+      "global",
+      "workspace"
+     ],
+     "title": "Scope",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "ReadInstructions",
+   "type": "object"
+  },
+  "ReadUsage": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "read_usage",
+     "title": "Op",
+     "type": "string"
+    },
+    "groupBy": {
+     "default": "day",
+     "enum": [
+      "day",
+      "model",
+      "workspace",
+      "owner"
+     ],
+     "title": "Groupby",
+     "type": "string"
+    },
+    "month": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Month"
+    },
+    "groupId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Groupid"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "ReadUsage",
+   "type": "object"
+  },
+  "Recipients": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "recipients",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "text": {
+     "minLength": 1,
+     "title": "Text",
+     "type": "string"
+    },
+    "reply": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Reply"
+    }
+   },
+   "required": [
+    "op",
+    "id",
+    "text"
+   ],
+   "title": "Recipients",
+   "type": "object"
+  },
+  "Reference": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "reference",
+     "title": "Op",
+     "type": "string"
+    },
+    "referenceId": {
+     "minLength": 1,
+     "title": "Referenceid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "referenceId"
+   ],
+   "title": "Reference",
+   "type": "object"
+  },
+  "RefreshProfiles": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "refresh_profiles",
+     "title": "Op",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "RefreshProfiles",
+   "type": "object"
+  },
+  "ResultFile": {
+   "additionalProperties": false,
+   "properties": {
+    "file": {
+     "$ref": "#/$defs/FileRef",
+     "description": "A complete JSON snapshot of the result, retained for at least 24 hours."
+    }
+   },
+   "required": [
+    "file"
+   ],
+   "title": "ResultFile",
+   "type": "object"
+  },
+  "RetryBot": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "retry",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "cardId": {
+     "minLength": 1,
+     "title": "Cardid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "id",
+    "cardId"
+   ],
+   "title": "RetryBot",
+   "type": "object"
+  },
+  "RevertRun": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "revert_run",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "direction": {
+     "enum": [
+      "undo",
+      "redo"
+     ],
+     "title": "Direction",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "id",
+    "direction"
+   ],
+   "title": "RevertRun",
+   "type": "object"
+  },
+  "RevertTurn": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "revert",
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "turnId": {
+     "minLength": 1,
+     "title": "Turnid",
+     "type": "string"
+    },
+    "direction": {
+     "enum": [
+      "undo",
+      "redo"
+     ],
+     "title": "Direction",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId",
+    "turnId",
+    "direction"
+   ],
+   "title": "RevertTurn",
+   "type": "object"
+  },
+  "SaveRoutine": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "save_routine",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Id"
+    },
+    "botId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Botid"
+    },
+    "conversationId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Conversationid"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "instruction": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Instruction"
+    },
+    "when": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "When"
+    },
+    "zone": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Zone"
+    },
+    "rrule": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Rrule"
+    },
+    "start": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Start"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Source"
+    },
+    "params": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Params"
+    },
+    "active": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Active"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "SaveRoutine",
+   "type": "object"
+  },
+  "SearchChats": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "search",
+     "title": "Op",
+     "type": "string"
+    },
+    "query": {
+     "minLength": 1,
+     "title": "Query",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "query"
+   ],
+   "title": "SearchChats",
+   "type": "object"
+  },
+  "SearchSettings": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "search",
+     "title": "Op",
+     "type": "string"
+    },
+    "mode": {
+     "enum": [
+      "fixed",
+      "auto"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "provider": {
+     "minLength": 1,
+     "title": "Provider",
+     "type": "string"
+    },
+    "connectionId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Connectionid"
+    },
+    "prices": {
+     "additionalProperties": true,
+     "default": {},
+     "title": "Prices",
+     "type": "object"
+    }
+   },
+   "required": [
+    "op",
+    "mode",
+    "provider"
+   ],
+   "title": "SearchSettings",
+   "type": "object"
+  },
+  "SearchWebInput": {
+   "additionalProperties": false,
+   "properties": {
+    "mode": {
+     "enum": [
+      "search",
+      "page"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "query": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Query"
+    },
+    "objective": {
+     "anyOf": [
+      {
+       "maxLength": 4000,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Objective"
+    },
+    "url": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Url"
+    }
+   },
+   "required": [
+    "mode"
+   ],
+   "title": "SearchWebInput",
+   "type": "object"
+  },
+  "Section": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "section",
+     "title": "Op",
+     "type": "string"
+    },
+    "old": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Old"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "Section",
+   "type": "object"
+  },
+  "SendBot": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "send",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "text": {
+     "minLength": 1,
+     "title": "Text",
+     "type": "string"
+    },
+    "reply": {
+     "anyOf": [
+      {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Reply"
+    },
+    "attachments": {
+     "additionalProperties": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "default": {},
+     "title": "Attachments",
+     "type": "object"
+    }
+   },
+   "required": [
+    "op",
+    "id",
+    "text"
+   ],
+   "title": "SendBot",
+   "type": "object"
+  },
+  "SettingsInput": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "discriminator": {
+      "mapping": {
+       "delete_connection": "#/$defs/DeleteConfig",
+       "delete_model": "#/$defs/DeleteConfig",
+       "discover_models": "#/$defs/Discover",
+       "folders": "#/$defs/SettingsList",
+       "memory_delete": "#/$defs/MemoryDelete",
+       "memory_edit": "#/$defs/MemoryEdit",
+       "memory_list": "#/$defs/MemoryList",
+       "page": "#/$defs/DefaultsPage",
+       "profiles": "#/$defs/Profiles",
+       "put_connection": "#/$defs/Connection",
+       "put_model": "#/$defs/PutModel",
+       "read": "#/$defs/SettingsList",
+       "read_instructions": "#/$defs/ReadInstructions",
+       "read_usage": "#/$defs/ReadUsage",
+       "refresh_profiles": "#/$defs/RefreshProfiles",
+       "search": "#/$defs/SearchSettings",
+       "set_defaults": "#/$defs/Defaults",
+       "spending": "#/$defs/SettingsList",
+       "test_connection": "#/$defs/TestConnection",
+       "usage": "#/$defs/Budget",
+       "write_instructions": "#/$defs/WriteInstructions"
+      },
+      "propertyName": "op"
+     },
+     "oneOf": [
+      {
+       "$ref": "#/$defs/SettingsList"
+      },
+      {
+       "$ref": "#/$defs/DefaultsPage"
+      },
+      {
+       "$ref": "#/$defs/Defaults"
+      },
+      {
+       "$ref": "#/$defs/ReadInstructions"
+      },
+      {
+       "$ref": "#/$defs/WriteInstructions"
+      },
+      {
+       "$ref": "#/$defs/Profiles"
+      },
+      {
+       "$ref": "#/$defs/RefreshProfiles"
+      },
+      {
+       "$ref": "#/$defs/Discover"
+      },
+      {
+       "$ref": "#/$defs/Connection"
+      },
+      {
+       "$ref": "#/$defs/PutModel"
+      },
+      {
+       "$ref": "#/$defs/DeleteConfig"
+      },
+      {
+       "$ref": "#/$defs/TestConnection"
+      },
+      {
+       "$ref": "#/$defs/SearchSettings"
+      },
+      {
+       "$ref": "#/$defs/ReadUsage"
+      },
+      {
+       "$ref": "#/$defs/Budget"
+      },
+      {
+       "$ref": "#/$defs/MemoryList"
+      },
+      {
+       "$ref": "#/$defs/MemoryEdit"
+      },
+      {
+       "$ref": "#/$defs/MemoryDelete"
+      }
+     ],
+     "title": "Operation"
+    }
+   },
+   "required": [
+    "operation"
+   ],
+   "title": "SettingsInput",
+   "type": "object"
+  },
+  "SettingsList": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "enum": [
+      "read",
+      "folders",
+      "spending"
+     ],
+     "title": "Op",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op"
+   ],
+   "title": "SettingsList",
+   "type": "object"
+  },
+  "TestConnection": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "test_connection",
+     "title": "Op",
+     "type": "string"
+    },
+    "modelId": {
+     "minLength": 1,
+     "title": "Modelid",
+     "type": "string"
+    },
+    "thinking": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Thinking"
+    },
+    "testSearch": {
+     "default": true,
+     "title": "Testsearch",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "op",
+    "modelId"
+   ],
+   "title": "TestConnection",
+   "type": "object"
+  },
+  "ToggleRoutine": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "toggle_routine",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "active": {
+     "title": "Active",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "op",
+    "id",
+    "active"
+   ],
+   "title": "ToggleRoutine",
+   "type": "object"
+  },
+  "UpdateChat": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "update",
+     "title": "Op",
+     "type": "string"
+    },
+    "conversationId": {
+     "minLength": 1,
+     "title": "Conversationid",
+     "type": "string"
+    },
+    "changes": {
+     "additionalProperties": true,
+     "title": "Changes",
+     "type": "object"
+    }
+   },
+   "required": [
+    "op",
+    "conversationId",
+    "changes"
+   ],
+   "title": "UpdateChat",
+   "type": "object"
+  },
+  "Upload": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "upload",
+     "title": "Op",
+     "type": "string"
+    },
+    "id": {
+     "minLength": 1,
+     "title": "Id",
+     "type": "string"
+    },
+    "name": {
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "data": {
+     "title": "Data",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "id",
+    "name",
+    "data"
+   ],
+   "title": "Upload",
+   "type": "object"
+  },
+  "WriteInstructions": {
+   "additionalProperties": false,
+   "properties": {
+    "op": {
+     "const": "write_instructions",
+     "title": "Op",
+     "type": "string"
+    },
+    "scope": {
+     "default": "workspace",
+     "enum": [
+      "global",
+      "workspace"
+     ],
+     "title": "Scope",
+     "type": "string"
+    },
+    "text": {
+     "title": "Text",
+     "type": "string"
+    }
+   },
+   "required": [
+    "op",
+    "text"
+   ],
+   "title": "WriteInstructions",
+   "type": "object"
+  }
+ }
+}

@@ -1,0 +1,25 @@
+/* The factor publish sheet (output/quant-design/factor.css, the publish part). */
+.pb { display: flex; flex-direction: column; gap: 2px; font-size: var(--tx-size-sm); }
+.pb h4 { margin: 14px 0 6px; font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); color: var(--tx-text-3); }
+.pb-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 32px; }
+.pb-row > span:first-child { color: var(--tx-text-3); }
+.pb-code { font-family: var(--tx-font-mono); color: var(--tx-text); overflow-wrap: anywhere; }
+.pb-t2 { color: var(--tx-text-2); } .pb-t3 { color: var(--tx-text-3); } .pb-t4 { color: var(--tx-text-4); }
+.pb-block { margin-top: 6px; color: var(--tx-ember-text); }
+.pb-ck { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.pb-ck i { width: 6px; height: 6px; border-radius: 50%; background: var(--tx-watch); }
+.pb-closest { margin: 10px 0 0; color: var(--tx-text-2); }
+.pb-closest[data-attention] { color: var(--tx-watch); }
+.pb-closest b { color: inherit; font-weight: var(--tx-weight-medium); }
+.pb-num { font-family: var(--tx-font-mono); }
+.pb-table { width: 100%; border-collapse: collapse; font-size: var(--tx-size-sm); }
+.pb-table th { text-align: right; font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); color: var(--tx-text-3); height: 26px; border-bottom: 1px solid var(--tx-line); padding: 0 8px; }
+.pb-table th:first-child, .pb-table td:first-child { text-align: left; }
+.pb-table td { height: 26px; padding: 0 8px; text-align: right; border-bottom: 1px solid var(--tx-white-04); font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; }
+.pb-table td:first-child { font-family: var(--tx-font); color: var(--tx-text-2); }
+.pb-us > div { min-height: 22px; }
+.pb-foot { display: flex; align-items: center; gap: 8px; width: 100%; }
+.pb-sp { flex: 1 1 auto; }
+.pb-failed { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pb-stage { display: inline-flex; align-items: center; gap: 8px; color: var(--tx-text-2); }
+.pb-blocked { color: var(--tx-ember-text); font-size: var(--tx-size-sm); }

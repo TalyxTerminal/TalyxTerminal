@@ -1,0 +1,3 @@
+{"manifestVersion": 5, "id": "marketpage", "name": "Market page", "version": "1.0.0",
+ "description": "Market's own data.read handler on prepared local data, in its own process (standard 2)",
+ "entries": {"backend": "backend.entry"}, "requires": {}}

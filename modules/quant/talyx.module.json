@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 5,
+  "id": "quant",
+  "ai": {"guide": "GUIDE.md", "docs": [{"topic": "strategy", "title": "Write a backtest strategy in code (q.Strategy), save, check and run it", "file": "docs/strategy.md"}, {"topic": "research", "title": "Write factor, model or allocation code, or notebook cells (talyx_quant)", "file": "docs/research.md"}]},
+  "name": "Quant",
+  "version": "1.1.0",
+  "description": "Write, run and compare strategies and research.",
+  "entries": {
+    "backend": "backend.entry",
+    "frontend": "frontend/module.tsx"
+  },
+  "requires": {
+    "market": {},
+    "chart": {"optional": true},
+    "developer": {
+      "optional": true
+    }
+  },
+  "panels": {
+    "workspace": {
+      "title": "Quant",
+      "icon": "flask",
+      "launcher": true,
+      "description": "Quant objects: strategies, research and their runs. Open targets: objectId \"research\" opens the Quant home; \"object:<objectId>\" (or the bare id) opens one object; \"run:<runId>\" opens a run of its object."
+    }
+  },
+  "views": {
+    "result": {
+      "description": "Research result",
+      "props": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId"
+        ],
+        "additionalProperties": false
+      },
+      "emits": {}
+    }
+  },
+  "provides": {
+    "developer.development_support": [
+      {
+        "id": "source_language",
+        "descriptor": {
+          "name": "Quant source environment",
+          "capabilities": [
+            "language"
+          ],
+          "appliesTo": {
+            "sourceKinds": [
+              "file"
+            ],
+            "filePatterns": [
+              "*.py",
+              "*.yaml",
+              "*.yml",
+              "*.json",
+              "*.toml"
+            ],
+            "projectKinds": [
+              "local"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

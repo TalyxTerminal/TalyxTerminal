@@ -1,0 +1,49 @@
+/* The home window and workspace frame look (Home, Workspaces, Community, the bar). Injected as a <style> by
+   ExperienceShellStyles so it keeps its place after the component library in the cascade. Button and input
+   inheritance sits in :where() so it never outranks a module's own type and colour rules. */
+#talyx-layout-manager-candidate { --talyx-chassis: #08090a;--talyx-floor: #0b0d0f;--talyx-plate: #111418;--talyx-panel: #15191d;--talyx-raised: #1a1e23;--talyx-hover: #20252b;--talyx-glass: rgba(255, 255, 255, .065);--talyx-glass-active: rgba(255, 255, 255, .11);--talyx-ink: #f2f0ea;--talyx-secondary: #aaa9a2;--talyx-muted: #777a75;--talyx-faint: #525650;--talyx-ring: rgba(255, 255, 255, .085);--talyx-ring-strong: rgba(255, 255, 255, .15);--talyx-ember: #f36b21;--talyx-ember-bright: #ff7a2f;--talyx-ember-wash: rgba(243, 107, 33, .12);--talyx-danger: #d56d64;width:100%;color:var(--talyx-ink);background:transparent;font-family:Instrument Sans,Segoe UI,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased }
+#talyx-layout-manager-candidate *,#talyx-layout-manager-candidate *:before,#talyx-layout-manager-candidate *:after { box-sizing:border-box }
+:where(#talyx-layout-manager-candidate) button,:where(#talyx-layout-manager-candidate) input { font:inherit }
+:where(#talyx-layout-manager-candidate) button { color:inherit }
+#talyx-layout-manager-candidate button:focus-visible,#talyx-layout-manager-candidate input:focus-visible { outline:2px solid var(--talyx-ember-bright);outline-offset:2px }
+#talyx-layout-manager-candidate [hidden] { display:none!important }
+#talyx-layout-manager-candidate .product { min-height:820px;overflow:hidden;position:relative;background:var(--talyx-floor);box-shadow:0 0 0 1px var(--talyx-ring) }
+#talyx-layout-manager-candidate .screen { display:none;animation:talyx-screen-enter .18s cubic-bezier(.23,1,.32,1) }
+#talyx-layout-manager-candidate .screen.is-active { display:block }
+#talyx-layout-manager-candidate h1,#talyx-layout-manager-candidate h2,#talyx-layout-manager-candidate p { margin:0 }
+#talyx-layout-manager-candidate ::selection { color:var(--talyx-ink);background:#f36b2157 }
+@keyframes talyx-screen-enter { 0%{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)} }
+@media (max-width: 620px) {
+  #talyx-layout-manager-candidate .product { min-height:760px }
+}
+@media (prefers-reduced-motion: reduce) {
+  #talyx-layout-manager-candidate *,#talyx-layout-manager-candidate *:before,#talyx-layout-manager-candidate *:after { animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important }
+}
+html,body,body > #root { width: 100%;
+  height: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+  padding: 0; }
+#talyx-layout-manager-candidate { width: 100%;
+  min-height: 100%; }
+#talyx-layout-manager-candidate[data-screen="workspace"] { height: 100%;
+  min-height: 0;
+  overflow: hidden; }
+#talyx-layout-manager-candidate:not([data-screen="workspace"]) .product { min-height: 100dvh; }
+#talyx-layout-manager-candidate[data-screen="workspace"] .product { display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0; }
+#talyx-layout-manager-candidate[data-screen="workspace"] .product > main,#talyx-layout-manager-candidate[data-screen="workspace"]
+  .product
+  > main
+  > .screen.is-active,#talyx-layout-manager-candidate[data-screen="workspace"]
+  .workspace-shell.workspace-shell-dock-only,#talyx-layout-manager-candidate[data-screen="workspace"]
+  .workspace-shell-dock-only
+  .experience-dockview-host { height: 100%;
+  min-height: 0; }
+#talyx-layout-manager-candidate[data-screen="workspace"] .product > main,#talyx-layout-manager-candidate[data-screen="workspace"]
+  .product
+  > main
+  > .screen.is-active { overflow: hidden; }

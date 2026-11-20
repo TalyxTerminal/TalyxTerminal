@@ -1,0 +1,17 @@
+## A notebook's matplotlib figures on TALYX's dark panel (docs/design/tokens.css): no white sheet, text and lines in the panel's colours.
+figure.facecolor: none
+axes.facecolor: none
+savefig.facecolor: none
+savefig.edgecolor: none
+savefig.transparent: True
+text.color: F4F3F0
+axes.labelcolor: A8A6A1
+axes.titlecolor: F4F3F0
+axes.edgecolor: FFFFFF2B
+xtick.color: A8A6A1
+ytick.color: A8A6A1
+grid.color: FFFFFF1C
+legend.facecolor: 0B0B0D
+legend.edgecolor: FFFFFF2B
+legend.labelcolor: A8A6A1
+axes.prop_cycle: cycler('color', ['F4F3F0', '83B1F7', 'AB6EE6', '747C8C'])

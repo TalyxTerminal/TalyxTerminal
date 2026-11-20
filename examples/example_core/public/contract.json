@@ -1,0 +1,60 @@
+{
+ "contractVersion": 5,
+ "module": "example_core",
+ "actions": {
+  "text_stats": {
+   "description": "How many characters and words a text has. Example: {\"text\": \"Hello world\"}.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/TextInput"
+   },
+   "output": {
+    "$ref": "#/$defs/TextStats"
+   }
+  }
+ },
+ "streams": {},
+ "events": {},
+ "extensionPoints": {},
+ "settings": {},
+ "$defs": {
+  "TextInput": {
+   "additionalProperties": false,
+   "properties": {
+    "text": {
+     "description": "The text to count.",
+     "maxLength": 200000,
+     "title": "Text",
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "title": "TextInput",
+   "type": "object"
+  },
+  "TextStats": {
+   "additionalProperties": false,
+   "properties": {
+    "characters": {
+     "title": "Characters",
+     "type": "integer"
+    },
+    "words": {
+     "title": "Words",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "characters",
+    "words"
+   ],
+   "title": "TextStats",
+   "type": "object"
+  }
+ }
+}

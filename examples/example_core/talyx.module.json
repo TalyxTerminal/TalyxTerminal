@@ -1,0 +1,15 @@
+{
+  "manifestVersion": 5,
+  "id": "example_core",
+  "name": "Example core",
+  "version": "1.0.0",
+  "description": "An example a module calls into: one public action, and a view other modules mount in their own panels.",
+  "entries": {"backend": "backend.entry", "frontend": "frontend/module.js"},
+  "views": {
+    "text_card": {
+      "description": "A card showing a text, with a button that picks it.",
+      "props": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]},
+      "emits": {"selected": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}
+    }
+  }
+}

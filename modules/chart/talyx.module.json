@@ -1,0 +1,114 @@
+{
+  "manifestVersion": 5,
+  "id": "chart",
+  "name": "Chart",
+  "version": "0.3.0",
+  "ai": {"guide": "GUIDE.md", "docs": [
+    {"topic": "indicators", "title": "Write a chart indicator: the Pine-style API, where it goes, saving and checking", "file": "backend/authoring.md"},
+    {"topic": "editing", "title": "Chart editing commands, templates, history, replay and file export", "file": "backend/editing.md"}
+  ]},
+  "description": "Charts, indicators, drawings, alerts, watchlists and screens. Charts by TradingView Lightweight Charts™ (Apache-2.0), https://www.tradingview.com/",
+  "entries": {
+    "backend": "backend.entry",
+    "frontend": "frontend/module.tsx"
+  },
+  "requires": {
+    "market": {},
+    "developer": {}
+  },
+  "panels": {
+    "main": {
+      "title": "Chart",
+      "icon": "chart",
+      "launcher": true,
+      "description": "Charts. Open targets: objectId \"instrument:<instrumentId>/<timeframe>@<YYYY-MM-DD>\" opens a new chart of that instrument on that timeframe with that day in view; \";import=<importId>\" may follow for an imported dataset."
+    }
+  },
+  "views": {
+    "layer_chart": {
+      "props": {
+        "type": "object",
+        "properties": {
+          "layer": {"anyOf": [{"$ref": "#/$defs/ResearchLayer"}, {"$ref": "#/$defs/FileRef"}]},
+          "focusTime": {"type": "string", "description": "ISO-8601 time of the bar to center and highlight."}
+        },
+        "required": ["layer"],
+        "additionalProperties": false
+      },
+      "emits": {}
+    }
+  },
+  "provides": {
+    "developer.document_source": [
+      {
+        "id": "indicator-docs",
+        "descriptor": {
+          "name": "Chart indicator documentation",
+          "readOnly": true,
+          "watch": false
+        }
+      }
+    ],
+    "developer.development_support": [
+      {
+        "id": "indicators",
+        "descriptor": {
+          "name": "Chart indicators",
+          "capabilities": [],
+          "appliesTo": {},
+          "documentation": [
+            {
+              "name": "Writing Chart indicators",
+              "source": {
+                "kind": "contribution",
+                "providerId": "chart:indicator-docs",
+                "sourceKey": "guide"
+              }
+            },
+            {
+              "name": "Example: Relative Strength Index",
+              "source": {
+                "kind": "contribution",
+                "providerId": "chart:indicator-docs",
+                "sourceKey": "builtin/rsi"
+              }
+            },
+            {
+              "name": "Example: Open Interest (_OI)",
+              "source": {
+                "kind": "contribution",
+                "providerId": "chart:indicator-docs",
+                "sourceKey": "builtin/open_interest"
+              }
+            },
+            {
+              "name": "Example: Derivatives Basis (_MARK, _INDEX)",
+              "source": {
+                "kind": "contribution",
+                "providerId": "chart:indicator-docs",
+                "sourceKey": "builtin/derivatives_basis"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "platform.status_item": [
+      {
+        "id": "indicators",
+        "descriptor": {
+          "title": "Chart indicators",
+          "icon": "refresh",
+          "action": "chart.restart_indicators"
+        }
+      },
+      {
+        "id": "alert_store",
+        "descriptor": {
+          "title": "Chart alerts",
+          "icon": "bell"
+        }
+      }
+    ]
+  }
+}

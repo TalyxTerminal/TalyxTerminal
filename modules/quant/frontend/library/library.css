@@ -1,0 +1,206 @@
+/* The library page (output/quant-design/library.css): what is unique to it; the shared look is the SDK's. Values from tokens only. */
+.lb-page { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.lb-prod { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 8px; border: 0; border-radius: var(--tx-radius-sm); font-size: var(--tx-size-xs); color: var(--tx-text-3); white-space: nowrap; background: none; cursor: pointer; }
+.lb-prod:hover { background: var(--tx-white-04); }
+.lb-prod b { font-family: var(--tx-font-mono); font-weight: var(--tx-weight-medium); color: var(--tx-text); }
+.lb-queue { display: grid; gap: 6px; min-width: 260px; max-width: 420px; font-size: var(--tx-size-sm); }
+.lb-queue .lb-r { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 10px; }
+.lb-queue .lb-r > span:first-child { color: var(--tx-text-3); }
+
+/* one screen: the table | the open item | its code; the divider is dragged */
+.lb { flex: 1; min-height: 0; display: flex; container-type: inline-size; }
+.lb-lpane { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.lb-open .lb-lpane { flex: 0 0 var(--lb-w, 372px); min-width: 300px; }
+.lb-cpane { flex: 1 1 0; min-width: 520px; display: flex; flex-direction: column; border-left: 1px solid var(--tx-line); container: care / inline-size; }
+.lb-filled .lb-lpane, .lb-filled .lb-gut { display: none; }
+.lb-filled .lb-cpane { border-left: 0; }
+@container qx (max-width: 820px) {
+  .lb-open { flex-direction: column; }
+  .lb-open .lb-lpane { flex: 0 1 auto; max-height: 28%; min-width: 0; }
+  .lb-open .lb-cpane { min-width: 0; min-height: 0; border-left: 0; }
+  .lb-open .lb-gut { display: none; }
+  .lb .lb-tbar, .lb .lb-ctabs { height: auto; min-height: var(--tx-tabs-height); flex-wrap: wrap; }
+  .lb .lb-chd { flex-wrap: wrap; }
+}
+.lb-gut { width: 6px; margin: 0 -3px; cursor: col-resize; flex: none; z-index: 2; }
+.lb-tbar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 16px; flex: none; border-bottom: 1px solid var(--tx-line); white-space: nowrap; }
+.lb-tscroll { flex: 1; min-height: 0; overflow: auto; padding: 0 8px 0 4px; display: flex; flex-direction: column; }
+.lb-sp { flex: 1 1 auto; }
+.lb-t2 { color: var(--tx-text-2); } .lb-t3 { color: var(--tx-text-3); } .lb-t4 { color: var(--tx-text-4); }
+.lb-watch { color: var(--tx-watch); }
+.lb-block { color: var(--tx-ember-text); }
+.lb-warn { color: var(--tx-watch); }
+.lb-strong { color: var(--tx-text); font-weight: var(--tx-weight-medium); }
+.lb-num { font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tx-tracking-tight); }
+.lb-skel { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; }
+.lb-skel .lb-skel-plot { height: 220px; }
+.lb-calm { padding: 18px 16px; color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.lb-link { background: none; border: 0; padding: 2px 5px; border-radius: 4px; color: var(--tx-text-3); font-size: var(--tx-size-xs); cursor: pointer; white-space: nowrap; }
+.lb-link:hover { color: var(--tx-text); background: var(--tx-white-04); }
+
+/* the table */
+.lb-table { table-layout: fixed; }
+.lb-table td { overflow: hidden; text-overflow: ellipsis; }
+.lb-table .lb-click { cursor: pointer; }
+.lb-table .lb-name b { font-weight: var(--tx-weight-medium); }
+.lb-table .lb-kind { color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.lb-table tr[data-quiet] td { color: var(--tx-text-3); }
+.lb-table tr[data-quiet] .lb-name b { color: var(--tx-text-2); font-weight: var(--tx-weight); }
+.lb-tablebar { display: flex; align-items: center; gap: 12px; padding: 10px 8px; }
+
+/* the open item: state and actions, why, tabs */
+.lb-care { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.lb-chd { flex: none; padding: 10px 14px 0 16px; }
+/* One line as in the draft: the actions keep their size and a long name gives way (cut with an ellipsis) instead of pushing More to a second line. */
+.lb-t1 { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.lb-t1 > * { flex: none; }
+.lb-t1 h3 { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--tx-size-lg); font-weight: 600; letter-spacing: var(--tx-tracking-heading); white-space: nowrap; margin: 0 6px 0 0; }
+.lb-t1 > .lb-sp { flex: 1 1 0; min-width: 0; }
+.lb-t2r { display: flex; align-items: center; gap: 6px; padding: 6px 0 10px; min-width: 0; flex-wrap: wrap; }
+.lb-vchip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 0; border-radius: var(--tx-radius-sm); background: none; font-size: var(--tx-size-xs); color: var(--tx-text-3); white-space: nowrap; cursor: pointer; }
+.lb-vchip b { font-family: var(--tx-font-mono); font-weight: var(--tx-weight-medium); color: var(--tx-text-2); }
+.lb-vchip:hover { color: var(--tx-text-2); }
+.lb-vchip[data-on="true"] { background: var(--tx-white-07); color: var(--tx-text-2); }
+.lb-vchip[data-on="true"] b { color: var(--tx-text); }
+.lb-autoc { display: inline-flex; align-items: center; gap: 8px; margin-left: 8px; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.lb-meta { font-size: var(--tx-size-sm); color: var(--tx-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; margin-left: auto; }
+.lb-ctabs { flex: none; height: 36px; display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: 1px solid var(--tx-line); }
+.lb-tab { height: 36px; padding: 0 10px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--tx-text-3); font-size: var(--tx-size); cursor: pointer; }
+.lb-tab:hover { color: var(--tx-text-2); }
+.lb-tab[data-selected="true"] { color: var(--tx-text); border-bottom-color: var(--tx-ember); }
+.lb-tab i { font-style: normal; font-family: var(--tx-font-mono); font-size: 10.5px; color: var(--tx-text-4); margin-left: 6px; }
+.lb-scroll { flex: 1; min-height: 0; overflow: auto; }
+.lb-pad { padding: 2px 16px 0; }
+.lb-pad-s { font-size: var(--tx-size-sm); padding: 6px 0; }
+
+.lb-iss { margin: 4px 16px 6px; padding: 0; font-size: var(--tx-size-sm); }
+.lb-iss[data-tone="fix"] .lb-iss-head b { color: var(--tx-ember-text); }
+.lb-iss[data-tone="watch"] .lb-iss-head b { color: var(--tx-watch); }
+.lb-iss-head { display: flex; align-items: baseline; gap: 10px; }
+.lb-iss-head b { font-weight: var(--tx-weight-medium); color: var(--tx-text); }
+.lb-iss-head .lb-t3 { font-weight: 400; font-size: var(--tx-size-xs); }
+.lb-why { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 3px 10px; margin: 4px 0 0; color: var(--tx-text-2); }
+.lb-why > span:nth-child(odd) { color: var(--tx-text-3); }
+.lb-lnks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+/* overview */
+.lb-ov { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 18px; }
+@container care (min-width: 860px) { .lb-ov { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); column-gap: 20px; } .lb-ov.lb-ov2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.lb-span2 { grid-column: 1 / -1; }
+.lb-sub { display: flex; align-items: center; gap: 10px; min-height: 22px; margin: 12px 0 6px; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.lb-sub b { font-size: var(--tx-size-sm); font-weight: 600; color: var(--tx-text); }
+.lb-wrap { flex-wrap: wrap; }
+.lb-chart { margin-bottom: 6px; }
+/* The figures' columns keep the draft's widths and the names take what is left, so a long change ("−19.4 pt") never runs past the column. */
+.lb-pt { width: 100%; table-layout: fixed; }
+.lb-palloc { max-width: 620px; }
+.lb-pt td:first-child { color: var(--tx-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-pt td, .lb-pt th { font-family: var(--tx-font-mono); font-variant-numeric: tabular-nums; }
+.lb-pt td:first-child, .lb-pt th:first-child { font-family: var(--tx-font); }
+.lb-prodrow { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+/* library.css .scap: the first and last day under the strip, as wide as the strip; it hangs below so the counts stay level with the cells. */
+.lb-stripcol { position: relative; min-width: 0; margin-bottom: 14px; }
+.lb-scap { position: absolute; left: 0; width: max(100%, 150px); white-space: nowrap; top: calc(100% + 3px); display: flex; justify-content: space-between; font-size: 10.5px; color: var(--tx-text-4); font-family: var(--tx-font-mono); }
+.lb-pnum { display: flex; gap: 22px; align-items: baseline; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.lb-pnum b { font-family: var(--tx-font-mono); font-size: 14px; font-weight: var(--tx-weight-medium); color: var(--tx-text); margin-right: 4px; }
+.lb-pdet { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 12px; align-items: start; margin: 10px 0; padding: 10px 0; border-top: 1px solid var(--tx-line); border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); }
+.lb-kv { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--tx-text-2); }
+.lb-kv > span > span { color: var(--tx-text-3); margin-right: 6px; }
+.lb-why3 { margin-top: 4px; color: var(--tx-text-2); }
+.lb-acts { display: flex; gap: 6px; }
+.lb-usr { display: grid; grid-template-columns: minmax(0, 1.3fr) 110px 46px minmax(0, 1.6fr) auto; align-items: center; column-gap: 10px; min-height: 30px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); }
+.lb-usr > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-note { color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.lb-note[data-attn] { color: var(--tx-ember-text); }
+.lb-chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.lb-chain-part { display: contents; }
+.lb-ar { color: var(--tx-text-4); }
+.lb-nd { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--tx-line-2); white-space: nowrap; }
+.lb-nd[role="button"] { cursor: pointer; }
+.lb-nd[data-me] { border-color: var(--tx-line-3); color: var(--tx-text); background: var(--tx-white-04); }
+.lb-nd i { width: 6px; height: 6px; border-radius: 50%; background: var(--tx-text-3); }
+
+/* values */
+.lb-vbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 16px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-xs); }
+.lb-datenav, .lb-pager { display: inline-flex; align-items: center; gap: 4px; color: var(--tx-text-2); }
+.lb-datenav input { background: var(--tx-white-04); border: 1px solid var(--tx-line-2); border-radius: 5px; color: var(--tx-text); height: 24px; padding: 0 6px; font: inherit; color-scheme: dark; }
+.lb-step { width: 24px; height: 24px; border: 0; border-radius: 5px; background: none; color: var(--tx-text-2); cursor: pointer; font-size: 16px; line-height: 1; }
+.lb-step:hover:not(:disabled) { background: var(--tx-white-07); }
+.lb-step:disabled { visibility: hidden; }  /* nothing on that side: the step is not shown (its place kept) */
+.lb-vtab { padding-top: 4px; }
+/* Four columns of short numbers: as wide as they need, not the pane's width apart. */
+.lb-vtab .lb-weights { width: 100%; }
+.lb-calm .lb-link { margin-left: 8px; }
+
+/* log and versions */
+.lb-log { table-layout: fixed; }
+.lb-log .lb-why-cell { white-space: normal; color: var(--tx-text-2); line-height: 1.35; }
+.lb-log .lb-tb td { background: var(--tx-black-20, var(--tx-white-02)); height: auto; }
+.lb-log pre { margin: 6px 0 8px; font: 11.5px/1.6 var(--tx-font-mono); color: var(--tx-text-2); white-space: pre-wrap; }
+.lb-diff { font: 12px/19px var(--tx-font-mono); border: 1px solid var(--tx-line); border-radius: 6px; overflow: hidden; }
+.lb-diff > div { padding: 0 10px; white-space: pre-wrap; word-break: break-word; color: var(--tx-text-2); }
+.lb-diff > [data-kind="a"] { background: color-mix(in srgb, var(--tx-green) 8%, transparent); color: var(--tx-text); }
+.lb-diff > [data-kind="r"] { background: color-mix(in srgb, var(--tx-red) 8%, transparent); color: var(--tx-text-3); }
+.lb-diff > [data-kind="h"] { color: var(--tx-text-4); background: var(--tx-white-02); }
+
+/* sheets */
+.lb-sheet-body { padding: 0 2px; font-size: var(--tx-size-sm); }
+.lb-sheet-body h4 { margin: 14px 0 6px; font-size: var(--tx-size-xs); font-weight: var(--tx-weight-medium); color: var(--tx-text-3); }
+.lb-sheet-body h4:first-child { margin-top: 0; }
+.lb-ulist > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 6px 0; border-bottom: 1px solid var(--tx-line); }
+.lb-ulist > div > :nth-child(3) { grid-column: 1 / -1; }
+.lb-kv2 { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 10px; color: var(--tx-text-2); }
+.lb-kv2 > span:nth-child(odd) { color: var(--tx-text-3); }
+.lb-sheet-foot { display: flex; align-items: center; gap: 8px; width: 100%; }
+.lb-sheet-error { margin-top: 10px; }
+
+/* frozen code */
+.lb-code { flex: 0 0 min(440px, 34%); min-width: 300px; display: flex; flex-direction: column; border-left: 1px solid var(--tx-line); background: var(--tx-panel); }
+.lb-code-tabs { display: flex; align-items: center; height: 36px; padding: 0 10px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); gap: 8px; }
+.lb-code-tabs > span { display: inline-flex; align-items: center; gap: 6px; flex: 1; }
+.lb-code-tabs .tx-icon { width: 13px; height: 13px; }
+.lb-code-tabs button { background: none; border: 0; color: var(--tx-text-3); cursor: pointer; }
+.lb-code-file { padding: 6px 12px; font-size: var(--tx-size-xs); color: var(--tx-text-3); border-bottom: 1px solid var(--tx-line); font-family: var(--tx-font-mono); }
+.lb-code-body { flex: 1; min-height: 0; overflow: auto; font: 12px/19px var(--tx-font-mono); padding: 6px 0; }
+.lb-code-line { display: flex; flex-wrap: wrap; }
+.lb-code-n { width: 38px; text-align: right; padding-right: 10px; color: var(--tx-text-4); flex: none; user-select: none; }
+.lb-code-t { white-space: pre; color: var(--tx-text-2); }
+.lb-code-line[data-bad] { background: var(--tx-ember-select); }
+.lb-code-line[data-bad] .lb-code-t { color: var(--tx-text); }
+.lb-code-peek { flex: 0 0 100%; padding: 2px 12px 4px 48px; color: var(--tx-ember-text); font-family: var(--tx-font); font-size: var(--tx-size-xs); }
+.lb-code-foot { display: flex; justify-content: space-between; gap: 10px; height: 26px; align-items: center; padding: 0 12px; border-top: 1px solid var(--tx-line); font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.lb-pt td { height: 26px; }
+.lb-pt th { height: 28px; }
+.lb-table td, .lb-log td { height: 26px; }
+.lb-vbar { min-height: 40px; }
+.lb-scroll { overflow-x: hidden; }
+.lb-keys { display: inline-flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: var(--tx-size-xs); color: var(--tx-text-3); }
+.lb-keys span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.lb-keys i { display: inline-block; width: 14px; border-top: 1.5px solid var(--tx-text-2); }
+.lb-keys i[data-kind="dash"] { border-top-style: dashed; border-top-color: var(--tx-text-3); }
+.lb-keys i[data-kind="sq"] { width: 8px; height: 8px; border: 0; border-radius: 2px; background: var(--tx-white-12, rgba(255,255,255,.12)); }
+.lb-table[data-compact] col:first-child { width: 186px; }
+
+/* After publication still collecting (library.js mainAfter) */
+.lb-collect { color: var(--tx-text-3); font-family: var(--tx-font); letter-spacing: var(--tx-tracking); }
+/* The search icon sits inside the box, before the text (the next look pads its inputs evenly). */
+.lb-page.lb-page .tx-search .tx-input { padding-left: 26px; width: 150px; }
+/* Tables are as dense as the draft's (quant7.css table.g): 28px heads, 26px rows. */
+.lb-page.lb-page .tx-table td { height: 26px; }
+.lb-page.lb-page .tx-table th { height: 28px; }
+.lb-dayfield { width: 112px; height: 24px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--tx-line-2); border-radius: var(--tx-radius-sm); background: none; color: var(--tx-text); font: inherit; font-size: var(--tx-size-sm); text-align: center; outline: none; }
+.lb-dayfield:focus { border-color: var(--tx-line-3); }
+/* A chart section's head is a region head (its chart puts its key there) drawn as the library's other heads. */
+.lb-page.lb-page .lb-sub.tx-regionhead { padding: 0; min-height: 22px; white-space: normal; }
+.lb-link-inline { padding: 0; font-size: inherit; }
+/* library.css .stp.big: the production strip's cells 7 px wide, so sixty periods and the counts share one line as in the draft. */
+.lb-prodrow .tx-periods[data-large] { gap: 2px; height: 20px; }
+.lb-prodrow .tx-periods[data-large] i { width: 7px; height: 18px; }
+/* library.js: the Periods row is words (in-sample, 106 settled · 6 pending), in the interface font. */
+.lb-pt td.lb-t3 { font-family: var(--tx-font); }
+
+/* A state as a word (no dot, no tag): what needs handling now in the attention colour, what to watch in amber, the rest quiet. */
+.lb-state { font-size: var(--tx-size-sm); color: var(--tx-text-3); white-space: nowrap; }
+.lb-state[data-tone="fix"] { color: var(--tx-ember-text); }
+.lb-state[data-tone="watch"] { color: var(--tx-watch); }
+.lb-state[data-tone="ok"] { color: var(--tx-text-2); }

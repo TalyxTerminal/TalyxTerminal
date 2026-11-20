@@ -1,0 +1,325 @@
+diff --git a/crates/execution/src/matching_engine/mod.rs b/crates/execution/src/matching_engine/mod.rs
+index cafde4d..f566167 100644
+--- a/crates/execution/src/matching_engine/mod.rs
++++ b/crates/execution/src/matching_engine/mod.rs
+@@ -65,6 +65,7 @@ use nautilus_model::{
+         AccountId, ClientOrderId, InstrumentId, PositionId, StrategyId, TradeId, TraderId, Venue,
+         VenueOrderId,
+     },
++    accounts::{Account, AccountAny},
+     instruments::{Instrument, InstrumentAny},
+     orderbook::{BookLevel, OrderBook},
+     orders::{MarketOrder, Order, OrderAny, OrderCore},
+@@ -76,7 +77,7 @@ use nautilus_model::{
+         quantity::QuantityRaw,
+     },
+ };
+-use rust_decimal::{Decimal, RoundingStrategy};
++use rust_decimal::{Decimal, RoundingStrategy, prelude::ToPrimitive};
+ use ustr::Ustr;
+ 
+ use self::{
+@@ -134,6 +135,8 @@ pub struct OrderMatchingEngine {
+     account_ids: IndexMap<TraderId, AccountId>,
+     pending_fills: IndexMap<TradeId, PendingFill>,
+     post_match_order_ids: IndexSet<ClientOrderId>,
++    // Orders whose account could not cover a fill; they take no further fills.
++    unaffordable_orders: IndexSet<ClientOrderId>,
+     orders: MatchingOrders,
+     ids_generator: IdsGenerator,
+     last_trade_size: Option<Quantity>,
+@@ -231,6 +234,7 @@ impl OrderMatchingEngine {
+             account_ids: IndexMap::new(),
+             pending_fills: IndexMap::new(),
+             post_match_order_ids: IndexSet::new(),
++            unaffordable_orders: IndexSet::new(),
+             orders: MatchingOrders::default(),
+             ids_generator,
+             last_trade_size: None,
+@@ -306,6 +310,7 @@ impl OrderMatchingEngine {
+         self.account_ids.clear();
+         self.pending_fills.clear();
+         self.post_match_order_ids.clear();
++        self.unaffordable_orders.clear();
+         self.orders
+             .reset(self.instrument.id(), &self.cache.borrow());
+         self.core.reset();
+@@ -6073,6 +6078,142 @@ impl OrderMatchingEngine {
+         });
+     }
+ 
++    // A cash account that may not borrow rejects a fill that takes a balance below zero, which
++    // ends a backtest and leaves a live or sandbox account unbooked. Limits the fill to what the
++    // account's balances cover, commission included; `None` when not even the smallest fill fits.
++    fn affordable_fill(
++        &self,
++        order: &OrderAny,
++        last_px: Price,
++        last_qty: Quantity,
++        commission: Money,
++        commission_for: &dyn Fn(Quantity) -> anyhow::Result<Money>,
++    ) -> anyhow::Result<Option<(Quantity, Money)>> {
++        let unchanged = Some((last_qty, commission));
++
++        let base_currency = match &self.instrument {
++            InstrumentAny::CurrencyPair(pair) if !pair.is_inverse() => Some(pair.base_currency),
++            InstrumentAny::Equity(_) => None,
++            _ => return Ok(unchanged),
++        };
++
++        let Some(account_id) = order
++            .account_id()
++            .or_else(|| self.account_ids.get(&order.trader_id()).copied())
++        else {
++            return Ok(unchanged);
++        };
++
++        // Balance totals as decimals; `None` when the account keeps no balance in that currency
++        // because it is a single-currency account valued in another one.
++        let (quote_total, base_total) = {
++            let cache = self.cache.borrow();
++            let Some(account) = cache.account(&account_id) else {
++                return Ok(unchanged);
++            };
++            let AccountAny::Cash(cash) = account.as_ref() else {
++                return Ok(unchanged);
++            };
++            if cash.allow_borrowing {
++                return Ok(unchanged);
++            }
++
++            let total_of = |currency: Currency| match cash.balance_total(Some(currency)) {
++                Some(total) => Some(total.as_decimal()),
++                None if cash.base_currency().is_some() => None,
++                None => Some(Decimal::ZERO),
++            };
++            (
++                total_of(self.instrument.quote_currency()),
++                base_currency.and_then(total_of),
++            )
++        };
++
++        let is_buy = order.is_buy();
++        let fits = |quantity: Quantity| -> anyhow::Result<bool> {
++            let notional = self
++                .instrument
++                .try_calculate_notional_value(quantity, last_px, None)?;
++            let fee = commission_for(quantity)?;
++            let mut quote_change = if is_buy {
++                -notional.as_decimal()
++            } else {
++                notional.as_decimal()
++            };
++            let mut base_change = if is_buy {
++                quantity.as_decimal()
++            } else {
++                -quantity.as_decimal()
++            };
++            if fee.currency == notional.currency {
++                quote_change -= fee.as_decimal();
++            } else if Some(fee.currency) == base_currency {
++                base_change -= fee.as_decimal();
++            }
++
++            Ok(quote_total.is_none_or(|total| total + quote_change >= Decimal::ZERO)
++                && base_total.is_none_or(|total| total + base_change >= Decimal::ZERO))
++        };
++
++        if fits(last_qty)? {
++            return Ok(unchanged);
++        }
++
++        // Largest whole multiple of the size increment that fits; cost never falls as size grows
++        let increment = self.instrument.size_increment().as_decimal();
++        let Some(mut high) = (last_qty.as_decimal() / increment).floor().to_i64() else {
++            return Ok(None);
++        };
++        let quantity_of = |steps: i64| {
++            Quantity::from_decimal_dp(increment * Decimal::from(steps), last_qty.precision)
++        };
++        let mut low = 0_i64;
++        while low < high {
++            let middle = low + (high - low + 1) / 2;
++            if fits(quantity_of(middle)?)? {
++                low = middle;
++            } else {
++                high = middle - 1;
++            }
++        }
++
++        if low == 0 {
++            return Ok(None);
++        }
++        let quantity = quantity_of(low)?;
++        if self
++            .instrument
++            .min_quantity()
++            .is_some_and(|minimum| quantity < minimum)
++        {
++            return Ok(None);
++        }
++
++        Ok(Some((quantity, commission_for(quantity)?)))
++    }
++
++    // Ends an order the account cannot fund (any more): rejected while still unacknowledged,
++    // otherwise canceled, so no later fill of this order is attempted.
++    fn refuse_unaffordable_order(&mut self, order: &OrderAny) {
++        self.unaffordable_orders.insert(order.client_order_id());
++        let reason = format!(
++            "Insufficient balance to fill {} including commission",
++            order.instrument_id()
++        );
++
++        // `order` is a snapshot from before this fill, so also ask what the engine has filled
++        let unfilled = self.engine_filled_qty(order).is_zero();
++        match order.status() {
++            OrderStatus::Initialized | OrderStatus::Submitted if unfilled => {
++                self.generate_order_rejected(order, reason.as_str().into());
++            }
++            _ => {
++                log::warn!("Canceling {}: {reason}", order.client_order_id());
++                self.cancel_order(order, None);
++            }
++        }
++    }
++
+     fn fill_order(
+         &mut self,
+         order: &OrderAny,
+@@ -6084,6 +6225,10 @@ impl OrderMatchingEngine {
+     ) -> anyhow::Result<()> {
+         self.check_size_precision(last_qty.precision, "fill quantity")?;
+ 
++        if self.unaffordable_orders.contains(&order.client_order_id()) {
++            return Ok(());
++        }
++
+         let (last_qty, new_filled_qty) = if let Some(filled_qty) = self
+             .orders
+             .cached_filled_qty
+@@ -6119,13 +6264,26 @@ impl OrderMatchingEngine {
+         };
+ 
+         let underlying_px = self.fee_underlying_price()?;
+-        let commission = self.fee_model.get_commission_with_context(
+-            commission_order,
+-            last_qty,
+-            last_px,
+-            &self.instrument,
+-            underlying_px,
+-        )?;
++        let commission_for = |quantity: Quantity| {
++            self.fee_model.get_commission_with_context(
++                commission_order,
++                quantity,
++                last_px,
++                &self.instrument,
++                underlying_px,
++            )
++        };
++        let commission = commission_for(last_qty)?;
++
++        let Some((affordable_qty, commission)) =
++            self.affordable_fill(order, last_px, last_qty, commission, &commission_for)?
++        else {
++            self.refuse_unaffordable_order(order);
++            return Ok(());
++        };
++        let reduced_for_balance = affordable_qty < last_qty;
++        let new_filled_qty = new_filled_qty.saturating_sub(last_qty) + affordable_qty;
++        let last_qty = affordable_qty;
+ 
+         // Resolve implicit membership before dispatch can close the cached position
+         let mut reduce_only_order_ids = position
+@@ -6179,6 +6337,9 @@ impl OrderMatchingEngine {
+             if order.order_type() != OrderType::MarketToLimit {
+                 self.purge_cached_filled_qty_if_closed(order.client_order_id());
+             }
++        } else if reduced_for_balance {
++            // The account covered only part of this fill, so nothing more can follow
++            self.refuse_unaffordable_order(order);
+         }
+ 
+         self.process_fill_contingencies(order, venue_position_id, post_fill_leaves_qty)?;
+diff --git a/crates/risk/src/engine/mod.rs b/crates/risk/src/engine/mod.rs
+index 2c4edca..b4a7e6c 100644
+--- a/crates/risk/src/engine/mod.rs
++++ b/crates/risk/src/engine/mod.rs
+@@ -17,7 +17,7 @@
+ 
+ pub mod config;
+ 
+-use std::{cell::RefCell, fmt::Debug, rc::Rc};
++use std::{cell::RefCell, fmt::Debug, rc::Rc, str::FromStr};
+ 
+ use ahash::AHashMap;
+ use config::RiskEngineConfig;
+@@ -2838,7 +2838,21 @@ impl AccountRisk<'_> {
+             return Ok((funding, -funding));
+         } else {
+             match order.order_side() {
+-                OrderSide::Buy => -notional,
++                OrderSide::Buy => {
++                    // A cash account debits the commission together with the notional, so the
++                    // buy must be affordable with its estimated fee.
++                    let required = self
++                        .with_estimated_fee(order, notional)
++                        .map_err(|detail| {
++                            self.check.reject(
++                                self.engine,
++                                order,
++                                &OrderDeniedReason::NotionalCalculationFailed { detail }
++                                    .to_string(),
++                            );
++                        })?;
++                    return Ok((required, -required));
++                }
+                 OrderSide::Sell => notional,
+             }
+         };
+@@ -2846,6 +2860,36 @@ impl AccountRisk<'_> {
+         Ok((notional, impact))
+     }
+ 
++    // The notional of a cash-account buy plus the commission it is estimated to pay. The rate is
++    // the instrument's `info["taker_fee"]` decimal string (the venue's own fee rate, set by
++    // whoever defines the instrument); an instrument without it is estimated at no fee.
++    fn with_estimated_fee(&self, order: &OrderAny, notional: Money) -> Result<Money, String> {
++        if !order.is_buy() || !matches!(self.account, AccountAny::Cash(_)) {
++            return Ok(notional);
++        }
++
++        let Some(rate) = self
++            .instrument
++            .info()
++            .and_then(|info| info.get_str("taker_fee"))
++        else {
++            return Ok(notional);
++        };
++
++        Decimal::from_str(rate)
++            .ok()
++            .filter(|rate| *rate >= Decimal::ZERO && *rate < Decimal::ONE)
++            .and_then(|rate| notional.as_decimal().abs().checked_mul(rate))
++            .and_then(|fee| notional.as_decimal().checked_add(fee))
++            .and_then(|total| Money::from_decimal(total, notional.currency).ok())
++            .ok_or_else(|| {
++                format!(
++                    "invalid taker_fee {rate:?} in the info of {}",
++                    self.instrument.id()
++                )
++            })
++    }
++
+     // A wallet locks the quote amount of a quote-quantity buy, and the notional of any other buy
+     // rounded up at the observed balance precision, so that amount is checked and reserved.
+     // Without an observed balance in the funding currency, the buy is checked against zero free
+@@ -2913,6 +2957,7 @@ impl AccountRisk<'_> {
+             self.instrument
+                 .try_calculate_notional_value(quantity, price, None)
+                 .map_err(|e| e.to_string())
++                .and_then(|notional| self.with_estimated_fee(order, notional))
+         }
+         .map_err(|detail| {
+             self.check.reject(

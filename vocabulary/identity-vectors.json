@@ -1,0 +1,122 @@
+{
+  "instruments": [
+    {
+      "identityVersion": 1,
+      "venueId": "Stra\u00dfe",
+      "symbol": "BTC/USD",
+      "displaySymbol": "BTC/USD",
+      "marketType": "swap",
+      "assetClass": "crypto",
+      "contractOrientation": "inverse",
+      "optionSide": null,
+      "adjustmentEligible": false,
+      "base": "BTC",
+      "quote": "USD",
+      "settle": "BTC",
+      "underlyingSymbol": null,
+      "contractSize": "100.000",
+      "strike": "9007199254740993.123456789",
+      "expiry": "1790892000000000000",
+      "calendarId": "24X7",
+      "instrumentId": "vi1_70247aa2c8a30777a2cf652a055c5dbbb5747650147c7c624c32d9aa57aa3de8",
+      "retiredAt": null
+    },
+    {
+      "identityVersion": 1,
+      "venueId": "binance",
+      "symbol": "BTC/USDT:USDT",
+      "displaySymbol": "BTC/USDT:USDT",
+      "marketType": "swap",
+      "assetClass": "crypto",
+      "contractOrientation": "linear",
+      "optionSide": null,
+      "adjustmentEligible": false,
+      "base": "BTC",
+      "quote": "USDT",
+      "settle": "USDT",
+      "underlyingSymbol": null,
+      "contractSize": "1",
+      "strike": null,
+      "expiry": null,
+      "retiredAt": null,
+      "calendarId": "24_7",
+      "instrumentId": "vi1_66e0139e58a547479ad1a5ef12c7d15517bfe17f70d80c6c59960e99e037bdbf"
+    }
+  ],
+  "series": [
+    {
+      "identityVersion": 1,
+      "instrumentId": "vi1_99051f168702813b1a499831b551450d167d93f54f411af775244528d88562a3",
+      "capability": "ohlcv",
+      "timeframe": "1m",
+      "priceBasis": "last",
+      "sessionScope": "all",
+      "adjustment": "raw",
+      "referenceKind": null,
+      "valueUnit": null,
+      "seriesId": "vs1_c35b9e92743ea32d933919646b845eb765883eef7e5080ad682395c06e45e631"
+    },
+    {
+      "identityVersion": 1,
+      "instrumentId": "vi1_99051f168702813b1a499831b551450d167d93f54f411af775244528d88562a3",
+      "capability": "ohlcv",
+      "timeframe": "1m",
+      "priceBasis": "mark",
+      "sessionScope": "all",
+      "adjustment": "raw",
+      "referenceKind": null,
+      "valueUnit": null,
+      "seriesId": "vs1_d0debbe935bae7aa6b7902c7d82f3c64ad021500930077585517f172d22c6d50"
+    },
+    {
+      "identityVersion": 1,
+      "instrumentId": "vi1_99051f168702813b1a499831b551450d167d93f54f411af775244528d88562a3",
+      "capability": "ohlcv",
+      "timeframe": "1m",
+      "priceBasis": "last",
+      "sessionScope": "regular",
+      "adjustment": "raw",
+      "referenceKind": null,
+      "valueUnit": null,
+      "seriesId": "vs1_f6f50e09087696910dbae29d002408197260fd3ef4ba08611d590de8d4e8c289"
+    },
+    {
+      "identityVersion": 1,
+      "instrumentId": "vi1_99051f168702813b1a499831b551450d167d93f54f411af775244528d88562a3",
+      "capability": "ohlcv",
+      "timeframe": "1m",
+      "priceBasis": "last",
+      "sessionScope": "all",
+      "adjustment": "split",
+      "referenceKind": null,
+      "valueUnit": null,
+      "seriesId": "vs1_8491f65ceffbf856219850b2e52b1b77cb92662bf13b89b0ca2ee5b99c50c99e"
+    },
+    {
+      "identityVersion": 1,
+      "instrumentId": "vi1_99051f168702813b1a499831b551450d167d93f54f411af775244528d88562a3",
+      "capability": "ohlcv",
+      "timeframe": "1mo",
+      "priceBasis": "last",
+      "sessionScope": "all",
+      "adjustment": "raw",
+      "referenceKind": null,
+      "valueUnit": null,
+      "seriesId": "vs1_20f54dc11e0ff90dbdd5a4e6a0d3b84fb83a31539f4315b7da79cd0a7bc6e6bf"
+    },
+    {
+      "identityVersion": 1,
+      "instrumentId": "vi1_99051f168702813b1a499831b551450d167d93f54f411af775244528d88562a3",
+      "capability": "derived_value",
+      "timeframe": null,
+      "priceBasis": "last",
+      "sessionScope": "all",
+      "adjustment": "not_applicable",
+      "referenceKind": null,
+      "valueUnit": null,
+      "provider": "library:values",
+      "key": "momentum_12m",
+      "seriesId": "vs1_dbc5f39e9e1e2eba621f30c0a3bb92d7d8e77982fdba3314eba0656c7fdad825"
+    }
+  ]
+}

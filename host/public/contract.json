@@ -1,0 +1,4406 @@
+{
+ "contractVersion": 5,
+ "module": "platform",
+ "actions": {
+  "activity.list": {
+   "description": "What runs for a workspace and would stop if it closed.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WorkspaceInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ActivityList"
+   },
+   "examples": [
+    {
+     "workspaceId": "research"
+    }
+   ]
+  },
+  "activity.stop": {
+   "description": "Stop some of what runs for a workspace (for example everything AI asked for); each is ended for real.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ActivityStop"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "workspaceId": "research",
+     "activities": [
+      {
+       "module": "example",
+       "id": "work-1"
+      }
+     ]
+    }
+   ]
+  },
+  "ai.call": {
+   "description": "(An AI client inside TALYX) call an action as AI, in a workspace. The platform runs it and records the call; whether to ask the\nuser first is the AI client's decision, from the action's effects.",
+   "effects": [
+    "write",
+    "delete",
+    "code",
+    "external",
+    "funds"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/AICall"
+   },
+   "output": {
+    "$ref": "#/$defs/AICallResult"
+   }
+  },
+  "ai.calls": {
+   "description": "Recent recorded calls by AI and running code.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CallsInput"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/CallRecord"
+    }
+   },
+   "examples": [
+    {
+     "limit": 10
+    }
+   ]
+  },
+  "ai.catalog": {
+   "description": "List modules with their AI guide summaries and authoring docs. Supply a module to read its AI actions, effects,\ninputs and examples.\nWhen nextCursor is present, pass it as cursor with the same module to continue.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CatalogQuery"
+   },
+   "output": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/ModulesPage"
+     },
+     {
+      "$ref": "#/$defs/ToolsPage"
+     },
+     {
+      "$ref": "#/$defs/ActionDetail"
+     }
+    ]
+   },
+   "examples": [
+    {},
+    {
+     "module": "platform"
+    }
+   ]
+  },
+  "ai.guide": {
+   "description": "Read a module's Markdown guide, or with topic one of its authoring docs: how to write code the module runs\n(where the files go, the API, how to save and check them). ai.catalog lists each module's docs. Continue with\nnextCursor.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/GuideQuery"
+   },
+   "output": {
+    "$ref": "#/$defs/GuidePage"
+   },
+   "examples": [
+    {
+     "module": "example"
+    },
+    {
+     "module": "example",
+     "topic": "plugins"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "unavailable"
+   ]
+  },
+  "catalog.implementations": {
+   "description": "Implementations of an extension point by enabled modules.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PointInput"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/Implementation"
+    }
+   },
+   "examples": [
+    {
+     "point": "platform.settings_section"
+    }
+   ]
+  },
+  "changes.list": {
+   "description": "List objects changed by your recorded calls or a code run in this workspace and conversation.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/ChangeCalls"
+     },
+     {
+      "$ref": "#/$defs/ChangeRun"
+     }
+    ]
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/Change"
+    }
+   },
+   "examples": [
+    {
+     "callIds": [
+      "example-call"
+     ]
+    }
+   ],
+   "errors": [
+    "not_found",
+    "permission_denied",
+    "unavailable"
+   ]
+  },
+  "changes.revert": {
+   "description": "Restore the objects changed by one of your calls to their state before the call (undo) or after it (redo).",
+   "effects": [
+    "write",
+    "delete"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RevertChange"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "callId": "example-call",
+     "direction": "undo"
+    }
+   ],
+   "errors": [
+    "not_found",
+    "permission_denied",
+    "unavailable"
+   ]
+  },
+  "modules.definitions": {
+   "description": "Every installed module's manifest, contract and state, for the window to load module frontends.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/DefinitionsQuery"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/ModuleDefinition"
+    }
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "modules.disable": {
+   "description": "Stop and disable a module. Refused while another enabled module requires it.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "user",
+    "ai"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ModuleId"
+   },
+   "output": {
+    "$ref": "#/$defs/ModuleState"
+   },
+   "examples": [
+    {
+     "id": "example"
+    }
+   ]
+  },
+  "modules.enable": {
+   "description": "Enable a module and start it.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "user",
+    "ai"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ModuleId"
+   },
+   "output": {
+    "$ref": "#/$defs/ModuleState"
+   },
+   "examples": [
+    {
+     "id": "example"
+    }
+   ]
+  },
+  "modules.install": {
+   "description": "Install a module from a folder or a zip file, prepare its Python environment if it needs extra packages,\nand start it.",
+   "effects": [
+    "write",
+    "code"
+   ],
+   "callers": [
+    "user",
+    "ai"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/InstallInput"
+   },
+   "output": {
+    "$ref": "#/$defs/ModuleState"
+   },
+   "examples": [
+    {
+     "path": "C:/Modules/example"
+    }
+   ]
+  },
+  "modules.list": {
+   "description": "Installed modules, whether each is enabled and running, and why one could not start.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/ModuleState"
+    }
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "modules.reload": {
+   "description": "Regenerate a module's contract from its code and restart only that module.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "user",
+    "ai"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ModuleId"
+   },
+   "output": {
+    "$ref": "#/$defs/ModuleState"
+   },
+   "examples": [
+    {
+     "id": "example"
+    }
+   ]
+  },
+  "modules.uninstall": {
+   "description": "Stop and remove an installed module and its environment.",
+   "effects": [
+    "delete"
+   ],
+   "callers": [
+    "user",
+    "ai"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ModuleId"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "id": "example"
+    }
+   ]
+  },
+  "notifications.channels": {
+   "description": "The user's push channels (Telegram, Feishu, Discord); credentials are never returned.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/Channel"
+    }
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "notifications.configure": {
+   "description": "Add, change or delete a push channel (the user only).",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "user"
+   ],
+   "task": false,
+   "input": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/ChannelSave"
+     },
+     {
+      "$ref": "#/$defs/ChannelDelete"
+     }
+    ]
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/Channel"
+    }
+   }
+  },
+  "notifications.read_delivery": {
+   "description": "How a notification this module sent was delivered, per channel.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/NotificationId"
+   },
+   "output": {
+    "$ref": "#/$defs/Delivery"
+   },
+   "examples": [
+    {
+     "notificationId": "daily-report"
+    }
+   ]
+  },
+  "notifications.send": {
+   "description": "Send a notification on configured channels. Delivery is durable and retried; read_delivery reports it.",
+   "effects": [
+    "external"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/NotificationSend"
+   },
+   "output": {
+    "$ref": "#/$defs/Delivery"
+   },
+   "examples": [
+    {
+     "notificationId": "daily-report",
+     "channelIds": [
+      "my-channel"
+     ],
+     "title": "Daily report",
+     "body": "Your report is ready."
+    }
+   ]
+  },
+  "notifications.test": {
+   "description": "Send a test message on one channel and wait (up to 25 s) for its receipt.",
+   "effects": [
+    "external"
+   ],
+   "callers": [
+    "user",
+    "ai"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/ChannelId"
+   },
+   "output": {
+    "$ref": "#/$defs/Delivery"
+   },
+   "examples": [
+    {
+     "channelId": "my-channel"
+    }
+   ]
+  },
+  "notifications.toast": {
+   "description": "Show a Windows toast (unavailable where Windows cannot show one).",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Toast"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "title": "Daily report",
+     "message": "Your report is ready."
+    }
+   ]
+  },
+  "panels.activate": {
+   "description": "Bring a panel of the workspace's window to the front.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PanelId"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "panelId": "panel-1"
+    }
+   ]
+  },
+  "panels.capture": {
+   "description": "Capture a laid-out panel in its desktop workspace window. Returns a PNG file reference kept for 24 hours.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PanelId"
+   },
+   "output": {
+    "$ref": "#/$defs/PanelCapture"
+   },
+   "examples": [
+    {
+     "panelId": "panel-1"
+    }
+   ],
+   "errors": [
+    "ui_required",
+    "target_gone",
+    "unavailable"
+   ]
+  },
+  "panels.close": {
+   "description": "Close a panel in the workspace window. A busy panel can refuse with conflict; declining its confirmation\nreturns cancelled. The panel stays open in both cases.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PanelId"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "panelId": "panel-1"
+    }
+   ],
+   "errors": [
+    "conflict",
+    "cancelled",
+    "target_gone"
+   ]
+  },
+  "panels.list": {
+   "description": "Panels in the workspace's window, with what each reports it shows.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/Panels"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "panels.open": {
+   "description": "To open a module, call platform.panels.open with {\"type\": \"module.panel\"} using the exact type listed below.\nFor a particular object, use platform.panels.open_target with module, panelType (the part after the dot)\nand the object's openTarget objectId.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PanelOpen"
+   },
+   "output": {
+    "$ref": "#/$defs/PanelId"
+   },
+   "examples": [
+    {
+     "type": "example.main"
+    }
+   ]
+  },
+  "panels.open_target": {
+   "description": "Open an object in its module's panel (an open target, such as one object of that module).",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/PanelTarget"
+   },
+   "output": {
+    "$ref": "#/$defs/PanelId"
+   },
+   "examples": [
+    {
+     "module": "example",
+     "panelType": "main",
+     "objectId": "item-1"
+    }
+   ]
+  },
+  "runs.calls": {
+   "description": "The calls one run made (its starter only).",
+   "effects": [
+    "read"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RunId"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/CallRecord"
+    }
+   }
+  },
+  "runs.end": {
+   "description": "The run is over: its token stops working.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RunId"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   }
+  },
+  "runs.start": {
+   "description": "A token for one run of code this module starts: the run's calls are recorded as code from this module and\nworkspace, and the context reaches the handlers it calls unchanged.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/RunStart"
+   },
+   "output": {
+    "$ref": "#/$defs/RunToken"
+   }
+  },
+  "secrets.configured": {
+   "description": "Whether one of the calling module's secrets is set.",
+   "effects": [
+    "read"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SecretKey"
+   },
+   "output": {
+    "$ref": "#/$defs/Configured"
+   }
+  },
+  "secrets.get": {
+   "description": "One of the calling module's secrets. Backends only: windows and AI learn whether one is configured.",
+   "effects": [
+    "read"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SecretKey"
+   },
+   "output": {
+    "$ref": "#/$defs/SecretValue"
+   }
+  },
+  "secrets.set": {
+   "description": "Store (or with null, delete) one of the calling module's secrets.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SecretWrite"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   }
+  },
+  "settings.read": {
+   "description": "Settings as they apply in a workspace (its own value, else the global one, else the default), or the global\nones with workspaceId \"global\".",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SettingsRead"
+   },
+   "output": {
+    "$ref": "#/$defs/SettingsValues"
+   },
+   "examples": [
+    {
+     "module": "platform",
+     "workspaceId": "global",
+     "keys": [
+      "upColor"
+     ]
+    }
+   ]
+  },
+  "settings.reset": {
+   "description": "Make a workspace follow the global value again for these settings.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SettingsReset"
+   },
+   "output": {
+    "$ref": "#/$defs/SettingsValues"
+   },
+   "examples": [
+    {
+     "module": "platform",
+     "workspaceId": "research",
+     "keys": [
+      "upColor"
+     ]
+    }
+   ]
+  },
+  "settings.write": {
+   "description": "Set settings globally or for one workspace only. Global-only settings cannot be set for a workspace.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SettingsWrite"
+   },
+   "output": {
+    "$ref": "#/$defs/SettingsValues"
+   },
+   "examples": [
+    {
+     "module": "platform",
+     "workspaceId": "global",
+     "values": {
+      "upColor": "green-up"
+     }
+    }
+   ]
+  },
+  "storage.directories": {
+   "description": "The calling module's data directory and user folder.",
+   "effects": [
+    "read"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/Directories"
+   }
+  },
+  "tasks.cancel": {
+   "description": "Cancel a running long task.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/TaskId"
+   },
+   "output": {
+    "$ref": "#/$defs/Task"
+   },
+   "examples": [
+    {
+     "taskId": "task-1"
+    }
+   ]
+  },
+  "tasks.get": {
+   "description": "A long task's state, progress and, once finished, its result or error.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/TaskId"
+   },
+   "output": {
+    "$ref": "#/$defs/Task"
+   },
+   "examples": [
+    {
+     "taskId": "task-1"
+    }
+   ]
+  },
+  "tasks.start": {
+   "description": "(Module SDKs) record a long task of one of the caller's task actions.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "module"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/TaskStart"
+   },
+   "output": {
+    "$ref": "#/$defs/TaskId"
+   }
+  },
+  "workspace.close": {
+   "description": "Close a workspace: everything running for it (listed by activity.list) is stopped first, for real. A workspace\nnever saved is deleted as workspace.delete deletes one.",
+   "effects": [
+    "write",
+    "delete"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WorkspaceInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "workspaceId": "research"
+    }
+   ]
+  },
+  "workspace.copy": {
+   "description": "Copy a saved workspace, open or not: the copy is saved with the same layout under the name given (or\n\"<name> copy\"), and each module copies what it keeps for the workspace. The copy gets its own copy of the folder\nTALYX made for the workspace; a folder the user bound is shared, not copied. The copy is not opened.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/CopyInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Copied"
+   },
+   "examples": [
+    {
+     "workspaceId": "research",
+     "name": "Research copy"
+    }
+   ]
+  },
+  "workspace.delete": {
+   "description": "Delete a saved workspace (with the revision read, so a newer save is not lost).\nWhat the modules keep for it is deleted; the folder TALYX made for it goes to the Recycle Bin, one the user bound\nstays.",
+   "effects": [
+    "delete"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/DeleteInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {
+     "snapshotId": "saved-research"
+    }
+   ]
+  },
+  "workspace.delete_preview": {
+   "description": "List what deleting this workspace would remove: the modules' contents, then the folder TALYX made for it.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WorkspaceInput"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "type": "string"
+    }
+   },
+   "examples": [
+    {
+     "workspaceId": "research"
+    }
+   ]
+  },
+  "workspace.folder": {
+   "description": "The workspace's folder: its files, which modules read directly.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/WorkspaceInput"
+   },
+   "output": {
+    "$ref": "#/$defs/FolderOutput"
+   },
+   "examples": [
+    {
+     "workspaceId": "research"
+    }
+   ]
+  },
+  "workspace.list": {
+   "description": "Saved workspaces, most recently saved first.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/SavedList"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "workspace.list_open": {
+   "description": "Open workspaces, most recently opened last.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "type": "array",
+    "items": {
+     "$ref": "#/$defs/OpenRecord"
+    }
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "workspace.load": {
+   "description": "A saved workspace's state.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SnapshotId"
+   },
+   "output": {
+    "$ref": "#/$defs/SavedWorkspace"
+   },
+   "examples": [
+    {
+     "snapshotId": "saved-research"
+    }
+   ]
+  },
+  "workspace.open": {
+   "description": "Open a workspace: a new one, one by its workspaceId, or a saved one by snapshotId; the window shows it.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/OpenInput"
+   },
+   "output": {
+    "$ref": "#/$defs/OpenRecord"
+   },
+   "examples": [
+    {
+     "name": "Research"
+    }
+   ]
+  },
+  "workspace.save": {
+   "description": "Save the calling workspace's state (the window's layout and panels) under a name; a workspace has one saved\nstate, saved over with snapshotId and the revision read. Saved from no workspace, it is a new workspace's.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SaveInput"
+   },
+   "output": {
+    "$ref": "#/$defs/Saved"
+   },
+   "examples": [
+    {
+     "name": "Research",
+     "workspace": {
+      "tiles": []
+     }
+    }
+   ]
+  },
+  "workspace.set_folder": {
+   "description": "Bind the workspace to an existing folder (the user's choice), or back to its own.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "user"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/SetFolderInput"
+   },
+   "output": {
+    "$ref": "#/$defs/FolderOutput"
+   }
+  },
+  "workspace.shown": {
+   "description": "(The window) which open workspace this window shows and how many panels of each module it holds.",
+   "effects": [
+    "write"
+   ],
+   "callers": [
+    "user"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Shown"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   }
+  }
+ },
+ "streams": {
+  "activity.changes": {
+   "description": "Read activity.list on the first item, then again when work starts, ends or changes in a workspace.",
+   "cursor": false,
+   "trigger": false,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "$ref": "#/$defs/Empty"
+   }
+  },
+  "modules.changes": {
+   "description": "Modules being installed, enabled, disabled, started, restarted or failing; read modules.definitions again.",
+   "cursor": false,
+   "trigger": false,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "$ref": "#/$defs/ModulesChanged"
+   }
+  },
+  "notifications.activated": {
+   "description": "The user clicked a toast that leads somewhere.",
+   "cursor": false,
+   "trigger": false,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "$ref": "#/$defs/Activated"
+   }
+  },
+  "settings.changes": {
+   "description": "Settings that changed (a global change is reported once with workspaceId \"global\").",
+   "cursor": false,
+   "trigger": false,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "$ref": "#/$defs/SettingsChange"
+   }
+  },
+  "workspace.changes": {
+   "description": "Workspaces opening, closing and being copied, from now on.",
+   "cursor": false,
+   "trigger": false,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "$ref": "#/$defs/WorkspaceChange"
+   }
+  },
+  "workspace.windows": {
+   "description": "Every open workspace with the window showing it: now, then again whenever that changes.",
+   "cursor": false,
+   "trigger": false,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "$ref": "#/$defs/Windows"
+   }
+  }
+ },
+ "events": {
+  "activity.ended": {
+   "description": "Registered background work ended in its workspace.",
+   "payload": {
+    "$ref": "#/$defs/ActivityEnded"
+   }
+  }
+ },
+ "extensionPoints": {
+  "notification_section": {
+   "description": "A module's section of the notification settings.",
+   "descriptor": {
+    "$ref": "#/$defs/NotificationSection"
+   },
+   "actions": {},
+   "streams": {}
+  },
+  "settings_section": {
+   "description": "A section of the settings window drawn by a module's view.",
+   "descriptor": {
+    "$ref": "#/$defs/SettingsSection"
+   },
+   "actions": {},
+   "streams": {}
+  },
+  "status_item": {
+   "description": "An item in the window's status bar.",
+   "descriptor": {
+    "$ref": "#/$defs/StatusItem"
+   },
+   "actions": {},
+   "streams": {}
+  }
+ },
+ "settings": {
+  "upColor": {
+   "title": "Up color",
+   "description": "Which color means up for prices, P&L, buy and sell, everywhere in TALYX.",
+   "globalOnly": false,
+   "group": "Appearance",
+   "schema": {
+    "enum": [
+     "green-up",
+     "red-up"
+    ],
+    "type": "string"
+   },
+   "default": "green-up"
+  },
+  "launchOnLogin": {
+   "title": "Start TALYX when you sign in",
+   "description": "Works in the TALYX desktop app.",
+   "globalOnly": true,
+   "group": "Desktop",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": false
+  },
+  "keepAwakeWhileWatching": {
+   "title": "Keep the computer awake while work is running",
+   "description": "Only while an open workspace has work running. The screen can still turn off. Works in the TALYX desktop app.",
+   "globalOnly": true,
+   "group": "Desktop",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": false
+  }
+ },
+ "$defs": {
+  "AICall": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "action": {
+     "title": "Action",
+     "type": "string"
+    },
+    "input": {
+     "title": "Input"
+    },
+    "client": {
+     "description": "Which AI client is calling (a module acting as AI client, or an external client's name)",
+     "title": "Client",
+     "type": "string"
+    },
+    "conversation": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Conversation"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "action",
+    "input",
+    "client"
+   ],
+   "title": "AICall",
+   "type": "object"
+  },
+  "AICallResult": {
+   "additionalProperties": false,
+   "properties": {
+    "callId": {
+     "title": "Callid",
+     "type": "string"
+    },
+    "result": {
+     "title": "Result"
+    }
+   },
+   "required": [
+    "callId",
+    "result"
+   ],
+   "title": "AICallResult",
+   "type": "object"
+  },
+  "ActionDetail": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "The capability name, module.action",
+     "title": "Name",
+     "type": "string"
+    },
+    "description": {
+     "title": "Description",
+     "type": "string"
+    },
+    "effects": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Effects",
+     "type": "array"
+    },
+    "task": {
+     "title": "Task",
+     "type": "boolean"
+    },
+    "input": {
+     "additionalProperties": true,
+     "title": "Input",
+     "type": "object"
+    },
+    "examples": {
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Examples",
+     "type": "array"
+    },
+    "errors": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Errors",
+     "type": "array"
+    },
+    "effectBranches": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/EffectBranches"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "target": {
+     "anyOf": [
+      {
+       "pattern": "^[A-Za-z_][A-Za-z_0-9]*(\\.[A-Za-z_][A-Za-z_0-9]*)*$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Input field naming the object an action without effect branches acts on.",
+     "title": "Target"
+    },
+    "summaryPaths": {
+     "description": "Output paths to vocabulary Summary values; * selects array elements.",
+     "items": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "title": "Summarypaths",
+     "type": "array"
+    },
+    "outputFields": {
+     "items": {
+      "$ref": "#/$defs/OutputField"
+     },
+     "title": "Outputfields",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "description",
+    "effects",
+    "task",
+    "input",
+    "examples",
+    "errors",
+    "effectBranches",
+    "target",
+    "outputFields"
+   ],
+   "title": "ActionDetail",
+   "type": "object"
+  },
+  "Activated": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "navigation": {
+     "$ref": "#/$defs/Navigation"
+    }
+   },
+   "required": [
+    "id",
+    "navigation"
+   ],
+   "title": "Activated",
+   "type": "object"
+  },
+  "Activity": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "origin": {
+     "description": "Who asked for it",
+     "enum": [
+      "user",
+      "ai",
+      "module",
+      "code"
+     ],
+     "title": "Origin",
+     "type": "string"
+    },
+    "callId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Callid"
+    },
+    "openTarget": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/PanelTarget"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "progress": {
+     "default": null,
+     "title": "Progress"
+    }
+   },
+   "required": [
+    "module",
+    "id",
+    "title",
+    "origin"
+   ],
+   "title": "Activity",
+   "type": "object"
+  },
+  "ActivityEnded": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "activityId": {
+     "title": "Activityid",
+     "type": "string"
+    },
+    "callId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Callid"
+    },
+    "openTarget": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/PanelTarget"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "result": {
+     "enum": [
+      "completed",
+      "failed",
+      "stopped"
+     ],
+     "title": "Result",
+     "type": "string"
+    },
+    "summary": {
+     "default": null,
+     "title": "Summary"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "module",
+    "activityId",
+    "callId",
+    "openTarget",
+    "result"
+   ],
+   "title": "ActivityEnded",
+   "type": "object"
+  },
+  "ActivityList": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "activities": {
+     "items": {
+      "$ref": "#/$defs/Activity"
+     },
+     "title": "Activities",
+     "type": "array"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "activities"
+   ],
+   "title": "ActivityList",
+   "type": "object"
+  },
+  "ActivityRef": {
+   "additionalProperties": false,
+   "description": "One activity: its id is the module's own, so the module is part of who it is.",
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "module",
+    "id"
+   ],
+   "title": "ActivityRef",
+   "type": "object"
+  },
+  "ActivityStop": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "activities": {
+     "description": "Activities of activity.list",
+     "items": {
+      "$ref": "#/$defs/ActivityRef"
+     },
+     "minItems": 1,
+     "title": "Activities",
+     "type": "array"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "activities"
+   ],
+   "title": "ActivityStop",
+   "type": "object"
+  },
+  "CallRecord": {
+   "additionalProperties": false,
+   "properties": {
+    "callId": {
+     "title": "Callid",
+     "type": "string"
+    },
+    "capability": {
+     "title": "Capability",
+     "type": "string"
+    },
+    "caller": {
+     "additionalProperties": true,
+     "title": "Caller",
+     "type": "object"
+    },
+    "startedAt": {
+     "title": "Startedat",
+     "type": "string"
+    },
+    "endedAt": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Endedat"
+    },
+    "ok": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Ok"
+    },
+    "error": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Error"
+    },
+    "summary": {
+     "title": "Summary",
+     "type": "string"
+    }
+   },
+   "required": [
+    "callId",
+    "capability",
+    "caller",
+    "startedAt",
+    "endedAt",
+    "ok",
+    "error",
+    "summary"
+   ],
+   "title": "CallRecord",
+   "type": "object"
+  },
+  "CallsInput": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Workspaceid"
+    },
+    "limit": {
+     "default": 50,
+     "maximum": 200,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "CallsInput",
+   "type": "object"
+  },
+  "CatalogModule": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "description": {
+     "title": "Description",
+     "type": "string"
+    },
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "actions": {
+     "title": "Actions",
+     "type": "integer"
+    },
+    "guide": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/GuideInfo"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "docs": {
+     "description": "Authoring docs: how to write code the module runs; read one with ai.guide {module, topic}.",
+     "items": {
+      "$ref": "#/$defs/DocInfo"
+     },
+     "title": "Docs",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "description",
+    "module",
+    "actions",
+    "guide",
+    "docs"
+   ],
+   "title": "CatalogModule",
+   "type": "object"
+  },
+  "CatalogQuery": {
+   "additionalProperties": false,
+   "properties": {
+    "action": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Action"
+    },
+    "module": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Module"
+    },
+    "cursor": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Cursor",
+     "type": "integer"
+    }
+   },
+   "title": "CatalogQuery",
+   "type": "object"
+  },
+  "Change": {
+   "additionalProperties": false,
+   "properties": {
+    "callId": {
+     "title": "Callid",
+     "type": "string"
+    },
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    },
+    "label": {
+     "title": "Label",
+     "type": "string"
+    },
+    "openTarget": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/PanelTarget"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "kind": {
+     "enum": [
+      "created",
+      "updated",
+      "deleted"
+     ],
+     "title": "Kind",
+     "type": "string"
+    }
+   },
+   "required": [
+    "callId",
+    "objectId",
+    "label",
+    "openTarget",
+    "kind"
+   ],
+   "title": "Change",
+   "type": "object"
+  },
+  "ChangeCalls": {
+   "additionalProperties": false,
+   "properties": {
+    "callIds": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Callids",
+     "type": "array"
+    }
+   },
+   "required": [
+    "callIds"
+   ],
+   "title": "ChangeCalls",
+   "type": "object"
+  },
+  "ChangeRun": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "ChangeRun",
+   "type": "object"
+  },
+  "Channel": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "telegram",
+      "feishu",
+      "discord"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "enabled": {
+     "title": "Enabled",
+     "type": "boolean"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "integer"
+    },
+    "configured": {
+     "description": "Whether its credentials are stored (they are never read back).",
+     "title": "Configured",
+     "type": "boolean"
+    },
+    "settings": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Settings",
+     "type": "object"
+    },
+    "credentialMask": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Credentialmask"
+    },
+    "lastDelivery": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/LastDelivery"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "name",
+    "enabled",
+    "revision",
+    "configured",
+    "settings",
+    "credentialMask",
+    "lastDelivery"
+   ],
+   "title": "Channel",
+   "type": "object"
+  },
+  "ChannelCredentials": {
+   "additionalProperties": false,
+   "properties": {
+    "token": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Token"
+    },
+    "webhook": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Webhook"
+    },
+    "secret": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Secret"
+    }
+   },
+   "title": "ChannelCredentials",
+   "type": "object"
+  },
+  "ChannelDelete": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "const": "delete",
+     "title": "Operation",
+     "type": "string"
+    },
+    "channelId": {
+     "title": "Channelid",
+     "type": "string"
+    },
+    "expectedRevision": {
+     "title": "Expectedrevision",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "operation",
+    "channelId",
+    "expectedRevision"
+   ],
+   "title": "ChannelDelete",
+   "type": "object"
+  },
+  "ChannelDelivery": {
+   "additionalProperties": false,
+   "properties": {
+    "channelId": {
+     "title": "Channelid",
+     "type": "string"
+    },
+    "status": {
+     "enum": [
+      "pending",
+      "sending",
+      "sent",
+      "failed",
+      "unknown",
+      "cancelled"
+     ],
+     "title": "Status",
+     "type": "string"
+    },
+    "attempts": {
+     "title": "Attempts",
+     "type": "integer"
+    },
+    "createdAt": {
+     "title": "Createdat",
+     "type": "string"
+    },
+    "updatedAt": {
+     "title": "Updatedat",
+     "type": "string"
+    },
+    "error": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Error"
+    },
+    "truncated": {
+     "title": "Truncated",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "channelId",
+    "status",
+    "attempts",
+    "createdAt",
+    "updatedAt",
+    "error",
+    "truncated"
+   ],
+   "title": "ChannelDelivery",
+   "type": "object"
+  },
+  "ChannelId": {
+   "additionalProperties": false,
+   "properties": {
+    "channelId": {
+     "minLength": 1,
+     "title": "Channelid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "channelId"
+   ],
+   "title": "ChannelId",
+   "type": "object"
+  },
+  "ChannelSave": {
+   "additionalProperties": false,
+   "properties": {
+    "operation": {
+     "const": "save",
+     "title": "Operation",
+     "type": "string"
+    },
+    "channelId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "None for a new channel.",
+     "title": "Channelid"
+    },
+    "expectedRevision": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Expectedrevision"
+    },
+    "kind": {
+     "enum": [
+      "telegram",
+      "feishu",
+      "discord"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "name": {
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "enabled": {
+     "title": "Enabled",
+     "type": "boolean"
+    },
+    "settings": {
+     "$ref": "#/$defs/ChannelSettings"
+    },
+    "credentials": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ChannelCredentials"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Left out to keep the stored ones."
+    }
+   },
+   "required": [
+    "operation",
+    "channelId",
+    "expectedRevision",
+    "kind",
+    "name",
+    "enabled",
+    "settings"
+   ],
+   "title": "ChannelSave",
+   "type": "object"
+  },
+  "ChannelSettings": {
+   "additionalProperties": false,
+   "properties": {
+    "chatId": {
+     "anyOf": [
+      {
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Telegram only: the chat the bot writes to.",
+     "title": "Chatid"
+    }
+   },
+   "title": "ChannelSettings",
+   "type": "object"
+  },
+  "Configured": {
+   "additionalProperties": false,
+   "properties": {
+    "configured": {
+     "title": "Configured",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "configured"
+   ],
+   "title": "Configured",
+   "type": "object"
+  },
+  "Copied": {
+   "additionalProperties": false,
+   "properties": {
+    "snapshotId": {
+     "title": "Snapshotid",
+     "type": "string"
+    },
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "savedAt": {
+     "title": "Savedat",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "snapshotId",
+    "workspaceId",
+    "savedAt",
+    "revision",
+    "name"
+   ],
+   "title": "Copied",
+   "type": "object"
+  },
+  "CopyInput": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "maxLength": 200,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    }
+   },
+   "required": [
+    "workspaceId"
+   ],
+   "title": "CopyInput",
+   "type": "object"
+  },
+  "DefinitionsQuery": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Module"
+    }
+   },
+   "title": "DefinitionsQuery",
+   "type": "object"
+  },
+  "DeleteInput": {
+   "additionalProperties": false,
+   "properties": {
+    "snapshotId": {
+     "title": "Snapshotid",
+     "type": "string"
+    },
+    "expectedRevision": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Expectedrevision"
+    }
+   },
+   "required": [
+    "snapshotId"
+   ],
+   "title": "DeleteInput",
+   "type": "object"
+  },
+  "Delivery": {
+   "additionalProperties": false,
+   "properties": {
+    "producer": {
+     "title": "Producer",
+     "type": "string"
+    },
+    "notificationId": {
+     "title": "Notificationid",
+     "type": "string"
+    },
+    "deliveries": {
+     "items": {
+      "$ref": "#/$defs/ChannelDelivery"
+     },
+     "title": "Deliveries",
+     "type": "array"
+    }
+   },
+   "required": [
+    "producer",
+    "notificationId",
+    "deliveries"
+   ],
+   "title": "Delivery",
+   "type": "object"
+  },
+  "Directories": {
+   "additionalProperties": false,
+   "properties": {
+    "dataDir": {
+     "description": "The module's own data directory",
+     "title": "Datadir",
+     "type": "string"
+    },
+    "userDir": {
+     "description": "The module's folder among the user's files",
+     "title": "Userdir",
+     "type": "string"
+    },
+    "environmentsDir": {
+     "description": "The Python environments every module shares (the SDK's uv tool keeps them there, with who holds each)",
+     "title": "Environmentsdir",
+     "type": "string"
+    },
+    "modulesDir": {
+     "description": "Where the modules the user installs or writes live; a module folder made here is installed where it is",
+     "title": "Modulesdir",
+     "type": "string"
+    }
+   },
+   "required": [
+    "dataDir",
+    "userDir",
+    "environmentsDir",
+    "modulesDir"
+   ],
+   "title": "Directories",
+   "type": "object"
+  },
+  "DocInfo": {
+   "additionalProperties": false,
+   "properties": {
+    "topic": {
+     "title": "Topic",
+     "type": "string"
+    },
+    "title": {
+     "description": "What the document helps the reader write.",
+     "title": "Title",
+     "type": "string"
+    }
+   },
+   "required": [
+    "topic",
+    "title"
+   ],
+   "title": "DocInfo",
+   "type": "object"
+  },
+  "EffectBranch": {
+   "additionalProperties": false,
+   "properties": {
+    "effects": {
+     "items": {
+      "enum": [
+       "read",
+       "write",
+       "delete",
+       "code",
+       "external",
+       "funds"
+      ],
+      "type": "string"
+     },
+     "minItems": 1,
+     "title": "Effects",
+     "type": "array"
+    },
+    "target": {
+     "anyOf": [
+      {
+       "pattern": "^[A-Za-z_][A-Za-z_0-9]*(\\.[A-Za-z_][A-Za-z_0-9]*)*$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Target"
+    }
+   },
+   "required": [
+    "effects"
+   ],
+   "title": "EffectBranch",
+   "type": "object"
+  },
+  "EffectBranches": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "pattern": "^[A-Za-z_][A-Za-z_0-9]*(\\.[A-Za-z_][A-Za-z_0-9]*)*$",
+     "title": "Path",
+     "type": "string"
+    },
+    "branches": {
+     "additionalProperties": {
+      "$ref": "#/$defs/EffectBranch"
+     },
+     "minProperties": 1,
+     "title": "Branches",
+     "type": "object"
+    }
+   },
+   "required": [
+    "path",
+    "branches"
+   ],
+   "title": "EffectBranches",
+   "type": "object"
+  },
+  "Empty": {
+   "additionalProperties": false,
+   "properties": {},
+   "title": "Empty",
+   "type": "object"
+  },
+  "FolderOutput": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "path": {
+     "title": "Path",
+     "type": "string"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "path"
+   ],
+   "title": "FolderOutput",
+   "type": "object"
+  },
+  "GuideInfo": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "description": {
+     "title": "Description",
+     "type": "string"
+    }
+   },
+   "required": [
+    "name",
+    "description"
+   ],
+   "title": "GuideInfo",
+   "type": "object"
+  },
+  "GuidePage": {
+   "additionalProperties": false,
+   "properties": {
+    "text": {
+     "title": "Text",
+     "type": "string"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "text",
+    "nextCursor"
+   ],
+   "title": "GuidePage",
+   "type": "object"
+  },
+  "GuideQuery": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "topic": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "One of the module's authoring docs (ai.catalog lists them); without it, the module's guide.",
+     "title": "Topic"
+    },
+    "cursor": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Cursor",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "module"
+   ],
+   "title": "GuideQuery",
+   "type": "object"
+  },
+  "Implementation": {
+   "additionalProperties": false,
+   "properties": {
+    "moduleId": {
+     "title": "Moduleid",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "descriptor": {
+     "additionalProperties": true,
+     "title": "Descriptor",
+     "type": "object"
+    }
+   },
+   "required": [
+    "moduleId",
+    "id",
+    "descriptor"
+   ],
+   "title": "Implementation",
+   "type": "object"
+  },
+  "InstallInput": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "description": "A folder holding talyx.module.json, or a zip file of one",
+     "title": "Path",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "title": "InstallInput",
+   "type": "object"
+  },
+  "LastDelivery": {
+   "additionalProperties": false,
+   "properties": {
+    "producer": {
+     "title": "Producer",
+     "type": "string"
+    },
+    "notificationId": {
+     "title": "Notificationid",
+     "type": "string"
+    },
+    "status": {
+     "title": "Status",
+     "type": "string"
+    },
+    "error": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Error"
+    },
+    "updatedAt": {
+     "title": "Updatedat",
+     "type": "string"
+    }
+   },
+   "required": [
+    "producer",
+    "notificationId",
+    "status",
+    "error",
+    "updatedAt"
+   ],
+   "title": "LastDelivery",
+   "type": "object"
+  },
+  "LayoutSummary": {
+   "additionalProperties": false,
+   "description": "Each panel's module and its place, as shares of the workspace: a saved workspace's thumbnail.",
+   "properties": {
+    "tiles": {
+     "items": {
+      "$ref": "#/$defs/TileSummary"
+     },
+     "maxItems": 64,
+     "title": "Tiles",
+     "type": "array"
+    }
+   },
+   "required": [
+    "tiles"
+   ],
+   "title": "LayoutSummary",
+   "type": "object"
+  },
+  "ModuleDefinition": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "string"
+    },
+    "description": {
+     "title": "Description",
+     "type": "string"
+    },
+    "source": {
+     "enum": [
+      "official",
+      "installed"
+     ],
+     "title": "Source",
+     "type": "string"
+    },
+    "enabled": {
+     "title": "Enabled",
+     "type": "boolean"
+    },
+    "state": {
+     "enum": [
+      "starting",
+      "ready",
+      "failed",
+      "stopped"
+     ],
+     "title": "State",
+     "type": "string"
+    },
+    "problem": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Problem"
+    },
+    "pid": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Process ID of the connected module interpreter, or null when disconnected.",
+     "title": "Pid"
+    },
+    "manifest": {
+     "additionalProperties": true,
+     "description": "talyx.module.json (version 5)",
+     "title": "Manifest",
+     "type": "object"
+    },
+    "contract": {
+     "additionalProperties": true,
+     "description": "public/contract.json, generated from the module's code",
+     "title": "Contract",
+     "type": "object"
+    },
+    "digest": {
+     "title": "Digest",
+     "type": "string"
+    },
+    "assetBase": {
+     "description": "Where the module's files are read (its frontend entry is under it)",
+     "title": "Assetbase",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "version",
+    "description",
+    "source",
+    "enabled",
+    "state",
+    "problem",
+    "pid",
+    "manifest",
+    "contract",
+    "digest",
+    "assetBase"
+   ],
+   "title": "ModuleDefinition",
+   "type": "object"
+  },
+  "ModuleId": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "title": "ModuleId",
+   "type": "object"
+  },
+  "ModuleState": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "string"
+    },
+    "description": {
+     "title": "Description",
+     "type": "string"
+    },
+    "source": {
+     "enum": [
+      "official",
+      "installed"
+     ],
+     "title": "Source",
+     "type": "string"
+    },
+    "enabled": {
+     "title": "Enabled",
+     "type": "boolean"
+    },
+    "state": {
+     "enum": [
+      "starting",
+      "ready",
+      "failed",
+      "stopped"
+     ],
+     "title": "State",
+     "type": "string"
+    },
+    "problem": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Problem"
+    },
+    "pid": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Process ID of the connected module interpreter, or null when disconnected.",
+     "title": "Pid"
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "version",
+    "description",
+    "source",
+    "enabled",
+    "state",
+    "problem",
+    "pid"
+   ],
+   "title": "ModuleState",
+   "type": "object"
+  },
+  "ModulesChanged": {
+   "additionalProperties": false,
+   "properties": {
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "version"
+   ],
+   "title": "ModulesChanged",
+   "type": "object"
+  },
+  "ModulesPage": {
+   "additionalProperties": false,
+   "properties": {
+    "modules": {
+     "items": {
+      "$ref": "#/$defs/CatalogModule"
+     },
+     "title": "Modules",
+     "type": "array"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "modules",
+    "version",
+    "nextCursor"
+   ],
+   "title": "ModulesPage",
+   "type": "object"
+  },
+  "Navigation": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "panel": {
+     "description": "A panel type of the sender (``module.panel``).",
+     "minLength": 1,
+     "title": "Panel",
+     "type": "string"
+    },
+    "state": {
+     "additionalProperties": true,
+     "title": "State",
+     "type": "object"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "panel",
+    "state"
+   ],
+   "title": "Navigation",
+   "type": "object"
+  },
+  "NotificationId": {
+   "additionalProperties": false,
+   "properties": {
+    "notificationId": {
+     "minLength": 1,
+     "title": "Notificationid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "notificationId"
+   ],
+   "title": "NotificationId",
+   "type": "object"
+  },
+  "NotificationSection": {
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "minLength": 1,
+     "title": "Title",
+     "type": "string"
+    },
+    "view": {
+     "description": "The module's own view (its name in the manifest's views).",
+     "minLength": 1,
+     "title": "View",
+     "type": "string"
+    }
+   },
+   "required": [
+    "title",
+    "view"
+   ],
+   "title": "NotificationSection",
+   "type": "object"
+  },
+  "NotificationSend": {
+   "additionalProperties": false,
+   "properties": {
+    "notificationId": {
+     "description": "Chosen by the sender; sending the same id and content again is answered with the first delivery.",
+     "minLength": 1,
+     "title": "Notificationid",
+     "type": "string"
+    },
+    "channelIds": {
+     "items": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "minItems": 1,
+     "title": "Channelids",
+     "type": "array"
+    },
+    "title": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Title",
+     "type": "string"
+    },
+    "body": {
+     "maxLength": 20000,
+     "title": "Body",
+     "type": "string"
+    },
+    "navigation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Navigation"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    }
+   },
+   "required": [
+    "notificationId",
+    "channelIds",
+    "title",
+    "body"
+   ],
+   "title": "NotificationSend",
+   "type": "object"
+  },
+  "OpenInput": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "anyOf": [
+      {
+       "maxLength": 200,
+       "minLength": 1,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "An open workspace to show again, or a closed one to open again under its id.",
+     "title": "Workspaceid"
+    },
+    "snapshotId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A saved workspace: the workspace it is a saved state of opens again.",
+     "title": "Snapshotid"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "presentation": {
+     "default": null,
+     "description": "What the window keeps for the workspace while it is open (its unsaved layout).",
+     "title": "Presentation"
+    }
+   },
+   "title": "OpenInput",
+   "type": "object"
+  },
+  "OpenRecord": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Name"
+    },
+    "snapshotId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Snapshotid"
+    },
+    "presentation": {
+     "default": null,
+     "title": "Presentation"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "name",
+    "snapshotId"
+   ],
+   "title": "OpenRecord",
+   "type": "object"
+  },
+  "OutputField": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "type": {
+     "title": "Type",
+     "type": "string"
+    },
+    "unit": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Unit"
+    }
+   },
+   "required": [
+    "name",
+    "type"
+   ],
+   "title": "OutputField",
+   "type": "object"
+  },
+  "Panel": {
+   "additionalProperties": false,
+   "properties": {
+    "panelId": {
+     "title": "Panelid",
+     "type": "string"
+    },
+    "type": {
+     "description": "module.panel",
+     "title": "Type",
+     "type": "string"
+    },
+    "active": {
+     "title": "Active",
+     "type": "boolean"
+    },
+    "visible": {
+     "title": "Visible",
+     "type": "boolean"
+    },
+    "view": {
+     "default": null,
+     "description": "What the panel reports it shows (its module's own words), if it reports anything.",
+     "title": "View"
+    }
+   },
+   "required": [
+    "panelId",
+    "type",
+    "active",
+    "visible"
+   ],
+   "title": "Panel",
+   "type": "object"
+  },
+  "PanelCapture": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "bytes": {
+     "title": "Bytes",
+     "type": "integer"
+    },
+    "sha256": {
+     "title": "Sha256",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path",
+    "bytes",
+    "sha256"
+   ],
+   "title": "PanelCapture",
+   "type": "object"
+  },
+  "PanelId": {
+   "additionalProperties": false,
+   "properties": {
+    "panelId": {
+     "minLength": 1,
+     "title": "Panelid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "panelId"
+   ],
+   "title": "PanelId",
+   "type": "object"
+  },
+  "PanelOpen": {
+   "additionalProperties": false,
+   "properties": {
+    "type": {
+     "description": "module.panel",
+     "title": "Type",
+     "type": "string"
+    },
+    "state": {
+     "default": null,
+     "title": "State"
+    }
+   },
+   "required": [
+    "type"
+   ],
+   "title": "PanelOpen",
+   "type": "object"
+  },
+  "PanelTarget": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "panelType": {
+     "title": "Paneltype",
+     "type": "string"
+    },
+    "objectId": {
+     "title": "Objectid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "module",
+    "panelType",
+    "objectId"
+   ],
+   "title": "PanelTarget",
+   "type": "object"
+  },
+  "Panels": {
+   "additionalProperties": false,
+   "properties": {
+    "panels": {
+     "items": {
+      "$ref": "#/$defs/Panel"
+     },
+     "title": "Panels",
+     "type": "array"
+    }
+   },
+   "required": [
+    "panels"
+   ],
+   "title": "Panels",
+   "type": "object"
+  },
+  "PointInput": {
+   "additionalProperties": false,
+   "properties": {
+    "point": {
+     "description": "owner.name of an extension point",
+     "title": "Point",
+     "type": "string"
+    }
+   },
+   "required": [
+    "point"
+   ],
+   "title": "PointInput",
+   "type": "object"
+  },
+  "RevertChange": {
+   "additionalProperties": false,
+   "properties": {
+    "callId": {
+     "title": "Callid",
+     "type": "string"
+    },
+    "direction": {
+     "enum": [
+      "undo",
+      "redo"
+     ],
+     "title": "Direction",
+     "type": "string"
+    }
+   },
+   "required": [
+    "callId",
+    "direction"
+   ],
+   "title": "RevertChange",
+   "type": "object"
+  },
+  "RunId": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId"
+   ],
+   "title": "RunId",
+   "type": "object"
+  },
+  "RunStart": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Workspaceid"
+    },
+    "context": {
+     "default": null,
+     "title": "Context"
+    },
+    "conversation": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The AI conversation this code acts for: its changes can be listed and undone from that conversation",
+     "title": "Conversation"
+    }
+   },
+   "required": [
+    "workspaceId"
+   ],
+   "title": "RunStart",
+   "type": "object"
+  },
+  "RunToken": {
+   "additionalProperties": false,
+   "properties": {
+    "runId": {
+     "title": "Runid",
+     "type": "string"
+    },
+    "token": {
+     "title": "Token",
+     "type": "string"
+    },
+    "url": {
+     "description": "Where the process sends its calls (TALYX_CALL_URL)",
+     "title": "Url",
+     "type": "string"
+    }
+   },
+   "required": [
+    "runId",
+    "token",
+    "url"
+   ],
+   "title": "RunToken",
+   "type": "object"
+  },
+  "SaveInput": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Name",
+     "type": "string"
+    },
+    "workspace": {
+     "additionalProperties": true,
+     "description": "The window's layout and panel states (at most 4 MB).",
+     "title": "Workspace",
+     "type": "object"
+    },
+    "summary": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/LayoutSummary"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "snapshotId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Save over this saved workspace (with the revision read); left out for the first save.",
+     "title": "Snapshotid"
+    },
+    "expectedRevision": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Expectedrevision"
+    }
+   },
+   "required": [
+    "name",
+    "workspace"
+   ],
+   "title": "SaveInput",
+   "type": "object"
+  },
+  "Saved": {
+   "additionalProperties": false,
+   "properties": {
+    "snapshotId": {
+     "title": "Snapshotid",
+     "type": "string"
+    },
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "savedAt": {
+     "title": "Savedat",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "string"
+    }
+   },
+   "required": [
+    "snapshotId",
+    "workspaceId",
+    "savedAt",
+    "revision"
+   ],
+   "title": "Saved",
+   "type": "object"
+  },
+  "SavedInfo": {
+   "additionalProperties": false,
+   "properties": {
+    "snapshotId": {
+     "title": "Snapshotid",
+     "type": "string"
+    },
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "savedAt": {
+     "title": "Savedat",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "string"
+    },
+    "summary": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/LayoutSummary"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "snapshotId",
+    "workspaceId",
+    "name",
+    "savedAt",
+    "revision",
+    "summary"
+   ],
+   "title": "SavedInfo",
+   "type": "object"
+  },
+  "SavedList": {
+   "additionalProperties": false,
+   "properties": {
+    "saved": {
+     "items": {
+      "$ref": "#/$defs/SavedInfo"
+     },
+     "title": "Saved",
+     "type": "array"
+    },
+    "unreadable": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Unreadable",
+     "type": "array"
+    }
+   },
+   "required": [
+    "saved",
+    "unreadable"
+   ],
+   "title": "SavedList",
+   "type": "object"
+  },
+  "SavedWorkspace": {
+   "additionalProperties": false,
+   "properties": {
+    "snapshotId": {
+     "title": "Snapshotid",
+     "type": "string"
+    },
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "savedAt": {
+     "title": "Savedat",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "string"
+    },
+    "summary": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/LayoutSummary"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "workspace": {
+     "additionalProperties": true,
+     "title": "Workspace",
+     "type": "object"
+    }
+   },
+   "required": [
+    "snapshotId",
+    "workspaceId",
+    "name",
+    "savedAt",
+    "revision",
+    "summary",
+    "workspace"
+   ],
+   "title": "SavedWorkspace",
+   "type": "object"
+  },
+  "SecretKey": {
+   "additionalProperties": false,
+   "properties": {
+    "key": {
+     "pattern": "^[A-Za-z0-9._:-]{1,120}$",
+     "title": "Key",
+     "type": "string"
+    }
+   },
+   "required": [
+    "key"
+   ],
+   "title": "SecretKey",
+   "type": "object"
+  },
+  "SecretValue": {
+   "additionalProperties": false,
+   "properties": {
+    "value": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Value"
+    }
+   },
+   "required": [
+    "value"
+   ],
+   "title": "SecretValue",
+   "type": "object"
+  },
+  "SecretWrite": {
+   "additionalProperties": false,
+   "properties": {
+    "key": {
+     "pattern": "^[A-Za-z0-9._:-]{1,120}$",
+     "title": "Key",
+     "type": "string"
+    },
+    "value": {
+     "anyOf": [
+      {
+       "maxLength": 2500,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Value"
+    }
+   },
+   "required": [
+    "key",
+    "value"
+   ],
+   "title": "SecretWrite",
+   "type": "object"
+  },
+  "SetFolderInput": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "path": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Path"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "path"
+   ],
+   "title": "SetFolderInput",
+   "type": "object"
+  },
+  "SettingValue": {
+   "additionalProperties": false,
+   "properties": {
+    "value": {
+     "title": "Value"
+    },
+    "source": {
+     "enum": [
+      "default",
+      "global",
+      "workspace"
+     ],
+     "title": "Source",
+     "type": "string"
+    },
+    "globalOnly": {
+     "title": "Globalonly",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "value",
+    "source",
+    "globalOnly"
+   ],
+   "title": "SettingValue",
+   "type": "object"
+  },
+  "SettingsChange": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "keys": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Keys",
+     "type": "array"
+    }
+   },
+   "required": [
+    "module",
+    "workspaceId",
+    "keys"
+   ],
+   "title": "SettingsChange",
+   "type": "object"
+  },
+  "SettingsRead": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "description": "The module whose settings these are (\"platform\" for General)",
+     "title": "Module",
+     "type": "string"
+    },
+    "keys": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Keys"
+    },
+    "workspaceId": {
+     "description": "An open workspace's id, or \"global\"",
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "module",
+    "workspaceId"
+   ],
+   "title": "SettingsRead",
+   "type": "object"
+  },
+  "SettingsReset": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "workspaceId": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "keys": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Keys",
+     "type": "array"
+    }
+   },
+   "required": [
+    "module",
+    "workspaceId",
+    "keys"
+   ],
+   "title": "SettingsReset",
+   "type": "object"
+  },
+  "SettingsSection": {
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "minLength": 1,
+     "title": "Title",
+     "type": "string"
+    },
+    "view": {
+     "description": "The module's own view (its name in the manifest's views) drawn as the section.",
+     "minLength": 1,
+     "title": "View",
+     "type": "string"
+    },
+    "workspace": {
+     "default": false,
+     "description": "Also show this section in This workspace and pass the selected scope to the view.",
+     "title": "Workspace",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "title",
+    "view"
+   ],
+   "title": "SettingsSection",
+   "type": "object"
+  },
+  "SettingsValues": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "values": {
+     "additionalProperties": {
+      "$ref": "#/$defs/SettingValue"
+     },
+     "title": "Values",
+     "type": "object"
+    }
+   },
+   "required": [
+    "module",
+    "workspaceId",
+    "values"
+   ],
+   "title": "SettingsValues",
+   "type": "object"
+  },
+  "SettingsWrite": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "workspaceId": {
+     "description": "An open workspace's id, or \"global\"",
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "values": {
+     "additionalProperties": true,
+     "title": "Values",
+     "type": "object"
+    }
+   },
+   "required": [
+    "module",
+    "workspaceId",
+    "values"
+   ],
+   "title": "SettingsWrite",
+   "type": "object"
+  },
+  "Shown": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "moduleInstances": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "description": "How many panels of each module the window holds.",
+     "title": "Moduleinstances",
+     "type": "object"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "moduleInstances"
+   ],
+   "title": "Shown",
+   "type": "object"
+  },
+  "SnapshotId": {
+   "additionalProperties": false,
+   "properties": {
+    "snapshotId": {
+     "title": "Snapshotid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "snapshotId"
+   ],
+   "title": "SnapshotId",
+   "type": "object"
+  },
+  "StatusItem": {
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "minLength": 1,
+     "title": "Title",
+     "type": "string"
+    },
+    "icon": {
+     "minLength": 1,
+     "title": "Icon",
+     "type": "string"
+    },
+    "action": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The module's window action run when it is clicked.",
+     "title": "Action"
+    }
+   },
+   "required": [
+    "title",
+    "icon"
+   ],
+   "title": "StatusItem",
+   "type": "object"
+  },
+  "Task": {
+   "additionalProperties": false,
+   "properties": {
+    "taskId": {
+     "title": "Taskid",
+     "type": "string"
+    },
+    "action": {
+     "title": "Action",
+     "type": "string"
+    },
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "workspaceId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Workspaceid"
+    },
+    "state": {
+     "enum": [
+      "running",
+      "completed",
+      "failed",
+      "cancelled"
+     ],
+     "title": "State",
+     "type": "string"
+    },
+    "progress": {
+     "default": null,
+     "title": "Progress"
+    },
+    "result": {
+     "default": null,
+     "title": "Result"
+    },
+    "error": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Error"
+    }
+   },
+   "required": [
+    "taskId",
+    "action",
+    "module",
+    "workspaceId",
+    "state"
+   ],
+   "title": "Task",
+   "type": "object"
+  },
+  "TaskId": {
+   "additionalProperties": false,
+   "properties": {
+    "taskId": {
+     "title": "Taskid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "taskId"
+   ],
+   "title": "TaskId",
+   "type": "object"
+  },
+  "TaskStart": {
+   "additionalProperties": false,
+   "properties": {
+    "action": {
+     "title": "Action",
+     "type": "string"
+    }
+   },
+   "required": [
+    "action"
+   ],
+   "title": "TaskStart",
+   "type": "object"
+  },
+  "TileSummary": {
+   "additionalProperties": false,
+   "properties": {
+    "module": {
+     "title": "Module",
+     "type": "string"
+    },
+    "x": {
+     "maximum": 1,
+     "minimum": 0,
+     "title": "X",
+     "type": "number"
+    },
+    "y": {
+     "maximum": 1,
+     "minimum": 0,
+     "title": "Y",
+     "type": "number"
+    },
+    "w": {
+     "exclusiveMinimum": 0,
+     "maximum": 1,
+     "title": "W",
+     "type": "number"
+    },
+    "h": {
+     "exclusiveMinimum": 0,
+     "maximum": 1,
+     "title": "H",
+     "type": "number"
+    }
+   },
+   "required": [
+    "module",
+    "x",
+    "y",
+    "w",
+    "h"
+   ],
+   "title": "TileSummary",
+   "type": "object"
+  },
+  "Toast": {
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Title",
+     "type": "string"
+    },
+    "message": {
+     "maxLength": 4000,
+     "title": "Message",
+     "type": "string"
+    },
+    "navigation": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Navigation"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Where clicking it leads (notifications.activated reports the click)."
+    }
+   },
+   "required": [
+    "title",
+    "message"
+   ],
+   "title": "Toast",
+   "type": "object"
+  },
+  "Tool": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "The capability name, module.action",
+     "title": "Name",
+     "type": "string"
+    },
+    "description": {
+     "title": "Description",
+     "type": "string"
+    },
+    "effects": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Effects",
+     "type": "array"
+    },
+    "task": {
+     "title": "Task",
+     "type": "boolean"
+    },
+    "input": {
+     "additionalProperties": true,
+     "title": "Input",
+     "type": "object"
+    },
+    "examples": {
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Examples",
+     "type": "array"
+    },
+    "errors": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Errors",
+     "type": "array"
+    },
+    "effectBranches": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/EffectBranches"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "target": {
+     "anyOf": [
+      {
+       "pattern": "^[A-Za-z_][A-Za-z_0-9]*(\\.[A-Za-z_][A-Za-z_0-9]*)*$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Input field naming the object an action without effect branches acts on.",
+     "title": "Target"
+    },
+    "summaryPaths": {
+     "description": "Output paths to vocabulary Summary values; * selects array elements.",
+     "items": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "title": "Summarypaths",
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "description",
+    "effects",
+    "task",
+    "input",
+    "examples",
+    "errors",
+    "effectBranches",
+    "target"
+   ],
+   "title": "Tool",
+   "type": "object"
+  },
+  "ToolsPage": {
+   "additionalProperties": false,
+   "properties": {
+    "tools": {
+     "items": {
+      "$ref": "#/$defs/Tool"
+     },
+     "title": "Tools",
+     "type": "array"
+    },
+    "version": {
+     "title": "Version",
+     "type": "integer"
+    },
+    "nextCursor": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Nextcursor"
+    }
+   },
+   "required": [
+    "tools",
+    "version",
+    "nextCursor"
+   ],
+   "title": "ToolsPage",
+   "type": "object"
+  },
+  "WindowOf": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Name"
+    },
+    "snapshotId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Snapshotid"
+    },
+    "sessionId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "The window showing it, if one does.",
+     "title": "Sessionid"
+    },
+    "moduleInstances": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Moduleinstances",
+     "type": "object"
+    }
+   },
+   "required": [
+    "workspaceId",
+    "name",
+    "snapshotId",
+    "sessionId",
+    "moduleInstances"
+   ],
+   "title": "WindowOf",
+   "type": "object"
+  },
+  "Windows": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaces": {
+     "items": {
+      "$ref": "#/$defs/WindowOf"
+     },
+     "title": "Workspaces",
+     "type": "array"
+    }
+   },
+   "required": [
+    "workspaces"
+   ],
+   "title": "Windows",
+   "type": "object"
+  },
+  "WorkspaceChange": {
+   "additionalProperties": false,
+   "description": "A workspace opened, closed, was copied, or had its saved state written or renamed.",
+   "properties": {
+    "kind": {
+     "enum": [
+      "opened",
+      "closed",
+      "copied",
+      "saved"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "workspaceId": {
+     "title": "Workspaceid",
+     "type": "string"
+    },
+    "sourceWorkspaceId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Sourceworkspaceid"
+    },
+    "snapshotId": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Snapshotid"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "revision": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Revision"
+    }
+   },
+   "required": [
+    "kind",
+    "workspaceId"
+   ],
+   "title": "WorkspaceChange",
+   "type": "object"
+  },
+  "WorkspaceInput": {
+   "additionalProperties": false,
+   "properties": {
+    "workspaceId": {
+     "maxLength": 200,
+     "minLength": 1,
+     "title": "Workspaceid",
+     "type": "string"
+    }
+   },
+   "required": [
+    "workspaceId"
+   ],
+   "title": "WorkspaceInput",
+   "type": "object"
+  }
+ }
+}

@@ -1,0 +1,3 @@
+{"manifestVersion": 5, "id": "market", "name": "Market (local source)", "version": "2.1.0",
+ "description": "The real Market on a local deterministic source, without the network",
+ "entries": {"backend": "backend.entry"}, "requires": {}}

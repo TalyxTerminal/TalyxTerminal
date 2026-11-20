@@ -1,0 +1,27 @@
+/* All objects. Components come from the SDK; this file lays out the kind groups and the cells Home shares. */
+.qv-objects-dim { color: var(--tx-text-3); }
+.qv-objects-dim2 { color: var(--tx-text-2); font-family: var(--tx-font); }
+.qv-objects-up { color: var(--tx-up); }
+.qv-objects-down { color: var(--tx-down); }
+.qv-objects-fix { color: var(--tx-ember-text); }
+.qv-objects-search { display: inline-flex; align-items: center; gap: 6px; width: 150px; }
+.qv-objects-search .tx-icon { width: 12px; height: 12px; color: var(--tx-text-3); flex: none; }
+.qv-objects-group { padding: 4px 14px 14px; border-bottom: 1px solid var(--tx-line); }
+.qv-objects-grouphead { display: flex; align-items: baseline; gap: 10px; padding: 10px 0 6px; font-size: var(--tx-size-sm); }
+.qv-objects-grouphead b { font-weight: var(--tx-weight-strong); }
+.qv-objects-grouphead span { color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.qv-objects-table tbody tr { cursor: pointer; }
+.qv-objects-sort { cursor: pointer; user-select: none; }
+.qv-objects-sort:hover, .qv-objects-sort[aria-sort] { color: var(--tx-text); }
+.qv-objects-name { font-weight: var(--tx-weight-medium); }
+.qv-objects-note { margin-left: 8px; font-size: var(--tx-size-xs); color: var(--tx-text-3); font-weight: var(--tx-weight); }
+.qv-objects-hz { margin-left: 4px; font-size: 10px; color: var(--tx-text-4); }
+.qv-objects-rep { display: inline-flex; align-items: center; gap: 6px; font-family: var(--tx-font); }
+.qv-objects-star { width: 12px; height: 12px; color: var(--tx-watch); }
+.qv-objects-kn { display: inline-flex; align-items: baseline; gap: 6px; font-family: var(--tx-font); }
+.qv-objects-kn > span { color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.qv-objects-kn b { font-family: var(--tx-font-mono); font-weight: var(--tx-weight); }
+.qv-objects-checks { display: inline-flex; align-items: center; gap: 5px; font-family: var(--tx-font-mono); }
+.qv-objects-checks[data-ok] { color: var(--tx-text-3); }
+.qv-objects-checks i { width: 6px; height: 6px; border-radius: 50%; background: var(--tx-watch); }
+.qv-objects-why { display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }

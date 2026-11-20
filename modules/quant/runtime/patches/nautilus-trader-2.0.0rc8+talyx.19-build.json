@@ -1,0 +1,61 @@
+{
+  "version": "2.0.0rc8+talyx.19",
+  "base": {
+    "version": "2.0.0rc8+talyx.18",
+    "sha256": "532c57db95bb50bdd0aaed346421b42a866ae5f472f79b255c22e5d978bb1cb9"
+  },
+  "patches": [
+    {
+      "file": "patches/nautilus-trader-2.0.0rc8+talyx.19-stock-conditions.patch",
+      "sha256": "fda7483f0b54ac3566545ad688e19d69e61c000932308c8b8ab21df0560ef442"
+    }
+  ],
+  "source": "upstream/nautilus-trader-2.0.0rc8+talyx.19-source.tar.gz",
+  "source_sha256": "c1c698562128347390f498e3f0f0574c0f551ee508e340ec6e84abc84dfe4342",
+  "tools": {
+    "tool_lock_sha256": "bbd8d131a1970789a73b8675f2f3736ddf91aa9c7d65ae0c33fb9022e185a7bd",
+    "rustc": "1.99.1 (build/tools.json)",
+    "compiler": "MSVC 14.44.35207 Hostx64/x64 (tools/native-build/assets.lock.json)",
+    "maturin": "1.15.0 (build/tools.json)",
+    "jobs": 4,
+    "profile": {
+      "name": "release",
+      "lto": false,
+      "codegen_units": 16
+    }
+  },
+  "features": [
+    "extension-module",
+    "arrow",
+    "betfair",
+    "high-precision",
+    "mimalloc",
+    "redis",
+    "postgres",
+    "defi",
+    "hypersync",
+    "tracing-bridge"
+  ],
+  "command": [
+    "maturin",
+    "build",
+    "--release",
+    "--locked",
+    "--interpreter",
+    "<CPython 3.13>",
+    "--out",
+    "<wheels>",
+    "--features",
+    "extension-module,arrow,betfair,high-precision,mimalloc,redis,postgres,defi,hypersync,tracing-bridge"
+  ],
+  "typing": {
+    "generated_typing_files": 38,
+    "native_binaries_sha256": {
+      "nautilus_trader/_libnautilus.cp313-win_amd64.pyd": "d736c70d7327d7b3ed49424b562657b6fef4b13865615438fb2802a27c975b7d"
+    },
+    "packaging": "Maturin compiled wheel plus same-DLL Rust inventory typing; wheel RECORD regenerated"
+  },
+  "native_sha256": "d736c70d7327d7b3ed49424b562657b6fef4b13865615438fb2802a27c975b7d",
+  "wheel": "nautilus_trader-2.0.0rc8+talyx.19-cp313-cp313-win_amd64.whl",
+  "sha256": "68f9c3747dc210d97d1a7c8694134154196e4a52538a094b9497329c8e61ad58"
+}

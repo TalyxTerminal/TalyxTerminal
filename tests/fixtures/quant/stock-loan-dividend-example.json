@@ -1,0 +1,27 @@
+{
+  "actionId": "source-dividend",
+  "instrument": "TEST.XSIM",
+  "account": "XSIM-001",
+  "exNs": 1700000003000000123,
+  "payNs": 1700000005000000123,
+  "amountPerUnit": "1",
+  "currency": "USD",
+  "stockLoanDividendTerms": [
+    {
+      "sourceRef": "synthetic-stock-loan-contract-v1",
+      "actionId": "source-dividend",
+      "instrument": "TEST.XSIM",
+      "account": "XSIM-001",
+      "positionId": "TEST.XSIM-RESEARCH-001",
+      "validFromNs": 1700000000000000123,
+      "validUntilNs": 1700000010000000123,
+      "exNs": 1700000003000000123,
+      "payNs": 1700000005000000123,
+      "currency": "USD",
+      "manufacturedDividendPerUnit": "1",
+      "amountBasis": "Contract fixes one USD per short share; no gross-up",
+      "withholdingAndTaxTreatment": "Synthetic zero withholding; payment fixed by supplied contract",
+      "cashDebitAndCollateralPolicy": "native_account"
+    }
+  ]
+}

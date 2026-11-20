@@ -1,0 +1,19 @@
+{
+  "manifestVersion": 5,
+  "id": "example_addon",
+  "name": "Example add-on",
+  "version": "1.0.0",
+  "description": "An example that builds on another module: it calls example_core's action, mounts its view, and puts a section in the settings window and an item in the status bar.",
+  "entries": {"backend": "backend.entry", "frontend": "frontend/module.js"},
+  "requires": {"example_core": {}},
+  "panels": {
+    "main": {"title": "Example add-on", "icon": "module", "launcher": true, "description": "Counts a text with example_core and shows it in example_core's card."}
+  },
+  "views": {
+    "settings": {"description": "The add-on's section of the settings window."}
+  },
+  "provides": {
+    "platform.settings_section": [{"id": "prefs", "descriptor": {"title": "Example add-on", "view": "settings"}}],
+    "platform.status_item": [{"id": "state", "descriptor": {"title": "Example add-on", "icon": "module"}}]
+  }
+}

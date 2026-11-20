@@ -1,0 +1,10 @@
+{
+ "contractVersion": 5,
+ "module": "example_addon",
+ "actions": {},
+ "streams": {},
+ "events": {},
+ "extensionPoints": {},
+ "settings": {},
+ "$defs": {}
+}

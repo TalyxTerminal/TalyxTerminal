@@ -1,0 +1,396 @@
+diff --git a/crates/execution/src/matching.rs b/crates/execution/src/matching.rs
+--- a/crates/execution/src/matching.rs
++++ b/crates/execution/src/matching.rs
+@@ -148,6 +148,7 @@
+     pending_ask: SmallVec<[RestingOrder; 2]>,
+     order_index: AHashMap<ClientOrderId, (OrderSide, Option<(BookKind, Price)>)>,
+     pub(crate) mark: Option<Price>,
++    pub(crate) index: Option<Price>,
+ }
+ 
+ impl OrderMatchingCore {
+@@ -169,6 +170,7 @@
+             pending_ask: SmallVec::new(),
+             order_index: AHashMap::new(),
+             mark: None,
++            index: None,
+         }
+     }
+ 
+@@ -272,6 +274,7 @@
+         self.ask = None;
+         self.last = None;
+         self.mark = None;
++        self.index = None;
+         self.bid_limits.clear();
+         self.ask_limits.clear();
+         self.bid_stops.clear();
+@@ -593,6 +596,7 @@
+         match trigger_type {
+             TriggerType::LastPrice => self.last,
+             TriggerType::MarkPrice => self.mark,
++            TriggerType::IndexPrice => self.index,
+             TriggerType::LastOrBidAsk => self.last.or(quote_price),
+             _ => quote_price,
+         }
+diff --git a/crates/execution/src/matching_engine/mod.rs b/crates/execution/src/matching_engine/mod.rs
+--- a/crates/execution/src/matching_engine/mod.rs
++++ b/crates/execution/src/matching_engine/mod.rs
+@@ -47,7 +47,7 @@
+ use nautilus_core::{UUID4, UnixNanos, correctness::CorrectnessResult};
+ use nautilus_model::{
+     data::{
+-        Bar, BarType, InstrumentClose, MarkPriceUpdate, OrderBookDelta, OrderBookDeltas,
++        Bar, BarType, InstrumentClose, IndexPriceUpdate, MarkPriceUpdate, OrderBookDelta, OrderBookDeltas,
+         OrderBookDepth, QuoteTick, TradeTick,
+         order::{BookOrder, OrderId},
+     },
+@@ -1937,6 +1937,24 @@
+         );
+     }
+ 
++    pub fn process_index_price(&mut self, index: &IndexPriceUpdate) {
++        self.core.index = Some(index.value);
++        self.iterate_with_mode(
++            index.ts_init,
++            AggressorSide::NoAggressor,
++            OrderMatchMode::StopTriggers(TriggerType::IndexPrice),
++        );
++    }
++
++    fn reference_price(&self, trigger: Option<TriggerType>) -> Option<Price> {
++        match trigger {
++            Some(TriggerType::MarkPrice) => self.core.mark,
++            Some(TriggerType::IndexPrice) => self.core.index,
++            _ => None,
++        }
++    }
++
++
+     /// Processes a quote tick to update the market state.
+     pub fn process_quote_tick(&mut self, quote: &QuoteTick) {
+         if let Err(error) = self.observe_conditions(quote.ts_event.as_u64()) {
+@@ -4593,8 +4611,8 @@
+             Some(activation_price) => self.core.is_touch_triggered_with_trigger_type(
+                 side,
+                 activation_price,
+-                if order.trigger_type() == Some(TriggerType::MarkPrice) {
+-                    TriggerType::MarkPrice
++                if matches!(order.trigger_type(), Some(TriggerType::MarkPrice | TriggerType::IndexPrice)) {
++                    order.trigger_type().unwrap()
+                 } else {
+                     TriggerType::BidAsk
+                 },
+@@ -4852,6 +4870,7 @@
+         match trigger_type {
+             TriggerType::LastPrice => last,
+             TriggerType::MarkPrice => self.core.mark,
++            TriggerType::IndexPrice => self.core.index,
+             TriggerType::LastOrBidAsk => last.or(match order_side {
+                 OrderSide::Buy => ask,
+                 OrderSide::Sell => bid,
+@@ -4882,8 +4901,8 @@
+             return true;
+         }
+ 
+-        let (bid, ask) = if order.trigger_type() == Some(TriggerType::MarkPrice) {
+-            (self.core.mark, self.core.mark)
++        let (bid, ask) = if matches!(order.trigger_type(), Some(TriggerType::MarkPrice | TriggerType::IndexPrice)) {
++            (self.reference_price(order.trigger_type()), self.reference_price(order.trigger_type()))
+         } else {
+             (bid, ask)
+         };
+@@ -5031,7 +5050,7 @@
+                 {
+                     let trigger_price = order
+                         .trigger_price()
+-                        .filter(|_| order.trigger_type() != Some(TriggerType::MarkPrice));
++                        .filter(|_| !matches!(order.trigger_type(), Some(TriggerType::MarkPrice | TriggerType::IndexPrice)));
+                     match order.order_side() {
+                         OrderSide::Buy => {
+                             let target_price = if trigger_price
+@@ -5113,7 +5132,7 @@
+         // For stop market and market-if-touched orders during bar H/L/C processing, fill at trigger price
+         // (market moved through the trigger). For gaps/immediate triggers, fill at market.
+         if !self.fill_at_market
+-            && order.trigger_type() != Some(TriggerType::MarkPrice)
++            && !matches!(order.trigger_type(), Some(TriggerType::MarkPrice | TriggerType::IndexPrice))
+             && self.book_type == BookType::L1_MBP
+             && !fills.is_empty()
+             && matches!(
+@@ -5282,7 +5301,7 @@
+         // Skip consumption for synthetic fill-model books (prices may not exist
+         // in the real book) and trigger price fills (gap price may not exist)
+         let is_trigger_price_fill = !self.fill_at_market
+-            && order.trigger_type() != Some(TriggerType::MarkPrice)
++            && !matches!(order.trigger_type(), Some(TriggerType::MarkPrice | TriggerType::IndexPrice))
+             && self.book_type == BookType::L1_MBP
+             && matches!(
+                 order.order_type(),
+@@ -7277,8 +7296,8 @@
+             order,
+             self.core.bid,
+             self.core.ask,
+-            if order.trigger_type() == Some(TriggerType::MarkPrice) {
+-                self.core.mark
++            if matches!(order.trigger_type(), Some(TriggerType::MarkPrice | TriggerType::IndexPrice)) {
++                self.reference_price(order.trigger_type())
+             } else {
+                 self.core.last
+             },
+diff --git a/crates/execution/src/trailing.rs b/crates/execution/src/trailing.rs
+--- a/crates/execution/src/trailing.rs
++++ b/crates/execution/src/trailing.rs
+@@ -112,7 +112,7 @@
+     };
+ 
+     match trigger_type {
+-        TriggerType::LastPrice | TriggerType::MarkPrice => {
++        TriggerType::LastPrice | TriggerType::MarkPrice | TriggerType::IndexPrice => {
+             let last = last.ok_or(OrderError::InvalidStateTransition)?;
+             let cand_trigger = compute(trailing_offset, last)?;
+             new_trigger_price = maybe_move(&mut trigger_price, cand_trigger, better_trigger);
+diff --git a/crates/backtest/src/exchange.rs b/crates/backtest/src/exchange.rs
+--- a/crates/backtest/src/exchange.rs
++++ b/crates/backtest/src/exchange.rs
+@@ -52,7 +52,7 @@
+ use nautilus_model::{
+     accounts::{Account, AccountAny, margin_model::MarginModelHandle},
+     data::{
+-        Bar, Data, FundingRateUpdate, InstrumentClose, InstrumentStatus, MarkPriceUpdate,
++        Bar, Data, FundingRateUpdate, InstrumentClose, InstrumentStatus, IndexPriceUpdate, MarkPriceUpdate,
+         OrderBookDelta, OrderBookDeltas, OrderBookDepth, QuoteTick, TradeTick,
+     },
+     enums::{
+@@ -1100,6 +1100,34 @@
+         self.drain_oto_commands();
+         Ok(())
+     }
++    pub fn process_index_price(&mut self, index: &IndexPriceUpdate) -> anyhow::Result<()> {
++        self.pre_process_modules(&Data::IndexPrice(*index))?;
++
++        if !self.matching_engines.contains_key(&index.instrument_id) {
++            let instrument = {
++                let cache = self.cache.as_ref().borrow();
++                cache.instrument(&index.instrument_id).cloned()
++            };
++
++            if let Some(instrument) = instrument {
++                self.add_instrument(instrument)?;
++            } else {
++                anyhow::bail!(
++                    "No matching engine found for instrument {}",
++                    index.instrument_id
++                );
++            }
++        }
++
++        if let Some(matching_engine) = self.matching_engines.get_mut(&index.instrument_id) {
++            matching_engine.process_index_price(index);
++        } else {
++            anyhow::bail!("Matching engine should be initialized");
++        }
++
++        self.drain_oto_commands();
++        Ok(())
++    }
+ 
+     /// Processes a quote tick and updates the matching engine.
+     ///
+diff --git a/crates/backtest/src/engine.rs b/crates/backtest/src/engine.rs
+--- a/crates/backtest/src/engine.rs
++++ b/crates/backtest/src/engine.rs
+@@ -979,8 +979,7 @@
+             | DataRef::Quote(_)
+             | DataRef::Trade(_)
+             | DataRef::Bar(_)
+-            | DataRef::MarkPrice(_) => SettlementScope::Data(Some(data.instrument_id())),
+-            DataRef::IndexPrice(_) => SettlementScope::Data(None),
++            | DataRef::MarkPrice(_) | DataRef::IndexPrice(_) => SettlementScope::Data(Some(data.instrument_id())),
+             DataRef::FundingRate(_) => SettlementScope::Data(Some(data.instrument_id())),
+             DataRef::OptionGreeks(_) => SettlementScope::Data(None),
+             DataRef::InstrumentStatus(_) | DataRef::InstrumentClose(_) => {
+@@ -1588,7 +1587,6 @@
+         if matches!(
+             data,
+             DataRef::Instrument(_)
+-                | DataRef::IndexPrice(_)
+                 | DataRef::OptionGreeks(_)
+                 | DataRef::Custom(_)
+         ) {
+@@ -1621,9 +1619,7 @@
+                 DataRef::Trade(trade) => exchange_ref.process_trade_tick(trade)?,
+                 DataRef::Bar(bar) => exchange_ref.process_bar(*bar)?,
+                 DataRef::MarkPrice(mark) => exchange_ref.process_mark_price(mark)?,
+-                DataRef::IndexPrice(_) => {
+-                    unreachable!("filtered before exchange routing")
+-                }
++                DataRef::IndexPrice(index) => exchange_ref.process_index_price(index)?,
+                 DataRef::FundingRate(funding) => {
+                     let settlement_ns =
+                         exchange_ref.process_funding_rate_deferred(*funding, data.ts_init())?;
+diff --git a/crates/adapters/sandbox/src/execution.rs b/crates/adapters/sandbox/src/execution.rs
+--- a/crates/adapters/sandbox/src/execution.rs
++++ b/crates/adapters/sandbox/src/execution.rs
+@@ -52,7 +52,7 @@
+ };
+ use nautilus_model::{
+     accounts::AccountAny,
+-    data::{Bar, InstrumentClose, InstrumentStatus, OrderBookDeltas, QuoteTick, TradeTick},
++    data::{Bar, MarkPriceUpdate, IndexPriceUpdate, InstrumentClose, InstrumentStatus, OrderBookDeltas, QuoteTick, TradeTick},
+     enums::OmsType,
+     events::{
+         OrderCancelRejected, OrderEventAny, OrderModifyRejected, OrderRejected, PositionEvent,
+@@ -96,6 +96,10 @@
+     trade_handler: TypedHandler<TradeTick>,
+     bar_pattern: MStr<Pattern>,
+     bar_handler: TypedHandler<Bar>,
++    mark_pattern: MStr<Pattern>,
++    mark_handler: TypedHandler<MarkPriceUpdate>,
++    index_pattern: MStr<Pattern>,
++    index_handler: TypedHandler<IndexPriceUpdate>,
+     status_pattern: MStr<Pattern>,
+     status_handler: ShareableMessageHandler,
+     close_pattern: MStr<Pattern>,
+@@ -283,6 +287,23 @@
+             })
+         };
+ 
++        let mark_handler = {
++            let inner = inner_weak.clone();
++            TypedHandler::from(move |value: &MarkPriceUpdate| {
++                if value.instrument_id.venue == venue && let Some(inner_rc) = inner.upgrade() {
++                    SandboxInner::on_mark_price(&inner_rc, value);
++                }
++            })
++        };
++        let index_handler = {
++            let inner = inner_weak.clone();
++            TypedHandler::from(move |value: &IndexPriceUpdate| {
++                if value.instrument_id.venue == venue && let Some(inner_rc) = inner.upgrade() {
++                    SandboxInner::on_index_price(&inner_rc, value);
++                }
++            })
++        };
++
+         let status_handler = {
+             let inner = inner_weak.clone();
+             ShareableMessageHandler::from_typed(move |status: &InstrumentStatus| {
+@@ -317,6 +338,8 @@
+         let quote_pattern: MStr<Pattern> = format!("data.quotes.{venue}.*").into();
+         let trade_pattern: MStr<Pattern> = format!("data.trades.{venue}.*").into();
+         let bar_pattern: MStr<Pattern> = "data.bars.*".into();
++        let mark_pattern: MStr<Pattern> = format!("data.mark_prices.{venue}.*").into();
++        let index_pattern: MStr<Pattern> = format!("data.index_prices.{venue}.*").into();
+         let status_pattern: MStr<Pattern> = format!("data.status.{venue}.*").into();
+         let close_pattern: MStr<Pattern> = format!("data.close.{venue}.*").into();
+         let position_pattern: MStr<Pattern> = "events.position.*".into();
+@@ -325,6 +348,8 @@
+         msgbus::subscribe_quotes(quote_pattern, quote_handler.clone(), Some(10));
+         msgbus::subscribe_trades(trade_pattern, trade_handler.clone(), Some(10));
+         msgbus::subscribe_bars(bar_pattern, bar_handler.clone(), Some(10));
++        msgbus::subscribe_mark_prices(mark_pattern, mark_handler.clone(), Some(10));
++        msgbus::subscribe_index_prices(index_pattern, index_handler.clone(), Some(10));
+         msgbus::subscribe_any(status_pattern, status_handler.clone(), Some(10));
+         msgbus::subscribe_instrument_close(close_pattern, close_handler.clone(), Some(10));
+         msgbus::subscribe_position_events(position_pattern, position_handler.clone(), Some(10));
+@@ -338,6 +363,7 @@
+             trade_handler,
+             bar_pattern,
+             bar_handler,
++            mark_pattern, mark_handler, index_pattern, index_handler,
+             status_pattern,
+             status_handler,
+             close_pattern,
+@@ -358,6 +384,8 @@
+             msgbus::unsubscribe_quotes(handlers.quote_pattern, &handlers.quote_handler);
+             msgbus::unsubscribe_trades(handlers.trade_pattern, &handlers.trade_handler);
+             msgbus::unsubscribe_bars(handlers.bar_pattern, &handlers.bar_handler);
++            msgbus::unsubscribe_mark_prices(handlers.mark_pattern, &handlers.mark_handler);
++            msgbus::unsubscribe_index_prices(handlers.index_pattern, &handlers.index_handler);
+             msgbus::unsubscribe_any(handlers.status_pattern, &handlers.status_handler);
+             msgbus::unsubscribe_instrument_close(handlers.close_pattern, &handlers.close_handler);
+             msgbus::unsubscribe_position_events(
+@@ -457,6 +485,26 @@
+     /// # Errors
+     ///
+     /// Returns an error if the instrument is not found in the cache.
++    pub fn process_mark_price(&self, value: &MarkPriceUpdate) -> anyhow::Result<()> {
++        SandboxInner::drain_inbound(&self.inner);
++        let instrument = self.cache.borrow().try_instrument(&value.instrument_id)?.clone();
++        let mut inner = self.inner.borrow_mut();
++        inner.ensure_matching_engine(&instrument);
++        if let Some(engine) = inner.matching_engines.get_mut(&value.instrument_id) { engine.process_mark_price(value); }
++        inner.drain_oto_commands();
++        Ok(())
++    }
++
++    pub fn process_index_price(&self, value: &IndexPriceUpdate) -> anyhow::Result<()> {
++        SandboxInner::drain_inbound(&self.inner);
++        let instrument = self.cache.borrow().try_instrument(&value.instrument_id)?.clone();
++        let mut inner = self.inner.borrow_mut();
++        inner.ensure_matching_engine(&instrument);
++        if let Some(engine) = inner.matching_engines.get_mut(&value.instrument_id) { engine.process_index_price(value); }
++        inner.drain_oto_commands();
++        Ok(())
++    }
++
+     pub fn process_quote_tick(&self, quote: &QuoteTick) -> anyhow::Result<()> {
+         SandboxInner::drain_inbound(&self.inner);
+ 
+@@ -1092,6 +1140,24 @@
+         self.drain_oto_commands();
+     }
+ 
++    fn process_mark_price(&mut self, value: &MarkPriceUpdate) {
++        let instrument = self.cache.borrow().instrument(&value.instrument_id).cloned();
++        if let Some(instrument) = instrument {
++            self.ensure_matching_engine(&instrument);
++            if let Some(engine) = self.matching_engines.get_mut(&value.instrument_id) { engine.process_mark_price(value); }
++        }
++        self.drain_oto_commands();
++    }
++
++    fn process_index_price(&mut self, value: &IndexPriceUpdate) {
++        let instrument = self.cache.borrow().instrument(&value.instrument_id).cloned();
++        if let Some(instrument) = instrument {
++            self.ensure_matching_engine(&instrument);
++            if let Some(engine) = self.matching_engines.get_mut(&value.instrument_id) { engine.process_index_price(value); }
++        }
++        self.drain_oto_commands();
++    }
++
+     fn process_bar(&mut self, bar: &Bar) {
+         if !self.config.bar_execution {
+             return;
+@@ -1602,6 +1668,13 @@
+             return;
+         };
+ 
++        let (mark, index) = {
++            let cache = self.cache.borrow();
++            (cache.mark_price(&instrument_id).copied(), cache.index_price(&instrument_id).copied())
++        };
++        if let Some(mark) = mark { engine.process_mark_price(&mark); }
++        if let Some(index) = index { engine.process_index_price(&index); }
++
+         // Cached ticks initialize an empty engine; replay would replenish consumed liquidity
+         if self.config.liquidity_consumption
+             && (engine.get_book().update_count != 0 || engine.get_core().last.is_some())
+@@ -1776,6 +1849,16 @@
+     fn on_trade_tick(inner: &Rc<RefCell<Self>>, trade: &TradeTick) {
+         Self::drain_inbound(inner);
+         inner.borrow_mut().process_trade_tick(trade);
++    }
++
++    fn on_mark_price(inner: &Rc<RefCell<Self>>, value: &MarkPriceUpdate) {
++        Self::drain_inbound(inner);
++        inner.borrow_mut().process_mark_price(value);
++    }
++
++    fn on_index_price(inner: &Rc<RefCell<Self>>, value: &IndexPriceUpdate) {
++        Self::drain_inbound(inner);
++        inner.borrow_mut().process_index_price(value);
+     }
+ 
+     fn on_bar(inner: &Rc<RefCell<Self>>, bar: &Bar) {

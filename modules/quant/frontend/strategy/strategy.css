@@ -1,0 +1,234 @@
+/* A strategy's page, beyond what the factor page's classes (factor.css) give it. Values from tokens only. */
+.qx-keys { flex: none; padding: 10px 16px 0; }
+.qx-notes { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 2px 0; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.qx-mainrow { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 10px 16px 0; }
+.qx-mainchart { position: relative; flex: 1 1 60%; min-width: 0; min-height: 200px; display: flex; }
+.qx-mainchart > * { flex: 1; min-width: 0; }
+.qx-mainchart > .fx-rch[data-size] { height: auto; min-height: 0; }
+.qx-mainrow > .tx-checklist { flex: 0 0 38%; min-width: 260px; overflow: auto; }
+.qx-chart-missing { display: flex; flex-direction: column; }
+.qx-tfilters { display: flex; align-items: center; gap: 8px; padding: 6px 12px; flex-wrap: wrap; }
+.qx-tfilters label { display: inline-flex; align-items: center; gap: 4px; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.qx-trades, .qx-rebalances, .qx-log { display: flex; flex-direction: column; min-height: 0; }
+.qx-loglines { flex: 1; min-height: 0; overflow: auto; font-family: var(--tx-font-mono); font-size: var(--tx-size-xs); }
+.qx-logline { display: grid; grid-template-columns: 84px 44px 80px 1fr; gap: 8px; padding: 2px 12px; cursor: default; }
+.qx-logline[data-hit] { background: var(--tx-ember-select); }
+.qx-logline[data-kind="Error"], .qx-logline[data-kind="Stop"] { color: var(--tx-ember-text); }
+.qx-logkind { color: var(--tx-text-3); }
+.qx-failed { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.qx-locals h4, .qx-noprice h4, .qx-block h4 { margin: 0 0 4px; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); color: var(--tx-text-2); }
+.qx-accounts { display: grid; gap: 2px; padding: 0 12px; font-size: var(--tx-size-sm); }
+.qx-accounts > [role=row] { display: grid; grid-template-columns: 90px 1fr; gap: 8px; align-items: center; }
+.qx-lev { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+/* Results */
+.qx-results { flex: 1; min-height: 0; display: flex; }
+.qx-toc { flex: none; width: 150px; display: flex; flex-direction: column; padding: 10px 6px; border-inline-end: 1px solid var(--tx-line-2); overflow: auto; }
+.qx-rscroll { flex: 1; min-width: 0; overflow: auto; padding: 0 20px 40px; }
+.qx-rhead { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 8px 0; background: var(--tx-bg); }
+.qx-section { padding: 14px 0 6px; border-bottom: 1px solid var(--tx-line-2); }
+.qx-section > h3 { margin: 0 0 8px; font-size: var(--tx-size-md); font-weight: var(--tx-weight-medium); }
+.qx-block { margin: 10px 0; }
+.qx-code { height: 100%; }
+
+.qx-res { flex: 1 1 58%; min-height: 220px; overflow: hidden; }
+.fx-main > .fx-bot { flex: 0 1 32%; min-height: 150px; }
+/* Long lists draw only the rows in view (useVirtual): the rows have one height, so the empty space above and below stands for the rest. */
+.qx-scroll { overflow: auto; min-height: 0; }
+.qx-trades > .qx-scroll { flex: 1; }
+.qx-trades .qx-scroll td, .qx-trades .qx-scroll th { white-space: nowrap; }
+.qx-trades .qx-scroll thead th { position: sticky; top: 0; background: var(--tx-bg); z-index: 1; }
+.qx-logline { box-sizing: border-box; align-items: center; white-space: nowrap; overflow: hidden; padding-block: 0; }
+.qx-logline > span { overflow: hidden; text-overflow: ellipsis; }
+.qx-compare { display: flex; justify-content: flex-end; padding: 2px 12px 0; }
+.qx-trades, .qx-log { height: 100%; }
+
+.qx-keys { position: relative; }
+.qx-keys > .qx-compare { position: absolute; top: 0; right: 12px; padding: 0; }
+/* The bottom of Work: runs, trades or rebalances beside the log (the log of the run on screen, in simulated time). */
+.qx-bot { flex-direction: row !important; }
+.qx-botleft { flex: 1 1 58%; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.qx-botlog { flex: 0 0 42%; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-inline-start: 1px solid var(--tx-line); }
+.qx-botlog > .qx-log { flex: 1; height: auto; }
+.qx-botlog .qx-tfilters { flex-wrap: nowrap; overflow-x: auto; flex: none; }
+.qx-botlog .qx-logline { grid-template-columns: 92px 56px 84px minmax(0, 1fr); gap: 6px; }
+/* The bottom of Work: runs, trades or rebalances beside the log (the log of the run on screen, in simulated time). */
+.qx-bot { flex-direction: row !important; }
+.qx-botleft { flex: 1 1 58%; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.qx-botlog { flex: 0 0 42%; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-inline-start: 1px solid var(--tx-line); }
+.qx-botlog > .qx-log { flex: 1; height: auto; }
+.qx-botlog .qx-tfilters { flex-wrap: nowrap; overflow-x: auto; flex: none; }
+.qx-botlog .qx-logline { grid-template-columns: 92px 56px 84px minmax(0, 1fr); gap: 6px; }
+
+/* Work, as the draft lays it out: a head with the run and Runs tabs, the key numbers, the chart (the checks in its head), then trades (or the portfolio's
+   tables) beside the log. Each block has a head of its own: title, count, filters, and a button to fill the work area. */
+.qx-wmain { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
+.qx-lhead { flex: none; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px 0 4px; border-bottom: 1px solid var(--tx-line); white-space: nowrap; overflow: hidden; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.qx-ltab { height: 38px; display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; border: 0; background: none; font: inherit; color: var(--tx-text-3); cursor: pointer; position: relative; }
+.qx-ltab[aria-selected="true"] { color: var(--tx-text); }
+.qx-ltab[aria-selected="true"]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 1.5px; background: var(--tx-ember); }
+.qx-ltab b { font-family: var(--tx-font-mono); font-weight: var(--tx-weight-strong); color: var(--tx-text); }
+.qx-cnt { font-family: var(--tx-font-mono); font-size: var(--tx-size-xs); color: var(--tx-text-4); }
+.qx-sep { width: 1px; height: 16px; background: var(--tx-line-2); margin: 0 4px; flex: none; }
+.qx-per { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.qx-runsfull { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; }
+.qx-wmain > .qx-keys { padding: 0; border-bottom: 1px solid var(--tx-line); }
+.qx-wmain > .qx-keys .tx-keynumbers { border: 0; }
+/* The chart is the body of the first screen: the whole width (the checks fold into its head) and most of the height; trades and the log under it. */
+.qx-upper { flex: 1 1 68%; min-height: auto; display: flex; min-width: 0; }
+.qx-lower { flex: 1 1 32%; min-height: 140px; display: flex; min-width: 0; }
+/* Too narrow for the trades and the log side by side: the log goes under the trades, each the full width (its head clipped the trade filters),
+   and the two share half the work area with the chart. */
+@container (max-width: 680px) {
+  .qx-lower { flex: 1 1 50%; flex-direction: column; min-height: 280px; }
+  .qx-lower > .qx-lowleft, .qx-lower > .qx-botlog { flex: 1 1 0; }
+  .qx-lower > .qx-botlog { border-inline-start: 0; border-top: 1px solid var(--tx-line); }
+}
+.qx-upper[data-max="trades"], .qx-upper[data-max="log"], .qx-lower[data-max="chart"] { display: none; }
+.qx-upper[data-max="trades"] + .fx-hgut, .qx-upper[data-max="log"] + .fx-hgut, .qx-lower[data-max="chart"] { display: none; }
+.qx-lower[data-max="trades"] > .qx-botlog, .qx-lower[data-max="log"] > .qx-lowleft { display: none; }
+.qx-lower[data-max] { flex: 1 1 auto !important; }
+.qx-blk { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.qx-bh { flex: none; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px 0 14px; white-space: nowrap; overflow: hidden; }
+.qx-bh h3 { margin: 0; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); color: var(--tx-text); }
+.qx-s11 { font-size: var(--tx-size-xs); }
+.qx-chartblk { flex: 1 1 62%; }
+.qx-chartblk > .qx-mainchart { flex: 1; padding: 0 0 4px; }
+.qx-ckcol { flex: 0 0 38%; min-width: 250px; max-width: 420px; border-inline-start: 1px solid var(--tx-line); overflow: auto; scrollbar-width: none; }
+.qx-ckcol .tx-checklist { border: 0; }
+.qx-lowleft { flex: 1 1 58%; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.qx-lower > .qx-botlog { border-inline-start: 1px solid var(--tx-line); }
+.qx-lowleft > .qx-trades { flex: 1; height: auto; }
+.qx-chip { height: 22px; border: 1px solid var(--tx-line-2); border-radius: var(--tx-radius-pill); background: none; color: var(--tx-text-2); font: inherit; font-size: var(--tx-size-xs); padding: 0 8px; }
+.qx-chip.on { border-color: var(--tx-line-3, var(--tx-line-2)); color: var(--tx-text); background: var(--tx-white-04); }
+.qx-chip svg { width: 11px; height: 11px; vertical-align: -2px; }
+.qx-note2 { display: flex; align-items: center; gap: 10px; padding: 8px 14px; color: var(--tx-text-3); font-size: var(--tx-size-sm); }
+.qx-dd-go { color: var(--tx-text-3); white-space: nowrap; }
+.qx-dd-go svg { width: 11px; height: 11px; vertical-align: -2px; }
+.qx-ddrow { cursor: pointer; }
+.qx-key { display: inline-flex; align-items: center; gap: 5px; font-size: var(--tx-size-xs); color: var(--tx-text-3); white-space: nowrap; }
+.qx-key i { display: inline-block; width: 14px; border-top: 1.5px solid var(--tx-text); }
+.qx-key i.d { border-top: 1px dashed var(--tx-text-3); }
+.qx-key i.o { border-top: 1px solid var(--tx-text-3); }
+.qx-key i.sq { width: 8px; height: 8px; border: 0; border-radius: 2px; }
+.qx-key i.dn { border-top-color: var(--tx-down); }
+@container (max-width: 900px) { .qx-x5 { display: none; } }
+/* No standing scroll bars in the tables and the log; columns that do not fit a narrow block drop out (as the draft's x2/x3 classes). */
+.qx-scroll, .qx-loglines { scrollbar-width: none; }
+.qx-scroll::-webkit-scrollbar, .qx-loglines::-webkit-scrollbar { display: none; }
+.qx-lowleft { container-type: inline-size; }
+@container (max-width: 760px) { .qx-trades table.fx-g :is(th, td):nth-child(n+9) { display: none; } }
+@container (max-width: 560px) { .qx-trades table.fx-g :is(th, td):is(:nth-child(4), :nth-child(8)) { display: none; } }
+/* Results as the draft lays it out: the contents on the left with an ember mark on the section in view, each section under its own head, tables side by side. */
+.qx-toc { width: 186px; padding: 8px 0; gap: 0; }
+.qx-rscroll { padding: 0; }
+.qx-rhead { padding: 8px 14px; }
+.qx-section { padding: 6px 0 14px; border-bottom: 1px solid var(--tx-line); }
+.qx-section > .qx-block, .qx-section > .fx-rtable, .qx-section > .fx-rch, .qx-section > .fx-why, .qx-section > .qx-plot, .qx-section > .qx-tfilters, .qx-section > p { margin-inline: 14px; }
+.qx-sec { padding: 6px 0 4px; min-width: 0; }
+.qx-sec > .fx-rtable, .qx-sec > .qx-keys { padding: 0 14px; }
+.qx-grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.qx-grid1 { display: block; border-top: 1px solid var(--tx-line); }
+.qx-grid1 > .qx-pane { padding: 4px 0 6px; }
+.qx-grid1 > .qx-pane > h4 { margin: 0 14px 4px; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); color: var(--tx-text-2); }
+.qx-grid1 > .qx-pane > .fx-rch { margin: 0 14px; }
+.qx-grid2 > * + * { border-left: 1px solid var(--tx-line); }
+.qx-grid2 > .qx-sec > .fx-rtable { padding: 0 14px; }
+.qx-section > .qx-sec { margin-inline: 0; }
+/* While another run is read the page stays as it is, faded after a moment (a quick read never flickers). */
+.qx-rsecs > .qx-section { transition: opacity var(--tx-fast) var(--tx-ease); }
+.qx-rscroll[aria-busy="true"] .qx-rsecs > .qx-section { opacity: .45; transition-delay: 150ms; }
+/* Where the page is wide enough, sections sit two to a row in their order; wide tables and rows of charts keep the whole width. A half section stacks
+   what it had side by side. */
+.qx-rscroll { container-type: inline-size; }
+@container (min-width: 1400px) {
+  .qx-rsecs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qx-rsecs > .qx-section[data-wide] { grid-column: 1 / -1; }
+  .qx-rsecs > .qx-section:not([data-wide]) > .qx-grid2 { grid-template-columns: minmax(0, 1fr); }
+  .qx-rsecs > .qx-section:not([data-wide]) > .qx-grid2 > * + * { border-left: 0; }
+  .qx-rsecs > .qx-section:not([data-wide]) table.qx-heat :is(th, td) { padding-inline: 5px; }   /* twelve months, the year and the benchmark in half the page */
+}
+.qx-section .down { color: var(--tx-down); }
+.qx-section > .qx-grid2 { margin-inline: 0; }
+.qx-grid2 > .qx-sec > .fx-rch, .qx-grid2 > .qx-sec > .fx-why { margin: 0 14px; }
+.qx-locals { min-width: 0; }
+.qx-locals table.fx-g td.fx-vcell { max-width: 0; width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qx-failed { padding: 0; }
+.qx-failed > .tx-failure { margin: 10px 14px; }
+.qx-errout { margin: 0 14px 10px; padding: 8px 10px; max-height: 320px; overflow: auto; white-space: pre-wrap; font-family: var(--tx-font-mono); font-size: var(--tx-size-sm); color: var(--tx-text-2); background: var(--tx-surface-2); border-radius: var(--tx-radius-sm); }
+.qx-differs { display: flex; gap: 10px; padding: 6px 14px 2px; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
+.qx-differs b { font-weight: var(--tx-weight-medium); color: var(--tx-text-3); }
+.qx-rhead { gap: 12px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+.qx-rhead .qx-per { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fx-rch[data-size="m"] { height: 260px; }
+.fx-rch[data-size="dd"] { height: 130px; }
+.qx-bars { padding: 0 14px; }
+.qx-barrow { display: grid; grid-template-columns: 88px minmax(0, 1fr) 96px 56px; align-items: center; gap: 10px; height: 26px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); }
+.qx-barrow[data-total] { font-weight: var(--tx-weight-medium); }
+.qx-barrow > span:nth-child(3), .qx-barrow > span:nth-child(4) { text-align: right; font-family: var(--tx-font-mono); }
+.qx-barrow .up { color: var(--tx-up); } .qx-barrow .down { color: var(--tx-down); }
+.qx-bartrack { display: flex; justify-content: flex-end; }
+.qx-bartrack i { display: block; height: 8px; border-radius: 1px; background: var(--tx-text-3); }
+.qx-bartrack i[data-kind="total"] { background: var(--tx-text-2); }
+/* Returns by period and Rolling, as the draft: annual bars beside the monthly heat table; Sharpe, beta and volatility side by side */
+.qx-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.qx-grid3 > * + * { border-left: 1px solid var(--tx-line); }
+.qx-grid3 > .qx-sec > .fx-rch, .qx-grid3 > .qx-sec > .fx-why { margin: 0 14px; }
+.qx-periods { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); }
+.qx-heat td, .qx-heat th { text-align: center; padding-inline: 4px; }
+.qx-heat td { font-family: var(--tx-font-mono); font-size: 11px; }
+.qx-heat tbody th { text-align: right; color: var(--tx-text-3); font-weight: normal; }
+.qx-cellgo { all: unset; cursor: pointer; display: block; width: 100%; }
+.qx-cellgo:hover, .qx-cellgo:focus-visible { text-decoration: underline; }
+.qx-grid3 .fx-rch[data-size="s"], .qx-grid2 > .qx-pane .fx-rch[data-size="s"], .qx-periods .fx-rch[data-size="s"] { height: 170px; }
+.qx-grid3 > .qx-pane, .qx-grid2 > .qx-pane { min-width: 0; padding: 4px 0 6px; }
+.qx-grid3 > .qx-pane > h4, .qx-grid2 > .qx-pane > h4 { margin: 0 14px 4px; font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); color: var(--tx-text-2); }
+.qx-grid3 > .qx-pane > .fx-rch, .qx-grid3 > .qx-pane > .fx-why, .qx-grid2 > .qx-pane > .fx-rch, .qx-grid2 > .qx-pane > .fx-why { margin: 0 14px; }
+/* From gross to net: a cost's name keeps its "incomplete" tag on its own line */
+.qx-barrow { grid-template-columns: 132px minmax(0, 1fr) 96px 56px; }
+.qx-barrow > span:first-child { display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
+/* The checks in the chart's head: the list behind one button, the ones not passed named beside it. */
+.qx-ckstrip { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; margin-left: 10px; }
+.qx-ckall { flex: none; gap: 6px; }
+.qx-ckcount { color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+.qx-ckflag { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 0; border-radius: var(--tx-radius-sm); background: none; font: inherit; font-size: var(--tx-size-sm); color: var(--tx-text); cursor: pointer; }
+.qx-checks-compact { display: none; }
+@container (max-width: 680px) {
+  .qx-ckstrip .qx-ckflag, .qx-ckstrip .qx-ckcount { display: none; }
+  .qx-checks-compact { display: inline; color: var(--tx-text-3); font-size: var(--tx-size-xs); }
+}
+.qx-ckflag:hover { background: var(--tx-white-04); }
+.qx-ckflag i { width: 6px; height: 6px; border-radius: 50%; background: var(--tx-watch); }
+.qx-ckflag[data-state="fix"] i { background: var(--tx-ember); }
+.qx-ckflag b { font-family: var(--tx-font-mono); font-weight: var(--tx-weight); color: var(--tx-text-2); letter-spacing: var(--tx-tracking-tight); }
+.qx-stepday { min-width: 90px; text-align: center; font-weight: var(--tx-weight-medium); }
+.qx-locals-nb { margin: 8px 12px; }
+.qx-livechecks > div { display: flex; justify-content: space-between; padding: 0 12px; min-height: 27px; align-items: center; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); color: var(--tx-text-3); }
+.qx-datanotes { color: var(--tx-text-2); }
+.qx-notelist { margin: 0; padding: 10px 14px 10px 28px; max-width: 520px; display: grid; gap: 6px; font-size: var(--tx-size-sm); color: var(--tx-text-2); line-height: 1.45; }
+/* A failed run's row in the runs table says why, cut to the column, the whole error on hover. */
+.qx-failrow { display: inline-flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; }
+.qx-failwhy { color: var(--tx-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* A read-only setting in words (the mono face wrapped "Perpetual, no borrow"). */
+.qx-ro { color: var(--tx-text); white-space: nowrap; }
+/* Tables take their column's width, as the factor's do: the columns are narrow enough that a number stays near its label. */
+.qx-results table.fx-g, .qx-runsfull .tx-runtable { width: 100%; }
+.qx-results table.fx-g th, .qx-results table.fx-g td { padding-inline: 12px; }
+.qx-runsfull td[data-kind="change"] .tx-tag { margin-inline-end: 6px; }
+
+/* The engine's own figures sit side by side; the months get twice the years' room. */
+.qx-engine { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); column-gap: 28px; }
+.qx-engine > .qx-block { margin-inline: 0; min-width: 0; }
+.qx-engine .tx-regionhead { min-width: 0; }
+.qx-engine .tx-regionsub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qx-periods { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+
+.qx-toc-select { display: none; }
+@container qx (max-width: 760px) {
+  .qx-results { flex-direction: column; }
+  .qx-toc { display: none; }
+  .qx-toc-select { display: flex; padding: var(--tx-space-1) var(--tx-space-3); }
+  .qx-rhead { flex-wrap: wrap; gap: var(--tx-space-1) var(--tx-space-2); }
+  .qx-rhead .qx-per { white-space: normal; }
+  .qx-grid2, .qx-grid3, .qx-periods { grid-template-columns: minmax(0, 1fr); }
+  .qx-rsecs > .qx-section { min-width: 0; }
+}

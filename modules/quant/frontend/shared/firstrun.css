@@ -1,0 +1,29 @@
+/* An object before its first run (FirstRun.tsx): the run's number set large in the margin, a ledger of what the run will use, then the ways to start. */
+.qx-first { container-type: inline-size; display: grid; grid-template-columns: 96px minmax(0, 780px); grid-auto-rows: auto; column-gap: var(--tx-space-2); row-gap: var(--tx-space-8); align-content: start;
+  padding: var(--tx-space-8) var(--tx-space-8) var(--tx-space-8) var(--tx-space-6); }
+.qx-first-n { grid-row: 1; grid-column: 1; justify-self: end; padding-right: var(--tx-space-5-half); font-family: var(--tx-font-mono); font-size: calc(var(--tx-size-display) * 1.5); font-weight: var(--tx-weight-medium);
+  line-height: 1; letter-spacing: -.05em; color: var(--tx-text-4); }
+.qx-first-lines { grid-row: 1; grid-column: 2; margin: 0; border-top: 1px solid var(--tx-line); }
+.qx-first-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; min-height: 32px; border-bottom: 1px solid var(--tx-line); font-size: var(--tx-size-sm); }
+.qx-first-line dt { color: var(--tx-text-3); }
+.qx-first-line dd { display: flex; align-items: center; margin: 0; min-width: 0; color: var(--tx-text); overflow-wrap: anywhere; }
+/* A value that opens its setting keeps its text on the column edge: the button's own inline padding hangs into the gap. */
+.qx-first-line dd > button.tx-btn { width: auto; max-width: calc(100% + var(--tx-space-2-half)); height: auto; min-height: var(--tx-button-sm);
+  margin-inline-start: calc(-1 * var(--tx-space-2-half)); white-space: normal; color: inherit; }
+.qx-first-line[data-missing] dd { color: var(--tx-ember-text); }
+.qx-first-line[data-missing] :is(dd > span, dd > button > span)::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: var(--tx-space-2); border-radius: 50%; background: var(--tx-ember); vertical-align: 1px; }
+.qx-first-more { grid-row: 2; grid-column: 2; min-width: 0; }
+.qx-first-note { margin: 0; font-size: var(--tx-size-sm); color: var(--tx-text-3); }
+.qx-starters h3 { margin: 0 0 var(--tx-space-2-half); font-size: var(--tx-size-sm); font-weight: var(--tx-weight-strong); color: var(--tx-text); }
+.qx-starters ul { margin: 0; padding: 0; list-style: none; }
+.qx-starters button.tx-btn { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); align-items: center; column-gap: var(--tx-space-4); width: 100%; height: auto; min-height: var(--tx-space-8); padding-block: var(--tx-space-1-half); white-space: normal; }
+.qx-starters b { font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); color: var(--tx-text-2); }
+.qx-starters code { min-width: 0; overflow-wrap: anywhere; font-family: var(--tx-font-mono); font-size: var(--tx-size-sm); color: var(--tx-text-3); opacity: .7; }
+@container (max-width: 560px) {
+  .qx-first-line, .qx-starters button.tx-btn { grid-template-columns: 96px minmax(0, 1fr); }
+}
+@container qx (max-width: 720px) {
+  .qx-first { grid-template-columns: minmax(0, 1fr); padding: var(--tx-space-6) var(--tx-space-4); }
+  .qx-first-n { display: none; }
+  .qx-first-lines, .qx-first-more { grid-column: 1; }
+}

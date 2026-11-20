@@ -1,0 +1,15 @@
+{
+  "market.export": {"actions":["market.export"]},
+  "panel:cancel": {"actions":["market.downloads"]},
+  "panel:configure": {"userOnly":"This entry writes the user's source key to the credential manager. Other settings use market.write_source."},
+  "panel:detail": {"actions":["market.instruments.get","market.read_coverage","market.read_series"]},
+  "panel:disk": {"actions":["market.estimate_fetch"]},
+  "panel:folder": {"actions":["platform.workspace.folder"]},
+  "panel:import": {"actions":["market.write_data"]},
+  "panel:jobs": {"actions":["market.downloads"]},
+  "panel:library": {"actions":["market.read_coverage"]},
+  "panel:resume": {"actions":["market.downloads"]},
+  "panel:scan": {"actions":["market.scan_import"]},
+  "panel:selections": {"actions":["market.instruments.get","market.read_coverage"]},
+  "panel:sources": {"actions":["market.read_source"]}
+}

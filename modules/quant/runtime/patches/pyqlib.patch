@@ -1,0 +1,55 @@
+--- a/qlib/contrib/report/analysis_position/report.py
++++ b/qlib/contrib/report/analysis_position/report.py
+@@ -32,14 +32,14 @@
+     return series - series.cummax()
+ 
+ 
+-def _calculate_report_data(df: pd.DataFrame) -> pd.DataFrame:
++def _calculate_report_data(df: pd.DataFrame, time_format='%Y-%m-%d') -> pd.DataFrame:
+     """
+ 
+     :param df:
+     :return:
+     """
+     index_names = df.index.names
+-    df.index = df.index.strftime("%Y-%m-%d")
++    df.index = df.index.strftime(time_format)
+ 
+     report_df = pd.DataFrame()
+ 
+@@ -63,7 +63,7 @@
+     return report_df
+ 
+ 
+-def _report_figure(df: pd.DataFrame) -> [list, tuple]:
++def _report_figure(df: pd.DataFrame, time_format='%Y-%m-%d') -> [list, tuple]:
+     """
+ 
+     :param df:
+@@ -71,7 +71,7 @@
+     """
+ 
+     # Get data
+-    report_df = _calculate_report_data(df)
++    report_df = _calculate_report_data(df, time_format=time_format)
+ 
+     # Maximum Drawdown
+     max_start_date, max_end_date = _calculate_maximum(report_df)
+@@ -163,7 +163,7 @@
+     return (figure,)
+ 
+ 
+-def report_graph(report_df: pd.DataFrame, show_notebook: bool = True) -> [list, tuple]:
++def report_graph(report_df: pd.DataFrame, show_notebook: bool = True, time_format='%Y-%m-%d') -> [list, tuple]:
+     """display backtest report
+ 
+         Example:
+@@ -241,7 +241,7 @@
+     :return: if show_notebook is True, display in notebook; else return **plotly.graph_objs.Figure** list.
+     """
+     report_df = report_df.copy()
+-    fig_list = _report_figure(report_df)
++    fig_list = _report_figure(report_df, time_format=time_format)
+     if show_notebook:
+         BaseGraph.show_graph_in_notebook(fig_list)
+     else:
