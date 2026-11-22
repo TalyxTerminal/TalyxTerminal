@@ -21,21 +21,21 @@ Exchange data comes from the official APIs and history files: minute bars, fundi
 
 ## Stocks
 
-Prices, financial statements, industries and share counts for US, China A-share and Hong Kong stocks come from free public sources. They are enough for everyday research. Three things are worth knowing:
+**US stocks.** Nasdaq’s free list shows stocks listed today. If you use it to pick stocks for a past period, you miss companies that have since delisted. A paid Sharadar key adds delisted US stocks when Sharadar has both a listing (TICKERS) and daily prices (SEP). TALYX uses the day after the last recorded price as an estimate of the delisting date.
 
-- **Listed companies only.** Free sources cover companies that trade today, so companies delisted during a backtest period are not in the sample. Long backtests over broad universes are where this matters most.
-- **Industry history.** China A-share classifications use quarterly CSRC snapshots. US and Hong Kong stocks use their current industry throughout the historical period.
-- **No securities-lending data.** Short positions assume the shares can always be borrowed.
+**China A shares.** Baostock’s free data includes delisted stocks. Its weekly lists show which stocks belonged to the CSI 300, CSI 500 and SSE 50 at the time. Paid Tushare data gives each stock’s weight in the index once a month. Backtests use those weights from the date on each list. Until Tushare reports a new member’s weight, it stays blank.
 
-When you need delisted companies, point-in-time industries or other institutional data, add a key for a paid source such as Sharadar, Alpaca, Tushare or Databento in Market's sources. Market switches to the better source automatically and the other modules need no change.
+**Industry history.** For China A shares, TALYX reads the CSRC industry classification from Baostock every quarter. A backtest uses the latest classification available on the date it is testing, so a change can take up to a quarter to appear. For US and Hong Kong stocks, TALYX uses today’s industry throughout the backtest.
 
-**Historical universes.** Nasdaq's list contains active listings. Sharadar TICKERS and SEP add delisted US stocks with price history. The day after the last observed price approximates delisting. On a missing price tail, a backtest exits at the last close, which may differ from the eventual proceeds.
+**Hong Kong order sizes.** Each stock has a board lot, the number of shares in one standard order. TALYX uses the latest HKEX list for every date in a backtest. It does not model past changes in lot size or the prices you might get when trading less than a full lot.
 
-Baostock supplies weekly CSI 300, CSI 500 and SSE 50 membership. Tushare's monthly weights apply from their snapshot date. Hong Kong board lots use the latest HKEX list. Historical board-lot changes and odd-lot prices are unavailable.
+A few details affect how to read a stock backtest.
 
-Adjusted series are anchored to the latest price. Use raw prices for historical absolute-price screens.
+- **When prices stop.** If a stock’s price history ends during a backtest, the backtest closes the position at the last recorded close. After a delisting or takeover, the amount an investor actually received may have been different.
+- **Price screens.** Adjusted prices use the latest price as their reference. To find stocks that actually traded below $5 on a past date, use raw prices.
+- **Short selling.** Free data does not tell you which stocks you could borrow on a given day. The backtest assumes you can borrow any stock you short.
 
-Two more details:
+Stock price coverage also varies by source.
 
 - **Hong Kong hourly bars** go back about 60 days. Yahoo's 60-minute bars do not line up with HKEX sessions, so hourly bars are built from 15-minute bars, which Yahoo keeps for about 60 days.
 - **Databento US equities.** XNAS.ITCH covers Nasdaq trades and EQUS.MINI aggregates its included venues. EQUS.SUMMARY provides daily bars with extended-hours volume. Hourly bars follow trading sessions.

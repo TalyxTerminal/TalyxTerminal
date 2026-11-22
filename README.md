@@ -95,12 +95,11 @@ TalyxTerminal fetches data from the sources directly, on your computer; nothing 
 
 **Crypto** comes from the exchanges' official APIs and history files. Minute bars, funding rates, open interest, long/short ratios and taker volume come with full history, and indicators can read them directly. How far back each exchange goes differs, and a few exchanges are not reachable from some regions.
 
-**Stocks**: prices, financial statements, industries and share counts for US, China A-share and Hong Kong stocks come from free public sources. Three things are worth knowing about free stock data:
-- it covers companies that trade today, so companies delisted during a backtest period are not in the sample;
-- industry classifications are today's, not those of the time;
-- there is no securities-lending data, so short positions assume the shares can always be borrowed.
+**Stock data for backtests**
 
-Keep these in mind for long stock backtests. When you need more, add a key for a paid source such as Sharadar and Market switches over by itself.
+- **US stocks.** Nasdaq’s free list shows stocks listed today. If you build a backtest from that list, it leaves out companies that have since delisted. A paid Sharadar key adds delisted US stocks for which Sharadar has prices.
+- **China A shares.** Baostock’s free data includes delisted stocks and weekly lists of CSI 300, CSI 500 and SSE 50 members. Backtests use the industry recorded for each stock at the time. TALYX checks the classification quarterly, so a change can show up to a quarter late.
+- **Industry and short selling.** For US and Hong Kong stocks, backtests use today’s industry even for past dates. Free stock data does not tell you which shares you could borrow on a given day, so backtests assume you can borrow any stock you short.
 
 Each source has its own terms of use. See [docs/limits.md](docs/limits.md).
 

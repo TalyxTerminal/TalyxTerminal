@@ -73,6 +73,10 @@ El diseño se describe en [docs/architecture.md](../architecture.md) (en inglés
 
 **[Developer](../../modules/developer/README.md): donde se escriben módulos e indicadores.** Código, documentación y ejemplos en un mismo lugar, con depuración con puntos de interrupción en VS Code.
 
+## Guía de uso
+
+La guía explica cómo instalar TALYX y usar cada módulo. Está disponible en [inglés](../user-guide.md) y en [chino simplificado](../user-guide.zh-CN.md).
+
 ## Inicio rápido
 
 Descarga el instalador desde [Releases](https://github.com/talyxterminal/TalyxTerminal/releases) y ejecútalo. O ejecútalo desde el código fuente:
@@ -91,12 +95,11 @@ TalyxTerminal obtiene los datos directamente de las fuentes, desde tu ordenador;
 
 **Las criptomonedas** vienen de las API oficiales y los archivos históricos de los exchanges. Las velas de un minuto, las tasas de financiación, el interés abierto, la relación largos/cortos y el volumen tomador tienen historial completo, y los indicadores pueden leerlos directamente. Cada exchange llega hasta una fecha distinta, y algunos no son accesibles desde ciertas regiones.
 
-**Acciones**: los precios, estados financieros, sectores y número de acciones de EE. UU., China A y Hong Kong proceden de fuentes públicas gratuitas. Conviene saber tres cosas sobre los datos bursátiles gratuitos:
-- cubren las empresas que cotizan hoy, así que las que dejaron de cotizar durante el periodo de un backtest no están en la muestra;
-- las clasificaciones sectoriales son las actuales, no las de entonces;
-- no hay datos de préstamo de valores, así que las posiciones cortas suponen que siempre se pueden tomar prestadas las acciones.
+**Datos de acciones para backtests**
 
-Tenlo en cuenta en los backtests largos de acciones. Cuando necesites más, añade la clave de una fuente de pago como Sharadar y Market cambiará por sí solo.
+- **Estados Unidos.** La lista gratuita de Nasdaq solo incluye las acciones que cotizan hoy. Si la usas para un backtest, quedarán fuera las empresas que después dejaron de cotizar. Con una clave de pago de Sharadar puedes incluir las acciones retiradas de bolsa para las que Sharadar tiene precios.
+- **Acciones A de China.** Los datos gratuitos de Baostock incluyen acciones retiradas de bolsa. También puedes consultar qué empresas formaban parte del CSI 300, el CSI 500 y el SSE 50 cada semana. El backtest usa el sector que constaba en cada fecha. TALYX consulta la clasificación cada trimestre, así que un cambio puede tardar hasta un trimestre en reflejarse.
+- **Sectores y ventas en corto.** Para Estados Unidos y Hong Kong, el backtest aplica el sector actual a todo el periodo. Los datos gratuitos no indican qué acciones se podían tomar prestadas cada día, así que el backtest supone que siempre puedes conseguir las que quieras vender en corto.
 
 Cada fuente tiene sus propias condiciones de uso. Consulta [docs/limits.md](../limits.md) (en inglés).
 
