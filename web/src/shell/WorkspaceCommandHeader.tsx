@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { TxButton, TxDialog, TxField, TxIcon, TxInput, TxSearch, type IconName } from "@talyx/sdk";
 
@@ -67,16 +68,16 @@ function CommandPalette({ commands }: { commands: PaletteCommand[] }) {
   useEffect(() => setActive(0), [query]);
   useEffect(() => { list.current?.querySelector<HTMLElement>("[aria-selected='true']")?.scrollIntoView({ block: "nearest" }); }, [active]);
   const run = (command: PaletteCommand | undefined) => { if (!command) return; setOpen(false); window.setTimeout(command.run, 0); };
-  return <TxDialog open={open} onOpenChange={setOpen} title="" label="Commands" className="talyx-palette" footer={<></>}>
-    <TxSearch value={query} onValueChange={setQuery} placeholder="Search commands and workspaces" aria-label="Search commands" autoFocus
+  return <TxDialog open={open} onOpenChange={setOpen} title="" label={t("Commands")} className="talyx-palette" footer={<></>}>
+    <TxSearch value={query} onValueChange={setQuery} placeholder={t("Search commands and workspaces")} aria-label={t("Search commands")} autoFocus
       onKeyDown={event => {
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
           setActive(value => (value + (event.key === "ArrowDown" ? 1 : -1) + shown.length) % Math.max(1, shown.length));
         } else if (event.key === "Enter") { event.preventDefault(); run(shown[active]); }
       }} />
-    <div ref={list} className="talyx-palette-list" role="listbox" aria-label="Commands">
-      {shown.length === 0 && <div className="talyx-palette-none">Nothing matches “{query.trim()}”.</div>}
+    <div ref={list} className="talyx-palette-list" role="listbox" aria-label={t("Commands")}>
+      {shown.length === 0 && <div className="talyx-palette-none">{t("Nothing matches “{query}”.", { query: query.trim() })}</div>}
       {shown.map((command, index) => <PaletteRow key={command.id} command={command} heading={index === 0 || shown[index - 1].group !== command.group}
         active={index === active} onHover={() => setActive(index)} onRun={() => run(command)} />)}
     </div>
@@ -107,11 +108,11 @@ function FolderDialog({ workspaceId, name, onClose }: { workspaceId: string; nam
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
     finally { setSaving(false); }
   };
-  return <TxDialog open onOpenChange={value => { if (!value) onClose(); }} title={`${name} folder`} className="talyx-shell-dialog" footer={<>
-    <TxButton onClick={onClose}>Cancel</TxButton>
-    <TxButton variant="primary" loading={saving} disabled={!next.trim() || next.trim() === path} onClick={() => void save()}>Use this folder</TxButton>
+  return <TxDialog open onOpenChange={value => { if (!value) onClose(); }} title={t("{name} folder", { name })} className="talyx-shell-dialog" footer={<>
+    <TxButton onClick={onClose}>{t("Cancel")}</TxButton>
+    <TxButton variant="primary" loading={saving} disabled={!next.trim() || next.trim() === path} onClick={() => void save()}>{t("Use this folder")}</TxButton>
   </>}>
-    <TxField label="Folder" error={error ?? undefined}>
+    <TxField label={t("Folder")} error={error ?? undefined}>
       <TxInput className="talyx-mono-input" spellCheck={false} value={next} disabled={path === null} onChange={event => setNext(event.target.value)} />
     </TxField>
   </TxDialog>;
@@ -127,16 +128,16 @@ export default function WorkspaceCommandHeader(props: WorkspaceCommandHeaderProp
   const copyAiAddress = () => {
     void (async () => {
       const session = platformRuntime().bridge.getSessionId();
-      if (!session) throw new Error("The workspace is disconnected");
+      if (!session) throw new Error(t("The workspace is disconnected"));
       const response = await fetch("/api/platform/ai/connection", { headers: { "x-talyx-session": session } });
-      if (!response.ok) throw new Error("The AI connection address is unavailable");
+      if (!response.ok) throw new Error(t("The AI connection address is unavailable"));
       const value = await response.json() as { url: string };
       await navigator.clipboard.writeText(value.url);
-      onNotice("AI connection address copied");
+      onNotice(t("AI connection address copied"));
     })().catch(error => onError(String(error)));
   };
   const stopAiWork = () => {
-    void stopWorkspaceAI(workspaceId).then(() => onNotice("AI work in this workspace stopped")).catch(error => onError(String(error)));
+    void stopWorkspaceAI(workspaceId).then(() => onNotice(t("AI work in this workspace stopped"))).catch(error => onError(String(error)));
   };
 
   const tabKey = props.tabs.map(tab => `${tab.id}:${tab.name}`).join("|");
@@ -145,22 +146,22 @@ export default function WorkspaceCommandHeader(props: WorkspaceCommandHeaderProp
     const call = (pick: (value: WorkspaceCommandHeaderProps) => void) => () => pick(latest.current);
     const current = latest.current;
     return [
-      { id: "save", group: "This workspace", label: "Save", icon: "download", shortcut: "Ctrl S", run: call(value => value.onSave()) },
-      { id: "rename", group: "This workspace", label: "Rename…", icon: "edit", keywords: "name", run: call(value => value.onStartRename()) },
-      { id: "folder", group: "This workspace", label: "Folder…", icon: "folder", run: () => setFolder(true) },
-      { id: "ai", group: "This workspace", label: "Copy AI connection address", icon: "copy", keywords: "mcp", run: copyAiAddress },
-      { id: "window", group: "This workspace", label: "Open in new window", icon: "external", keywords: "screen monitor", run: call(value => value.onOpenNewWindow()) },
-      { id: "close", group: "This workspace", label: "Close workspace", icon: "close", run: call(value => value.onCloseWorkspace()) },
+      { id: "save", group: t("This workspace"), label: t("Save"), icon: "download", shortcut: "Ctrl S", run: call(value => value.onSave()) },
+      { id: "rename", group: t("This workspace"), label: t("Rename…"), icon: "edit", keywords: "name", run: call(value => value.onStartRename()) },
+      { id: "folder", group: t("This workspace"), label: t("Folder…"), icon: "folder", run: () => setFolder(true) },
+      { id: "ai", group: t("This workspace"), label: t("Copy AI connection address"), icon: "copy", keywords: "mcp", run: copyAiAddress },
+      { id: "window", group: t("This workspace"), label: t("Open in new window"), icon: "external", keywords: "screen monitor", run: call(value => value.onOpenNewWindow()) },
+      { id: "close", group: t("This workspace"), label: t("Close workspace"), icon: "close", run: call(value => value.onCloseWorkspace()) },
       ...current.modules.filter(item => !item.failed).map(item => ({
-        id: `add.${item.kind}`, group: "Add module", label: item.name, module: item.kind, keywords: "add module panel", run: call(value => value.onAddModuleKind(item)),
+        id: `add.${item.kind}`, group: t("Add module"), label: item.name, module: item.kind, keywords: "add module panel", run: call(value => value.onAddModuleKind(item)),
       })),
       ...current.tabs.filter(tab => tab.id !== current.workspaceId).map(tab => ({
-        id: `go.${tab.id}`, group: "Workspaces", label: tab.name, icon: "grid" as IconName, keywords: "switch workspace", run: call(value => value.onSelectWorkspace(tab)),
+        id: `go.${tab.id}`, group: t("Workspaces"), label: tab.name, icon: "grid" as IconName, keywords: "switch workspace", run: call(value => value.onSelectWorkspace(tab)),
       })),
-      { id: "launcher", group: "Workspaces", label: "New or saved workspace…", icon: "plus", keywords: "open saved new", run: call(value => value.onOpenLauncher()) },
-      { id: "home", group: "Go to", label: "Home", icon: "arrow-left", run: call(value => value.onBack()) },
-      { id: "community", group: "Go to", label: "Community", icon: "globe", keywords: "modules install discover", run: call(value => value.onCommunity()) },
-      { id: "settings", group: "Go to", label: "Settings", icon: "settings", keywords: "preferences options", run: () => openPlatformSettings() },
+      { id: "launcher", group: t("Workspaces"), label: t("New or saved workspace…"), icon: "plus", keywords: "open saved new", run: call(value => value.onOpenLauncher()) },
+      { id: "home", group: t("Go to"), label: t("Home"), icon: "arrow-left", run: call(value => value.onBack()) },
+      { id: "community", group: t("Go to"), label: t("Community"), icon: "globe", keywords: "modules install discover", run: call(value => value.onCommunity()) },
+      { id: "settings", group: t("Go to"), label: t("Settings"), icon: "settings", keywords: "preferences options", run: () => openPlatformSettings() },
     ];
   }, [tabKey, moduleKey]);
 

@@ -17,6 +17,7 @@ from deepagents.middleware.filesystem import (
 )
 from langchain_core.messages import ToolMessage
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 from wcmatch import glob as wcglob
 
 
@@ -35,7 +36,7 @@ class Files:
     def bind(self, workspace, path, writable):
         root = Path(path)
         if not root.is_absolute() or not root.is_dir() or type(writable) is not bool:
-            raise ContractError("invalid_input", "Choose a local folder and its write permission")
+            raise ContractError("invalid_input", t("Choose a local folder and its write permission"))
         with self.service.store.transaction():
             self.db.execute("INSERT INTO knowledge_folders VALUES (?,?,?,?)",
                             (uuid4().hex, workspace, str(root.resolve()), writable))
@@ -44,7 +45,7 @@ class Files:
         with self.service.store.transaction():
             if not self.db.execute("DELETE FROM knowledge_folders WHERE id=? AND (workspace IS NULL OR workspace=?)",
                                    (identity, workspace)).rowcount:
-                raise ContractError("not_found", "The knowledge folder is unavailable")
+                raise ContractError("not_found", t("The knowledge folder is unavailable"))
 
     async def roots(self, workspace):
         return {"/workspace/": Path(await self.service.ctx.platform.workspace_folder(workspace)),
@@ -56,7 +57,7 @@ class Files:
                 path = (root / virtual[len(prefix):]).resolve()
                 if path.is_relative_to(root.resolve()) and path.is_file():
                     return path
-        raise ContractError("not_found", "Choose a file in this workspace or a connected knowledge folder")
+        raise ContractError("not_found", t("Choose a file in this workspace or a connected knowledge folder"))
 
     async def choices(self, workspace, query=""):
         roots = await self.roots(workspace)
@@ -75,7 +76,7 @@ class Files:
     async def attach(self, workspace, conversation, virtual):
         path = await self.resolve(workspace, virtual)
         if path.stat().st_size > 10 * 1024 * 1024:
-            raise ContractError("attachment_too_large", "Each attachment may contain at most 10 MiB")
+            raise ContractError("attachment_too_large", t("Each attachment may contain at most 10 MiB"))
         data = await asyncio.to_thread(path.read_bytes)
         mime = mimetypes.guess_type(path.name)[0] or "text/plain"
         if mime.startswith("text/") and mime not in {"text/markdown", "text/csv"}:
@@ -201,7 +202,7 @@ class RecordedFiles(FilesystemMiddleware):
                     return folder._resolve_path(virtual[len(prefix):])
                 except ValueError as error:
                     raise ContractError("invalid_input", str(error)) from error
-        raise ContractError("invalid_input", "Choose a workspace or global skill script")
+        raise ContractError("invalid_input", t("Choose a workspace or global skill script"))
 
     async def awrap_tool_call(self, request, handler):
         call = request.tool_call

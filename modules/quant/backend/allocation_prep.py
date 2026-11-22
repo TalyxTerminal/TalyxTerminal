@@ -9,6 +9,7 @@ import copy
 import json
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .object_params import check_values, read_parameters
 from .project_paths import MODULE
@@ -17,7 +18,7 @@ STANDARD = MODULE / "native" / "allocation_standard.py"
 CAPABILITIES = MODULE / "native" / "allocation_capabilities.json"
 # Market's asset classes (an ETF is a `fund`; Market does not say whether a fund holds stocks or bonds, so it gets a group of its own the user splits)
 GROUP_BY_CLASS = {"equity": "Stocks", "fund": "Funds", "crypto": "Crypto", "commodity": "Commodities", "fx": "Currencies", "index": "Indices"}
-BENCHMARK = ("SPY", "IEF")   # the 60/40 the tracking limit, the tracking objective and the comparisons are against
+DEFAULT_BENCHMARK = "SPY 60%, IEF 40%"   # what the tracking objective and the tracking limit follow unless the allocation names another
 NUMBER_TEXT = ("max_weight", "min_weight", "cardinality", "threshold", "max_turnover", "max_tracking", "risk_cap", "min_return")
 ENGINE_TEXT = ("objective_parameters", "covariance_parameters")
 MIN_PERIODS = 12
@@ -61,20 +62,56 @@ def values_of(store, obj, changes=None):
         raise ContractError("invalid_input", str(error)) from error
     if "risk_free" not in obj["settings"].get("params", {}) and "risk_free" not in (changes or {}):
         params["risk_free"] = default_risk_free(obj)   # also for code that declares no rate: a run's Sharpe is always over one
+    params.setdefault("risk_free_pct", 4.0)   # code written before the fixed rate declares none
+    params.setdefault("benchmark", DEFAULT_BENCHMARK)   # nor a benchmark
     return params
 
 
 def default_risk_free(obj):
-    """The risk-free rate an allocation starts with: zero for a pool of crypto alone, else the 13-week T-bill (the cash of a dollar pool of stocks and funds)."""
-    classes = [(item.get("instrument") or {}).get("assetClass") for item in obj["settings"].get("data", {}).get("symbols", [])]
-    return "zero" if classes and all(kind == "crypto" for kind in classes) else "tbill"
+    """The risk-free rate an allocation starts with: zero for a pool of crypto alone, a fixed rate (4% a year, JoinQuant's) for A shares alone, else the
+    13-week T-bill (the cash of a dollar pool of stocks and funds)."""
+    instruments = [item.get("instrument") or {} for item in obj["settings"].get("data", {}).get("symbols", [])]
+    if instruments and all(item.get("assetClass") == "crypto" for item in instruments):
+        return "zero"
+    return "fixed" if instruments and all(item.get("venueId") == "CN" for item in instruments) else "tbill"
 
 
 async def risk_free(ctx, params, since, until, owner):
-    """The run's rate as the worker reads it (`allocation_work.risk_free_per_bar`): {basis: zero}, or the ^IRX closes from Market between `since` and `until`
-    (ms) with `unavailable` saying why there are none."""
+    """The run's rate as the worker reads it (`allocation_work.risk_free_per_bar`): {basis: zero}, {basis: fixed, pct}, or the ^IRX closes from Market between
+    `since` and `until` (ms) with `unavailable` saying why there are none."""
     from .strategy_inputs import risk_free as fetch
-    return await fetch(ctx, {"basis": "irx" if params["risk_free"] == "tbill" else "zero"}, since, until, owner)
+    basis = params["risk_free"]
+    spec = {"basis": "fixed", "pct": float(params["risk_free_pct"])} if basis == "fixed" else {"basis": {"tbill": "irx", "zero": "zero"}[basis]}
+    return await fetch(ctx, spec, since, until, owner)
+
+
+def tracks(params):
+    """Whether the settings follow the benchmark: the benchmark-tracking objective, or a tracking-error limit."""
+    return params.get("objective") == "benchmark_tracking" or params.get("max_tracking") not in (None, "")
+
+
+def benchmark_parts(text):
+    """The benchmark as written, "SPY 60%, IEF 40%" or one symbol ("QQQ", all of it): [(Market symbol, percent)] adding up to 100. Raises ContractError on the
+    benchmark field otherwise."""
+    parts = []
+    for piece in (text or "").split(","):
+        words = piece.split()
+        if not words:
+            continue
+        if len(words) > 2 or (len(words) == 2 and not words[1].endswith("%")):
+            raise ContractError("invalid_input", t("Benchmark: write each symbol with its weight, such as SPY 60%, not {strip}", strip=piece.strip()), {"fields": ["benchmark"]})
+        try:
+            weight = float(words[1][:-1]) if len(words) == 2 else None
+        except ValueError:
+            raise ContractError("invalid_input", t("Benchmark: {words} is not a percent", words=words[1]), {"fields": ["benchmark"]}) from None
+        parts.append((words[0], weight))
+    if not parts:
+        raise ContractError("invalid_input", t("Benchmark: name a Market symbol, such as SPY"), {"fields": ["benchmark"]})
+    if len(parts) == 1 and parts[0][1] is None:
+        return [(parts[0][0], 100.0)]
+    if any(weight is None for _, weight in parts) or abs(sum(weight for _, weight in parts) - 100) > 1e-6:
+        raise ContractError("invalid_input", t("Benchmark: the weights add up to 100%, such as SPY 60%, IEF 40%"), {"fields": ["benchmark"]})
+    return parts
 
 
 def pool_of(obj, params, columns=None):
@@ -103,7 +140,7 @@ def number(value, name):
     try:
         return float(value)
     except (TypeError, ValueError):
-        raise ContractError("invalid_input", f"{name} needs a number or nothing.", {"fields": [name]}) from None
+        raise ContractError("invalid_input", t("{name} needs a number or nothing.", name=name), {"fields": [name]}) from None
 
 
 def costs_of(params, pool):
@@ -116,13 +153,13 @@ def costs_of(params, pool):
 def check_values_before_run(params, pool):
     """What can be known without data: the pool, the limits, the numbers, the risk budget. Raises ContractError with the fields to mark."""
     if not pool:
-        raise ContractError("invalid_input", "The pool is empty", {"fields": ["pool"]})
+        raise ContractError("invalid_input", t("The pool is empty"), {"fields": ["pool"]})
     for name in NUMBER_TEXT:
         number(params.get(name), name)
     cap = number(params.get("max_weight"), "max_weight")
     short = float(params.get("short_cap") or 0)
     if cap is not None and short == 0 and cap * len(pool) < 100 - 1e-9:
-        raise ContractError("invalid_input", f"Limits can't add up to 100%: {len(pool)} assets x {cap:g}% = {cap * len(pool):g}%", {"fields": ["max_weight"]})
+        raise ContractError("invalid_input", t("Limits can't add up to 100%: {pool} assets x {cap}% = {cap2}%", pool=len(pool), cap=f'{cap:g}', cap2=f'{cap * len(pool):g}'), {"fields": ["max_weight"]})
     maxima = {row["group"]: number(row.get("max"), "group_limits") for row in params.get("group_limits") or [] if row.get("max") not in (None, "")}
     if maxima and short == 0:
         groups = {}
@@ -132,16 +169,13 @@ def check_values_before_run(params, pool):
         room = sum(each.values())
         if room < 100 - 1e-9:  # name each group's room, so the one to raise can be found
             parts = ", ".join(f"{group} {value:g}%" for group, value in sorted(each.items(), key=lambda item: -item[1]))
-            raise ContractError("invalid_input", f"Limits can't add up to 100%: the group limits allow {room:g}% ({parts})", {"fields": ["max_weight", "group_limits"]})
-    missing = [name for name in BENCHMARK if name not in {row["ticker"] for row in pool}]
-    if missing and params.get("objective") == "benchmark_tracking":
-        raise ContractError("invalid_input", f"Benchmark tracking follows the 60/40 of SPY and IEF; add {' and '.join(missing)} to the pool", {"fields": ["objective"]})
-    if missing and params.get("max_tracking") not in (None, ""):
-        raise ContractError("invalid_input", f"The tracking error is against the 60/40 of SPY and IEF; add {' and '.join(missing)} to the pool", {"fields": ["max_tracking"]})
+            raise ContractError("invalid_input", t("Limits can't add up to 100%: the group limits allow {room}% ({parts})", room=f'{room:g}', parts=parts), {"fields": ["max_weight", "group_limits"]})
+    if tracks(params):
+        benchmark_parts(params["benchmark"])
     if params.get("objective") == "risk_budget":
         total = sum(float(row.get("share") or 0) for row in params.get("budget") or [])
         if abs(total - 100) > 1e-6:
-            raise ContractError("invalid_input", f"Shares add up to {total:g}%", {"fields": ["budget"]})
+            raise ContractError("invalid_input", t("Shares add up to {total}%", total=f'{total:g}'), {"fields": ["budget"]})
     return True
 
 

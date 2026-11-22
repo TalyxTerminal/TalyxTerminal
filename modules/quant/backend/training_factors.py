@@ -5,6 +5,7 @@ import asyncio
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .library_inputs import named_items
 
@@ -17,12 +18,12 @@ async def prepare(library, definitions, params, research, directory, *, frozen=N
     for parameter, name in named_items(definitions, params):
         item = library.resolve(name, kind='factor') if versions is None else library.read_version(versions[parameter])
         if item['state'] == 'delisted':
-            raise ContractError('not_found', f'{name} was delisted from the library.')
+            raise ContractError('not_found', t("{name} was delisted from the library.", name=name))
         async with library.reading:
             rows = await asyncio.to_thread(library.store.read_values, item['versionId'])
         frame = await asyncio.to_thread(selected_values, rows, research["info"])
         if frame.empty:
-            raise ContractError('unavailable', f'{name} has no factor values for this training range and instrument selection.')
+            raise ContractError('unavailable', t("{name} has no factor values for this training range and instrument selection.", name=name))
         frames.append(frame.assign(name=name, versionId=item['versionId']))
         items.append({key: item[key] for key in ('name', 'versionId', 'version')} | {'parameter': parameter})
     if not frames:

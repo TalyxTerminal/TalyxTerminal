@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from vocabulary.instruments import MarketInstrument, ohlcv_series
 
@@ -43,9 +44,9 @@ async def lookup(ctx, key, values):
 
 def require_match(item):
     if item["status"] == "ambiguous":
-        raise ContractError("ambiguous", f"Qualify the symbol {item['symbol']}.", {"candidates": item["candidates"]})
+        raise ContractError("ambiguous", t("Qualify the symbol {symbol}.", symbol=item['symbol']), {"candidates": item["candidates"]})
     if item["status"] == "not_found":
-        raise ContractError("not_found", f"Market cannot identify {item['symbol']}.")
+        raise ContractError("not_found", t("Market cannot identify {symbol}.", symbol=item['symbol']))
     return item
 
 
@@ -139,7 +140,7 @@ def decimal_columns(frame, fields=FIELDS):
     for name in fields:
         column = pa.array(frame[name], type=pa.float64(), from_pandas=True)
         if column.null_count or not pc.all(pc.is_finite(column)).as_py():
-            raise ContractError("invalid_input", f"Market input contains missing or nonfinite {name}.")
+            raise ContractError("invalid_input", t("Market input contains missing or nonfinite {name}.", name=name))
         scale = decimal_scale(column)
         text = pc.cast(pc.cast(column, pa.decimal128(38, scale)), pa.string())
         parts = pc.extract_regex(text, r"^(?P<sign>-?)(?P<whole>\d+)(?:\.(?P<fraction>\d+))?E(?P<exponent>-\d+)$")

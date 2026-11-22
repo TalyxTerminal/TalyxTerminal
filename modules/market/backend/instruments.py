@@ -8,6 +8,8 @@ import json
 import time
 from weakref import WeakValueDictionary
 
+from talyx_sdk.i18n import t
+
 from vocabulary.instruments import MarketInstrument
 
 from .codes import MARKET_CALENDARS, parse_typed
@@ -29,7 +31,7 @@ def _uncursor(text: str | None) -> dict:
     try:
         return json.loads(base64.urlsafe_b64decode(text.encode()))
     except ValueError as exc:
-        raise MarketError("invalid_input", "Unknown cursor") from exc
+        raise MarketError("invalid_input", t("Unknown cursor")) from exc
 
 
 class Instruments:
@@ -49,9 +51,7 @@ class Instruments:
         """(source id, venue or market, family) of every directory a source can list."""
         found = []
         for source_id, entry in self.market.registry.entries.items():
-            if "catalog" not in entry.descriptor["supports"] or not self.market.registry.enabled(source_id):
-                continue
-            if entry.coverage is None:
+            if "catalog" not in entry.descriptor["supports"] or not self.market.registry.usable(entry):
                 continue
             for item in entry.coverage["rows"]:
                 scope = item["scope"]
@@ -59,7 +59,8 @@ class Instruments:
                     found.append((source_id, venue, "contracts"))
                 if item["kind"] == "listings":
                     for market in scope.get("markets", []):
-                        found.append((source_id, market, "listings"))
+                        family = entry.source.catalog_family
+                        found.append((source_id, market, family))
         return sorted(set(found))
 
     def start_loading(self, *, force: bool = False) -> None:
@@ -121,7 +122,7 @@ class Instruments:
             ranked = [sid for sid, entry in self.market.registry.entries.items()
                       if sid == venue and "catalog" in entry.descriptor["supports"]]
             if not ranked:
-                raise MarketError("not_found", f"No {environment} directory for {venue}")
+                raise MarketError("not_found", t("No {environment} directory for {venue}", environment=environment, venue=venue))
             candidates, _cursor_value = await self.market.registry.call(venue, "catalog", {"venues": [venue]},
                                                                         environment, None)
             # Shown like every other record (BTCUSDT.P, OKX), so OKX:BTCUSDT.P resolves in a test environment too.
@@ -189,7 +190,7 @@ class Instruments:
     async def _environment_search(self, value, query, limit, offset, environment, constraint) -> dict:
         venue = constraint["venueId"] if constraint else (value.get("venues") or [None])[0]
         if venue is None:
-            raise MarketError("invalid_input", "Searching a test environment needs one venue")
+            raise MarketError("invalid_input", t("Searching a test environment needs one venue"))
         records = await self.environment_catalog(venue, environment) if environment != "production" else \
             [r["instrument"] for r in self.identity.search(query, venues=[venue], limit=500)]
         text = query.upper().replace("-", "/")
@@ -281,9 +282,9 @@ class Instruments:
             candidates = [r["instrument"]["instrumentId"] for r in exact]
         candidates = list(dict.fromkeys(candidates))
         if not candidates:
-            raise MarketError("not_found", f"No instrument matches {text}")
+            raise MarketError("not_found", t("No instrument matches {text}", text=text))
         if len(candidates) > 1:
-            raise MarketError("ambiguous", f"{text} matches several instruments",
+            raise MarketError("ambiguous", t("{text} matches several instruments", text=text),
                               details={"candidates": [self.identity.record(c) for c in candidates[:10]]})
         record = self.identity.record(candidates[0])
         matched = "code" if record["symbol"].upper() == code.upper() else "former_code"
@@ -305,7 +306,7 @@ class Instruments:
                     break
         if not exact:
             self._directory_failed(venue)
-            raise MarketError("not_found", f"{venue} has no {symbol}")
+            raise MarketError("not_found", t("{venue} has no {symbol}", venue=venue, symbol=symbol))
         return {"instrument": exact[0], "matched": "contract"}
 
     async def _resolve_base(self, base: str, value: dict) -> dict:
@@ -317,9 +318,9 @@ class Instruments:
                    and (not value.get("settle") or r.get("settle") == value["settle"].upper())]
         if not records:
             self._directory_failed(value["venueId"])
-            raise MarketError("not_found", f"No {base} contract on {value['venueId']}")
+            raise MarketError("not_found", t("No {base} contract on {venueId}", base=base, venueId=value['venueId']))
         if len(records) > 1:
-            raise MarketError("ambiguous", f"{base} matches several contracts", details={"candidates": records[:10]})
+            raise MarketError("ambiguous", t("{base} matches several contracts", base=base), details={"candidates": records[:10]})
         return {"instrument": records[0], "matched": "contract"}
 
     async def _directory_loaded(self, venue: str, *, first_page=False) -> None:
@@ -360,8 +361,7 @@ class Instruments:
         if record["identityVersion"] == 1:
             if record["venueId"].upper() in MARKET_CALENDARS:
                 # A listing rebuilt as a contract (its id dropped) is another instrument; it must not become one here.
-                raise MarketError("invalid_input", f"{record['symbol']} on {record['venueId']} is a listing; send the "
-                                  "record with the id Market assigned (identity version 2)")
+                raise MarketError("invalid_input", t("{symbol} on {venueId} is a listing; send the record with the id Market assigned (identity version 2)", symbol=record['symbol'], venueId=record['venueId']))
             checked = MarketInstrument.from_wire(record).wire_dict()
             self.identity.upsert_contracts(checked["venueId"], [checked])
             return {"kind": "known", "id": checked["instrumentId"]}
@@ -407,11 +407,11 @@ class Instruments:
         if state is None or state["state"] == "loading":
             sources = [s for s, v, f in self.directories() if v == venue and f == family]
             if not sources:
-                raise MarketError("not_found", f"No directory for {venue}")
+                raise MarketError("not_found", t("No directory for {venue}", venue=venue))
             await self.load(sources[0], venue, family)
             state = {(c["venue"], c["family"]): c for c in self.identity.catalogs()}[(venue, family)]
         if cursor and cursor.get("revision") != state["revision"]:
-            raise MarketError("invalid_input", "The directory changed; start again without a cursor")
+            raise MarketError("invalid_input", t("The directory changed; start again without a cursor"))
         kinds = ("listing",) if family == "listings" else ("contract",)
         records = self.identity.catalog_page(venue, kinds=kinds, asset_classes=value.get("assetClasses"),
                                              market_types=products, include_inactive=value.get("includeInactive", False),

@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+import { translator } from "@talyx/sdk";
 import { useCallback, useEffect, useState } from "react";
 import type { Json } from "@talyx/sdk";
 import type { Platform } from "@talyx/sdk";
@@ -43,8 +45,8 @@ export function workspacesUsing(workspaces: readonly { summary?: SavedInfo["summ
 function stateOf(row: Listed): { state: ModuleState; reason: string | null } {
   const runtime = platformRuntime();
   if (!row.enabled) return { state: "disabled", reason: null };
-  if (row.state === "failed") return { state: "failed", reason: row.problem ?? "It couldn't start." };
-  if (row.state === "stopped") return { state: "failed", reason: row.problem ?? "It isn't running." };
+  if (row.state === "failed") return { state: "failed", reason: row.problem ?? t("It couldn't start.") };
+  if (row.state === "stopped") return { state: "failed", reason: row.problem ?? t("It isn't running.") };
   if (row.state === "starting") return { state: "starting", reason: null };
   const fault = runtime.faults.get(row.id);
   if (fault) return { state: "failed", reason: fault };
@@ -54,28 +56,28 @@ function stateOf(row: Listed): { state: ModuleState; reason: string | null } {
 
 export function readModules(rows: readonly Listed[]): ModuleEntry[] {
   const kernel = platformRuntime().kernel;
-  const nameOf = (id: string) => kernel.definitions.get(id)?.name ?? id;
+  const nameOf = (id: string) => translator(id)(kernel.definitions.get(id)?.name ?? id);
   return rows.filter(row => row.id !== "platform").map(row => {
     const definition = kernel.definitions.get(row.id);
     const manifest = definition?.manifest, contract = definition?.contract;
     const section = manifest?.provides?.["platform.settings_section"]?.[0];
     return {
       id: row.id,
-      name: row.name,
-      summary: row.description,
+      name: translator(row.id)(row.name),
+      summary: translator(row.id)(row.description),
       version: row.version,
       readable: Boolean(definition),
       official: row.source === "official",
       enabled: row.enabled,
       ...stateOf(row),
-      panels: Object.values(manifest?.panels ?? {}).map(panel => panel.title),
+      panels: Object.values(manifest?.panels ?? {}).map(panel => translator(row.id)(panel.title)),
       actions: Object.entries(contract?.actions ?? {}).map(([local, spec]) =>
         ({ name: `${row.id}.${local}`, title: spec.description.split("\n")[0] })),
       settings: Object.keys(contract?.settings ?? {}).length ? `settings:${row.id}` : section ? `${row.id}.${section.id}` : null,
       requires: Object.entries(manifest?.requires ?? {}).filter(([, value]) => !value.optional).map(([id]) => nameOf(id)),
       dependents: [...kernel.definitions.values()]
         .filter(item => item.id !== row.id && item.enabled && item.manifest.requires?.[row.id] && !item.manifest.requires[row.id].optional)
-        .map(item => item.name),
+        .map(item => translator(item.id)(item.name)),
     };
   });
 }

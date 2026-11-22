@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { SerializedDockview } from "dockview-react";
 import type { Platform } from "@talyx/sdk";
 import { platformRuntime } from "../kernel/runtime";
@@ -16,7 +17,7 @@ export function freshPanel(owner: string, title?: string): ShellPanel {
   const kernel = platformRuntime().kernel;
   const type = kernel.launcherPanel(owner);
   if (!type) throw new Error(`Module '${owner}' offers no panel to open`);
-  return { id: `${owner}-${crypto.randomUUID().slice(0, 8)}`, kind: `module:${owner}`, title: title?.trim() || kernel.definitions.get(owner)!.name,
+  return { id: `${owner}-${crypto.randomUUID().slice(0, 8)}`, kind: `module:${owner}`, title: title?.trim() || kernel.panelType(type)!.spec.title,
     state: { panelType: type, state: null } };
 }
 
@@ -67,14 +68,14 @@ export function composeWorkspace(workspace: WorkspaceState, layout: SerializedDo
 
 export function restoreWorkspace(loaded: unknown): Pick<WorkspaceState, "panels" | "activePanelId" | "dockLayout"> {
   if (!isRecord(loaded) || loaded.version !== WORKSPACE_VERSION) throw new Error(`Workspace isn't a v${WORKSPACE_VERSION} workspace; save a new one.`);
-  if (!Array.isArray(loaded.panels) || !isRecord(loaded.layout) || !isRecord(loaded.layout.grid) || !isRecord(loaded.layout.panels)) throw new Error("Workspace is damaged.");
+  if (!Array.isArray(loaded.panels) || !isRecord(loaded.layout) || !isRecord(loaded.layout.grid) || !isRecord(loaded.layout.panels)) throw new Error(t("Workspace is damaged."));
   const layout = loaded.layout as unknown as SerializedDockview;
   const panels: ShellPanel[] = loaded.panels.map((saved: unknown) => {
-    if (!isRecord(saved) || typeof saved.id !== "string" || typeof saved.kind !== "string" || !saved.kind.startsWith("module:")) throw new Error("Workspace has a damaged panel.");
+    if (!isRecord(saved) || typeof saved.id !== "string" || typeof saved.kind !== "string" || !saved.kind.startsWith("module:")) throw new Error(t("Workspace has a damaged panel."));
     const title = isRecord(layout.panels[saved.id]) ? (layout.panels[saved.id] as { title?: unknown }).title : undefined;
     return { id: saved.id, kind: saved.kind, title: typeof title === "string" && title.trim() ? title : saved.kind.slice("module:".length), state: boundedModuleState(saved.state ?? null) };
   });
-  if (!samePanels(layout, panels)) throw new Error("Workspace layout doesn't match its panels.");
+  if (!samePanels(layout, panels)) throw new Error(t("Workspace layout doesn't match its panels."));
   const active = typeof loaded.activePanelId === "string" && panels.some(panel => panel.id === loaded.activePanelId) ? loaded.activePanelId : null;
   return { panels, activePanelId: active, dockLayout: hydrateDockLayout(layout, panels) };
 }

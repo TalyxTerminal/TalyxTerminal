@@ -249,7 +249,7 @@ def test_activity_ends_with_the_default_public_run_and_frozen_dates(tmp_path, mo
     async def scenario():
         ctx, shell, factors = services(tmp_path, monkeypatch, [0.012])
 
-        async def bars(settings, report=None):
+        async def bars(settings, report=None, facts=True):
             result = await prepared(settings, report)
             return {**result, "bars": 2, "dataFrom": 0, "dataTo": DAY}
 

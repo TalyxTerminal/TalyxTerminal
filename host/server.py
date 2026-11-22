@@ -21,11 +21,13 @@ from starlette.routing import Route as StarletteRoute
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from talyx_sdk import wire
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 
 from kernel.router import QUEUE_SECONDS as READY_SECONDS
 from kernel.router import Endpoint
 
 from .app import Host
+from .files import PLATFORM_DIRECTORY, PLATFORM_LOCALES
 
 log = logging.getLogger("talyx.server")
 # The window's frames: an envelope line, then the body (JSON), in one binary WebSocket message.
@@ -54,7 +56,7 @@ class WindowEndpoint(Endpoint):
         tell which one sent a frame: a window call is never a module's (a module frontend reaches its own backend
         through its private routes)."""
         if "from" in envelope:
-            raise ContractError("permission_denied", "A window cannot say who is calling; the Host does")
+            raise ContractError("permission_denied", t("A window cannot say who is calling; the Host does"))
         return {"origin": "user", "module": None,
                 "workspaceId": window_workspace(self.host, self.session, envelope.get("ws")), "session": self.session}
 
@@ -89,7 +91,7 @@ class HostRequests:
             if scope["type"] == "websocket":
                 await send({"type": "websocket.close", "code": 1012})
             else:
-                await failed(ContractError("unavailable", "TALYX is closing"), 503)(scope, receive, send)
+                await failed(ContractError("unavailable", t("TALYX is closing")), 503)(scope, receive, send)
             return
         task = asyncio.current_task()
         self.pending.add(task)
@@ -110,7 +112,7 @@ class HostRequests:
             if scope["type"] == "websocket":
                 # Uvicorn has already sent the socket's shutdown frame.
                 return
-            error = ContractError("unavailable", "TALYX is closing", execution="unknown", effects="may_have_occurred")
+            error = ContractError("unavailable", t("TALYX is closing"), execution="unknown", effects="may_have_occurred")
             await failed(error, 503)(scope, receive, send)
         finally:
             self.pending.remove(task)
@@ -122,7 +124,7 @@ def window_workspace(host: Host, session: str, claimed: str | None) -> str | Non
     workspace the window is bound to."""
     if claimed:
         if not host.workspaces.is_open(claimed):
-            raise ContractError("target_gone", f"Workspace {claimed} is not open")
+            raise ContractError("target_gone", t("Workspace {claimed} is not open", claimed=claimed))
         return claimed
     return host.workspaces.session_workspace(session)
 
@@ -169,7 +171,7 @@ def create_app(host: Host) -> FastAPI:
                     break
                 data = message.get("bytes") or message.get("text", "").encode()
                 if len(data) > WINDOW_FRAME_LIMIT:
-                    raise ContractError("too_large", "A window frame is at most 32 MB")
+                    raise ContractError("too_large", t("A window frame is at most 32 MB"))
                 head, _, body = data.partition(b"\n")
                 envelope = orjson.loads(head)
                 try:
@@ -190,7 +192,7 @@ def create_app(host: Host) -> FastAPI:
     async def private_target(module_id: str, request_headers) -> tuple[str, dict]:
         session = request_headers.get("x-talyx-session")
         if session not in host.sessions:
-            raise ContractError("permission_denied", "Private routes belong to an open window")
+            raise ContractError("permission_denied", t("Private routes belong to an open window"))
         process = host.supervisor.processes.get(module_id)
         if process is not None and process.state == "starting":
             # Like calls (standard 5): a request to a module still starting waits for it, within the same limit.
@@ -198,10 +200,10 @@ def create_app(host: Host) -> FastAPI:
                 await asyncio.wait_for(process.ready_event.wait(), READY_SECONDS)
             except TimeoutError:
                 raise ContractError("unavailable",
-                                    f"{module_id} did not finish starting within {READY_SECONDS:g} s") from None
+                                    t("{module_id} did not finish starting within {READY_SECONDS} s", module_id=module_id, READY_SECONDS=f'{READY_SECONDS:g}')) from None
         routes = (process.ready_info or {}).get("routes") if process is not None and process.state == "ready" else None
         if routes is None:
-            raise ContractError("unavailable", f"{module_id} is not running or has no private routes")
+            raise ContractError("unavailable", t("{module_id} is not running or has no private routes", module_id=module_id))
         headers = {"x-talyx-route-secret": routes["secret"], "x-talyx-module": module_id,
                    "x-talyx-workspace": window_workspace(host, session, request_headers.get("x-talyx-workspace")) or ""}
         return f"127.0.0.1:{routes['port']}", headers
@@ -297,11 +299,17 @@ def create_app(host: Host) -> FastAPI:
     async def module_file(module_id: str, path: str):
         item = host.catalog.modules.get(module_id)
         if item is None:
-            return failed(ContractError("not_found", f"No module {module_id} is installed"), 404)
+            return failed(ContractError("not_found", t("No module {module_id} is installed", module_id=module_id)), 404)
         target = (item.directory / path).resolve()
         if not target.is_relative_to(item.directory.resolve()) or not target.is_file():
-            return failed(ContractError("not_found", f"{module_id} has no file {path}"), 404)
+            return failed(ContractError("not_found", t("{module_id} has no file {path}", module_id=module_id, path=path)), 404)
         return FileResponse(target)
+
+    @app.get("/api/platform/files/{path:path}")
+    async def platform_file(path: str):
+        if path not in PLATFORM_LOCALES.values():
+            return failed(ContractError("not_found", t("The platform has no file {path}", path=path)), 404)
+        return FileResponse(PLATFORM_DIRECTORY / path)
 
     app.router.routes.append(StarletteRoute("/mcp/workspaces/{workspace_id}", host.mcp, methods=["GET", "POST",
                                                                                              "DELETE"]))

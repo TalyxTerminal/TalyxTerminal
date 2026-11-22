@@ -13,29 +13,30 @@ import uuid
 from collections.abc import Callable
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t
 
 from .marketdata import Market
 from .store import Store
 
 LOG = logging.getLogger(__name__)
 MAX_MEMBERS = 200
-DEFAULT_LIST = ("Watchlist", (
-    ("Crypto", ("okx:BTC/USDT", "okx:ETH/USDT", "okx:SOL/USDT")),
-    ("Stocks", ("US:AAPL", "US:NVDA", "US:MSFT", "US:TSLA", "US:AMZN")),
+DEFAULT_LIST = (mark("Watchlist"), (
+    (mark("Crypto"), ("okx:BTC/USDT", "okx:ETH/USDT", "okx:SOL/USDT")),
+    (mark("Stocks"), ("US:AAPL", "US:NVDA", "US:MSFT", "US:TSLA", "US:AMZN")),
 ))
 
 
 def checked(sections: list[dict]) -> list[dict]:
     ids = [section["id"] for section in sections]
     if len(set(ids)) != len(ids):
-        raise ContractError("invalid_input", "Section ids repeat")
+        raise ContractError("invalid_input", t("Section ids repeat"))
     members = [member["instrument"].get("instrumentId") for section in sections for member in section["members"]]
     if None in members:
-        raise ContractError("invalid_input", "A member's instrument has no instrumentId")
+        raise ContractError("invalid_input", t("A member's instrument has no instrumentId"))
     if len(members) > MAX_MEMBERS:
-        raise ContractError("invalid_input", f"A watchlist holds at most {MAX_MEMBERS} symbols")
+        raise ContractError("invalid_input", t("A watchlist holds at most {MAX_MEMBERS} symbols", MAX_MEMBERS=MAX_MEMBERS))
     if len(set(members)) != len(members):
-        raise ContractError("invalid_input", "A symbol is in the watchlist more than once")
+        raise ContractError("invalid_input", t("A symbol is in the watchlist more than once"))
     return sections
 
 
@@ -52,7 +53,7 @@ class Watchlists:
         for value in self.all(workspace):
             if value["id"] == watchlist_id:
                 return value
-        raise ContractError("not_found", f"No watchlist {watchlist_id} in this workspace")
+        raise ContractError("not_found", t("No watchlist {watchlist_id} in this workspace", watchlist_id=watchlist_id))
 
     def put(self, workspace: str, value: dict) -> dict:
         self.store.put_object("watchlist", {"id": value["id"], "value": value}, workspace)
@@ -67,7 +68,7 @@ class Watchlists:
                sections: list[dict] | None) -> dict:
         current = self.get(workspace, watchlist_id)
         if revision != current["revision"]:
-            raise ContractError("conflict", "The watchlist changed meanwhile", {"revision": current["revision"]})
+            raise ContractError("conflict", t("The watchlist changed meanwhile"), {"revision": current["revision"]})
         value = self.put(workspace, {**current, "revision": revision + 1,
                                      "name": current["name"] if name is None else name,
                                      "sections": current["sections"] if sections is None else checked(sections)})
@@ -100,8 +101,8 @@ class Watchlists:
                     members.append({"instrument": match["instrument"]})
                 else:
                     LOG.warning("Default watchlist leaves out %s: %s", match["symbol"], match["status"])
-            sections.append({"id": f"s{index + 1}", "name": title, "members": members})
-        self.create(workspace, name, sections)
+            sections.append({"id": f"s{index + 1}", "name": t(title), "members": members})
+        self.create(workspace, t(name), sections)
         self.store.put_object("seeded", {"id": workspace}, workspace)
         del self.seeding[workspace]
 

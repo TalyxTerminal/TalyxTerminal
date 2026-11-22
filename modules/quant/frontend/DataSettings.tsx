@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ContractError, ModuleView, TxButton, TxParamRow, TxDialog, TxIcon, TxIconButton, TxInput, TxMenu, TxPopover, TxSegmented, TxSelect, TxSkeleton, type Json, type ModuleContext } from "@talyx/sdk";
 import { createClient as marketClient, type ContractTypes as MarketTypes } from "../../market/public/ts/types";
@@ -28,7 +29,7 @@ export function fillChoices(verified: Timeframe[], timeframe: Timeframe | undefi
   const rank = timeframe === undefined ? TIMEFRAMES.length : TIMEFRAMES.indexOf(timeframe);
   return (["5m", "1m"] as const).filter(item => verified.includes(item) && TIMEFRAMES.indexOf(item) < rank);
 }
-const SERIES_NAMES: Record<string, string> = {funding_rate: "Funding rate", open_interest: "Open interest"};
+const SERIES_NAMES: Record<string, string> = {funding_rate: t("Funding rate"), open_interest: t("Open interest")};
 /** The series beyond prices Market has for this instrument, in words. */
 export function extraSeriesOf(rows: CapabilityRow[]): string[] {
   return [...new Set(rows.filter(row => row.capability !== "ohlcv" && SERIES_NAMES[row.capability] &&
@@ -75,11 +76,11 @@ export function defaultResearchData(items: IndexMaterial[]): DataSettings | null
 export function UntilField({until, since, onChange}: {until: string | undefined; since: string | undefined; onChange(until: string): void}) {
   const fixed = until !== undefined && until !== "latest";
   return <span className="qx-data-until">
-    <TxSelect aria-label="To" value={fixed ? "date" : "latest"} onChange={event => onChange(event.target.value === "latest" ? "latest" : fixed ? until! : lastFullDay())}>
-      <option value="latest">Latest close</option>
-      <option value="date">A date</option>
+    <TxSelect aria-label={t("To")} value={fixed ? "date" : "latest"} onChange={event => onChange(event.target.value === "latest" ? "latest" : fixed ? until! : lastFullDay())}>
+      <option value="latest">{t("Latest close")}</option>
+      <option value="date">{t("A date")}</option>
     </TxSelect>
-    {fixed && <DayInput label="To" value={until!} min={since} onChange={day => {if (day) onChange(day);}} />}
+    {fixed && <DayInput label={t("To")} value={until!} min={since} onChange={day => {if (day) onChange(day);}} />}
   </span>;
 }
 /** The same settings choosing the symbols another way; whatever chose them before is dropped. */
@@ -100,7 +101,7 @@ const firstFullDay = (at: number) => new Date(Math.ceil(at / 86_400_000) * 86_40
 export function HistoryStart({boundary, onStart}: {boundary: HistoryBoundary; onStart?(since: string): void}) {
   return <div className="qx-history-start">
     <span>{boundary.reason}</span>
-    {onStart && <TxButton size="sm" onClick={() => onStart((boundary.earliestDate ?? firstFullDay(boundary.earliestAt)))}>Start on {(boundary.earliestDate ?? firstFullDay(boundary.earliestAt))}</TxButton>}
+    {onStart && <TxButton size="sm" onClick={() => onStart((boundary.earliestDate ?? firstFullDay(boundary.earliestAt)))}>{t("Start on {earliestDate}", { earliestDate: (boundary.earliestDate ?? firstFullDay(boundary.earliestAt)) })}</TxButton>}
   </div>;
 }
 const universeOf = (data: DataSettings): Universe => data.list ? "list" : data.index ? "index" : data.universe === "code" ? "code" : "symbols";
@@ -196,11 +197,11 @@ export function DataSettingsChip({ctx, api, kind, data, defaults, defaultsError,
   const universe = universeOf(picked ?? data);
   const range = data.since && data.until ? rangeLabel(data.since, data.until) : "";
   const {detail: list, error: listError} = useListDetail(ctx, api, data.list);
-  const searchProps = useMemo<Json>(() => ({placeholder: "Search symbol"}), []);
+  const searchProps = useMemo<Json>(() => ({placeholder: t("Search symbol")}), []);
   const searchEvents = useMemo(() => ({
     selected: (raw: Json) => {
       const {instrument, series} = raw as unknown as MarketTypes["view:search_box:selected"];
-      if (series !== null) {setError("Choose a Market instrument; research does not use imported or derived series."); setSearching(null); onOpenChange(true); return;}
+      if (series !== null) {setError(t("Choose a Market instrument; research does not use imported or derived series.")); setSearching(null); onOpenChange(true); return;}
       const target = searching;
       // Symbols: the search stays open for the next one (an eleven-asset pool took eleven round trips); a list member closes it as before.
       if (target === "symbols") {save(withSymbol(latest.current, instrument)); setAdded(current => current.includes(instrument.displaySymbol) ? current : [...current, instrument.displaySymbol]); return;}
@@ -210,14 +211,14 @@ export function DataSettingsChip({ctx, api, kind, data, defaults, defaultsError,
     },
     closed: () => {setSearching(null); onOpenChange(true);},
   }), [data, searching, list]);
-  const universes: {value: Universe; label: string}[] = [{value: "symbols", label: "Symbols"}, {value: "list", label: "Research list"}, {value: "index", label: "Index"},
-    ...(research ? [{value: "code" as const, label: "Rule in the code"}] : [])];
+  const universes: {value: Universe; label: string}[] = [{value: "symbols", label: t("Symbols")}, {value: "list", label: t("Research list")}, {value: "index", label: t("Index")},
+    ...(research ? [{value: "code" as const, label: t("Rule in the code")}] : [])];
   const pickUniverse = (value: Universe) => {
     if (value === universe) return;
     if (value === "list" && lists !== null && lists.length === 0) {setListDialog("create"); return;}
     if (value === "index") {
       if (indexes.items === null) return;
-      if (indexes.items.length === 0) {setError("Market keeps historical members for no index."); return;}
+      if (indexes.items.length === 0) {setError(t("Market keeps historical members for no index.")); return;}
       // Index members are stocks: daily bars suit them, whatever the symbols used before.
       save({...choose(data, "index", undefined, selectionOf(indexes.items[0])), timeframe: "1d"});
       return;
@@ -227,85 +228,85 @@ export function DataSettingsChip({ctx, api, kind, data, defaults, defaultsError,
   };
   const index = indexes.items === null ? undefined : indexes.items.find(item => sameIndex(item, (picked ?? data).index));
   return <>
-    <TxPopover open={open} onOpenChange={onOpenChange} label="Data settings" className="qx-data"
-      trigger={trigger ?? <button type="button" className="qx-chip" data-need={summary === null}><TxIcon name="list" /><span className="qx-chip-text">{summary ?? "Set data"}</span></button>}>
+    <TxPopover open={open} onOpenChange={onOpenChange} label={t("Data settings")} className="qx-data"
+      trigger={trigger ?? <button type="button" className="qx-chip" data-need={summary === null}><TxIcon name="list" /><span className="qx-chip-text">{summary ?? t("Set data")}</span></button>}>
       <div className="qx-data-grid">
-        <span className="qx-data-key">Universe</span>
-        <TxSegmented label="Universe" value={universe} options={universes} onChange={pickUniverse} />
+        <span className="qx-data-key">{t("Universe")}</span>
+        <TxSegmented label={t("Universe")} value={universe} options={universes} onChange={pickUniverse} />
         {universe === "symbols" && <>
-          <span className="qx-data-key">Symbols</span>
+          <span className="qx-data-key">{t("Symbols")}</span>
           <div className="qx-data-symbols">
             {symbols.map(item => <span key={item.instrument.instrumentId} className="qx-symbol">
               <span>{item.instrument.displaySymbol}</span><span className="qx-muted">{item.instrument.venueId}</span>
-              <TxIconButton size="sm" label={`Remove ${item.instrument.displaySymbol}`} icon="close"
+              <TxIconButton size="sm" label={t("Remove {displaySymbol}", { displaySymbol: item.instrument.displaySymbol })} icon="close"
                 onClick={() => save({...latest.current, symbols: (latest.current.symbols ?? []).filter(other => other.instrument.instrumentId !== item.instrument.instrumentId)})} />
             </span>)}
-            <TxButton size="sm" onClick={() => {onOpenChange(false); setAdded([]); setSearching("symbols");}}><TxIcon name="plus" />{symbols.length ? "Add" : "Choose symbol"}</TxButton>
+            <TxButton size="sm" onClick={() => {onOpenChange(false); setAdded([]); setSearching("symbols");}}><TxIcon name="plus" />{symbols.length ? t("Add") : t("Choose symbol")}</TxButton>
           </div>
         </>}
         {universe === "list" && <>
-          <span className="qx-data-key">List</span>
+          <span className="qx-data-key">{t("List")}</span>
           <div className="qx-data-list">
-            <TxSelect aria-label="Research list" value={data.list} onChange={event => save(choose(data, "list", event.target.value))}>
+            <TxSelect aria-label={t("Research list")} value={data.list} onChange={event => save(choose(data, "list", event.target.value))}>
               {(lists ?? []).map(item => <option key={item.id} value={item.id}>{item.name} · {item.count}</option>)}
             </TxSelect>
-            <TxButton size="sm" onClick={() => setListDialog("create")}><TxIcon name="plus" />New list</TxButton>
-            <TxMenu label="List actions" align="end" items={[
-              {id: "rename", label: "Rename…", icon: "edit", onSelect: () => setListDialog("rename")},
-              {id: "delete", label: "Delete…", icon: "trash", tone: "danger", onSelect: () => setListDialog("delete")},
-            ]} trigger={<TxIconButton size="sm" label="List actions" icon="more" />} />
+            <TxButton size="sm" onClick={() => setListDialog("create")}><TxIcon name="plus" />{t("New list")}</TxButton>
+            <TxMenu label={t("List actions")} align="end" items={[
+              {id: "rename", label: t("Rename…"), icon: "edit", onSelect: () => setListDialog("rename")},
+              {id: "delete", label: t("Delete…"), icon: "trash", tone: "danger", onSelect: () => setListDialog("delete")},
+            ]} trigger={<TxIconButton size="sm" label={t("List actions")} icon="more" />} />
           </div>
-          <span className="qx-data-key">Members</span>
+          <span className="qx-data-key">{t("Members")}</span>
           {list === null ? listError ? <span className="qx-error">{listError}</span> : <TxSkeleton width="50%" /> : <ListMembers list={list} onAdd={() => {onOpenChange(false); setSearching("list");}}
             onRemove={id => void api.updateList(list.id, {members: list.members.filter(member => member.instrument.instrumentId !== id).map(member => ({instrument: member.instrument}))})
               .catch(reason => setError(message(reason)))} />}
         </>}
         {universe === "index" && <>
-          <span className="qx-data-key">Index</span>
+          <span className="qx-data-key">{t("Index")}</span>
           <div className="qx-data-list">
-            <TxSelect aria-label="Historical index" value={index === undefined ? "" : index.index.instrumentId}
+            <TxSelect aria-label={t("Historical index")} value={index === undefined ? "" : index.index.instrumentId}
               onChange={event => {const next = indexes.items!.find(item => item.index.instrumentId === event.target.value)!; save(choose(data, "index", undefined, selectionOf(next)));}}>
-              {index === undefined && <option value="">{indexes.items === null ? "Loading…" : "Not found in Market"}</option>}
+              {index === undefined && <option value="">{indexes.items === null ? t("Loading…") : t("Not found in Market")}</option>}
               {(indexes.items ?? []).map(item => <option key={item.index.instrumentId} value={item.index.instrumentId}>{indexLabel(item)}</option>)}
             </TxSelect>
           </div>
-          <span className="qx-data-key">Members</span>
+          <span className="qx-data-key">{t("Members")}</span>
           {index === undefined ? <span className="qx-muted">{indexes.error ?? "—"}</span> : <IndexFacts ctx={ctx} item={index} at={untilDay(data) ?? lastFullDay()} asOf={data.index?.asOf} />}
         </>}
         {universe === "code" && <>
-          <span className="qx-data-key">Rule</span>
-          <span className="qx-data-note">The code picks its own symbols, for example <code>q.data(["AAPL", "MSFT"], "1d", start, end)</code>. Nothing is fetched before it runs.</span>
+          <span className="qx-data-key">{t("Rule")}</span>
+          <span className="qx-muted">{t("Picked by the code")}</span>
         </>}
-        <span className="qx-data-key">Interval</span>
-        <TxSegmented label="Interval" value={data.timeframe ?? ("" as Timeframe)} options={(verified === null ? TIMEFRAMES : TIMEFRAMES.filter(value => verified.includes(value) || value === data.timeframe)).map(value => ({value, label: value}))}
+        <span className="qx-data-key">{t("Interval")}</span>
+        <TxSegmented label={t("Interval")} value={data.timeframe ?? ("" as Timeframe)} options={(verified === null ? TIMEFRAMES : TIMEFRAMES.filter(value => verified.includes(value) || value === data.timeframe)).map(value => ({value, label: value}))}
           onChange={timeframe => save({...data, timeframe, ...(data.fillBars ? {fillBars: undefined} : {})})} />
-        <span className="qx-data-key">Range</span>
+        <span className="qx-data-key">{t("Range")}</span>
         <div className="qx-data-range">
-          <TxSegmented label="Range" value={range} options={RANGES.map(([label]) => ({value: label, label}))}
+          <TxSegmented label={t("Range")} value={range} options={RANGES.map(([label]) => ({value: label, label}))}
             onChange={label => save({...data, since: monthsBack(RANGES.find(item => item[0] === label)![1]), until: "latest"})} />
-          <DayInput label="From" value={data.since ?? null} max={untilDay(data)} onChange={day => {if (day) save({...data, since: day});}} />
+          <DayInput label={t("From")} value={data.since ?? null} max={untilDay(data)} onChange={day => {if (day) save({...data, since: day});}} />
           <UntilField until={data.until} since={data.since} onChange={until => save({...data, until})} />
         </div>
         {boundary !== null && <><span className="qx-data-key" /><HistoryStart boundary={boundary} onStart={since => save({...data, since})} /></>}
         {research && <>
-          <span className="qx-data-key">Prices</span>
-          <TxSegmented label="Prices" value={data.adjustment ?? "adjusted"} options={[{value: "adjusted", label: "Adjusted for splits and dividends"}, {value: "raw", label: "Raw"}]}
+          <span className="qx-data-key">{t("Prices")}</span>
+          <TxSegmented label={t("Prices")} value={data.adjustment ?? "adjusted"} options={[{value: "adjusted", label: t("Adjusted for splits and dividends")}, {value: "raw", label: t("Raw")}]}
             onChange={adjustment => save({...data, adjustment})} />
         </>}
         {kind === "strategy" && verified !== null && fillChoices(verified, data.timeframe).length > 0 && <>
-          <span className="qx-data-key">Fill with</span>
-          <TxSelect aria-label="Fill with" value={data.fillBars ?? ""} onChange={event => save({...data, fillBars: (event.target.value || undefined) as DataSettings["fillBars"]})}>
-            <option value="">Same bars</option>{fillChoices(verified, data.timeframe).map(item => <option key={item} value={item}>{item === "5m" ? "5 minutes" : "1 minute"}</option>)}</TxSelect>
+          <span className="qx-data-key">{t("Fill with")}</span>
+          <TxSelect aria-label={t("Fill with")} value={data.fillBars ?? ""} onChange={event => save({...data, fillBars: (event.target.value || undefined) as DataSettings["fillBars"]})}>
+            <option value="">{t("Same bars")}</option>{fillChoices(verified, data.timeframe).map(item => <option key={item} value={item}>{item === "5m" ? t("5 minutes") : t("1 minute")}</option>)}</TxSelect>
         </>}
-        {kind === "strategy" && alsoBuilt && <><span className="qx-data-key">Also built</span><span className="qx-data-defaults">{alsoBuilt}</span></>}
+        {kind === "strategy" && alsoBuilt && <><span className="qx-data-key">{t("Also built")}</span><span className="qx-data-defaults">{alsoBuilt}</span></>}
         {kind === "strategy" && first !== undefined && capabilities !== null && extraSeriesOf(capabilities).length > 0 && <>
-          <span className="qx-data-key">Extra series</span><span className="qx-data-defaults">{extraSeriesOf(capabilities).join(", ")}</span></>}
-        {kind === "strategy" && <><span className="qx-data-key">Held out from</span><span className="qx-data-defaults">{data.heldOutFrom ? dayShown(data.heldOutFrom) : "none"}</span></>}
+          <span className="qx-data-key">{t("Extra series")}</span><span className="qx-data-defaults">{extraSeriesOf(capabilities).join(", ")}</span></>}
+        {kind === "strategy" && <><span className="qx-data-key">{t("Held out from")}</span><span className="qx-data-defaults">{data.heldOutFrom ? dayShown(data.heldOutFrom) : t("none")}</span></>}
         {!research && (defaults !== null || defaultsError !== null || boundary !== null) && <>
-          <span className="qx-data-key">Venue</span>
+          <span className="qx-data-key">{t("Venue")}</span>
           <span className="qx-data-defaults">{defaults ? <>
             {[...new Set(defaults.instruments.map(item => `${item.venueLabel} ${item.marketType === "swap" ? "perpetual" : item.marketType}`))].join(", ")}
-            {" · "}{defaults.account.fee === null ? "Stock commission and taxes follow instrument rules" : <>Fees {fee(defaults.account.fee.maker)} maker / {fee(defaults.account.fee.taker)} taker</>}
+            {" · "}{defaults.account.fee === null ? (defaults.instruments.some(item => item.assetClass !== "equity" && item.assetClass !== "fund") ? t("Fees per symbol, from Market") : t("Stock commission and taxes follow instrument rules")) : <>{t("Fees {maker} maker / {taker} taker", { maker: fee(defaults.account.fee.maker), taker: fee(defaults.account.fee.taker) })}</>}
           </> : boundary !== null ? "—" : defaultsError}</span>
         </>}
       </div>
@@ -313,12 +314,12 @@ export function DataSettingsChip({ctx, api, kind, data, defaults, defaultsError,
       {(error ?? listsError ?? capabilityError) && <p role="alert" className="qx-error">{error ?? listsError ?? capabilityError}</p>}
       <div className="qx-data-foot">
         <span className="tx-spacer" />
-        <TxButton variant="primary" onClick={() => onOpenChange(false)}>Done</TxButton>
+        <TxButton variant="primary" onClick={() => onOpenChange(false)}>{t("Done")}</TxButton>
       </div>
     </TxPopover>
-    <TxDialog open={searching !== null} onOpenChange={value => {if (!value) {setSearching(null); onOpenChange(true);}}} title={searching === "list" && list !== null ? `Add to ${list.name}` : "Add symbols"} size="standard"
-      footer={searching === "symbols" ? <><span className="qx-muted">{added.length ? `Added ${added.join(", ")}` : ""}</span><span className="tx-spacer" />
-        <TxButton size="sm" variant="primary" onClick={() => {setSearching(null); onOpenChange(true);}}>Done</TxButton></> : undefined}>
+    <TxDialog open={searching !== null} onOpenChange={value => {if (!value) {setSearching(null); onOpenChange(true);}}} title={searching === "list" && list !== null ? t("Add to {name}", { name: list.name }) : t("Add symbols")} size="standard"
+      footer={searching === "symbols" ? <><span className="qx-muted">{added.length ? t("Added {added}", { added: added.join(", ") }) : ""}</span><span className="tx-spacer" />
+        <TxButton size="sm" variant="primary" onClick={() => {setSearching(null); onOpenChange(true);}}>{t("Done")}</TxButton></> : undefined}>
       <div className="qx-search-host">{searching !== null && <ModuleView id="market.search_box" context={ctx} props={searchProps} on={searchEvents} />}</div>
     </TxDialog>
     {/* A dialog opened from the data settings goes back to them when it closes, as the symbol search does. */}
@@ -354,13 +355,13 @@ export function DataInline({ctx, api, data, onSave}: {ctx: ModuleContext; api: A
     save(choose(data, value));
   };
   const index = indexes.items === null ? undefined : indexes.items.find(item => sameIndex(item, (picked ?? data).index));
-  const options: {value: Universe; label: string}[] = [{value: "symbols", label: "Symbols"}, {value: "list", label: "Research list"}, {value: "index", label: "Index"}];
+  const options: {value: Universe; label: string}[] = [{value: "symbols", label: t("Symbols")}, {value: "list", label: t("Research list")}, {value: "index", label: t("Index")}];
   return <>
-    <TxParamRow label="Universe"><TxSegmented label="Universe" value={universe} options={options} onChange={pick} /></TxParamRow>
-    {universe === "index" && <TxParamRow label="Members">{indexes.items === null && !indexes.error ? <TxSkeleton width="60%" /> : index === undefined ? <span className="qx-muted">{indexes.error ?? "Not found in Market"}</span> : <IndexFacts ctx={ctx} item={index} at={untilDay(data) ?? lastFullDay()} asOf={data.index?.asOf} />}</TxParamRow>}
-    {universe === "list" && <TxParamRow label="Members"><span className="qx-muted">{(lists ?? []).find(item => item.id === data.list)?.count ?? "—"} names</span></TxParamRow>}
-    <TxParamRow label="From"><DayInput label="From" value={data.since ?? null} max={untilDay(data)} onChange={day => {if (day) save({...data, since: day});}} /></TxParamRow>
-    <TxParamRow label="To"><UntilField until={data.until} since={data.since} onChange={until => save({...data, until})} /></TxParamRow>
+    <TxParamRow label={t("Universe")}><TxSegmented label={t("Universe")} value={universe} options={options} onChange={pick} /></TxParamRow>
+    {universe === "index" && <TxParamRow label={t("Members")}>{indexes.items === null && !indexes.error ? <TxSkeleton width="60%" /> : index === undefined ? <span className="qx-muted">{indexes.error ?? t("Not found in Market")}</span> : <IndexFacts ctx={ctx} item={index} at={untilDay(data) ?? lastFullDay()} asOf={data.index?.asOf} />}</TxParamRow>}
+    {universe === "list" && <TxParamRow label={t("Members")}><span className="qx-muted">{t("{count} names", { count: (lists ?? []).find(item => item.id === data.list)?.count ?? "—" })}</span></TxParamRow>}
+    <TxParamRow label={t("From")}><DayInput label={t("From")} value={data.since ?? null} max={untilDay(data)} onChange={day => {if (day) save({...data, since: day});}} /></TxParamRow>
+    <TxParamRow label={t("To")}><UntilField until={data.until} since={data.since} onChange={until => save({...data, until})} /></TxParamRow>
     {error && <p role="alert" className="qx-error">{error}</p>}
   </>;
 }
@@ -386,9 +387,7 @@ function IndexFacts({ctx, item, at, asOf}: {ctx: ModuleContext; item: IndexMater
     return () => {live = false;};
   }, [market, item.index.instrumentId, at, asOf]);
   return <span className="qx-data-defaults">
-    {error !== null ? error : counts === null ? <TxSkeleton width="12em" /> : <>
-      {counts.mapped} of {counts.mapped + counts.unmapped} members have Market symbols
-    </>}
+    {error !== null ? error : counts === null ? <TxSkeleton width="12em" /> : <>{t("{mapped} of {mapped2} members have Market symbols", { mapped: counts.mapped, mapped2: counts.mapped + counts.unmapped })}</>}
   </span>;
 }
 
@@ -408,10 +407,10 @@ function ListMembers({list, onAdd, onRemove}: {list: ResearchList; onAdd(): void
   return <div className="qx-data-symbols">
     {shown.map(member => <span key={member.instrument.instrumentId} className="qx-symbol">
       <span>{member.displaySymbol}</span><span className="qx-muted">{member.venue}</span>
-      <TxIconButton size="sm" label={`Remove ${member.displaySymbol} from ${list.name}`} icon="close" onClick={() => onRemove(member.instrument.instrumentId)} />
+      <TxIconButton size="sm" label={t("Remove {displaySymbol} from {name}", { displaySymbol: member.displaySymbol, name: list.name })} icon="close" onClick={() => onRemove(member.instrument.instrumentId)} />
     </span>)}
-    {list.members.length > SHOWN && <TxButton size="sm" variant="quiet" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${list.members.length}`}</TxButton>}
-    <TxButton size="sm" onClick={onAdd}><TxIcon name="plus" />Add symbol</TxButton>
+    {list.members.length > SHOWN && <TxButton size="sm" variant="quiet" onClick={() => setAll(!all)}>{all ? t("Show fewer") : t("Show all {membersCount}", { membersCount: list.members.length })}</TxButton>}
+    <TxButton size="sm" onClick={onAdd}><TxIcon name="plus" />{t("Add symbol")}</TxButton>
   </div>;
 }
 
@@ -419,8 +418,8 @@ function ListMembers({list, onAdd, onRemove}: {list: ResearchList; onAdd(): void
 export const nextListName = (names: string[]) => {
   const taken = new Set(names.map(name => name.trim().toLowerCase()));
   let at = 1;
-  while (taken.has(`list ${at}`)) at += 1;
-  return `List ${at}`;
+  while (taken.has(t("List {number}", { number: at }).toLowerCase())) at += 1;
+  return t("List {number}", { number: at });
 };
 
 /** Create, rename or delete a research list. Deleting one that something's data settings still select is refused, with who selects it. */
@@ -439,16 +438,16 @@ function ListDialog({action, api, list, names, onClose, onCreated, onDelete}: {
       else if (action === "rename") {await api.updateList(list!.id, {name: name.trim() || fallback}); onClose();}
       else await onDelete();
     } catch (reason) {
-      setError(reason instanceof ContractError && reason.code === "conflict" ? `Not deleted. ${reason.message}` : message(reason));
+      setError(reason instanceof ContractError && reason.code === "conflict" ? t("Not deleted. {reason}", { reason: reason.message }) : message(reason));
     } finally {setBusy(false);}
   };
-  const title = action === "create" ? "New research list" : action === "rename" ? "Rename research list" : "Delete research list";
+  const title = action === "create" ? t("New research list") : action === "rename" ? t("Rename research list") : t("Delete research list");
   return <TxDialog open onOpenChange={value => {if (!value) onClose();}} title={title}
-    footer={<><TxButton onClick={onClose}>Cancel</TxButton><TxButton variant="primary" onClick={() => {if (!busy) void submit();}}>
-      {action === "create" ? "Create" : action === "rename" ? "Rename" : "Delete"}</TxButton></>}>
-    {action === "delete" ? <p>Delete {list === null ? "this list" : list.name}? This page stops using it; runs that used it keep the members they ran with.</p>
+    footer={<><TxButton onClick={onClose}>{t("Cancel")}</TxButton><TxButton variant="primary" onClick={() => {if (!busy) void submit();}}>
+      {action === "create" ? t("Create") : action === "rename" ? t("Rename") : t("Delete")}</TxButton></>}>
+    {action === "delete" ? <p>{t("Delete {value}? This page stops using it; runs that used it keep the members they ran with.", { value: list === null ? t("this list") : list.name })}</p>
       : <>
-        <TxInput autoFocus aria-label="Name" placeholder={fallback} value={name} onChange={event => setName(event.target.value)}
+        <TxInput autoFocus aria-label={t("Name")} placeholder={fallback} value={name} onChange={event => setName(event.target.value)}
           onKeyDown={event => {if (event.key === "Enter" && !busy) void submit();}} />
       </>}
     {error && <p role="alert" className="qx-error">{error}</p>}

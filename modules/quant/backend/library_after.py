@@ -31,7 +31,7 @@ def book_returns(prices, table, settings, sectors, annualization):
     scores = table.reindex(closes.index).to_numpy(float)
     industry = [sectors.get(name) for name in closes.columns] if sectors else None
     panel = W.Panel(closes.index, closes.columns, {"close": closes.to_numpy(float)}, None, {"annualization": annualization}, industry=industry)
-    groups = W.group_of(scores, settings, industry)
+    groups = W.group_of(scores, settings, panel.industry)
     returns = W.returns_of(panel, groups, W.group_count(groups, settings), settings, scores)
     return pd.Series(returns["net"], index=closes.index)
 

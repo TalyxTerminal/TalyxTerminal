@@ -50,6 +50,31 @@ def _value(model) -> dict:
     return model.model_dump(mode="json", exclude_unset=True)
 
 
+async def upgrade_member_dates(ctx):
+    """Keep cached index data when moving to exchange-local member dates and separate weights."""
+    from .sources.indices import localize_sp500_dates
+    from .store import DocumentStore
+
+    research = Path((await ctx.platform.storage())["dataDir"]) / "research"
+
+    def upgrade():
+        members = DocumentStore(research, "members")
+        for index in members.ids():
+            doc = members.read(index)
+            if doc["source"] == "sp500_history":
+                localize_sp500_dates(doc["rows"])
+                members.write(index, doc)
+            elif doc["source"] == "tushare":
+                weights = research / "weights"
+                weights.mkdir(exist_ok=True)
+                (members.root / f"{index}.json").replace(weights / f"{index}.json")
+
+    await asyncio.to_thread(upgrade)
+
+
+module.data_format(2, {2: upgrade_member_dates})
+
+
 @module.changes
 class SourceChanges:
     @staticmethod
@@ -248,7 +273,11 @@ async def read_research(input: inputs.Research, call: Call) -> outputs.Research:
     """Reference data as one table: actions (splits with ratio, cash dividends with amount; exDate, recordDate and
     payDate are exchange-local dates), members of an index (code at the time, current symbol, name, start and end of
     each membership, both inclusive; index.at for one day's members, start/end for everyone who was in the index in
-    that window), classification (sector, industry), shares, financials (source concept names in metrics; FY or FQ),
+    that window; weight is percent when published), classification (sector, industry; with start/end or at, where
+    a source keeps dated answers (A shares) each row runs from when it was known until it changed, read on the
+    window's first day and each quarter end, so a change shows at most a quarter late; elsewhere the source's rows,
+    start empty when the source gives none), shares,
+    financials (source concept names in metrics; FY or FQ),
     market_cap, earnings_dates, factors. asOf hides what was published after that time. Pages by size: follow
     nextCursor."""
     return await market.public.research(_value(input))

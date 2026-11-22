@@ -2,6 +2,8 @@
 AppId=TALYX.Desktop
 AppName=TALYX
 AppVersion={#Version}
+; The desktop holds this mutex while it runs (host/desktop/app.py): Setup asks to quit TALYX before replacing its files.
+AppMutex=TALYX.Desktop
 DefaultDirName={localappdata}\Programs\TALYX
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -16,6 +18,22 @@ LZMANumBlockThreads=1
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=no
+
+[InstallDelete]
+; An upgrade replaces the program, not adds to it: a file the new version no longer has (a removed module, an old
+; package's files in the environment) would otherwise stay and still be loaded. The user's data and files are not here
+; (they are under %LOCALAPPDATA%\TALYX\Data), so these folders are the program alone.
+Type: filesandordirs; Name: "{app}\host"
+Type: filesandordirs; Name: "{app}\kernel"
+Type: filesandordirs; Name: "{app}\modules"
+Type: filesandordirs; Name: "{app}\sdk"
+Type: filesandordirs; Name: "{app}\vocabulary"
+Type: filesandordirs; Name: "{app}\contracts"
+Type: filesandordirs; Name: "{app}\scripts"
+Type: filesandordirs; Name: "{app}\web"
+Type: filesandordirs; Name: "{app}\examples"
+Type: filesandordirs; Name: "{app}\python"
+Type: filesandordirs; Name: "{app}\.venv"
 
 [Files]
 Source: "{#Payload}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "__pycache__,*.pyc"

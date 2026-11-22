@@ -52,7 +52,7 @@ group_limits = q.table("group_limits", [], columns=["group", "max", "min", "coun
 cardinality = q.param("cardinality", "", label="At most", group="Limits")
 threshold = q.param("threshold", "", label="If held, at least", group="Limits")
 max_turnover = q.param("max_turnover", "", label="Turnover cap", group="Limits")
-max_tracking = q.param("max_tracking", "", label="Tracking error vs 60/40", group="Limits")
+max_tracking = q.param("max_tracking", "", label="Tracking error", group="Limits")
 risk_cap_measure = q.choice("risk_cap_measure", "cvar", [("variance", "Variance"), ("standard_deviation", "Standard deviation"), ("cvar", "CVaR"), ("cdar", "CDaR"),
                             ("max_drawdown", "Max drawdown"), ("semi_deviation", "Semi deviation")], label="Risk cap measure", group="Limits")
 risk_cap = q.param("risk_cap", "", label="Risk cap", group="Limits")
@@ -61,8 +61,11 @@ cost_aware = q.param("cost_aware", True, label="Cost-aware", group="Limits")
 
 cost_multiple = q.param("cost_multiple", 1.0, min=0.0, label="Costs", group="Costs by group", help="Scales every cost; sweep it to see what doubled costs leave")
 capital = q.param("capital", 1000000.0, min=0.0, label="Capital", group="Run settings", help="What the trades list of a rebalance is sized on; the backtest itself works in weights")
-risk_free = q.choice("risk_free", "tbill", [("tbill", "13-week T-bill"), ("zero", "Zero")], label="Risk-free", group="Run settings",
-                     help="What the Sharpe and a maximum ratio are over: the 13-week US T-bill (^IRX) of each day, or zero. A pool of crypto alone starts at zero")
+risk_free = q.choice("risk_free", "tbill", [("tbill", "13-week T-bill"), ("fixed", "Fixed"), ("zero", "Zero")], label="Risk-free", group="Run settings",
+                     help="What the Sharpe and a maximum ratio are over: the 13-week US T-bill (^IRX) of each day, a fixed rate a year, or zero. A pool of A shares starts at a fixed 4%, of crypto alone at zero")
+risk_free_pct = q.param("risk_free_pct", 4.0, min=-5.0, max=50.0, label="Rate", group="Run settings", show_if={"risk_free": "fixed"}, help="Percent a year")
+benchmark = q.param("benchmark", "SPY 60%, IEF 40%", label="Benchmark", group="Run settings",
+                    help="What benchmark tracking and the tracking error follow: Market symbols with their weights, such as QQQ or SPY 60%, IEF 40%; they need not be in the pool")
 frequency = q.choice("frequency", "monthly", [("weekly", "Weekly"), ("monthly", "Monthly"), ("quarterly", "Quarterly")], label="Every", group="Rebalance")
 costs = q.table("costs", [{"group": "Stocks", "bps": 5.0}, {"group": "Funds", "bps": 5.0}, {"group": "Bonds", "bps": 5.0}, {"group": "Crypto", "bps": 10.0},
                          {"group": "Commodities", "bps": 10.0}, {"group": "Other", "bps": 10.0}], columns=["group", "bps"],
@@ -76,5 +79,6 @@ settings = {"pool": pool, "align": align, "currency": currency, "objective": obj
             "covariance_parameters": covariance_parameters, "long_cap": long_cap, "short_cap": short_cap, "net": net, "max_weight": max_weight,
             "min_weight": min_weight, "group_limits": group_limits, "cardinality": cardinality, "threshold": threshold, "max_turnover": max_turnover,
             "max_tracking": max_tracking, "risk_cap_measure": risk_cap_measure, "risk_cap": risk_cap, "linear": linear, "cost_aware": cost_aware,
-            "frequency": frequency, "costs": costs, "cost_multiple": cost_multiple, "capital": capital, "risk_free": risk_free, "shocks": shocks}
+            "frequency": frequency, "costs": costs, "cost_multiple": cost_multiple, "capital": capital, "risk_free": risk_free, "risk_free_pct": risk_free_pct,
+            "benchmark": benchmark, "shocks": shocks}
 result = q.allocate(settings)

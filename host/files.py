@@ -9,6 +9,14 @@ from uuid import uuid4
 
 import orjson
 
+# The platform's dictionaries (the Host's words, the window's shell, the SDK's components, the tray), like a module's.
+PLATFORM_DIRECTORY = Path(__file__).resolve().parent
+PLATFORM_LOCALES = {"zh-CN": "locales/zh-CN.json"}
+
+
+def platform_locale_files() -> dict[str, Path]:
+    return {language: PLATFORM_DIRECTORY / path for language, path in PLATFORM_LOCALES.items()}
+
 
 def default_data_dir() -> Path:
     """``TALYX_DATA_DIR``, else the daily data root."""

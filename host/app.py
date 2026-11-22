@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import itertools
+import json
 import logging
 import secrets
 import shutil
@@ -17,9 +18,10 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from talyx_sdk import memory, stall, wire
+from talyx_sdk import i18n, memory, stall, upgrade, wire
 from talyx_sdk.contract import build
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.process import Codec, error_value
 
 from kernel.router import Endpoint, Route, Router
@@ -27,8 +29,8 @@ from kernel.router import Endpoint, Route, Router
 from . import catalog as catalog_module
 from .ai import AI, MCP
 from .catalog import Catalog, read_docs, read_guide
+from .files import PLATFORM_LOCALES, finish_before_cancel, platform_locale_files
 from .files import default_data_dir as default_data_dir
-from .files import finish_before_cancel
 from .notifications import ChannelSecrets, NotificationService, Toasts
 from .platform import declarations as platform
 from .platform import services
@@ -36,6 +38,7 @@ from .records import CallLog, Runs, Tasks
 from .secrets import Secrets
 from .settings import GLOBAL, Settings
 from .supervisor import ModuleProcess, Supervisor
+from .updates import Updates, update_folder
 from .workspaces import Workspaces, panel_modules
 
 log = logging.getLogger("talyx.host")
@@ -43,6 +46,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # A module must stop a closing workspace's work within this time, or its process is restarted.
 STOP_SECONDS = 5.0
+# The format of the platform's own data (settings, workspaces, call records, notification channels under platform/), and
+# for each version after 1 the step from the version before (talyx_sdk.upgrade). Bump it with a step whenever that
+# format changes: installed users' data is brought up before the Host reads it.
+PLATFORM_FORMAT = 1
+PLATFORM_FORMAT_STEPS: dict = {}
 # How long a module may take to be ready for, and then to do, its part of copying a workspace.
 COPY_SECONDS = 60.0
 
@@ -77,7 +85,7 @@ class PlatformEndpoint(Endpoint):
         return self.codecs[id(annotation)]
 
     def caller(self, envelope: dict) -> dict:
-        raise ContractError("permission_denied", "The platform does not call itself through the router")
+        raise ContractError("permission_denied", t("The platform does not call itself through the router"))
 
     def deliver(self, envelope: dict, body: bytes = b"") -> None:
         kind = envelope["t"]
@@ -100,7 +108,7 @@ class PlatformEndpoint(Endpoint):
             self.host.router.answer(self, {"t": "result", "id": envelope["id"]}, data)
         except asyncio.CancelledError:
             self.host.router.answer(self, {"t": "error", "id": envelope["id"], "err": ContractError(
-                "cancelled", "Cancelled", execution="unknown").to_dict()}, b"")
+                "cancelled", t("Cancelled"), execution="unknown").to_dict()}, b"")
         except Exception as exc:  # noqa: BLE001 - every failure answers in the one error format
             self.host.router.answer(self, {"t": "error", "id": envelope["id"], "err": error_value(exc, invalid_input=True)},
                                     b"")
@@ -173,6 +181,9 @@ class Host:
     def __init__(self, config: HostConfig):
         self.config = config
         data = config.data_dir
+        fresh = not (data / "platform").exists()   # no earlier version ran on this data: no release notes to show
+        for version in upgrade.bring_up_to_date_now(data / "platform", PLATFORM_FORMAT, PLATFORM_FORMAT_STEPS):
+            log.info("Platform data brought up to format %s", version)
         self.instance = secrets.token_hex(8)
         self.catalog = Catalog(config.official_root, config.user_dir / "modules", data / "platform" / "modules.json",
                                data / "platform" / "environments")
@@ -197,6 +208,10 @@ class Host:
                                      self.module_frame)
         # Shared by every module: request-limit domains and cooldowns of remote APIs several modules call.
         self.supervisor.environment["TALYX_SHARED_DIR"] = str(data / "shared")
+        self.supervisor.module_data = data / "modules"
+        # The SDK's own words in module processes come from the platform's dictionary.
+        self.supervisor.environment[i18n.PLATFORM_LOCALES_ENV] = json.dumps({
+            language: str(path) for language, path in platform_locale_files().items()})
         self.ai = AI(self)
         self.mcp = MCP(self.ai)
         self.change_listeners: set[asyncio.Queue] = set()
@@ -204,6 +219,21 @@ class Host:
         self.desktop = None
         self.platform_contract = build(platform.module)
         services.HOST = self
+        i18n.configure(platform_locale_files(), self.language())
+        self.updates = Updates(lambda: self.settings.read("platform", GLOBAL, ["checkForUpdates"])["values"]["checkForUpdates"]["value"],
+                               update_folder(data), fresh=fresh)
+        self.update_checks: asyncio.Task | None = None
+        self.settings.observers.append(self.settings_changed)
+
+    def language(self) -> str:
+        return self.settings.read("platform", GLOBAL, ["language"])["values"]["language"]["value"]
+
+    def settings_changed(self, module: str, workspace_id: str, keys: list[str]) -> None:
+        # Module processes follow the setting themselves; a process started from now on starts in it.
+        if module == "platform" and "language" in keys:
+            i18n.set_language(self.language())
+        if module == "platform" and "checkForUpdates" in keys and self.update_checks is not None and self.updates.enabled():
+            asyncio.get_running_loop().create_task(self.updates.check())
 
     # ── starting and stopping ────────────────────────────────────────────
 
@@ -215,6 +245,8 @@ class Host:
             from .desktop_effects import DesktopEffects
             self.desktop = DesktopEffects(self, self.config.data_dir)
             self.desktop.start()
+            # Only the desktop app looks for a newer version by itself (the installed TALYX always runs as it).
+            self.update_checks = asyncio.create_task(self.updates.run())
         self.catalog.discover()
         for skipped, reason in self.catalog.skipped.items():
             log.warning("Module %s is not loaded: %s", skipped, reason.problem)
@@ -265,7 +297,9 @@ class Host:
 
     async def close(self) -> None:
         memory.restore(getattr(self, "collector", None))
-        self.router.end_streams("platform.", ContractError("unavailable", "TALYX is closing"))
+        if self.update_checks is not None:
+            self.update_checks.cancel()
+        self.router.end_streams("platform.", ContractError("unavailable", t("TALYX is closing")))
         await self.supervisor.stop_all()
         await self.calls.written()
         await self.notifications.close()
@@ -281,38 +315,38 @@ class Host:
                 return Route("platform", None, event=True)
             declared = platform.module.actions if kind == "call" else platform.module.streams
             if name not in declared:
-                raise ContractError("unknown_capability", f"The platform has no {capability}")
+                raise ContractError("unknown_capability", t("The platform has no {capability}", capability=capability))
             if kind == "call":
                 self.check_callers(caller, capability, declared[name].callers)
             return Route("platform", self.platform)
         if ":" in name:
             point, implementer, rest = name.split(":", 2)
             if caller.get("module") != owner:
-                raise ContractError("permission_denied", f"Only {owner} calls implementations of {owner}.{point}")
+                raise ContractError("permission_denied", t("Only {owner} calls implementations of {owner}.{point}", owner=owner, point=point))
             return self._module_route(implementer)
         item = self.catalog.modules.get(owner)
         if item is None:
-            raise ContractError("unknown_capability", f"No module {owner} is installed")
+            raise ContractError("unknown_capability", t("No module {owner} is installed", owner=owner))
         contract = item.contract
         if kind == "call":
             if name not in contract["actions"]:
-                raise ContractError("unknown_capability", f"{owner} has no action {name}")
+                raise ContractError("unknown_capability", t("{owner} has no action {name}", owner=owner, name=name))
             action = contract["actions"][name]
             self.check_callers(caller, capability, action.get("callers"))
             return self._module_route(owner, tuple(action["effects"]))
         if name in contract["events"]:
             return Route(owner, None, event=True)
         if name not in contract["streams"]:
-            raise ContractError("unknown_capability", f"{owner} has no stream or event {name}")
+            raise ContractError("unknown_capability", t("{owner} has no stream or event {name}", owner=owner, name=name))
         return self._module_route(owner)
 
     def _module_route(self, module_id: str, effects: tuple = ()) -> Route:
         item = self.catalog.modules.get(module_id)
         process = self.supervisor.processes.get(module_id)
         if item is None or not item.enabled or process is None:
-            raise ContractError("unavailable", f"{module_id} is not enabled")
+            raise ContractError("unavailable", t("{module_id} is not enabled", module_id=module_id))
         if process.state == "failed":
-            raise ContractError("unavailable", f"{module_id} could not start: {process.problem}")
+            raise ContractError("unavailable", t("{module_id} could not start: {problem}", module_id=module_id, problem=process.problem))
         endpoint = process.endpoint if process.state == "ready" else None
         return Route(module_id, endpoint, effects)
 
@@ -326,12 +360,12 @@ class Host:
                     return
             item = self.catalog.modules.get(caller["module"])
             if item is None or owner not in item.requires:
-                raise ContractError("permission_denied", f"{caller['module']} does not list {owner} in its requires")
+                raise ContractError("permission_denied", t("{module} does not list {owner} in its requires", module=caller['module'], owner=owner))
 
     @staticmethod
     def check_callers(caller: dict, capability: str, allowed) -> None:
         if allowed is not None and caller["origin"] not in allowed:
-            raise ContractError("permission_denied", f"{capability} only accepts calls from {', '.join(allowed)}")
+            raise ContractError("permission_denied", t("{capability} only accepts calls from {value}", capability=capability, value=', '.join(allowed)))
 
     def record(self, caller: dict, capability: str, body: bytes, call_id: str) -> None:
         self.calls.begin(caller, capability, body, call_id)
@@ -348,17 +382,17 @@ class Host:
 
     def check_workspace(self, workspace_id: str) -> None:
         if not self.workspaces.is_open(workspace_id):
-            raise ContractError("permission_denied", f"Workspace {workspace_id} is not open")
+            raise ContractError("permission_denied", t("Workspace {workspace_id} is not open", workspace_id=workspace_id))
 
     def calling_module(self, caller: dict) -> str:
         if caller["module"] is None:
-            raise ContractError("permission_denied", "This belongs to a module's backend")
+            raise ContractError("permission_denied", t("This belongs to a module's backend"))
         return caller["module"]
 
     def module_backend(self, caller: dict) -> str:
         """The calling module, when the call comes from its own backend (not AI acting through it)."""
         if caller["origin"] != "module":
-            raise ContractError("permission_denied", "This is for the module's own backend only")
+            raise ContractError("permission_denied", t("This is for the module's own backend only"))
         return caller["module"]
 
     # ── modules ──────────────────────────────────────────────────────────
@@ -390,15 +424,15 @@ class Host:
                 for item in self.catalog.modules.values()] + [
                 {"id": "platform", "name": "TALYX", "version": "0.5.0", "description": "", "source": "official",
                  "enabled": True, "state": "ready", "problem": None, "pid": None, "digest": "platform",
-                 "manifest": {"id": "platform", "name": "TALYX", "entries": {}}, "contract": self.platform_contract,
-                 "assetBase": ""}]
+                 "manifest": {"id": "platform", "name": "TALYX", "entries": {}, "locales": PLATFORM_LOCALES},
+                 "contract": self.platform_contract, "assetBase": "/api/platform/files/"}]
 
     async def enable(self, module_id: str) -> dict:
         item = self.catalog.get(module_id)
         missing = [name for name, spec in item.requires.items() if not spec.get("optional") and not (
             name in self.catalog.modules and self.catalog.modules[name].enabled)]
         if missing:
-            raise ContractError("unavailable", f"{module_id} requires {', '.join(missing)}")
+            raise ContractError("unavailable", t("{module_id} requires {value}", module_id=module_id, value=', '.join(missing)))
         if "ai" in item.manifest:
             guide = await asyncio.to_thread(read_guide, item.directory, item.manifest["ai"]["guide"])
             item.docs = await asyncio.to_thread(read_docs, item.directory, item.manifest["ai"].get("docs", []))
@@ -415,7 +449,7 @@ class Host:
         item = self.catalog.get(module_id)
         dependents = self.catalog.dependents(module_id)
         if dependents:
-            raise ContractError("conflict", f"{', '.join(dependents)} cannot work without {module_id}")
+            raise ContractError("conflict", t("{value} cannot work without {module_id}", value=', '.join(dependents), module_id=module_id))
         await self.stop_module(module_id, "disable")
         item.enabled = False
         self.catalog.disabled.add(module_id)
@@ -433,7 +467,7 @@ class Host:
                     "platform.prepare_module_stop", {"id": module_id, "reason": reason}, endpoint=window)
                     for window, workspace in windows))
         except TimeoutError as exc:
-            raise ContractError("unavailable", f"An open workspace did not finish preparing {module_id} to stop") from exc
+            raise ContractError("unavailable", t("An open workspace did not finish preparing {module_id} to stop", module_id=module_id)) from exc
         process = self.supervisor.processes.pop(module_id, None)
         if process is not None:
             await process.stop()
@@ -493,17 +527,17 @@ class Host:
     async def uninstall(self, module_id: str) -> None:
         if failed := self.catalog.skipped.get(module_id):
             if failed.source != "installed":
-                raise ContractError("permission_denied", f"{failed.name} comes with TALYX and cannot be uninstalled")
+                raise ContractError("permission_denied", t("{name} comes with TALYX and cannot be uninstalled", name=failed.name))
             await asyncio.to_thread(shutil.rmtree, failed.directory)
             del self.catalog.skipped[module_id]
             self.modules_changed()
             return
         item = self.catalog.get(module_id)
         if item.source != "installed":
-            raise ContractError("permission_denied", f"{module_id} comes with TALYX and cannot be uninstalled")
+            raise ContractError("permission_denied", t("{module_id} comes with TALYX and cannot be uninstalled", module_id=module_id))
         dependents = self.catalog.dependents(module_id)
         if dependents:
-            raise ContractError("conflict", f"{', '.join(dependents)} cannot work without {module_id}")
+            raise ContractError("conflict", t("{value} cannot work without {module_id}", value=', '.join(dependents), module_id=module_id))
         await self.stop_module(module_id, "uninstall")
         await asyncio.to_thread(self.catalog.uninstall, module_id)
         self.modules_changed()
@@ -543,7 +577,7 @@ class Host:
         if process.endpoint is None:
             for owner, future in self.asked.values():
                 if owner is process and not future.done():
-                    future.set_exception(ContractError("provider_restarted", f"{process.module_id} disconnected",
+                    future.set_exception(ContractError("provider_restarted", t("{module_id} disconnected", module_id=process.module_id),
                                                        execution="unknown", effects="may_have_occurred"))
 
     def module_frame(self, process: ModuleProcess, envelope: dict, body: bytes) -> None:
@@ -590,7 +624,7 @@ class Host:
     async def _ask_module(self, process: ModuleProcess, envelope: dict, seconds: float):
         """Ask a running module to perform one declared hook or stop its work, and await its reply."""
         if process.endpoint is None:
-            raise ContractError("unavailable", f"{process.module_id} is not running")
+            raise ContractError("unavailable", t("{module_id} is not running", module_id=process.module_id))
         request_id = f"s{secrets.token_hex(6)}"
         future = asyncio.get_running_loop().create_future()
         self.asked[request_id] = (process, future)
@@ -635,7 +669,7 @@ class Host:
             if item.contract.get("deleteWorkspace"):
                 process = self.supervisor.processes.get(module_id)
                 if process is None or process.state != "ready":
-                    raise ContractError("unavailable", f"Start {item.manifest['name']} to delete this workspace.",
+                    raise ContractError("unavailable", t("Start {name} to delete this workspace.", name=item.manifest['name']),
                                         {"module": module_id})
                 owners.append(process)
         return owners
@@ -686,10 +720,9 @@ class Host:
             if process is None or process.state not in ("starting", "ready"):
                 item = self.catalog.modules.get(module_id)
                 name = item.manifest["name"] if item else module_id
-                why = "is not installed" if item is None else "is turned off" if not item.enabled else \
-                    "could not start" if process is not None and process.state == "failed" else "is not running"
-                raise ContractError("unavailable", f"{name} {why}, so its panels' content cannot be copied with the "
-                                    f"workspace. Start {name}, then copy again.", {"module": module_id})
+                why = t("is not installed") if item is None else t("is turned off") if not item.enabled else \
+                    t("could not start") if process is not None and process.state == "failed" else t("is not running")
+                raise ContractError("unavailable", t("{name} {why}, so its panels' content cannot be copied with the workspace. Start {name}, then copy again.", name=name, why=why), {"module": module_id})
         return await finish_before_cancel(self._copy_contents(source, name))
 
     async def _copy_contents(self, source: dict, name: str | None) -> dict:
@@ -729,8 +762,7 @@ class Host:
         try:
             await asyncio.wait_for(process.ready_event.wait(), COPY_SECONDS)
         except TimeoutError as exc:
-            raise ContractError("unavailable", f"{process.module_id} is not running, so the workspace cannot be "
-                                               "copied with its content") from exc
+            raise ContractError("unavailable", t("{module_id} is not running, so the workspace cannot be copied with its content", module_id=process.module_id)) from exc
         await self._ask_module(process, {"t": "copy_workspace", "from_ws": source, "ws": copy}, COPY_SECONDS)
 
 
@@ -742,7 +774,7 @@ class Host:
         session = self.workspaces.window_of(workspace) if workspace else caller.get("session")
         endpoint = self.sessions.get(session) if session else None
         if endpoint is None:
-            raise ContractError("ui_required", "No window shows this workspace")
+            raise ContractError("ui_required", t("No window shows this workspace"))
         return await self.internal.call(caller, f"platform.{action}", value, endpoint=endpoint)
 
     # ── data kept for modules ────────────────────────────────────────────
@@ -771,7 +803,7 @@ class Host:
     def _navigation(self, module_id: str, caller: dict, navigation: dict | None) -> None:
         if navigation is not None and (not navigation["panel"].startswith(module_id + ".")
                                        or navigation["workspaceId"] != caller.get("workspaceId")):
-            raise ContractError("permission_denied", "A notification leads to the sender's own panel in its workspace")
+            raise ContractError("permission_denied", t("A notification leads to the sender's own panel in its workspace"))
 
     async def send_notification(self, caller: dict, value: dict) -> dict:
         module_id = self.calling_module(caller)

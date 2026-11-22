@@ -9,9 +9,10 @@ import time
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import market_inputs as M
-from .materials import Materials, read_selection, release, run_task
+from .materials import Materials, read_selection, release
 
 DAY = 86_400_000
 FUNDING_PAGE = 1000
@@ -52,25 +53,22 @@ async def risk_free(ctx, spec, since, until, owner):
     return {"basis": "irx", "rows": rows, **({} if rows else {"unavailable": "Market has no ^IRX closes in this period"})}
 
 
-INDEX_SYMBOL = "US:SPY"
-
-
 async def benchmark(ctx, spec, since, until, owner):
     """The benchmark as the report reads it. `spec` is {kind, symbol?}: hold (what the strategy trades, from the run's own bars), none, equal (the
-    run's members equally weighted each day, from its bars), symbol (a Market symbol's daily closes), or beta (cash plus beta times the S&P 500,
-    from SPY's adjusted daily closes; the report measures beta over the run)."""
-    kind = (spec or {}).get("kind", "hold")
+    run's members equally weighted each day, from its bars), or symbol (any Market symbol's daily closes, split- and dividend-adjusted for a stock
+    or fund)."""
+    kind = spec["kind"]
     if kind in ("hold", "equal", "none"):
         return {"kind": kind}
-    symbol = spec["symbol"] if kind == "symbol" else INDEX_SYMBOL
+    symbol = spec["symbol"]
     from .object_data import resolve_series, resolve_text
     try:
         instrument = await resolve_text(ctx, symbol)
         instrument, series = await resolve_series(ctx, instrument, "1d")
         rows = await daily_closes(ctx, instrument, series, since - 7 * DAY, until, owner + ":benchmark")
     except ContractError as error:
-        return {"kind": "series" if kind == "symbol" else kind, "label": symbol, "rows": [], "unavailable": f"{symbol}: {error.message}"}
-    return {"kind": "series" if kind == "symbol" else kind, "label": instrument["displaySymbol"] if kind == "symbol" else "Cash + β × S&P 500", "symbol": symbol,
+        return {"kind": "series", "label": symbol, "symbol": symbol, "rows": [], "unavailable": f"{symbol}: {error.message}"}
+    return {"kind": "series", "label": instrument["displaySymbol"], "symbol": symbol,
             "rows": rows, **({} if rows else {"unavailable": f"Market has no daily closes of {symbol} in this period"})}
 
 
@@ -82,17 +80,17 @@ async def funding_history(ctx, instrument, since, until):
     rows = sorted(dict(rows).items())
     if not rows:
         if not gaps:
-            gaps.append({"from": since, "to": until, "reason": "Market has no funding settlements for this period"})
+            gaps.append({"from": since, "to": until, "reason": t("Market has no funding settlements for this period")})
         return [], gaps
     steps = sorted(b[0] - a[0] for a, b in zip(rows, rows[1:], strict=False)) or [8 * 3_600_000]
     usual = steps[len(steps) // 2]
     if rows[0][0] - since > 2 * usual:
-        gaps.append({"from": since, "to": rows[0][0], "reason": "Market's funding history starts later"})
+        gaps.append({"from": since, "to": rows[0][0], "reason": t("Market's funding history starts later")})
     for (a, _), (b, _) in zip(rows, rows[1:], strict=False):
         if b - a > 3 * usual:
-            gaps.append({"from": a, "to": b, "reason": "No funding settlements reported"})
+            gaps.append({"from": a, "to": b, "reason": t("No funding settlements reported")})
     if until - rows[-1][0] > 2 * usual and until < int(time.time() * 1000) - usual:
-        gaps.append({"from": rows[-1][0], "to": until, "reason": "Market's funding history ends earlier"})
+        gaps.append({"from": rows[-1][0], "to": until, "reason": t("Market's funding history ends earlier")})
     return rows, gaps
 
 
@@ -113,7 +111,7 @@ async def settlement_marks(ctx, instrument, rows, since, until, gaps):
             marks[at] = closes[position][1]
     missing = [at for at, _ in rows if at not in marks]
     if missing:
-        gaps = [*gaps, {"from": missing[0], "to": missing[-1], "reason": f"no mark price at {len(missing)} of {len(rows)} settlements; funding there is on the last trade price"}]
+        gaps = [*gaps, {"from": missing[0], "to": missing[-1], "reason": t("no mark price at {missing} of {rows} settlements; funding there is on the last trade price", missing=len(missing), rows=len(rows))}]
     return marks, gaps
 
 
@@ -162,32 +160,27 @@ def series_names(files):
     return names
 
 
-async def extras(ctx, names, sources, since, until, directory, progress=None):
+async def extras(ctx, names, sources, since, until, directory, progress=None, notes=None):
+    """Each named series per name, frozen as (time ms, value) rows a strategy reads up to its simulation time. `industry` is each name's
+    industry by the date it took effect, as Market knew it then where it keeps dated answers (A shares); a source with only its current
+    classification gives one row from the start, said in `notes`."""
     out = {}
     for name in sorted(names):
         paths = {}
         if name == "industry":
-            # Market's own classification where it has one; the names it lacks in one fetch (Market limits the requests).
-            fetched = await run_task(ctx, "market.fetch", {"symbols": [item["marketInstrument"]["instrumentId"] for item in sources],
-                                                           "data": [{"kind": "classification"}], "end": M.timestamp(until)},
-                                     progress=progress)
-            first = next((entry for entry in fetched["failures"] if entry["problem"]["code"] not in {"no_data", "unsupported", "not_found"}), None)
+            from .research_inputs import industries
+            histories, problems = await industries(ctx, [item["marketInstrument"] for item in sources], since, until, progress=progress)
+            first = next(((identity, problem) for identity, problem in problems.items() if problem["code"] not in {"no_data", "unsupported", "not_found"}), None)
             if first is not None:
                 from .market_capture import failure
-                raise failure(first["problem"], next(item["marketInstrument"] for item in sources
-                                                     if item["marketInstrument"]["instrumentId"] == first["instrumentId"]))
+                raise failure(first[1], next(item["marketInstrument"] for item in sources if item["marketInstrument"]["instrumentId"] == first[0]))
         for item in sources:
             instrument = item["marketInstrument"]
             if name == "funding_rate":
                 rows, _ = await funding_history(ctx, instrument, since, until)
             elif name == "industry":
-                from .research_inputs import read_pages, source_problem
-                found = await read_pages(ctx, {"data": "classification", "symbols": [instrument["instrumentId"]],
-                                               "asOf": M.timestamp(int(time.time() * 1000)), "fill": "none"})
-                problem = source_problem(found["coverage"])
-                if problem is not None and problem["code"] not in {"no_data", "unsupported", "not_found"}:
-                    raise ContractError(problem["code"], problem["message"], problem)
-                rows = [(M.milliseconds(row["knownAt"]), row["name"]) for row in found["rows"] if row["level"] == "sector"]
+                # Each row at the date it took effect (an undated one from the start of the data); a strategy sees it from then on.
+                rows = [(0 if start is None else start, label) for start, _end, label in histories.get(instrument["instrumentId"], ())]
             else:
                 basis = {"mark_price": "mark", "index_price": "index"}.get(name)
                 records = await M.observations(ctx, instrument, "ohlcv" if basis else name, since, until,
@@ -217,7 +210,7 @@ async def conversions(ctx, currencies, report, since, until, directory, owner):
         instrument, series = await resolve_series(ctx, instrument, "1d")
         rows = await daily_closes(ctx, instrument, series, since - 7 * DAY, until, f"{owner}:{currency}{report}", clock="knownAt")
         if not any(at <= since for at, _ in rows):
-            raise ContractError("no_conversion", f"No known {currency}/{report} rate at the start ({M.timestamp(since)}).",
+            raise ContractError("no_conversion", t("No known {currency}/{report} rate at the start ({since}).", currency=currency, report=report, since=M.timestamp(since)),
                                 {"currency": currency, "report": report, "at": since})
         path = directory / f"conversion-{currency}.parquet"
         await asyncio.to_thread(lambda: pd.DataFrame(rows, columns=["time", "close"]).to_parquet(path, index=False))

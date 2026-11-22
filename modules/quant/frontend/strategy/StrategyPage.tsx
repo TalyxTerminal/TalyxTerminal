@@ -1,5 +1,6 @@
 /* A strategy's page: one row on top (name, data, Run), the settings column (the code's own, then the platform's), Work or Results in the middle, the code area beside, and
    under Work the runs, the trades or the portfolio's tables and the log. The state of every run comes from the backend; what the page keeps is what the user is looking at. */
+import { t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TxButton, TxCompare, TxFailure, TxRunPicker, TxSkeleton, TxTag, TxIcon, TxIconButton, TxMenu, TxRunButton, TxRunProgress, TxSegmented, useTxToast, type ModuleContext, type TxMenuItem } from "@talyx/sdk";
 import { DataSettingsChip, historyBoundary, type HistoryBoundary } from "../DataSettings";
@@ -19,7 +20,8 @@ import { restoreNotice } from "../shared/restored";
 import { ResultsView, dataToText } from "./Results";
 import { SettingsColumn, differing } from "./Settings";
 import { TradesTable } from "./TradesTable";
-import { ChecksStrip, DataNotes, KeyNumbersRow, LiveRun, RunsView } from "./Work";
+import { ChecksStrip, KeyNumbersRow, LiveRun, RunsView } from "./Work";
+import { DataNotes } from "../shared/DataNotes";
 import { HeldView } from "./validation/HeldView";
 import { ValidationPane } from "./validation/Pane";
 import { validationApi } from "./validation/api";
@@ -38,7 +40,7 @@ const barMs = (timeframe: string): number => {
 };
 /** The button that lets one block fill the work area, and gives the room back. */
 function MaxButton({id, maxed, onMax}: {id: string; maxed: string | null; onMax(id: string | null): void}) {
-  return <TxIconButton size="sm" label={maxed === id ? "Restore" : "Fill the work area"} icon={maxed === id ? "restore" : "maximize"} onClick={() => onMax(maxed === id ? null : id)} />;
+  return <TxIconButton size="sm" label={maxed === id ? t("Restore") : t("Fill the work area")} icon={maxed === id ? "restore" : "maximize"} onClick={() => onMax(maxed === id ? null : id)} />;
 }
 
 export function mergeRun(stored: Record<string, any>, patch: Record<string, any>): Record<string, any> {
@@ -57,34 +59,34 @@ export function mergeRun(stored: Record<string, any>, patch: Record<string, any>
 /** A walk-forward, or a sweep with no combination picked, has no Results of its own: each window or combination is a run of its own. */
 export const noOwnResults = (run: StrategyRun | null) => run !== null && (run.kind === "sweep" || run.kind === "walk") && run.shownRunId === run.id;
 
-const WORDS: Record<string, string> = {code: "Saving the code", data: "Fetching prices", environment: "Preparing the environment", backtest: "Backtesting", run: "Backtesting", sweep: "Running the combinations", walk: "Walking forward"};
+const WORDS: Record<string, string> = {code: t("Saving the code"), data: t("Fetching prices"), environment: t("Preparing the environment"), backtest: t("Backtesting"), run: t("Backtesting"), sweep: t("Running the combinations"), walk: t("Walking forward")};
 
 export function progressText(run: RunView["run"] | null): {stage: string; count?: string; value: number | null} {
-  if (run === null) return {stage: "Starting", value: null};
+  if (run === null) return {stage: t("Starting"), value: null};
   const words = WORDS;
   const progress = run.progress;
   const fetching = progress?.fetch && (progress.stage ?? run.stage) === "data" ? progress.fetch : null;
   if (fetching) {
     // While the data is fetched: which step, how many names of all, and the names left out so far (Market refused them or has no prices).
-    const left = fetching.leftOut.length ? `${fetching.leftOut.length} left out: ${fetching.leftOut.slice(0, 3).join(", ")}${fetching.leftOut.length > 3 ? ", …" : ""}` : undefined;
+    const left = fetching.leftOut.length ? t("{count} left out: {names}{more}", { count: fetching.leftOut.length, names: fetching.leftOut.slice(0, 3).join(", "), more: fetching.leftOut.length > 3 ? ", …" : "" }) : undefined;
     if (fetching.waitingFor) {
-      const until = fetching.waitingUntil === null || fetching.waitingUntil === undefined ? "" :
-        " until " + new Date(Number(BigInt(fetching.waitingUntil) / 1_000_000n)).toISOString().slice(11, 16) + " UTC";
-      return {stage: "Waiting for " + fetching.waitingFor + until, count: left, value: null};
+              const stage = fetching.waitingUntil == null ? t("Waiting for {source}", { source: fetching.waitingFor })
+          : t("Waiting for {source} until {time} UTC", { source: fetching.waitingFor, time: new Date(Number(BigInt(fetching.waitingUntil) / 1_000_000n)).toISOString().slice(11, 16) });
+      return {stage, count: left, value: null};
     }
     const step = fetching.message || FETCH_STEPS[fetching.step];
-    return {stage: fetching.total ? `${step}: ${fetching.done} of ${fetching.total}` : step, count: left, value: fetching.total ? fetching.done / fetching.total : null};
+    return {stage: fetching.total ? t("{step}: {done} of {total}", { step, done: fetching.done, total: fetching.total }) : step, count: left, value: fetching.total ? fetching.done / fetching.total : null};
   }
-  if (progress && run.state === "running" && progress.simulatedTo) return {stage: `Backtesting to ${mdy(progress.simulatedTo)}`, count: `${progress.tradesSoFar} trades`, value: progress.value};
-  return {stage: words[run.stage ?? ""] ?? words[run.message ?? ""] ?? "Starting", value: null};
+  if (progress && run.state === "running" && progress.simulatedTo) return {stage: t("Backtesting to {simulatedTo}", { simulatedTo: mdy(progress.simulatedTo) }), count: t("{count} trades", { count: progress.tradesSoFar }), value: progress.value};
+  return {stage: words[run.stage ?? ""] ?? words[run.message ?? ""] ?? t("Starting"), value: null};
 }
 
 /** The head while another run is shown: what the going run's row says (its step, and for a sweep how many combinations are done), not "Starting" throughout. */
 export function rowProgress(row: StrategyRunRow | null): {stage: string; count?: string; value: number | null} {
   if (row === null) return progressText(null);
-  const stage = WORDS[row.stage ?? ""] ?? "Starting";
+  const stage = WORDS[row.stage ?? ""] ?? t("Starting");
   return row.sweep && row.stage !== "data" && row.stage !== "environment" && row.stage !== "code"
-    ? {stage, count: `${row.sweep.done} of ${row.sweep.total}`, value: row.sweep.total ? row.sweep.done / row.sweep.total : null} : {stage, value: null};
+    ? {stage, count: t("{done} of {total}", { done: row.sweep.done, total: row.sweep.total }), value: row.sweep.total ? row.sweep.done / row.sweep.total : null} : {stage, value: null};
 }
 
 export function StrategyPage({ctx, api, detail, onDetail, state, update, title, menu, onOpenObject}: {
@@ -273,7 +275,7 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
     onDetail(await api.read(detail.id));
     await start();
   };
-  const blocked = detail.errors.length > 0 ? "Fix the code error shown next to the settings first" : null;
+  const blocked = detail.errors.length > 0 ? t("Fix the code error shown next to the settings first") : null;
   const progress = active !== null && run?.id === active.id ? progressText(run) : rowProgress(active);
   const goSection = (section: string) => update({strategyView: "results", strategyResults: section});
   const [ranges, setRanges] = useState<Record<string, string>>({});
@@ -288,7 +290,7 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
   const codeShown = state.side === "code";
   const [codeLine, setCodeLine] = useState<{line: number; request: string} | undefined>(undefined);
   const goLine = (_file: string | null | undefined, line: number) => {update({side: "code"}); setCodeLine({line, request: `${Date.now()}`});};
-  const marks: CodeMark[] = run?.failure && run.failure.line && run.failure.file ? [{uri: fileUri(root, run.failure.file), line: run.failure.line, message: run.failure.error.split("\n")[0], title: "Run #" + run.number}] : [];
+  const marks: CodeMark[] = run?.failure && run.failure.line && run.failure.file ? [{uri: fileUri(root, run.failure.file), line: run.failure.line, message: run.failure.error.split("\n")[0], title: t("Run #") + run.number}] : [];
   const [dragging, setDragging] = useState<{height?: number; side?: number} | null>(null);
   const side = dragging?.side ?? state.sideSize ?? .32, botHeight = dragging?.height ?? state.strategyHeight ?? null;
   const mainBox = useRef<HTMLDivElement>(null);
@@ -313,7 +315,7 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
   // ---------------------------------------------------------------- the bottom
   const tab = state.strategyTab;
   const [kinds, setKinds] = useState<string[]>([]);
-  const bottomTabs: {id: NonNullable<ShellState["strategyTab"]>; label: string; count?: number}[] = [{id: "rebalances", label: "Rebalances"}, {id: "trades", label: "Trades"}, {id: "holdings", label: "Holdings"}, {id: "contributions", label: "Contributors"}];
+  const bottomTabs: {id: NonNullable<ShellState["strategyTab"]>; label: string; count?: number}[] = [{id: "rebalances", label: t("Rebalances")}, {id: "trades", label: t("Trades")}, {id: "holdings", label: t("Holdings")}, {id: "contributions", label: t("Contributors")}];
   const runsTab = tab === "runs";
   const shownTab = bottomTabs.some(item => item.id === tab) ? tab : "rebalances";
   const [maxed, setMaxed] = useState<string | null>(null);
@@ -321,15 +323,15 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
   const sourceInstrument = source?.instrument as {base?: string; displaySymbol?: string; symbol?: string} | undefined;
   const instrumentShort = sourceInstrument?.base ?? sourceInstrument?.displaySymbol ?? sourceInstrument?.symbol ?? "";
   const liveSymbols = (data.symbols ?? []).map(item => item.instrument as {displaySymbol?: string; symbol?: string; base?: string});
-  const liveName = liveSymbols.length === 1 ? liveSymbols[0].base ?? liveSymbols[0].displaySymbol ?? liveSymbols[0].symbol ?? "" : "Equity";
+  const liveName = liveSymbols.length === 1 ? liveSymbols[0].base ?? liveSymbols[0].displaySymbol ?? liveSymbols[0].symbol ?? "" : t("Equity");
   const liveKind = `${data.timeframe ?? ""}`.replace(/^(\d+)([a-z]+)$/i, "$1 $2");
-  const liveBenchmark = liveSymbols.length === 1 ? `${liveName} hold` : "the market";
+  const liveBenchmark = liveSymbols.length === 1 ? t("{name} hold", { name: liveName }) : t("the market");
   const instrumentKind = `${work?.instrument?.type ?? ""} · ${(source?.series.timeframe ?? data.timeframe ?? "").replace(/^(\d+)([a-z]+)$/i, "$1 $2")}`.replace(/^ · /, "");
-  const chartTitle = single ? <><h3>{instrumentShort}</h3><span className="fx-t3 qx-s11">{instrumentKind}</span></> : <><h3>Equity and price</h3>{work?.multi && <span className="qx-cnt">{work.multi.rebalancesTotal} rebalances</span>}</>;
+  const chartTitle = single ? <><h3>{instrumentShort}</h3><span className="fx-t3 qx-s11">{instrumentKind}</span></> : <><h3>{t("Equity and price")}</h3>{work?.multi && <span className="qx-cnt">{t("{rebalancesTotal} rebalances", { rebalancesTotal: work.multi.rebalancesTotal })}</span>}</>;
   const chartTools = <>{work !== null && run !== null && run.failure === null && <ChecksStrip work={work} go={validation.onCheck} />}
     <span className="tx-spacer" /><MaxButton id="chart" maxed={maxed} onMax={setMaxed} /></>;
   const comparePicker = <TxCompare run={comparedRuns.length ? comparedRuns.map(item => `#${item.number}`).join(", ") : null} items={[
-    {id: "none", label: "No comparison", checked: comparedRuns.length === 0, onSelect: () => setChosen([])},
+    {id: "none", label: t("No comparison"), checked: comparedRuns.length === 0, onSelect: () => setChosen([])},
     ...list.filter(item => usable(item) && item.id !== selected?.id).map(item => ({id: item.id, label: `#${item.number}`, detail: when(item.createdAt), checked: comparedRuns.some(other => other.id === item.id), disabled: comparedRuns.length >= 3 && !comparedRuns.some(other => other.id === item.id),
       onSelect: () => setChosen(comparedRuns.some(other => other.id === item.id) ? comparedRuns.filter(other => other.id !== item.id).map(other => other.id) : [...comparedRuns.map(other => other.id), item.id])}))]} />;
   const [restored, setRestored] = useState<{id: string; note: string} | null>(null);
@@ -344,42 +346,42 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
   };
   const menuItems: TxMenuItem[] = [
     ...(selected && run?.id === selected.id && run.codeDigest && selected.state === "completed" && !selected.sweep ? [
-      {id: "rerun", label: "Run with original settings", onSelect: () => void sapi.start(detail.id, selected.id).then(next => {update({runId: next.id}); void loadRuns();}, fail)},
-      {id: "apply", label: "Use this version", onSelect: () => void useVersion(selected.id).catch(fail)}] : []),
-    {id: "common", label: "Open common code", icon: "folder", onSelect: () => void openCommonCode(ctx, api).catch(fail)}, ...menu];
+      {id: "rerun", label: t("Run with original settings"), onSelect: () => void sapi.start(detail.id, selected.id).then(next => {update({runId: next.id}); void loadRuns();}, fail)},
+      {id: "apply", label: t("Use this version"), onSelect: () => void useVersion(selected.id).catch(fail)}] : []),
+    {id: "common", label: t("Open common code"), icon: "folder", onSelect: () => void openCommonCode(ctx, api).catch(fail)}, ...menu];
   const mainFigure = work?.figures?.equity;
   const failedLine = run?.failure && run.failure.line && run.failure.file ? run.failure : null;
-  const codeStatus = <>{run?.environment?.python && <span>Python {run.environment.python}</span>}{run?.environment?.nautilus && <span>Nautilus {run.environment.nautilus}</span>}{failedLine ? <span className="attn" role="alert">Line {failedLine.line}: {failedLine.error.split("\n")[0].split(":")[0]}</span> : run ? <span>Code of #{run.number}</span> : null}
-    <span className="tx-spacer" /><span>Ctrl+Enter runs</span></>;
+  const codeStatus = <>{run?.environment?.python && <span>{t("Python {python}", { python: run.environment.python })}</span>}{run?.environment?.nautilus && <span>{t("Nautilus {nautilus}", { nautilus: run.environment.nautilus })}</span>}{failedLine ? <span className="attn" role="alert">{t("Line {line}: {error}", { line: failedLine.line ?? "", error: failedLine.error.split("\n")[0].split(":")[0] })}</span> : run ? <span>{t("Code of #{number}", { number: run.number })}</span> : null}
+    <span className="tx-spacer" /><span>{t("Ctrl+Enter runs")}</span></>;
   const firstLines: FirstLine[] = [
-    {label: "Names", value: universeText(data, null) ?? "Set data", missing: universeText(data, null) === null, onClick: () => setDataOpen(true)},
-    {label: "Bars", value: liveKind || "Set data", missing: !liveKind, onClick: () => setDataOpen(true)},
-    {label: "Period", value: data.since && data.until ? <>{periodText(data.since, data.until)}{data.heldOutFrom && <span className="fx-t3">, then held out</span>}</> : "Set data", missing: !(data.since && data.until), onClick: () => setDataOpen(true)},
-    {label: "Code", value: blocked ?? detail.entry, missing: blocked !== null, onClick: () => update({side: "code"})},
+    {label: t("Names"), value: universeText(data, null) ?? t("Set data"), missing: universeText(data, null) === null, onClick: () => setDataOpen(true)},
+    {label: t("Bars"), value: liveKind || t("Set data"), missing: !liveKind, onClick: () => setDataOpen(true)},
+    {label: t("Period"), value: data.since && data.until ? <>{periodText(data.since, data.until)}{data.heldOutFrom && <span className="fx-t3">{t(", then held out")}</span>}</> : t("Set data"), missing: !(data.since && data.until), onClick: () => setDataOpen(true)},
+    {label: t("Code"), value: blocked ?? detail.entry, missing: blocked !== null, onClick: () => update({side: "code"})},
   ];
   return <div className="qx-page fx-page" onKeyDownCapture={event => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && blocked === null && !(selected && isActive(selected))) {event.preventDefault(); event.stopPropagation(); validation.run(() => void start().catch(fail));}
   }}>
     <div className="tx-panelhead fx-head">
-      {title}<span className="fx-kind">Strategy</span>
+      {title}<span className="fx-kind">{t("Strategy")}</span>
       <DataSettingsChip ctx={ctx} api={api} kind="strategy" alsoBuilt={settings?.alsoBuilt ?? null} data={data} defaults={defaults.value} defaultsError={defaults.error} boundary={defaults.boundary} open={dataOpen} onOpenChange={setDataOpen}
         onSave={async next => onDetail(await api.settings(detail.id, {data: next}))} />
       <span className="tx-spacer" />
       {active !== null ? <TxRunProgress run={`#${active.number}`} stage={progress.stage} count={progress.count} value={progress.value} elapsed={elapsed((now - active.createdAt) / 1000)}
         onStop={() => void sapi.cancel(active.id).then(() => loadRuns(), fail)} />
-        : <TxRunButton label={validation.label} kinds={validation.kinds} onRun={() => validation.run(() => void start().catch(fail))} onKind={validation.onKind} disabled={blocked !== null} title={blocked ?? "Run backtest (Ctrl+Enter)"} />}
-      <TxSegmented label="Work or Results" value={pageView} options={[{value: "work", label: "Work"}, {value: "results", label: "Results"}]} onChange={next => update({strategyView: next === "results" ? "results" : undefined})} />
-      <button type="button" className="tx-codetoggle" aria-pressed={codeShown} onClick={() => update({side: codeShown ? undefined : "code"})}><TxIcon name="code" /><span>{codeShown ? "Hide code" : "Show code"}</span></button>
-      <TxMenu label="Strategy actions" align="end" items={menuItems} trigger={<TxIconButton label="Strategy actions" icon="more" />} />
+        : <TxRunButton label={validation.label} kinds={validation.kinds} onRun={() => validation.run(() => void start().catch(fail))} onKind={validation.onKind} disabled={blocked !== null} title={blocked ?? t("Run backtest (Ctrl+Enter)")} />}
+      <TxSegmented label={t("Work or Results")} value={pageView} options={[{value: "work", label: t("Work")}, {value: "results", label: t("Results")}]} onChange={next => update({strategyView: next === "results" ? "results" : undefined})} />
+      <button type="button" className="tx-codetoggle" aria-pressed={codeShown} onClick={() => update({side: codeShown ? undefined : "code"})}><TxIcon name="code" /><span>{codeShown ? t("Hide code") : t("Show code")}</span></button>
+      <TxMenu label={t("Strategy actions")} align="end" items={menuItems} trigger={<TxIconButton label={t("Strategy actions")} icon="more" />} />
     </div>
     {restored?.note && restored.id === selected?.id && <div className="qx-note2" role="status">{restored.note}</div>}
-    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>Dismiss</TxButton></div>}
+    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>{t("Dismiss")}</TxButton></div>}
     <div className="fx-desk">
       <div className="fx-view">
         {pageView === "results"
-            ? <div className="fx-main">{readError !== null && resultsWanted ? <TxFailure title="Could not read this run’s results" message={readError} />
+            ? <div className="fx-main">{readError !== null && resultsWanted ? <TxFailure title={t("Could not read this run’s results")} message={readError} />
               : report === null ? runs !== null && selected === null ? <NoResultsYet lines={firstLines} toWork={() => update({strategyView: undefined})} /> : <div className="fx-pad"><TxSkeleton width="40%" /></div>
-            : held === null && ownless ? <p className="fx-empty">{report.run.kind === "walk" ? `Walk-forward #${report.run.number} has no Results of its own; its windows are on Work.` : `Sweep #${report.run.number} has no Results of its own until one combination is picked on Work.`}</p>
+            : held === null && ownless ? <p className="fx-empty">{report.run.kind === "walk" ? t("Walk-forward #{number} has no Results of its own; its windows are on Work.", { number: report.run.number }) : t("Sweep #{number} has no Results of its own until one combination is picked on Work.", { number: report.run.number })}</p>
             : <ResultsView api={sapi} run={report.run} pending={held !== null} parameters={detail.parameters} picking={report.picking} multi={report.multi} compare={usable(selected) ? comparePicker : undefined} onWork={() => update({strategyView: undefined})} picker={<TxRunPicker run={`#${report.run.number}`} items={list.filter(item => usable(item) || item.state === "failed").map(item => ({id: item.id, label: `#${item.number}`, detail: when(item.createdAt), checked: item.id === selected?.id, onSelect: () => update({runId: item.id})}))} />} view={report.results} section={state.strategyResults} onSection={id => update({strategyResults: id})}
               onStar={() => void sapi.annotate(report.run.id, {starred: !report.run.starred}).then(() => loadRuns(), fail)}
               onNotebook={() => void route<{notebookId: string}>(ctx, "POST", at`/runs/${report.run.id}/notebook`).then(opened => onOpenObject(opened.notebookId), fail)} onOrder={order => void findTrade(report.run.id, {since: order.time - bar, until: order.time + bar}, item => item.instrument === order.instrument).then(found => toTrade(found, "log"), fail)}
@@ -389,22 +391,22 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
             <SettingsColumn signalRun={(detail.settings as {signalRun?: {param: string; model: string; number: number; kind?: string}}).signalRun ?? null} entry={detail.entry} since={data.since} view={dataChosen ? settings : null} parameters={detail.parameters} errors={detail.errors} params={params} library={library} base={base} changed={changed} inputs={inputs}
               riskFreeMean={work?.riskFree.meanPct} onParam={editParam} onRun={edit} onRevert={revert} onLine={(file, line) => goLine(file, line)}
               ranges={ranges} rangeErrors={validation.plan.errors} combinations={validation.plan.total} onRange={setRange} heldMissing={validation.heldMissing} walk={walkSettings} onWalk={patch => setWalkSettings(current => ({...current, ...patch}))}
-              onSwitch={(name, versionId) => void sapi.switchInput(detail.id, name, versionId).then(found => {setInputs(found.items); toast({title: found.notComparable ? "Switched; results won't compare with earlier runs" : "Switched back"});}, fail)}
+              onSwitch={(name, versionId) => void sapi.switchInput(detail.id, name, versionId).then(found => {setInputs(found.items); toast({title: found.notComparable ? t("Switched; results won't compare with earlier runs") : t("Switched back")});}, fail)}
               onOpenRun={runId => update({runId})} />
             <div className="fx-main qx-wmain" ref={mainBox}>
               <div className="qx-lhead" role="tablist">
-                <button type="button" role="tab" className="qx-ltab" aria-selected={!runsTab} onClick={() => update({strategyTab: undefined})}>Run{selected && <b>#{selected.number}</b>}</button>
-                <button type="button" role="tab" className="qx-ltab" aria-selected={runsTab} onClick={() => update({strategyTab: "runs"})}>Runs<span className="qx-cnt">{list.length}</span></button>
+                <button type="button" role="tab" className="qx-ltab" aria-selected={!runsTab} onClick={() => update({strategyTab: undefined})}>{t.c("run record", "Run")}{selected && <b>#{selected.number}</b>}</button>
+                <button type="button" role="tab" className="qx-ltab" aria-selected={runsTab} onClick={() => update({strategyTab: "runs"})}>{t("Runs")}<span className="qx-cnt">{list.length}</span></button>
                 {!runsTab && selected && run && <>
                   <span className="qx-sep" />
                   <span className="qx-x5">{when(selected.createdAt)}</span>
-                  <span className="fx-t3 qx-per" title={run.dataTo ? `Data to ${dataToText(run.dataTo)}` : undefined}>{dataToText(run.settings.data.since)} – {dataToText(run.settings.data.until)}</span>
-                  {run.seconds ? <span className="fx-t3 qx-x5">ran {elapsed(run.seconds)}</span> : null}
+                  <span className="fx-t3 qx-per" title={run.dataTo ? t("Data to {dataTo}", { dataTo: dataToText(run.dataTo) }) : undefined}>{dataToText(run.settings.data.since)} – {dataToText(run.settings.data.until)}</span>
+                  {run.seconds ? <span className="fx-t3 qx-x5">{t("ran {seconds}", { seconds: elapsed(run.seconds) })}</span> : null}
                   {work !== null && <DataNotes notes={work.dataNotes ?? []} />}
-                  {selected.kind !== "backtest" && <TxTag tone="muted">{selected.kind === "sweep" ? "Sweep" : selected.kind === "walk" ? "Walk-forward" : "Held-out"}</TxTag>}{selected.state === "failed" && <TxTag tone="fix">Failed</TxTag>}{(selected.state === "cancelled" || selected.state === "interrupted") && <TxTag tone="muted">Stopped</TxTag>}
+                  {selected.kind !== "backtest" && <TxTag tone="muted">{selected.kind === "sweep" ? t("Sweep") : selected.kind === "walk" ? t("Walk-forward") : t("Held-out")}</TxTag>}{selected.state === "failed" && <TxTag tone="fix">{t("Failed")}</TxTag>}{(selected.state === "cancelled" || selected.state === "interrupted") && <TxTag tone="muted">{t("Stopped")}</TxTag>}
                   {usable(selected) && comparePicker}
                   <span className="tx-spacer" />
-                  {selected.state === "completed" && !ownless && <TxButton size="sm" variant="quiet" onClick={() => update({strategyView: "results"})}>Results<TxIcon name="chevron" /></TxButton>}
+                  {selected.state === "completed" && !ownless && <TxButton size="sm" variant="quiet" onClick={() => update({strategyView: "results"})}>{t("Results")}<TxIcon name="chevron" /></TxButton>}
                 </>}
               </div>
               {runsTab ? <div className="qx-runsfull"><RunsView runs={list} parameters={detail.parameters} selected={selected?.id ?? null} compared={usable(selected) ? compared?.id ?? null : null} ticked={ticked}
@@ -416,12 +418,12 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
                   : work !== null ? <KeyNumbersRow work={work} go={goSection} />
                   : run !== null && isActive(selected) && run.state === "running" && run.kind === "backtest" ? <LiveRun run={run.progress} name={liveName} kind={liveKind} benchmark={liveBenchmark} />
                   : run !== null && isActive(selected) ? <div className="fx-empty" role="status"><TxIcon name="refresh" />{progress.stage}{progress.count ? ` · ${progress.count}` : ""}</div>
-                  : run !== null && run.state === "completed" ? <p className="fx-empty">{run.notes[0] ?? "This run has no report"}</p>
+                  : run !== null && run.state === "completed" ? <p className="fx-empty">{run.notes[0] ?? t("This run has no report")}</p>
                   : run === null ? <div className="fx-pad"><TxSkeleton width="40%" /></div>
-                  : <p className="fx-empty" role="status">{run.message ?? (run.state === "cancelled" ? "Stopped before the backtest began" : "Interrupted before the backtest began")}</p>}
+                  : <p className="fx-empty" role="status">{run.message ?? (run.state === "cancelled" ? t("Stopped before the backtest began") : t("Interrupted before the backtest began"))}</p>}
                 {run !== null && (run.kind === "sweep" || run.kind === "walk") && (run.failure === null || run.kind === "walk")
                   ? <ValidationPane ctx={ctx} runId={run.id} state={run.state} kind={run.kind} sourceNumber={list.find(item => item.id === run.of)?.number ?? null} onError={fail}
-                    onUsed={() => {toast({title: "Values written to the settings"}); void api.read(detail.id).then(onDetail, fail);}}
+                    onUsed={() => {toast({title: t("Values written to the settings")}); void api.read(detail.id).then(onDetail, fail);}}
                     onRunValues={(sweepId, index) => void sapi_use_and_run(sweepId, index)}
                     onWiden={(axis, end) => {
                       // The range the sweep ran, one more step past the end the best value sat on; the sweep is then one Run away.
@@ -442,7 +444,7 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
                     </div>}
                     {run !== null && run.failure !== null && <div className="qx-blk qx-ckcol"><FailureLocals run={run} onNotebook={() => void route<{notebookId: string}>(ctx, "POST", at`/runs/${run.id}/notebook`).then(opened => onOpenObject(opened.notebookId), fail)} /></div>}
                   </div>
-                  <div className="fx-hgut" role="separator" aria-label="Resize" onPointerDown={dragHeight} onDoubleClick={() => update({strategyHeight: undefined})} />
+                  <div className="fx-hgut" role="separator" aria-label={t("Resize")} onPointerDown={dragHeight} onDoubleClick={() => update({strategyHeight: undefined})} />
                   <div className="qx-lower" data-max={maxed ?? undefined} style={botHeight !== null ? {flex: `0 0 ${botHeight}px`} : undefined}>
                     <div className="qx-lowleft">{single
                       ? <TradesTable key={selected.id + ":" + selected.state} api={sapi} runId={selected.id} currency={work.currency} picked={trade?.id ?? state.strategyTrade ?? null} onPick={pick} during={state.strategyDrawdown ?? null} from={work.heldOut?.from ?? null} onClearDuring={() => update({strategyDrawdown: undefined})} extra={<MaxButton id="trades" maxed={maxed} onMax={setMaxed} />} />
@@ -458,8 +460,8 @@ export function StrategyPage({ctx, api, detail, onDetail, state, update, title, 
               </>}
             </div></>}
       </div>
-      {codeShown && <div className="fx-vsplit" role="separator" aria-label="Resize the code" onPointerDown={dragSide} />}
-      {codeShown && <section className="fx-code" aria-label="Code" style={{width: `calc(${side * 100}% + ${state.strategyTree ? 150 : 0}px)`}}>
+      {codeShown && <div className="fx-vsplit" role="separator" aria-label={t("Resize the code")} onPointerDown={dragSide} />}
+      {codeShown && <section className="fx-code" aria-label={t("Code")} style={{width: `calc(${side * 100}% + ${state.strategyTree ? 150 : 0}px)`}}>
         <CodeArea status={codeStatus} ctx={ctx} projectId={detail.developer?.projectId ?? null} rootUri={root} treeTitle={detail.name} entryUri={detail.entryUri} marks={marks} line={codeLine?.line} request={codeLine?.request}
           tree={state.strategyTree === true} onTree={open => update({strategyTree: open})} onHide={() => update({side: undefined})}
           onOpenDeveloper={() => void ctx.platform.panels.openTarget({module: "developer", panelType: "main", objectId: `file:${detail.entryUri}`}).catch(fail)} onChanged={change => {if (!change.dirty) void api.read(detail.id).then(onDetail, fail);}} />

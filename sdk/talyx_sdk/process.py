@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import importlib
+import importlib.util
 import itertools
+import json
 import logging
 import os
 import sys
@@ -18,14 +20,16 @@ import traceback
 from collections.abc import AsyncIterator, Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
+from pathlib import Path
 from types import EllipsisType
 from typing import Any, is_typeddict
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
-from . import memory, stall, wire
+from . import i18n, memory, stall, upgrade, wire
 from .declare import ActionSpec, Module, StreamSpec
 from .errors import ContractError
+from .i18n import platform_t
 
 log = logging.getLogger("talyx.module")
 GLOBAL = "global"
@@ -121,7 +125,7 @@ class Codec:
             try:
                 self.adapter.validate_json(wire.encode(value), strict=True)
             except ValidationError as exc:
-                raise ContractError("invalid_output", f"The answer does not match the declaration: {_short(exc)}",
+                raise ContractError("invalid_output", platform_t("The answer does not match the declaration: {value}", value=_short(exc)),
                                     execution="unknown", effects="may_have_occurred") from exc
         return value
 
@@ -516,7 +520,7 @@ class ModuleProcess:
             self._send_output({"t": "result", "id": request_id}, result, output_type, spec)
         except asyncio.CancelledError:
             self.send({"t": "error", "id": request_id, "err": ContractError(
-                "cancelled", "Cancelled", execution="unknown", effects="may_have_occurred").to_dict()})
+                "cancelled", platform_t("Cancelled"), execution="unknown", effects="may_have_occurred").to_dict()})
         except Exception as exc:  # noqa: BLE001 - every failure crosses the wire as the one error format
             self.send({"t": "error", "id": request_id, "err": error_value(exc, invalid_input=True)})
         finally:
@@ -535,7 +539,7 @@ class ModuleProcess:
         task = asyncio.current_task()
         self.running[task_id] = task
         if caller.workspace_id:
-            activity = self.ctx.activity(caller.workspace_id, spec.title)
+            activity = self.ctx.activity(caller.workspace_id, i18n.t(spec.title))
             activity.add_task(task)
             _TASK_ACTIVITY.set(activity)
         try:
@@ -545,7 +549,7 @@ class ModuleProcess:
             if caller.workspace_id:
                 activity.outcome = "stopped"
             self.send({"t": "task_end", "task": task_id, "err": ContractError(
-                "cancelled", "Cancelled", execution="failed", effects="may_have_occurred").to_dict()})
+                "cancelled", platform_t("Cancelled"), execution="failed", effects="may_have_occurred").to_dict()})
         except Exception as exc:  # noqa: BLE001
             if caller.workspace_id:
                 activity.outcome = "failed"
@@ -672,7 +676,7 @@ def _route_server(module: Module, ctx: Context):
             if headers.get(b"x-talyx-route-secret", b"").decode() != secret:
                 if scope["type"] == "http":
                     body = wire.encode({"error": ContractError(
-                        "permission_denied", "Private routes are reached through the Host").to_dict()})
+                        "permission_denied", platform_t("Private routes are reached through the Host")).to_dict()})
                     await send({"type": "http.response.start", "status": 403,
                                 "headers": [(b"content-type", b"application/json")]})
                     await send({"type": "http.response.body", "body": body})
@@ -687,10 +691,44 @@ def _route_server(module: Module, ctx: Context):
     return uvicorn.Server(config), secret
 
 
+def _set_up_language(package: str) -> None:
+    """The module's dictionaries, from its manifest, for this process and every process it starts."""
+    directory = Path(importlib.util.find_spec(package).submodule_search_locations[0])
+    manifest = json.loads((directory / "talyx.module.json").read_text(encoding="utf-8"))
+    files = {language: str((directory / path).resolve()) for language, path in manifest.get("locales", {}).items()}
+    os.environ[i18n.LOCALES_ENV] = json.dumps(files)
+    i18n.configure(files, os.environ.get(i18n.LANGUAGE_ENV, i18n.SOURCE),
+                   json.loads(os.environ.get(i18n.PLATFORM_LOCALES_ENV, "{}")))
+
+
+async def _follow_language(ctx: Context) -> None:
+    async def read():
+        result = await ctx.call("platform.settings.read", {"module": "platform", "workspaceId": GLOBAL, "keys": ["language"]})
+        i18n.set_language(result["values"]["language"]["value"])
+
+    changes = await ctx.subscribe("platform.settings.changes")
+    await read()   # a change between this process starting and the subscription opening
+    try:
+        async for change in changes:
+            if change["module"] == "platform" and "language" in change["keys"]:
+                await read()
+    except ContractError as exc:
+        if exc.code != "unavailable":   # unavailable: TALYX is closing and ends its streams
+            raise
+
+
+async def _upgrade_data(module: Module, ctx: Context) -> None:
+    folder = Path(os.environ["TALYX_MODULE_DATA"])   # the module's data folder, not made until something is kept there
+    steps = {version: (lambda step=step: step(ctx)) for version, step in module.format_steps.items()}
+    for version in await upgrade.bring_up_to_date(folder, module.format_version, steps):
+        log.info("Data brought up to format %s", version)
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, stream=sys.stderr,
                         format=f"%(asctime)s {os.environ['TALYX_MODULE']} %(levelname)s %(name)s: %(message)s")
     package = os.environ["TALYX_PACKAGE"]
+    _set_up_language(package)
     # Modules keep the loop free by doing Python work on worker threads, which hold the GIL: each time the loop wakes
     # it waits for them up to the switch interval. 1 ms instead of 5 keeps that wait under the loop's lag line
     # (measured on startup: a module's per-second p99 45 -> 28 ms).
@@ -704,7 +742,11 @@ async def main() -> None:
     process = ModuleProcess(module, reader, writer)
     process.send({"t": "hello", "module": module.id, "pid": os.getpid(), "token": os.environ.pop("TALYX_TOKEN")})
     serving = asyncio.create_task(process.serve())
+    language = asyncio.create_task(_follow_language(process.ctx))
+    language.add_done_callback(lambda task: task.cancelled() or task.exception() is None or log.error(
+        "Following the language setting stopped\n%s", "".join(traceback.format_exception(task.exception()))))
     try:
+        await _upgrade_data(module, process.ctx)
         for starter in module.starters:
             await starter(process.ctx)
         routes = await _run_routes(module, process.ctx)

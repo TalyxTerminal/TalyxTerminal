@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "modules" / "quant"))
 
@@ -37,13 +38,43 @@ def test_returns_cross_gaps_of_the_pool_only():
     assert np.allclose(returns.iloc[10].to_numpy(), (closes.iloc[11] / closes.iloc[10] - 1).to_numpy())
 
 
+def test_the_benchmark_follows_its_own_closes_on_the_pools_days_in_the_pool_or_not():
+    """The tracking benchmark is any frozen columns with weights: on each of the pool's days, each column's last close on or before it, close to close, mixed."""
+    bars = bars_with_gaps()
+    returns, info = A.daily_returns(bars, ["IEF"])
+    bench = A.W.benchmark_daily(bars, {"SPY": 60.0, "BIL": 40.0}, info["closes"].index)   # neither benchmark column is in the pool
+    assert bench.index.equals(returns.index)
+    frame = bars.assign(day=pd.to_datetime(bars["label"], unit="ms")).pivot_table(index="day", columns="column", values="close")
+    levels = frame.reindex(frame.index.union(info["closes"].index)).ffill().reindex(info["closes"].index)
+    expected = .6 * levels["SPY"].pct_change().iloc[1:] + .4 * levels["BIL"].pct_change().iloc[1:]
+    assert np.allclose(bench.to_numpy(), expected.to_numpy())
+    days = pd.bdate_range("2020-01-01", periods=60)
+    # BIL's missing close is crossed: its return over the gap is counted on the day after, not lost
+    assert np.isclose(bench[days[31]], .6 * (frame.loc[days[31], "SPY"] / frame.loc[days[30], "SPY"] - 1) + .4 * (frame.loc[days[31], "BIL"] / frame.loc[days[29], "BIL"] - 1))
+    weekly, info = A.daily_returns(bars, ["SPY", "IEF"], {"align": "weekly"})
+    assert A.W.benchmark_daily(bars, {"BIL": 100.0}, info["closes"].index).index.equals(weekly.index)
+    assert A.W.benchmark_daily(bars, {}, info["closes"].index) is None
+
+
+def test_a_benchmark_without_a_price_where_the_pool_starts_is_named():
+    bars = bars_with_gaps()
+    _, info = A.daily_returns(bars, ["SPY"])
+    with pytest.raises(A.W.SettingsError) as error:
+        A.W.benchmark_daily(bars, {"IEF": 100.0}, info["closes"].index)
+    assert error.value.fields == ["benchmark"] and "IEF" in str(error.value)
+
+
+def test_a_fixed_risk_free_rate_is_its_percent_over_the_year():
+    assert A.W.risk_free_per_bar({"basis": "fixed", "pct": 4.0}, pd.bdate_range("2020-01-01", periods=3), 252) == pytest.approx(.04 / 252)
+
+
 def test_allocate_reads_the_same_returns_as_the_worker(monkeypatch, tmp_path):
     import talyx_quant as q
     bars = bars_with_gaps()
     path = tmp_path / "bars.parquet"
     bars.to_parquet(path)
     settings = {"pool": [{"ticker": "SPY", "group": "Stocks"}, {"ticker": "IEF", "group": "Bonds"}]}
-    worker, _ = A.returns_of({"data": {"barsPath": str(path)}, "settings": settings})
+    worker, _ = A.returns_of({"data": {"barsPath": str(path)}, "settings": {**settings, "benchmarkColumns": {}}})
     seen = {}
     monkeypatch.setattr(A.W, "backtest", lambda returns, settings, **kw: seen.update(returns=returns) or {"periods": []})
     monkeypatch.setattr(q, "data", lambda *a, **k: SimpleNamespace(bars=bars, annualization=252, info={}))

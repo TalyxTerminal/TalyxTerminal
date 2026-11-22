@@ -26,10 +26,9 @@ describe("Work's key numbers", () => {
     expect(row).toContain("+2.1 pt");
     expect(row).toContain("−12");
   });
-  it("a number the run cannot give reads a dash, and a short sample says so beside the annual return", () => {
-    const short = work({shortSample: true, stats: {...work().stats, cagr: null, sharpe: null}});
+  it("a number the run cannot give reads a dash", () => {
+    const short = work({stats: {...work().stats, cagr: null, sharpe: null}});
     const markup = renderToStaticMarkup(createElement(KeyNumbersRow, {work: short, go: vi.fn()}));
-    expect(markup).toContain("short sample");
     expect(markup).toContain("—");
     expect(markup).not.toContain("NaN");
   });

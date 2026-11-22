@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { TxAlert, TxButton, TxIcon, TxIconButton, type ModuleContext } from "@talyx/sdk";
 import { documents } from "../documents/service";
@@ -33,9 +34,9 @@ export function FileTree({ ctx, project }: { ctx: ModuleContext; project: Worksp
     </TxButton>;
     return directory && expanded ? [row, ...rows(entry.path, depth + 1)] : [row];
   });
-  return <nav className="developer-tree" aria-label={`${project.name} files`}>
-    <header className="developer-tree-head"><span title={project.root}>{project.name}</span><TxIconButton size="sm" label="Refresh files" icon="refresh" onClick={refresh} /></header>
-    {error && <TxAlert title="Files unavailable">{error}</TxAlert>}
+  return <nav className="developer-tree" aria-label={t("{name} files", { name: project.name })}>
+    <header className="developer-tree-head"><span title={project.root}>{project.name}</span><TxIconButton size="sm" label={t("Refresh files")} icon="refresh" onClick={refresh} /></header>
+    {error && <TxAlert title={t("Files unavailable")}>{error}</TxAlert>}
     <div className="developer-tree-rows">{rows("", 0)}</div>
   </nav>;
 }

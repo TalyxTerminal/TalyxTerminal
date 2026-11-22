@@ -178,6 +178,26 @@ class PlatformClient:
         """(Module SDKs) record a long task of one of the caller's task actions. Returns the result."""
         return await self.ctx.call("platform.tasks.start", input, workspace=workspace)
 
+    async def updates_check(self, input: dict, *, workspace: str | None = None) -> Any:
+        """Ask GitHub for the latest published version now. Returns the result."""
+        return await self.ctx.call("platform.updates.check", input, workspace=workspace)
+
+    async def updates_download(self, input: dict, *, workspace: str | None = None) -> Any:
+        """Download the newer version's installer and check its SHA-256 against the release's; returns at once, the progress Returns the result."""
+        return await self.ctx.call("platform.updates.download", input, workspace=workspace)
+
+    async def updates_notes_seen(self, input: dict, *, workspace: str | None = None) -> Any:
+        """This version's notes have been read: they are not shown again. Returns the result."""
+        return await self.ctx.call("platform.updates.notes_seen", input, workspace=workspace)
+
+    async def updates_open(self, input: dict, *, workspace: str | None = None) -> Any:
+        """Open the newer version's release page (with its installer) in the default browser. Returns the result."""
+        return await self.ctx.call("platform.updates.open", input, workspace=workspace)
+
+    async def updates_read(self, input: dict, *, workspace: str | None = None) -> Any:
+        """This installation's version and the newer published one, if the last check found one. Returns the result."""
+        return await self.ctx.call("platform.updates.read", input, workspace=workspace)
+
     async def workspace_close(self, input: dict, *, workspace: str | None = None) -> Any:
         """Close a workspace: everything running for it (listed by activity.list) is stopped first, for real. A workspace Returns the result."""
         return await self.ctx.call("platform.workspace.close", input, workspace=workspace)
@@ -237,6 +257,9 @@ class PlatformClient:
 
     async def subscribe_settings_changes(self, params: dict, *, workspace: str | None = None, cursor=None):
         return await self.ctx.subscribe("platform.settings.changes", params, workspace=workspace, cursor=cursor)
+
+    async def subscribe_updates_changes(self, params: dict, *, workspace: str | None = None, cursor=None):
+        return await self.ctx.subscribe("platform.updates.changes", params, workspace=workspace, cursor=cursor)
 
     async def subscribe_workspace_changes(self, params: dict, *, workspace: str | None = None, cursor=None):
         return await self.ctx.subscribe("platform.workspace.changes", params, workspace=workspace, cursor=cursor)

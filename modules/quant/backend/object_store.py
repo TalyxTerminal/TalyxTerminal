@@ -11,6 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t, tc
 
 from ..native import styles
 from ..native.object_templates import SOURCES
@@ -32,91 +33,137 @@ FOLDER = "qfolder"
 
 def clean_name(value, label="name"):
     if not isinstance(value, str) or not value.strip() or len(value.strip()) > 120:
-        raise ContractError("invalid_input", f"Choose a {label} of 1 to 120 characters.")
+        raise ContractError("invalid_input", t("Choose a {label} of 1 to 120 characters.", label=label))
     return value.strip()
 
 
 def parse_day(value, label):
     if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
-        raise ContractError("invalid_input", f"{label} needs a date written YYYY-MM-DD.")
+        raise ContractError("invalid_input", t("{label} needs a date written YYYY-MM-DD.", label=label))
     try:
         return date.fromisoformat(value)
     except ValueError as error:
-        raise ContractError("invalid_input", f"{label} is not a real date.") from error
+        raise ContractError("invalid_input", t("{label} is not a real date.", label=label)) from error
 
 
 def check_data(data, kind):
     """Data settings: exact Market instruments, a research list or the code's own rule for the instruments, one bar period and one UTC date range."""
     if set(data) - {"symbols", "list", "universe", "index", "timeframe", "since", "until", "adjustment", "referencePrices", "heldOutFrom", "fillBars"}:
-        raise ContractError("invalid_input", "Data settings hold symbols, list, universe, index, timeframe, since, until, adjustment, fillBars and heldOutFrom.")
+        raise ContractError("invalid_input", t("Data settings hold symbols, list, universe, index, timeframe, since, until, adjustment, fillBars and heldOutFrom."))
     if data.get("fillBars") is not None:
         # Finer bars the venue matches orders on (stops and targets inside a signal bar); the chart and the signals stay on `timeframe`.
         if kind != "strategy" or data["fillBars"] not in {"1m", "5m"}:
-            raise ContractError("invalid_input", "fillBars is 1m or 5m (a strategy's fine bars for matching), or null for the signal bars.")
+            raise ContractError("invalid_input", t("fillBars is 1m or 5m (a strategy's fine bars for matching), or null for the signal bars."))
         if data.get("timeframe") in {"1m", "5m"} and TIMEFRAMES.index(data["fillBars"]) >= TIMEFRAMES.index(data["timeframe"]):
-            raise ContractError("invalid_input", "Fine bars must be shorter than the signal bars.")
+            raise ContractError("invalid_input", t("Fine bars must be shorter than the signal bars."))
     if 'index' in data:
         from .index_universe import check
         check(data['index'])
     if 'referencePrices' in data:
         bases = data['referencePrices']
         if kind != 'strategy' or not isinstance(bases, list) or any(value not in {'mark', 'index'} for value in bases) or len(set(bases)) != len(bases):
-            raise ContractError('invalid_input', 'Strategy referencePrices is a list containing mark and/or index, without duplicates.')
+            raise ContractError('invalid_input', t("Strategy referencePrices is a list containing mark and/or index, without duplicates."))
     for symbol in data.get("symbols", []):
         instrument = symbol.get("instrument") if isinstance(symbol, dict) else None
         if set(symbol) != {"instrument"} or not isinstance(instrument, dict) or not instrument.get("instrumentId"):
-            raise ContractError("invalid_input", "Each symbol is {\"instrument\": <the Market instrument>} copied from a Market search, or {\"symbol\": \"Market symbol notation\"}.")
+            raise ContractError("invalid_input", t("Each symbol is {\"instrument\": <the Market instrument>} copied from a Market search, or {\"symbol\": \"Market symbol notation\"}."))
     chosen = [key for key in ("symbols", "list", "universe", "index") if data.get(key)]
     if len(chosen) > 1:
-        raise ContractError("invalid_input", "Choose the symbols one way: a list of symbols, a research list or the code's own rule.", {"chosen": chosen})
+        raise ContractError("invalid_input", t("Choose the symbols one way: a list of symbols, a research list or the code's own rule."), {"chosen": chosen})
     if data.get("universe") not in {None, "code"}:
-        raise ContractError("invalid_input", "The only rule is \"code\": the code picks its own symbols.")
+        raise ContractError("invalid_input", t("The only rule is \"code\": the code picks its own symbols."))
     if data.get("universe") and kind == "strategy":
-        raise ContractError("invalid_input", "A strategy backtests the symbols chosen here; the code cannot pick its own.")
+        raise ContractError("invalid_input", t("A strategy backtests the symbols chosen here; the code cannot pick its own."))
     if data.get("timeframe") not in {None, *TIMEFRAMES}:
-        raise ContractError("invalid_input", "Choose a bar period: " + ", ".join(TIMEFRAMES) + ".")
+        raise ContractError("invalid_input", t("Choose a bar period: {periods}.", periods=', '.join(TIMEFRAMES)))
     allowed = {None, "raw"} if kind == "strategy" else {None, "raw", "adjusted", "split", "split_dividend"}
     if data.get("adjustment") not in allowed:
-        raise ContractError("invalid_input", "Strategy prices are fixed: splits and dividends for stocks, raw for other instruments." if kind == "strategy" else "Prices are raw or adjusted for splits and dividends.")
+        raise ContractError("invalid_input", t("Strategy prices are fixed: splits and dividends for stocks, raw for other instruments.") if kind == "strategy" else t("Prices are raw or adjusted for splits and dividends."))
     since = parse_day(data["since"], "The start date") if data.get("since") else None
     until = parse_day(data["until"], "The end date") if data.get("until") and data["until"] != "latest" else None  # "latest" is the last closed bar when a run starts
     if since and until and since > until:
-        raise ContractError("invalid_input", "The end date must not be before the start date.")
+        raise ContractError("invalid_input", t("The end date must not be before the start date."))
     object_data.check_range(data)
     if data.get("heldOutFrom") is not None:
         # The end of the period kept out of every run and every check, until a held-out validation scores one run on it once.
         held = parse_day(data["heldOutFrom"], "The held-out start")
         if since and held <= since or until and held > until:
-            raise ContractError("invalid_input", "The held-out period starts inside the data period, after its first day.")
+            raise ContractError("invalid_input", t("The held-out period starts inside the data period, after its first day."))
 
 
 def check_account(account):
     if set(account) - {"capital", "fee", "leverage", "stockCommission"}:
-        raise ContractError("invalid_input", "Account settings hold capital, fee, leverage and stockCommission.")
+        raise ContractError("invalid_input", t("Account settings hold capital, fee, leverage and stockCommission."))
     for key in ("capital", "leverage"):
         if key in account and (type(account[key]) not in (int, float) or account[key] <= 0):
-            raise ContractError("invalid_input", f"{key} needs a positive number.")
+            raise ContractError("invalid_input", t("{key} needs a positive number.", key=key))
     fee = account.get("fee")
     if fee is not None and (not isinstance(fee, dict) or set(fee) != {"maker", "taker"}
                             or any(type(fee[key]) not in (int, float) or fee[key] < 0 for key in fee)):
-        raise ContractError("invalid_input", "fee is {\"maker\": rate, \"taker\": rate} with rates of 0 or more.")
+        raise ContractError("invalid_input", t("fee is {\"maker\": rate, \"taker\": rate} with rates of 0 or more."))
     commission = account.get('stockCommission')
     if commission is not None:
         if not isinstance(commission, dict) or set(commission) != {'rate', 'perShare', 'minimum', 'maximumRate'}:
-            raise ContractError('invalid_input', 'stockCommission requires rate, perShare, minimum and maximumRate (null for uncapped).')
+            raise ContractError('invalid_input', t("stockCommission requires rate, perShare, minimum and maximumRate (null for uncapped)."))
         if any(value is not None and (type(value) not in (int, float) or not math.isfinite(value) or value < 0) for value in commission.values()) or any(commission[key] is None for key in ('rate', 'perShare', 'minimum')):
-            raise ContractError('invalid_input', 'Stock commission values must be finite nonnegative numbers.')
+            raise ContractError('invalid_input', t("Stock commission values must be finite nonnegative numbers."))
+
+
+# Display metadata read from the read-only strategy presets. Their executable source stays in English.
+PRESET_WORDS = {
+    mark("0 = long only"),
+    mark("Blank when the item has only one"),
+    mark("Buffer"),
+    mark("Buy above"),
+    mark("Buy when the signal is above this"),
+    mark("By rank"),
+    mark("By signal"),
+    mark("Equal"),
+    mark("Fast window"),
+    mark("Hold the top"),
+    mark("Inverse volatility"),
+    mark("Invested"),
+    mark("Keep a held name until it falls below the top + this"),
+    mark("Largest share of one sector; 0 = no limit"),
+    mark("Largest weight of one name; 0 = no limit"),
+    mark("Lookback (bars)"),
+    mark("Max weight"),
+    mark("Min traded value"),
+    mark("Rebalance every"),
+    mark("Risk per trade (%)"),
+    mark("Sector cap"),
+    mark("Sell below"),
+    mark("Sell when the signal is below this"),
+    mark("Share of equity invested"),
+    mark("Share of equity per buy"),
+    mark("Share of the weights invested"),
+    mark("Short the bottom"),
+    mark("Signal"),
+    mark("Signal field"),
+    mark("Slow window"),
+    mark("Smallest 20-day average traded value; 0 = no limit"),
+    mark("Stop (ATR)"),
+    mark("This many signals between rebalances"),
+    mark("This many weight sets between rebalances"),
+    mark("Tolerance"),
+    mark("Trade only when a weight is off by more than this"),
+    mark("Trade the short side"),
+    mark("Trailing stop (ATR)"),
+    mark("Weighting"),
+    mark("Weights (library item)"),
+    mark("Weights field"),
+}
 
 
 # A model's presets: the standard pipeline with some settings filled in (the universe and the period stay empty: the data settings are the object's).
 MODEL_PRESETS = {
-    "model:lgb-alpha158": {"label": "LightGBM on Alpha158", "description": "Qlib's benchmark settings",
+    "model:lgb-alpha158": {"label": mark("LightGBM on Alpha158"), "description": mark("Qlib's benchmark settings"),
                            "params": {"inputs": [{"source": "builtin", "name": "Alpha158", "ref": "alpha158"}], "algorithm": "lightgbm", "lgb_lr": 0.2, "lgb_leaves": 210, "lgb_depth": 8,
-                                      "lgb_ff": 0.8879, "lgb_bf": 0.8789, "lgb_l1": 205.6999, "lgb_l2": 580.9768, "label": "Ref($open, -2) / Ref($open, -1) - 1"}},
-    "model:lstm-alpha360": {"label": "LSTM on Alpha360", "description": "Qlib's benchmark settings",
+                                      "lgb_ff": 0.8879, "lgb_bf": 0.8789, "lgb_l1": 205.6999, "lgb_l2": 580.9768, "label": "Ref($open, -2) / Ref($open, -1) - 1"}},  # i18n: ignore
+    "model:lstm-alpha360": {"label": mark("LSTM on Alpha360"), "description": mark("Qlib's benchmark settings"),
                             "params": {"inputs": [{"source": "builtin", "name": "Alpha360", "ref": "alpha360"}], "algorithm": "lstm", "nn_width": 64, "nn_layers": 2, "nn_dropout": 0.0,
-                                       "nn_epochs": 200, "nn_lr": 0.001, "nn_stop": 20, "nn_batch": 800, "every_months": 6, "label": "Ref($open, -2) / Ref($open, -1) - 1"}},
-    "model:ridge-styles": {"label": "Ridge on the price styles", "description": "The seven price styles as inputs, a regularised linear model",
+                                       "nn_epochs": 200, "nn_lr": 0.001, "nn_stop": 20, "nn_batch": 800, "every_months": 6, "label": "Ref($open, -2) / Ref($open, -1) - 1"}},  # i18n: ignore
+    "model:ridge-styles": {"label": mark("Ridge on the price styles"), "description": mark("The seven price styles as inputs, a regularised linear model"),
                            "params": {"inputs": [{"source": "builtin", "name": "Styles", "ref": "styles"}], "algorithm": "ridge"}},
 }
 
@@ -140,12 +187,12 @@ class ObjectStore:
     def read(self, identity):
         record = self.records.find(OBJECT, identity)
         if record is None or record.get("deleted"):
-            raise ContractError("not_found", "This Quant object does not exist.")
+            raise ContractError("not_found", t("This Quant object does not exist."))
         return record
 
     def check_writer(self, identity):
         if identity in self.writing:
-            raise ContractError("conflict", "The object is being edited.", {"objectId": identity})
+            raise ContractError("conflict", t("The object is being edited."), {"objectId": identity})
 
     def save(self, record, **changes):
         self.check_writer(record["id"])
@@ -158,21 +205,24 @@ class ObjectStore:
 
     def check_version(self, record, expected):
         if expected is not None and record["version"] != expected:
-            raise ContractError("conflict", "Read the current object before changing it.",
+            raise ContractError("conflict", t("Read the current object before changing it."),
                                 {"objectId": record["id"], "version": record["version"]})
 
     @staticmethod
     def preset(record):
         """What the list shows about a ready-made strategy, or None for anything else."""
         found = PRESETS[record["preset"]] if record["preset"] else None
-        return {"id": record["preset"], "label": found["label"], "description": found["description"], "shortParameter": found["shortParameter"]} if found else None
+        return {"id": record["preset"], "label": t(found["label"]), "description": t(found["description"]), "shortParameter": found["shortParameter"]} if found else None
 
     @staticmethod
     def presets():
-        ready = [{"id": key, "kind": "strategy", "label": item["label"], "description": item["description"], "shortParameter": item["shortParameter"]} for key, item in PRESETS.items()]
+        ready = [{"id": key, "kind": "strategy", "label": t(item["label"]), "description": t(item["description"]), "shortParameter": item["shortParameter"]} for key, item in PRESETS.items()]
         # A factor's presets are the price styles, written as formulas (one definition: native/styles.py).
-        ready += [{"id": key, "kind": "model", "label": item["label"], "description": item["description"], "shortParameter": None} for key, item in MODEL_PRESETS.items()]
-        return ready + [{"id": "factor:" + item["style"], "kind": "factor", "label": item["style"], "description": item["measuredAs"], "shortParameter": None,
+        ready += [{"id": key, "kind": "model", "label": t(item["label"]), "description": t(item["description"]), "shortParameter": None} for key, item in MODEL_PRESETS.items()]
+        style_labels = {"Momentum": t("Momentum"), "Reversal": t("Reversal"), "Volatility": t("Volatility"),
+                        "Residual volatility": t("Residual volatility"), "Beta": t("Beta"),
+                        "Liquidity": t("Liquidity"), "Size": tc("factor", "Size")}
+        return ready + [{"id": "factor:" + item["style"], "kind": "factor", "label": style_labels[item["style"]], "description": t(item["measuredAs"]), "shortParameter": None,
                          "formula": item["formula"]} for item in styles.preset_formulas()]
 
     def summary(self, record, last=True):
@@ -221,7 +271,7 @@ class ObjectStore:
     def create_folder(self, args):
         name = clean_name(args["name"], "folder name")
         if args["kind"] not in KINDS:
-            raise ContractError("invalid_input", "Choose one of the Quant kinds: " + ", ".join(KINDS) + ".")
+            raise ContractError("invalid_input", t("Choose one of the Quant kinds: {kinds}.", kinds=', '.join(KINDS)))
         self.register_folder(args["kind"], name)
         record = self.records.find(FOLDER, f"{args['kind']}:{name}")
         self.ctx.publish("object_changed", {"objectId": "", "kind": args["kind"], "workspaceId": self.workspace(), "version": 0})
@@ -231,11 +281,11 @@ class ObjectStore:
         """The folder's record when it may go: only an empty folder does; objects of any workspace count, since the folder is shared by them all."""
         held = self.folder_objects(args["kind"], args["name"])
         if held:
-            raise ContractError("conflict", f"The folder {args['name']} still holds {len(held)} object(s); move or delete them first.",
+            raise ContractError("conflict", t("The folder {name} still holds {held} object(s); move or delete them first.", name=args['name'], held=len(held)),
                                 {"kind": args["kind"], "name": args["name"], "objects": [item["name"] for item in held]})
         record = self.records.find(FOLDER, f"{args['kind']}:{args['name']}")
         if record is None or record["deleted"]:
-            raise ContractError("not_found", f"There is no folder {args['name']} in {args['kind']}.")
+            raise ContractError("not_found", t("There is no folder {name} in {kind}.", name=args['name'], kind=args['kind']))
         return record
 
     def delete_folder(self, args):
@@ -262,14 +312,14 @@ class ObjectStore:
     async def create(self, args, *, default_universe=True):
         kind, preset = args["kind"], args["preset"] if "preset" in args else None
         if kind not in CREATABLE:
-            raise ContractError("unavailable", f"A {kind} cannot be created yet.", {"creatable": list(CREATABLE)})
+            raise ContractError("unavailable", t("A {kind} cannot be created yet.", kind=kind), {"creatable": list(CREATABLE)})
         factor_presets = {"factor:" + item["style"]: item for item in styles.preset_formulas()}
         if kind == "model" and preset is not None and preset not in MODEL_PRESETS:
-            raise ContractError("invalid_input", "A model preset is one of: " + ", ".join(MODEL_PRESETS) + ".", {"presets": list(MODEL_PRESETS)})
+            raise ContractError("invalid_input", t("A model preset is one of: {presets}.", presets=", ".join(MODEL_PRESETS)), {"presets": list(MODEL_PRESETS)})
         if preset is not None and kind == "factor" and preset not in factor_presets and preset not in PRESETS:
-            raise ContractError("invalid_input", "A factor preset is one of: " + ", ".join(factor_presets) + ".", {"presets": list(factor_presets)})
+            raise ContractError("invalid_input", t("A factor preset is one of: {presets}.", presets=", ".join(factor_presets)), {"presets": list(factor_presets)})
         if preset is not None and kind != "model" and (kind != "factor" or preset in PRESETS) and (kind != "strategy" or preset not in PRESETS):
-            raise ContractError("invalid_input", "A ready-made strategy is one of: " + ", ".join(PRESETS) + ".", {"presets": list(PRESETS)})
+            raise ContractError("invalid_input", t("A ready-made strategy is one of: {presets}.", presets=", ".join(PRESETS)), {"presets": list(PRESETS)})
         name = clean_name(args.get("name") or (factor_presets[preset]["style"] if kind == "factor" and preset else MODEL_PRESETS[preset]["label"] if kind == "model" and preset
                                                else PRESETS[preset]["label"] if preset else DEFAULT_NAMES[kind]))
         folder = clean_name(args["folder"], "folder name") if args.get("folder") else None
@@ -349,7 +399,7 @@ class ObjectStore:
         """One's own strategy from a ready-made one (or any strategy): the code as it is now and the same settings, free to edit."""
         record = self.read(identity)
         if record["kind"] != "strategy":
-            raise ContractError("invalid_input", "Only a strategy can be copied.")
+            raise ContractError("invalid_input", t("Only a strategy can be copied."))
         created = await self.make("strategy", clean_name(name or record["name"] + " (copy)"), record["folder"], None, self.code(record), copy.deepcopy(record["settings"]))
         if record.get("heldOutUsed"):
             # The held-out period was looked at by the one it was copied from: the copy carries that, so looking again is still told.
@@ -382,7 +432,7 @@ class ObjectStore:
             doc = await self.ctx.call("developer.documents.open", {"source": {
                 "kind":"file", "projectId":developer["projectId"], "uri":path.as_uri()}})
             if doc["conflict"] or doc["dirty"]:
-                raise ContractError("conflict", f"Save or resolve the open edits in {relative} before generating source.")
+                raise ContractError("conflict", t("Save or resolve the open edits in {relative} before generating source.", relative=relative))
             args = {"documentId":doc["documentId"], "expectedVersion":doc["version"], "content":content}
             edited = await self.ctx.call("developer.documents.edit", args)
             from .run_restore import save
@@ -391,10 +441,9 @@ class ObjectStore:
     def code_target(self, record):
         """The object as it will be checked and saved when its entry file is replaced."""
         if record["kind"] == "notebook":
-            raise ContractError("invalid_input", "A notebook's code is its cells: change them with write_cell.")
+            raise ContractError("invalid_input", t("A notebook's code is its cells: change them with write_cell."))
         if record["preset"]:
-            raise ContractError("invalid_input", "A ready-made strategy runs TALYX's code: copy it (create_object copyOf) "
-                                                 "to write your own.")
+            raise ContractError("invalid_input", t("A ready-made strategy runs TALYX's code: copy it (create_object copyOf) to write your own."))
         if record["kind"] == "strategy":
             return record
         return {**record, "settings": {**record["settings"], "mode": "code"}}
@@ -422,7 +471,7 @@ class ObjectStore:
         if "name" in args:
             changes["name"] = clean_name(args["name"])
             if changes["name"] in self.taken_names(record["kind"], but=record["id"]):
-                raise ContractError("conflict", f"Another {record['kind']} is named {changes['name']}; choose a different name.", {"name": changes["name"]})
+                raise ContractError("conflict", t("Another {kind} is named {name}; choose a different name.", kind=record['kind'], name=changes['name']), {"name": changes["name"]})
         if "folder" in args:
             changes["folder"] = clean_name(args["folder"], "folder name") if args["folder"] else None
         return changes
@@ -467,24 +516,35 @@ class ObjectStore:
         off = (record["settings"].get("run") or {}).get("shorting") == "off"
         if data.get('index'):
             if off:
-                raise ContractError('invalid_input', f"Shorting is off in the run settings; set {parameter} to 0 or allow shorting.")
+                raise ContractError('invalid_input', t("Shorting is off in the run settings; set {parameter} to 0 or allow shorting.", parameter=parameter))
             return
         blocked = [item["instrument"]["displaySymbol"] for item in data["symbols"]
                    if item["instrument"]["marketType"] != "swap" and (off or item["instrument"]["assetClass"] not in {"equity", "fund"})]
         if blocked:
-            raise ContractError("invalid_input", f"{', '.join(blocked)} cannot be shorted: shorting needs perpetuals or stocks with shorting allowed. Set {parameter} to 0, or choose other symbols.",
+            raise ContractError("invalid_input", t("{blocked} cannot be shorted: shorting needs perpetuals or stocks with shorting allowed. Set {parameter} to 0, or choose other symbols.", blocked=', '.join(blocked), parameter=parameter),
                                 {"symbols": blocked, "parameter": parameter})
 
     def parameters(self, content):
         try:
             return read_parameters(content)
         except SyntaxError as error:
-            return {"parameters": [], "errors": [{"line": error.lineno, "message": f"line {error.lineno}: {error.msg}"}]}
+            return {"parameters": [], "errors": [{"line": error.lineno, "message": t("line {lineno}: {msg}", lineno=error.lineno, msg=error.msg)}]}
 
     def project_declarations(self, record, code=None):
         """The settings declared across every Python file of the object's project (research objects); a strategy reads its entry file."""
         if record["kind"] == "strategy" or record["preset"]:
-            return read_parameters(self.code(record) if code is None else code, record["entry"])
+            source = self.code(record) if code is None else code
+            declared = read_parameters(source, record["entry"])
+            preset = record["preset"] or record.get("presetOf")
+            if preset and source == PRESETS[preset]["source"]:
+                for setting in declared["parameters"]:
+                    for field in ("label", "help"):
+                        if setting[field] in PRESET_WORDS:
+                            setting[field] = t(setting[field])
+                    for option in setting.get("options", []):
+                        if option["label"] in PRESET_WORDS:
+                            option["label"] = t(option["label"])
+            return declared
         if record["kind"] == "model" and record["settings"].get("mode", "standard") == "standard":
             from .model_prep import standard_declarations
             return standard_declarations()  # the standard pipeline is TALYX's current file
@@ -536,7 +596,7 @@ class ObjectStore:
         models = {name: name for source in files.values() for name in model_inputs.declarations(source)}
         unknown = versions.keys() - set(named.values()) - models.keys()
         if unknown:
-            raise ContractError("invalid_input", f"This strategy does not read {', '.join(sorted(unknown))}.")
+            raise ContractError("invalid_input", t("This strategy does not read {unknown}.", unknown=', '.join(sorted(unknown))))
         old = settings.get("inputs") or {}
         legacy = {pin["name"]: pin["versionId"] for pin in old if pin.get("name") and pin.get("versionId")} if isinstance(old, list) else {}
         pins = {}
@@ -568,10 +628,11 @@ class ObjectStore:
         if record["kind"] == "model" and "run" in args:
             run = args.pop("run")
             if not isinstance(run, dict) or set(run) - {"cost", "topN"}:
-                raise ContractError("invalid_input", "A model's run settings hold cost (bps a trade) and topN.")
+                raise ContractError("invalid_input", t("A model's run settings hold cost (bps a trade) and topN."))
             for key in ("cost", "topN"):
                 if key in run and (type(run[key]) not in (int, float) or run[key] < 0 or key == "topN" and (run[key] < 1 or run[key] != int(run[key]))):
-                    raise ContractError("invalid_input", f"{key} needs a number of 0 or more" + (" (a whole number of 1 or more)" if key == "topN" else "") + ".")
+                    raise ContractError("invalid_input", (t("{key} needs a number of 0 or more (a whole number of 1 or more).", key=key)
+                            if key == 'topN' else t("{key} needs a number of 0 or more.", key=key)))
             settings["run"] = {**MODEL_RUN, **(settings.get("run") or {}), **run}
         if "run" in args and record["kind"] == "strategy":
             from . import strategy_settings
@@ -586,10 +647,10 @@ class ObjectStore:
             args = {key: value for key, value in args.items() if key != "run"}
         if "formula" in args or "run" in args:
             if record["kind"] != "factor":
-                raise ContractError("invalid_input", "Only a factor has a formula and factor run settings.")
+                raise ContractError("invalid_input", t("Only a factor has a formula and factor run settings."))
             if "formula" in args:
                 if not isinstance(args["formula"], str) or len(args["formula"]) > 4000:
-                    raise ContractError("invalid_input", "A formula is text of at most 4000 characters.")
+                    raise ContractError("invalid_input", t("A formula is text of at most 4000 characters."))
                 settings["formula"] = args["formula"]
             if "run" in args:
                 from ..native.factor_work import settings_of
@@ -605,7 +666,7 @@ class ObjectStore:
             if record["kind"] == "strategy":
                 # The held-out start is set with the run settings only; the data settings show it and keep it.
                 if "heldOutFrom" in data and data["heldOutFrom"] != settings["data"].get("heldOutFrom"):
-                    raise ContractError("invalid_input", "Set the held-out start in the run settings; the data settings only show it.")
+                    raise ContractError("invalid_input", t("Set the held-out start in the run settings; the data settings only show it."))
                 data = {key: value for key, value in data.items() if key != "heldOutFrom"}
                 if "heldOutFrom" in settings["data"]:
                     # Once set (the default, the user's choice, or cleared) it stays as it is, while it still lies inside the new range;

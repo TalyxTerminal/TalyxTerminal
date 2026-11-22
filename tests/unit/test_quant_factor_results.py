@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 from jsonschema import Draft202012Validator
 
+from tests.fixtures.quant_index import frozen_index
 from tests.unit.test_quant_factor_runs import DATA, services, settled
 
 SCHEMA = json.loads((Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "quant" / "factor-results.schema.json").read_text(encoding="utf-8"))  # the shapes frontend/factor/resultTypes.ts reads
@@ -570,16 +571,17 @@ def test_names_a_day_stands_beside_the_members_the_index_held_that_day():
     from modules.quant.native import factor_work as W
     day = 86_400_000
     labels = np.arange(10) * day
-    member = lambda asset, instrument=True: {"assetId": asset, "instrument": {"instrumentId": asset} if instrument else None}
-    index = {"intervals": [
-        {"since": 0, "until": 4 * day + day - 1, "members": [member("a"), member("b"), member("c", False), member("d", False)]},
-        {"since": 5 * day, "until": 7 * day + day - 1, "members": [member("a"), member("b"), member("c", False)]},
-    ]}
+    member = lambda asset, instrument=True: {"assetId": asset, "instrumentId": asset if instrument else None}
+    a, b, c, d = member("a"), member("b"), member("c", False), member("d", False)
+    index = frozen_index({"intervals": [
+        {"since": 0, "until": 4 * day + day - 1, "members": [a, b, c, d]},
+        {"since": 5 * day, "until": 7 * day + day - 1, "members": [a, b, c]},
+    ]})
     assert W.members_a_day(labels, index).tolist() == [4, 4, 4, 4, 4, 3, 3, 3, 0, 0]
     assert W.members_a_day(labels, None) is None
     data = panel(days=120, names=8)
-    data.info = {**data.info, "index": {"intervals": [{"since": int(data.labels[0]), "until": int(data.labels[-1]),
-                                                       "members": [member(str(n)) for n in range(8)] + [member(f"x{n}", False) for n in range(5)]}]}}
+    data.info = {**data.info, "index": frozen_index({"intervals": [{"since": int(data.labels[0]), "until": int(data.labels[-1]),
+                                                       "members": [member(str(n)) for n in range(8)] + [member(f"x{n}", False) for n in range(5)]}]})}
     raw = np.random.default_rng(3).normal(0, 1, data.shape)
     numbers = W.Evaluation(data, raw, W.settings_of({"neutralize": "none"}), formula=True).numbers
     assert numbers["members"] == 13 and numbers["names"] <= 8

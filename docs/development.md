@@ -103,6 +103,7 @@ The full set, run from the repository root:
 npm --prefix web run build
 npm --prefix web test
 npm --prefix web run test:contracts
+& .\.venv\Scripts\python.exe -B scripts/checks/check_i18n.py --strict
 ```
 
 - The backend suite takes about six minutes with `-n 4`; most of that is tests that start real processes (the multi-process platform, Agent, Developer).

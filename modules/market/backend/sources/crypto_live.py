@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 
+from talyx_sdk.i18n import t
+
 from vocabulary.identity import timeframe_nanoseconds
 
 from ..common import MarketError, now_ns
@@ -46,7 +48,7 @@ def okx_channel(timeframe: str, price_basis: str) -> str:
         return f"index-candle{bar}"
     if price_basis == "last":
         return f"candle{bar}"
-    raise MarketError("unsupported", f"OKX publishes no {price_basis} candles", source_id="okx")
+    raise MarketError("unsupported", t("OKX publishes no {price_basis} candles", price_basis=price_basis), source_id="okx")
 
 
 def okx_route(contracts: dict[str, bool]):

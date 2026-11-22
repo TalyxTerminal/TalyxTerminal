@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { TxAlert, TxButton, TxSkeleton, type Json, type ModuleContext } from "@talyx/sdk";
 import { useAgentSettings } from "../data/useAgent";
@@ -14,7 +15,7 @@ export function SettingsData({ ctx, children }: {
   children: (settings: AgentSettings, client: AgentClient, refresh: () => Promise<void>) => ReactNode;
 }) {
   const { client, value, error, refresh } = useAgentSettings(ctx);
-  if (error) return <TxAlert title="Agent settings couldn't be read" actions={<TxButton size="sm" onClick={() => void refresh()}>Try again</TxButton>}>{errorText(error)}</TxAlert>;
+  if (error) return <TxAlert title={t("Agent settings couldn't be read")} actions={<TxButton size="sm" onClick={() => void refresh()}>{t("Try again")}</TxButton>}>{errorText(error)}</TxAlert>;
   if (!value) return <div className="agent-settings-loading"><TxSkeleton width="60%" /><TxSkeleton width="80%" /><TxSkeleton width="40%" /></div>;
   return <>{children(value, client, refresh)}</>;
 }

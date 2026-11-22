@@ -110,6 +110,7 @@ class SettingSpec:
     description: str
     global_only: bool = False
     group: str = ""
+    options: dict[str, str] | None = None
 
 
 def _hints(function: Callable) -> tuple[Any, Any, str]:
@@ -148,6 +149,8 @@ class Module:
         self.change_handlers: type | None = None
         self.workspace_deleter: Callable | None = None
         self.routes: Callable | None = None
+        self.format_version = 1
+        self.format_steps: dict[int, Callable] = {}
 
     def _name(self, name: str | None, function: Callable) -> str:
         return name or function.__name__
@@ -212,12 +215,23 @@ class Module:
                                                           "streams": dict(streams or {})}
 
     def setting(self, key: str, type: Any, default: Any, *, title: str, description: str = "",
-                global_only: bool = False, group: str = "") -> None:
+                global_only: bool = False, group: str = "", options: dict[str, str] | None = None) -> None:
         """A setting stored by the platform. ``group`` is the heading it is listed under in the settings window.
         ``global_only``: bound to this machine or shared data
-        (a data source and its key, a notification channel's sign-in), so a workspace cannot have its own."""
+        (a data source and its key, a notification channel's sign-in), so a workspace cannot have its own.
+        ``options``: what people read for each value of a choice (by default the value in words). Like the title,
+        it is English and translated with the module's dictionary."""
         TypeAdapter(type).validate_python(default)
-        self.settings[key] = SettingSpec(key, type, default, title, description, global_only, group)
+        self.settings[key] = SettingSpec(key, type, default, title, description, global_only, group, options)
+
+    def data_format(self, version: int, steps: dict[int, Callable]) -> None:
+        """The version of the format this module keeps its data in (its data folder, its user files, what it keeps in
+        workspace folders), and for each version after 1 the step ``async (ctx) -> None`` that turns data of the version
+        before into it. The steps run before ``on_start``, so data installed users already have keeps working after an
+        upgrade (``talyx_sdk.upgrade``). Data kept before this was declared is version 1."""
+        from .upgrade import check_steps
+        check_steps(version, steps)
+        self.format_version, self.format_steps = version, dict(steps)
 
     def on_start(self, function: Callable) -> Callable:
         """``async (ctx) -> None``: runs once the process is connected, before it reports ready."""

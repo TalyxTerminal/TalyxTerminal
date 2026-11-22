@@ -8,6 +8,7 @@ from urllib.parse import quote, unquote
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .providers.projection import safe_source
 
@@ -123,6 +124,6 @@ class References:
     def read(self, reference_id, workspace):
         row = self.store.db.execute("SELECT conversation,value FROM references_data WHERE id=?", (reference_id,)).fetchone()
         if row is None:
-            raise ContractError("target_gone", "This reference is unavailable")
+            raise ContractError("target_gone", t("This reference is unavailable"))
         self.store.conversation(row["conversation"], workspace)
         return json.loads(row["value"])

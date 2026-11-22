@@ -6,6 +6,8 @@ import asyncio
 import dataclasses
 from pathlib import Path
 
+from talyx_sdk.i18n import t
+
 from vocabulary.instruments import MarketInstrument
 
 from .actions import Actions
@@ -67,11 +69,11 @@ class Market:
         if path.is_absolute():
             return path.resolve()
         if path.anchor or not workspace_id:
-            raise MarketError("invalid_input", "Give an absolute path or a path relative to a bound workspace")
+            raise MarketError("invalid_input", t("Give an absolute path or a path relative to a bound workspace"))
         base = Path(await self.ctx.platform.workspace_folder(workspace_id)).resolve()
         target = (base / path).resolve()
         if not target.is_relative_to(base):
-            raise MarketError("invalid_input", f"Relative path {text} leaves the workspace folder")
+            raise MarketError("invalid_input", t("Relative path {text} leaves the workspace folder", text=text))
         return target
 
     async def start(self, *, load_catalogs: bool = True) -> None:
@@ -251,10 +253,10 @@ class Market:
         if record is not None:
             return record
         if set(value) == {"instrumentId"}:
-            raise MarketError("not_found", f"Unknown instrument ID {value['instrumentId']}")
+            raise MarketError("not_found", t("Unknown instrument ID {instrumentId}", instrumentId=value['instrumentId']))
         outcome = self.instruments.accept_record(value)
         if outcome["kind"] == "missing":
-            raise MarketError("not_found", f"Market does not know {value['symbol']} ({value['instrumentId']})",
+            raise MarketError("not_found", t("Market does not know {symbol} ({instrumentId})", symbol=value['symbol'], instrumentId=value['instrumentId']),
                               details={"candidates": outcome["candidates"]})
         return self.identity.record(outcome["id"])
 
@@ -274,7 +276,7 @@ class Market:
                                       sessionScope=key.session_scope,
                                       adjustment="raw" if record["adjustmentEligible"] else "not_applicable",
                                       importId=key.import_id)
-                found.append({"series": series.to_dict(), "label": f"Imported {key.import_id}"})
+                found.append({"series": series.to_dict(), "label": t("Imported {import_id}", import_id=key.import_id)})
         return found
 
     def instrument_changed(self, instrument_id: str) -> None:

@@ -12,6 +12,7 @@ from uuid import uuid4
 from pydantic import Field
 from talyx_sdk import ContractError
 from talyx_sdk.declare import Model, Module
+from talyx_sdk.i18n import t
 from talyx_sdk.process import Call, Context
 
 from .action_inputs import BotInput, ChatInput, OperationResult, ResultFile, SettingsInput
@@ -88,10 +89,10 @@ async def search_web(input: SearchWebInput, call: Call) -> dict[str, Any]:
     value = input.model_dump(exclude_none=True)
     if value["mode"] == "page":
         if "url" not in value or {"query", "objective"} & value.keys():
-            raise ContractError("invalid_input", "Page mode requires only an exact URL")
+            raise ContractError("invalid_input", t("Page mode requires only an exact URL"))
         return await service.search.read_page(value["url"])
     if "query" not in value or "url" in value:
-        raise ContractError("invalid_input", "Search mode requires query and optional objective")
+        raise ContractError("invalid_input", t("Search mode requires query and optional objective"))
     model_id, usage = None, None
     turn = service.calling_turn(call)
     if turn is not None:
@@ -108,10 +109,10 @@ async def search_web(input: SearchWebInput, call: Call) -> dict[str, Any]:
 
 async def conversation(operation: str, args: dict, workspace: str | None):
     if workspace is None:
-        raise ContractError("invalid_target", "Open a workspace before using a conversation")
+        raise ContractError("invalid_target", t("Open a workspace before using a conversation"))
     if operation in {"delete", "update", "fork"}:
         if service.store.conversation(args["conversationId"], workspace)["kind"] != "chat":
-            raise ContractError("invalid_target", "Manage bot and group threads through their bot or group")
+            raise ContractError("invalid_target", t("Manage bot and group threads through their bot or group"))
     if operation == "create":
         if args.get("modelId") is not None:
             service.catalogue.model(args["modelId"])
@@ -121,7 +122,7 @@ async def conversation(operation: str, args: dict, workspace: str | None):
     if operation == "search":
         query = args.get("query")
         if not isinstance(query, str) or not query.strip():
-            raise ContractError("invalid_input", "Enter text to search chat messages")
+            raise ContractError("invalid_input", t("Enter text to search chat messages"))
         return [row[0] for row in service.store.db.execute(
             "SELECT DISTINCT c.id FROM conversations c JOIN cards m ON m.conversation=c.id WHERE c.workspace=? "
             "AND coalesce(json_extract(c.value,'$.kind'),'chat')='chat' AND json_extract(m.value,'$.type')='answer' "
@@ -201,7 +202,7 @@ async def conversation(operation: str, args: dict, workspace: str | None):
         return None
     if operation == "reference":
         return service.references.read(args["referenceId"], workspace)
-    raise ContractError("invalid_input", "Unknown conversation operation")
+    raise ContractError("invalid_input", t("Unknown conversation operation"))
 
 
 async def settings(operation: str, args: dict, workspace: str | None):
@@ -267,19 +268,19 @@ async def settings(operation: str, args: dict, workspace: str | None):
             for group in result["groups"]:
                 row = service.store.db.execute("SELECT json_extract(value,'$.name'),'Bot' FROM bot_entries WHERE id=? "
                     "UNION ALL SELECT json_extract(value,'$.title'),'Chat' FROM conversations WHERE id=?", (group["key"],group["key"])).fetchone()
-                group["label"],group["kind"] = tuple(row) if row else ("Removed or unassigned", "")
+                group["label"],group["kind"] = tuple(row) if row else (t("Removed or unassigned"), "")
         elif group_by == "workspace":
             opened = await service.ctx.call("platform.workspace.list_open", {})
             names = {w["workspaceId"]:w["name"] for w in opened}
             for group in result["groups"]:
-                group["label"] = names.get(group["key"], group["key"] or "Unassigned")
+                group["label"] = names.get(group["key"], group["key"] or t("Unassigned"))
         return result
     if operation == "test_connection":
         return await service.providers.test_connection(args["modelId"], thinking=args.get("thinking"),
                                                        test_search=args.get("testSearch", True))
     if operation == "refresh_profiles":
         return await service.providers.refresh_profiles()
-    raise ContractError("invalid_input", "Unknown Agent settings operation")
+    raise ContractError("invalid_input", t("Unknown Agent settings operation"))
 
 
 async def bots(operation, args, workspace):
@@ -357,7 +358,7 @@ async def bot(input: BotInput, call: Call) -> OperationResult | ResultFile:
     op = input.operation
     ws = call.workspace_id
     if ws is None:
-        raise ContractError("invalid_target", "Open a workspace to use Bots")
+        raise ContractError("invalid_target", t("Open a workspace to use Bots"))
     if op.op in {"sources", "inspect"}:
         value = service.bots.directory(ws, id=op.id) if op.op == "inspect" else service.bots.sources
     else:
@@ -451,7 +452,7 @@ def routes(ctx: Context):
     async def handle(name: str, request: Request):
         try:
             if name not in handlers:
-                raise ContractError("not_found", f"Agent has no route {name}")
+                raise ContractError("not_found", t("Agent has no route {name}", name=name))
             body = await request.json()
             workspace = request.headers.get("x-talyx-workspace") or None
             handler = change_settings if name == "settings" else handlers[name]

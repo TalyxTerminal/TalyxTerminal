@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { failure, type Json, type PanelRef } from "@talyx/sdk";
 import { platformRuntime } from "../kernel/runtime";
@@ -18,20 +19,20 @@ export function useFramePanels(ref: MutableRefObject<WorkspaceState | null>, com
 
   const addPanel = useCallback((panel: ShellPanel) => commit(current => change(current, { panels: [...current.panels, panel], activePanelId: panel.id })), [commit]);
   const addModule = useCallback((module: ShellModuleChoice) => {
-    try { addPanel(freshPanel(module.kind.slice("module:".length), module.name)); }
-    catch (reason) { say(`Module not added: ${reason instanceof Error ? reason.message : String(reason)}`, true); }
+    try { addPanel(freshPanel(module.kind.slice("module:".length))); }
+    catch (reason) { say(t("Module not added: {reason}", { reason: reason instanceof Error ? reason.message : String(reason) }), true); }
   }, [addPanel, say]);
   const removePanel = useCallback((id: string) => {
     const decision = kernel.panels.get(id)?.instance.prepareLeave?.("close");
     if (decision?.decision === "block") {
-      const reason = failure("conflict", decision.message ?? "A module is busy");
+      const reason = failure("conflict", decision.message ?? t("A module is busy"));
       say(reason.message);
       return reason;
     }
     const confirmed = confirmedClose.current === id;
     confirmedClose.current = null;
-    if (decision?.decision === "confirm" && !confirmed && !window.confirm(decision.message ?? "Close this module?"))
-      return failure("cancelled", "Panel close cancelled");
+    if (decision?.decision === "confirm" && !confirmed && !window.confirm(decision.message ?? t("Close this module?")))
+      return failure("cancelled", t("Panel close cancelled"));
     commit(current => {
       const panels = current.panels.filter(panel => panel.id !== id);
       return change(current, { panels, activePanelId: current.activePanelId === id ? panels[0]?.id ?? null : current.activePanelId });
@@ -40,10 +41,10 @@ export function useFramePanels(ref: MutableRefObject<WorkspaceState | null>, com
   /** The dock asks before it closes a tab: a module may block, or want the user to confirm. */
   const requestPanelClose = useCallback(async (id: string): Promise<boolean> => {
     const decision = kernel.panels.get(id)?.instance.prepareLeave?.("close");
-    if (decision?.decision === "block") { say(decision.message ?? "A module is busy"); return false; }
+    if (decision?.decision === "block") { say(decision.message ?? t("A module is busy")); return false; }
     if (decision?.decision !== "confirm") return true;
     const title = ref.current?.panels.find(panel => panel.id === id)?.title ?? "panel";
-    const ok = await new Promise<boolean>(resolve => setPanelConfirm({ title: `Close ${title}?`, message: decision.message ?? "Unsaved changes in this panel will be lost.", resolve }));
+    const ok = await new Promise<boolean>(resolve => setPanelConfirm({ title: t("Close {title}?", { title }), message: decision.message ?? t("Unsaved changes in this panel will be lost."), resolve }));
     if (ok) confirmedClose.current = id;
     return ok;
   }, [kernel, ref, say]);
@@ -68,7 +69,7 @@ export function useFramePanels(ref: MutableRefObject<WorkspaceState | null>, com
           return await new Promise<PanelRef>((resolve, reject) => {
             const check = () => queueMicrotask(() => { const mounted = kernel.panels.get(id); if (mounted) resolve(mounted.ref); });
             stop = kernel.change.watch(check);
-            timer = setTimeout(() => reject(failure("unavailable", "Panel did not mount")), 10000);
+            timer = setTimeout(() => reject(failure("unavailable", t("Panel did not mount"))), 10000);
             check();
           });
         } catch (reason) {
@@ -100,13 +101,13 @@ export function useFrameRequests(workspaceId: string, ref: MutableRefObject<Work
     const answer = async (request: FrameRequest): Promise<boolean> => {
       if (request.notificationNavigation) {
         const target: PanelNavigation = request.notificationNavigation;
-        if (target.workspaceId !== workspaceId) throw new Error("This notification belongs to another workspace.");
+        if (target.workspaceId !== workspaceId) throw new Error(t("This notification belongs to another workspace."));
         kernel.shell!.activate(await kernel.openPanel("platform", { type: target.panel, state: target.state }));
         return false;
       }
       if (request.workspaceAction === "save") {
         await save();
-        if (unsaved(ref.current!)) throw new Error("The workspace has newer unsaved changes. Save again before closing.");
+        if (unsaved(ref.current!)) throw new Error(t("The workspace has newer unsaved changes. Save again before closing."));
       }
       return unsaved(ref.current!);
     };

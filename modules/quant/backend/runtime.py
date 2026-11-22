@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from talyx_sdk import ContractError, wire
+from talyx_sdk.i18n import t
 from talyx_sdk.jobs import spawn
 from talyx_sdk.process import Context
 from talyx_sdk.uv import Environments
@@ -97,7 +98,7 @@ class Quant:
     def workspace() -> str:
         workspace = WORKSPACE.get()
         if not workspace:
-            raise ContractError("invalid_input", "Quant works in a workspace; this request names none.")
+            raise ContractError("invalid_input", t("Quant works in a workspace; this request names none."))
         return workspace
 
     # ── background work ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -175,7 +176,7 @@ class Quant:
                 await asyncio.to_thread(shutil.copyfile, reference["path"], temporary)
             if await asyncio.to_thread(_digest, temporary) != reference["sha256"]:
                 temporary.unlink()
-                raise ContractError("conflict", "A handed-over file changed after it was handed over.")
+                raise ContractError("conflict", t("A handed-over file changed after it was handed over."))
             os.replace(temporary, target)
         owners = self.files / (reference["sha256"] + ".owners")
         owners.mkdir(exist_ok=True)
@@ -262,7 +263,7 @@ class Processes:
     def _get(self, identity: str) -> _Process:
         found = self.running.get(identity)
         if found is None:
-            raise ContractError("target_gone", "This process is gone.")
+            raise ContractError("target_gone", t("This process is gone."))
         return found
 
     async def status(self, identity: str) -> dict:

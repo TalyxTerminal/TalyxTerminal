@@ -6,6 +6,8 @@ there, never in `on_bar` at the same moment. A period that cannot be decided (fo
 skipped and written to the report with the reason.
 """
 
+from .i18n import mark
+
 RANKED = '''"""Hold the top names by a library signal, and optionally short the bottom ones, re-ranked when a new signal arrives.
 
 Ready-made strategy: copy it to change the code. Choose the signal (a factor or a model's prediction in the library) in the parameters.
@@ -598,16 +600,16 @@ class Crossover(q.Strategy):
 '''
 
 PRESETS = {
-    "ranked": {"label": "Top N by signal", "description": "Holds the top names of a library signal, optionally shorting the bottom ones, re-ranked as new signals arrive.",
+    "ranked": {"label": mark("Top N by signal"), "description": mark("Holds the top names of a library signal, optionally shorting the bottom ones, re-ranked as new signals arrive."),
                "source": RANKED, "shortParameter": "short_n"},
-    "rebalance": {"label": "Rebalance to weights", "description": "Holds the weights an allocation in the library publishes, trading to each new set.",
+    "rebalance": {"label": mark("Rebalance to weights"), "description": mark("Holds the weights an allocation in the library publishes, trading to each new set."),
                   "source": REBALANCE, "shortParameter": None},
-    "signal": {"label": "One name on a signal", "description": "Buys one name when a library signal is above a level and sells when it is below another.",
+    "signal": {"label": mark("One name on a signal"), "description": mark("Buys one name when a library signal is above a level and sells when it is below another."),
                "source": SIGNAL, "shortParameter": None},
-    "breakout": {"label": "BTC breakout", "description": "Enters on a close above the last N bars with an ATR stop, an ATR trailing stop and a channel exit.",
+    "breakout": {"label": mark("BTC breakout"), "description": mark("Enters on a close above the last N bars with an ATR stop, an ATR trailing stop and a channel exit."),
                  "source": BREAKOUT, "shortParameter": "shorts",
                  "data": {"symbols": [{"symbol": "okx:BTC/USDT:USDT"}], "timeframe": "1h", "years": 2}},
-    "crossover": {"label": "Moving-average crossover", "description": "Long when the fast average is above the slow one, flat otherwise.",
+    "crossover": {"label": mark("Moving-average crossover"), "description": mark("Long when the fast average is above the slow one, flat otherwise."),
                   "source": CROSSOVER, "shortParameter": "shorts",
                   "data": {"symbols": [{"symbol": "US:SPY"}], "timeframe": "1d", "years": 10}},
 }

@@ -5,6 +5,7 @@
   "name": "Market data",
   "version": "2.1.0",
   "description": "Market data: instruments, local history, live data and sources",
+  "locales": {"zh-CN": "locales/zh-CN.json"},
   "entries": {
     "backend": "backend.entry",
     "frontend": "frontend/module.tsx"
@@ -342,7 +343,8 @@
             "bars",
             "actions",
             "classification",
-            "shares"
+            "shares",
+            "members"
           ],
           "assetClasses": [
             "equity",
@@ -366,18 +368,29 @@
             "tushare"
           ],
           "kinds": [
-            "bars"
+            "bars",
+            "weights",
+            "shares"
           ],
           "assetClasses": [
-            "equity"
+            "equity",
+            "index"
           ],
           "credentials": "required",
           "paid": true,
           "supports": [
             "history",
-            "bulk"
+            "bulk",
+            "research"
           ],
           "settings": [
+            {
+              "name": "requestsPerMinute",
+              "label": "Requests per minute",
+              "type": "integer",
+              "secret": false,
+              "required": false
+            },
             {
               "name": "token",
               "label": "Tushare token",
@@ -431,6 +444,13 @@
           ],
           "settings": [
             {
+              "name": "requestsPerMinute",
+              "label": "Requests per minute",
+              "type": "integer",
+              "secret": false,
+              "required": false
+            },
+            {
               "name": "keyId",
               "label": "API key id",
               "type": "string",
@@ -455,18 +475,26 @@
             "sharadar"
           ],
           "kinds": [
-            "bars"
+            "bars",
+            "listings"
           ],
           "assetClasses": [
-            "equity",
-            "fund"
+            "equity"
           ],
           "credentials": "required",
           "paid": true,
           "supports": [
-            "history"
+            "history",
+            "catalog"
           ],
           "settings": [
+            {
+              "name": "requestsPerMinute",
+              "label": "Requests per minute",
+              "type": "integer",
+              "secret": false,
+              "required": false
+            },
             {
               "name": "apiKey",
               "label": "Nasdaq Data Link API key",
@@ -499,6 +527,13 @@
           ],
           "settings": [
             {
+              "name": "requestsPerMinute",
+              "label": "Requests per minute",
+              "type": "integer",
+              "secret": false,
+              "required": false
+            },
+            {
               "name": "apiKey",
               "label": "Databento API key",
               "type": "string",
@@ -511,7 +546,9 @@
               "type": "choice",
               "choices": [
                 "XNAS.ITCH",
-                "DBEQ.BASIC"
+                "DBEQ.BASIC",
+                "EQUS.MINI",
+                "EQUS.SUMMARY"
               ],
               "secret": false,
               "required": true

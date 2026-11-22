@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 PREFIX = "TALYX: "
 
@@ -41,12 +42,12 @@ def write_launch(root: Path, configurations: list[dict]) -> Path:
     try:
         current = jsonc(path.read_text(encoding="utf-8")) if path.is_file() else {"version": "0.2.0", "configurations": []}
     except (ValueError, IndexError) as exc:
-        raise ContractError("invalid_input", f"{path} is not valid JSON. Fix it in VS Code, then retry.") from exc
+        raise ContractError("invalid_input", t("{path} is not valid JSON. Fix it in VS Code, then retry.", path=path)) from exc
     except OSError as exc:
-        raise ContractError("unavailable", f"{path} could not be read: {exc.strerror}. Retry once it is free.") from exc
+        raise ContractError("unavailable", t("{path} could not be read: {strerror}. Retry once it is free.", path=path, strerror=exc.strerror)) from exc
     existing = current.get("configurations", []) if isinstance(current, dict) else None
     if not isinstance(existing, list) or not all(isinstance(item, dict) for item in existing):
-        raise ContractError("invalid_input", f"{path} needs an object with a list of configurations. Fix it in VS Code, then retry.")
+        raise ContractError("invalid_input", t("{path} needs an object with a list of configurations. Fix it in VS Code, then retry.", path=path))
     names = {item["name"] for item in configurations}
     merged = [item for item in existing if item.get("name") not in names] + configurations
     if path.is_file() and merged == existing:
@@ -58,7 +59,7 @@ def write_launch(root: Path, configurations: list[dict]) -> Path:
         temporary.write_text(json.dumps(current, indent=2) + "\n", encoding="utf-8")
         os.replace(temporary, path)
     except OSError as exc:
-        raise ContractError("unavailable", f"{path} could not be written: {exc.strerror}. Close what holds it, then retry.") from exc
+        raise ContractError("unavailable", t("{path} could not be written: {strerror}. Close what holds it, then retry.", path=path, strerror=exc.strerror)) from exc
     finally:
         temporary.unlink(missing_ok=True)
     return path
@@ -73,6 +74,6 @@ def module_attach(root: Path, name: str, pid: int) -> dict:
 def open_folder(root: Path):
     command = shutil.which("code")
     if command is None:
-        raise ContractError("unavailable", "VS Code's code command was not found. Install VS Code and enable 'Add to PATH', then retry.")
+        raise ContractError("unavailable", t("VS Code's code command was not found. Install VS Code and enable 'Add to PATH', then retry."))
     subprocess.Popen([command, str(root)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

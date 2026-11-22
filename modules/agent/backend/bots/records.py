@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 # A mention in a message: the bot's reference marker.
 MENTION = re.compile(r"\[\[ref:([^\]]+)\]\]")
@@ -41,9 +42,9 @@ def stamp(at):
     return datetime.fromtimestamp(at, UTC).isoformat(timespec="minutes")
 
 
-def text_value(value, label):
+def text_value(value, required_message):
     if not isinstance(value, str) or not value.strip():
-        raise ContractError("invalid_input", f"Enter {label}")
+        raise ContractError("invalid_input", required_message)
     return value.strip()
 
 
@@ -55,7 +56,7 @@ def avatar(look):
         or look.get("tint")
         not in {"brown", "red", "yellow", "green", "teal", "blue", "purple", "pink", "grey"}
     ):
-        raise ContractError("invalid_input", "Choose a bot shape and colour")
+        raise ContractError("invalid_input", t("Choose a bot shape and colour"))
     result = {"shape": look["shape"], "tint": look["tint"]}
     if "photo" not in look:
         return result
@@ -85,7 +86,7 @@ def avatar(look):
         binascii.Error,
     ) as exc:
         raise ContractError(
-            "invalid_input", "Choose a readable PNG, JPEG, WebP, GIF or BMP image"
+            "invalid_input", t("Choose a readable PNG, JPEG, WebP, GIF or BMP image")
         ) from exc
     return result
 

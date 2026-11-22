@@ -1,4 +1,5 @@
 /* The library page (output/quant-design/library.html): one table of everything published, problems first; opening an item narrows the table to a list beside it; its frozen code can open on the right. */
+import { t } from "../i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TxButton, TxIcon, TxObjectTitle, TxPopover, TxSearch, TxSegmented, TxSkeleton, type ModuleContext } from "@talyx/sdk";
 import { useEvent } from "../objects";
@@ -39,9 +40,9 @@ export function useLibrary(ctx: ModuleContext, api: LibraryApi, query = "") {
   return {data, items: data === null ? null : data.items, error, reload: load};
 }
 
-const FILTERS: {id: string; label: string; test(row: LibraryRow): boolean}[] = [{id: "all", label: "All", test: () => true}, {id: "attn", label: "Needs attention", test: row => row.attention},
-  {id: "factor", label: "Factors", test: row => row.kind === "factor"}, {id: "model", label: "Models", test: row => row.kind === "model"}, {id: "allocation", label: "Allocations", test: row => row.kind === "allocation"},
-  {id: "data", label: "One-off data", test: row => row.kind === "data"}];
+const FILTERS: {id: string; label: string; test(row: LibraryRow): boolean}[] = [{id: "all", label: t("All"), test: () => true}, {id: "attn", label: t("Needs attention"), test: row => row.attention},
+  {id: "factor", label: t("Factors"), test: row => row.kind === "factor"}, {id: "model", label: t("Models"), test: row => row.kind === "model"}, {id: "allocation", label: t("Allocations"), test: row => row.kind === "allocation"},
+  {id: "data", label: t("One-off data"), test: row => row.kind === "data"}];
 
 export function LibraryPage({ctx, state, update, onHome, onOpenObject, onOpenVersion, onOpenRun}: {ctx: ModuleContext; state: ShellState; update(patch: Partial<ShellState>): void; onHome(): void;
   onOpenObject(id: string): void; onOpenVersion(versionId: string): void; onOpenRun(objectId: string, runId: string): void}) {
@@ -105,12 +106,12 @@ export function LibraryPage({ctx, state, update, onHome, onOpenObject, onOpenVer
   const archivable = data?.archivable ?? [];
   const lib = <div className={`lb${open ? " lb-open" : ""}${open && filled ? " lb-filled" : ""}`} ref={body} style={open && width !== null ? ({["--lb-w" as string]: `${width}px`} as React.CSSProperties) : undefined}>
     <div className="lb-lpane">
-      <div className="lb-tbar">{open ? <><TxButton size="sm" variant="quiet" onClick={() => {select(null); setFilled(false);}}><TxIcon name="arrow-left" />Table</TxButton><span className="lb-sp" /><TxSearch value={query} onValueChange={setQuery} placeholder="Name" aria-label="Name" /></>
-        : <><TxSegmented label="Filter" value={filter} onChange={setFilter} options={FILTERS.map(item => ({value: item.id, label: `${item.label} ${(items ?? []).filter(item.test).length}`}))} /><TxSearch value={query} onValueChange={setQuery} placeholder="Name" aria-label="Name" /><span className="lb-sp" /></>}</div>
-      <div className="lb-tscroll">{items !== null && rows.length === 0 ? <div className="lb-calm">{(items ?? []).length === 0 ? "Nothing published yet" : "No items match"}</div>
+      <div className="lb-tbar">{open ? <><TxButton size="sm" variant="quiet" onClick={() => {select(null); setFilled(false);}}><TxIcon name="arrow-left" />{t("Table")}</TxButton><span className="lb-sp" /><TxSearch value={query} onValueChange={setQuery} placeholder={t("Name")} aria-label={t("Name")} /></>
+        : <><TxSegmented label={t("Filter")} value={filter} onChange={setFilter} options={FILTERS.map(item => ({value: item.id, label: `${item.label} ${(items ?? []).filter(item.test).length}`}))} /><TxSearch value={query} onValueChange={setQuery} placeholder={t("Name")} aria-label={t("Name")} /><span className="lb-sp" /></>}</div>
+      <div className="lb-tscroll">{items !== null && rows.length === 0 ? <div className="lb-calm">{(items ?? []).length === 0 ? t("Nothing published yet") : t("No items match")}</div>
         : <LibraryTable rows={rows} selected={current} compact={open || compact} onSelect={select} onAuto={toggleAuto} />}
         {!open && archivable.length > 0 && <div className="lb-tablebar"><span className="lb-sp" />
-          {archivable.length > 0 && <button type="button" className="lb-link" onClick={() => select(archivable[0].itemId)}>{`${archivable.length} stopped ${archivable.length > 1 ? "versions" : "version"} nobody uses`}</button>}</div>}</div>
+          {archivable.length > 0 && <button type="button" className="lb-link" onClick={() => select(archivable[0].itemId)}>{(archivable.length > 1 ? t("{archivableCount} stopped versions nobody uses", { archivableCount: archivable.length }) : t("{archivableCount} stopped version nobody uses", { archivableCount: archivable.length }))}</button>}</div>}</div>
     </div>
     {open && <div className="lb-gut" onMouseDown={drag} role="separator" aria-orientation="vertical" />}
     {open && <div className="lb-cpane"><LibraryItem ctx={ctx} api={api} itemId={current!} versionId={state.versionId} tab={tab} refresh={data?.items.length ?? 0} handlers={{
@@ -119,12 +120,12 @@ export function LibraryPage({ctx, state, update, onHome, onOpenObject, onOpenVer
     {open && code.open && <CodeColumn api={api} itemId={current!} versionId={state.versionId} request={code} onClose={() => setCode({open: false})} />}
   </div>;
   return <div className="lb-page">
-    <div className="qx-bar"><TxButton variant="quiet" size="sm" onClick={onHome}><TxIcon name="arrow-left" />Home</TxButton>
-      <TxObjectTitle name="Library" kind={items === null ? "" : `${items.length} ${items.length === 1 ? "item" : "items"}`} />
+    <div className="qx-bar"><TxButton variant="quiet" size="sm" onClick={onHome}><TxIcon name="arrow-left" />{t("Home")}</TxButton>
+      <TxObjectTitle name={t("Library")} kind={items === null ? "" : items.length === 1 ? t("1 item") : t("{count} items", { count: items.length })} />
       <span className="tx-spacer" />
-      <TxPopover open={queue} onOpenChange={setQueue} label="Production" trigger={<button type="button" className="lb-prod" title="Production">{data?.nextRound ? <>Next round <b>{`${md(data.nextRound.at)}, ${hm(data.nextRound.at)}`}</b></> : "Production"}</button>}>
+      <TxPopover open={queue} onOpenChange={setQueue} label={t("Production")} trigger={<button type="button" className="lb-prod" title={t("Production")}>{data?.nextRound ? <>{t.rich("Next round {at}", { at: <b>{`${md(data.nextRound.at)}, ${hm(data.nextRound.at)}`}</b> })}</> : t("Production")}</button>}>
         <ProductionQueue production={data?.production ?? null} /></TxPopover>
-      {open && <TxButton size="sm" variant="quiet" onClick={() => setCode(value => ({open: !value.open}))}><TxIcon name="code" />{code.open ? "Hide code" : "Show code"}</TxButton>}</div>
+      {open && <TxButton size="sm" variant="quiet" onClick={() => setCode(value => ({open: !value.open}))}><TxIcon name="code" />{code.open ? t("Hide code") : t("Show code")}</TxButton>}</div>
     {error && <div className="qx-page-error" role="alert"><span>{error}</span></div>}
     {lib}
   </div>;

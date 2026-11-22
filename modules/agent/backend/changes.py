@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .store import encode
 
@@ -159,7 +160,7 @@ class Changes:
         self.store.conversation(conversation, workspace)
         turn = self.store.turn(turn_id)
         if turn["conversationId"] != conversation or direction not in {"undo", "redo"}:
-            raise ContractError("invalid_input", "Choose changes from this conversation and undo or redo")
+            raise ContractError("invalid_input", t("Choose changes from this conversation and undo or redo"))
         undo = direction == "undo"
         rows = self.db.execute("SELECT DISTINCT call_id,owner FROM turn_changes WHERE turn_id=? AND undone=? "
                                "AND changed>=? AND json_extract(item,'$.reversible')=1 ORDER BY rowid", (turn_id, int(not undo), since)).fetchall()

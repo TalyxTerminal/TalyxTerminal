@@ -21,6 +21,7 @@ from itertools import count
 from pathlib import Path
 
 from .errors import ContractError
+from .i18n import platform_t
 from .rest_fuse import RateLimited, check
 from .rest_profiles import profiles
 
@@ -304,7 +305,7 @@ def check_cancelled():
     """A synchronous request whose work was stopped (``STOP_REQUEST`` set) is not sent."""
     stop = STOP_REQUEST.get()
     if stop is not None and stop.is_set():
-        raise ContractError('cancelled', 'The request was cancelled before sending')
+        raise ContractError('cancelled', platform_t("The request was cancelled before sending"))
 
 
 def shutdown():

@@ -1,4 +1,5 @@
 /* The formula box on top of a factor's Work: one Qlib expression, coloured, with its first mistake marked in place. */
+import { t } from "../i18n";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { TxButton, TxIcon, TxPopover } from "@talyx/sdk";
 import type { FactorFields, FormulaError } from "./api";
@@ -34,7 +35,7 @@ export function highlight(text: string, error: FormulaError | null): ReactNode[]
   return out;
 }
 
-const fromText = (from: string | number) => typeof from === "number" || /^\d{10,}$/.test(String(from)) ? `from ${my(Number(from))}` : `from ${from}`;
+const fromText = (from: string | number) => typeof from === "number" || /^\d{10,}$/.test(String(from)) ? t("from {date}", { date: my(Number(from)) }) : t("from {date}", { date: from });
 
 /** The fields a formula can read for these names: only what Market gives (one it does not give is named where a formula uses it), by group, with where its data start. */
 export function FieldList({fields, onPick}: {fields: FactorFields["fields"]; onPick(name: string): void}) {
@@ -45,7 +46,7 @@ export function FieldList({fields, onPick}: {fields: FactorFields["fields"]; onP
       <td className="l fx-t3 fx-fnote">{field.from !== undefined ? fromText(field.from) : ""}</td></tr>)}</tbody></table></div>)}</div>;
 }
 
-export function FormulaBox({value, error, fields, onChange, onRun, onToCode, focusKey, label = "Formula", placeholder = "Formula, e.g. -Ref($close, 5) / $close"}: {
+export function FormulaBox({value, error, fields, onChange, onRun, onToCode, focusKey, label = t("Formula"), placeholder = t("Formula, e.g. -Ref($close, 5) / $close")}: {
   value: string; error: FormulaError | null; fields: FactorFields | null;
   onChange(value: string): void; onRun(): void; /** Without it there is no To code (a label or a weight is not turned into code). */ onToCode?(): void;
   /** Changes when the main field should take focus (a new, empty factor). */
@@ -82,21 +83,21 @@ export function FormulaBox({value, error, fields, onChange, onRun, onToCode, foc
           onChange={event => onChange(event.target.value.replace(/\r?\n/g, " "))}
           onKeyDown={event => {if (event.key === "Enter") {event.preventDefault(); onRun();}}} />
       </div>
-      <TxPopover open={fieldsOpen} onOpenChange={setFieldsOpen} label="Fields" size="wide" align="end" trigger={<TxButton size="sm" variant="quiet">Fields</TxButton>}>
+      <TxPopover open={fieldsOpen} onOpenChange={setFieldsOpen} label={t("Fields")} size="wide" align="end" trigger={<TxButton size="sm" variant="quiet">{t("Fields")}</TxButton>}>
         <FieldList fields={fields?.fields ?? []} onPick={insert} />
       </TxPopover>
-      <TxPopover open={functions} onOpenChange={setFunctions} label="Functions" className="fx-fns"
-        trigger={<TxButton size="sm" variant="quiet">Functions</TxButton>}>
+      <TxPopover open={functions} onOpenChange={setFunctions} label={t("Functions")} className="fx-fns"
+        trigger={<TxButton size="sm" variant="quiet">{t("Functions")}</TxButton>}>
         {[...groups.entries()].map(([group, items]) => <div key={group}><h5>{group}</h5><div className="fx-fnl">
           {items.map(item => <button key={item.name} type="button" className="fx-fn" data-off={item.off ? "" : undefined} title={item.title} onClick={() => insert(item.insert)}>{item.name}</button>)}
         </div></div>)}
       </TxPopover>
-      {onToCode && value.trim() && error === null && <TxButton size="sm" variant="quiet" onClick={onToCode}><TxIcon name="code" />To code</TxButton>}
+      {onToCode && value.trim() && error === null && <TxButton size="sm" variant="quiet" onClick={onToCode}><TxIcon name="code" />{t("To code")}</TxButton>}
     </div>
     <div className="fx-ferr" role={error ? "alert" : undefined}>{error && <>
-      <TxIcon name="alert" /><b>{error.message}</b><span className="fx-t3">at character {error.at + 1}</span>
-      {error.fix && <TxButton size="sm" onClick={() => onChange(value.slice(0, error.at) + error.fix + value.slice(error.at + error.length))}>Use {error.fix}</TxButton>}
-      {error.kind === "field" && <TxButton size="sm" variant="quiet" onClick={() => setFieldsOpen(true)}>Fields</TxButton>}
+      <TxIcon name="alert" /><b>{error.message}</b><span className="fx-t3">{t("at character {at}", { at: error.at + 1 })}</span>
+      {error.fix && <TxButton size="sm" onClick={() => onChange(value.slice(0, error.at) + error.fix + value.slice(error.at + error.length))}>{t("Use {fix}", { fix: error.fix })}</TxButton>}
+      {error.kind === "field" && <TxButton size="sm" variant="quiet" onClick={() => setFieldsOpen(true)}>{t("Fields")}</TxButton>}
     </>}</div>
   </div>;
 }

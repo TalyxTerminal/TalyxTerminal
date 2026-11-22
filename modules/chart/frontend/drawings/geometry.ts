@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { GeometryBar as Bar } from "./types";
 import { getStroke } from "perfect-freehand";
 import simplify from "simplify-js";
@@ -93,7 +94,7 @@ function rangeReadout(type: OverlayType, points: readonly OverlayPoint[], bars: 
   const barsCount = bars.filter(bar => bar.time >= Math.min(start?.timestamp ?? 0, end?.timestamp ?? 0) && bar.time <= Math.max(start?.timestamp ?? 0, end?.timestamp ?? 0)).length;
   const configured = [settings?.showPriceRange ? compact(delta) : null, settings?.showPercentChange ? `${percent.toFixed(2)}%` : null,
     settings?.showBarsRange ? `${barsCount} bars` : null, settings?.showDateTimeRange ? duration : null,
-    settings?.showDistance ? `${Math.max(0,barsCount-1)} periods` : null].filter(Boolean).join(" · ");
+    settings?.showDistance ? t("{count} periods", { count: Math.max(0, barsCount - 1) }) : null].filter(Boolean).join(" · ");
   const label = configured || (type === "date_range"
     ? duration
     : type === "price_range"
@@ -137,7 +138,7 @@ function anchoredVwapReadout(accumulator: AnchoredVwapAccumulator): OverlayReado
   const vwap = anchoredVwapAvailable(accumulator) ? latest?.value ?? null : null;
   return {
     kind: "anchored_vwap",
-    label: vwap == null ? "AVWAP unavailable" : `AVWAP ${compact(vwap)}`,
+    label: vwap == null ? t("AVWAP unavailable") : `AVWAP ${compact(vwap)}`,
     values: {
       vwap,
       cumulativeVolume: latest?.cumulativeVolume ?? 0,
@@ -174,11 +175,11 @@ export function buildRegressionRuntimeData(result: RegressionResult | null): Ove
 
 function positionReadout(type: "long_position" | "short_position", points: readonly OverlayPoint[], settings?:OverlaySettings, pointValue?:number|null): OverlayReadout {
   const metrics=positionMetrics(type,points,settings,pointValue);
-  const ratio=`${type === "long_position" ? "Long" : "Short"} R:R ${metrics.rewardRisk == null ? "n/a" : metrics.rewardRisk.toFixed(2)}`;
-  const sized=settings?.accountSize===undefined?"":metrics.quantity===null?" · Quantity unavailable":` · Qty ${metrics.quantity.toFixed(settings.qtyPrecision??2)} · Target ${compact(metrics.targetBalance!)} · Stop ${compact(metrics.stopBalance!)}`;
+  const ratio=`${type === "long_position" ? t("Long") : t("Short")} R:R ${metrics.rewardRisk == null ? "n/a" : metrics.rewardRisk.toFixed(2)}`;
+  const sized=settings?.accountSize===undefined?"":metrics.quantity===null?t(" · Quantity unavailable"):t(" · Qty {quantity} · Target {target} · Stop {stop}", { quantity: metrics.quantity.toFixed(settings.qtyPrecision ?? 2), target: compact(metrics.targetBalance!), stop: compact(metrics.stopBalance!) });
   return {
     kind: "position",
-    label: settings?.compact?ratio:`${ratio} · risk ${compact(metrics.risk)}${sized}`,
+    label: settings?.compact?ratio:t("{ratio} · risk {compact}{sized}", { ratio, compact: compact(metrics.risk), sized }),
     values: {...metrics},
   };
 }
@@ -208,7 +209,7 @@ export function buildOverlayRuntimeData(
   else if (contract?.kind === "position") readout = positionReadout(type as "long_position" | "short_position", points, settings, positionUnitValue);
   else if (type === "price_label") {
     const value = points[0]?.value ?? null;
-    readout = { kind: "range", label: value == null ? "Price unavailable" : compact(value), values: { value } };
+    readout = { kind: "range", label: value == null ? t("Price unavailable") : compact(value), values: { value } };
   }
   return {
     toolType: type,
@@ -620,7 +621,7 @@ export function buildOverlayGeometry(
       { type: "circle", attrs: { x: a.x, y: a.y, r: 7 } },
       label({ x: a.x + 11, y: a.y - 1 }, runtime.text ?? ""),
     ];
-    case "price_label": return [line([{ x: a.x - 12, y: a.y }, { x: a.x + 12, y: a.y }]), label({ x: a.x + 14, y: a.y }, runtime.readout?.label ?? "Price")];
+    case "price_label": return [line([{ x: a.x - 12, y: a.y }, { x: a.x + 12, y: a.y }]), label({ x: a.x + 14, y: a.y }, runtime.readout?.label ?? t("Price"))];
     case "arrow_marker": return [...arrow({ x: a.x, y: a.y + 14 }, a), ...(runtime.text ? [label({ x: a.x + 8, y: a.y }, runtime.text)] : [])];
     case "xabcd": return [...(runtime.settings?.showBackground===false?[]:[polygon(stream.slice(0,3)),polygon(stream.slice(2,5))]),...labeledPattern(stream,["X","A","B","C","D"])];
     case "abcd": return labeledPattern(stream, ["A", "B", "C", "D"]);
@@ -648,7 +649,7 @@ export function buildOverlayGeometry(
         { type: "rect", attrs: { x: left, y: Math.min(a.y, c.y), width: right - left, height: Math.abs(c.y - a.y) }, styles: { color: stopColor } },
         line([{ x: left, y: a.y }, { x: right, y: a.y }]),
         ...(runtime.settings?.showStatistics!==false?readoutFigure(runtime, { x: right, y: a.y-(runtime.settings?.showPriceLabels?20:0) }):[]),
-        ...(runtime.settings?.showPriceLabels?[["Entry",a],["Target",b],["Stop",c]].map(([name,point],index)=>label({x:right,y:(point as OverlayPixelPoint).y},`${name} ${compact(Number(runtime.readout?.values[["entry","target","stop"][index]]??0))}`)):[]),
+        ...(runtime.settings?.showPriceLabels?[[t("Entry"),a],[t("Target"),b],[t("Stop"),c]].map(([name,point],index)=>label({x:right,y:(point as OverlayPixelPoint).y},`${name} ${compact(Number(runtime.readout?.values[["entry","target","stop"][index]]??0))}`)):[]),
       ];
     }
     default: return [];

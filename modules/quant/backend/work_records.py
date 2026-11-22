@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import changes
 from .runtime import ACTIVITY, ACTIVITY_RUN, call_attribution
@@ -106,7 +107,7 @@ class WorkRecords:
     def get(self, kind, identity):
         record = self.find(kind, identity)
         if record is None:
-            raise ContractError("not_found", "The selected research record is unavailable.")
+            raise ContractError("not_found", t("The selected research record is unavailable."))
         return record
 
     def _write(self, operation, args):

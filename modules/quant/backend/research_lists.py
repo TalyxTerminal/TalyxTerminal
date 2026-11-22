@@ -5,6 +5,7 @@ import time
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import market_inputs as market
 from .object_data import resolve_text
@@ -14,7 +15,7 @@ LIST = "qlist"
 
 def clean_name(value):
     if not isinstance(value, str) or not value.strip() or len(value.strip()) > 120:
-        raise ContractError("invalid_input", "Choose a list name of 1 to 120 characters.")
+        raise ContractError("invalid_input", t("Choose a list name of 1 to 120 characters."))
     return value.strip()
 
 
@@ -26,7 +27,7 @@ class ResearchLists:
     def read(self, identity):
         record = self.records.find(LIST, identity)
         if record is None or record.get("deleted"):
-            raise ContractError("not_found", "This research list does not exist.")
+            raise ContractError("not_found", t("This research list does not exist."))
         return record
 
     def summary(self, record):
@@ -48,7 +49,7 @@ class ResearchLists:
         for item in symbols:
             instrument = item.get("instrument") if set(item) == {"instrument"} else (await resolve_text(self.ctx, item["symbol"]) if set(item) == {"symbol"} else None)
             if not isinstance(instrument, dict) or not instrument.get("instrumentId"):
-                raise ContractError("invalid_input", "Each member is {\"instrument\": <the Market instrument>} copied from a Market search, or {\"symbol\": \"US:AAPL\"}.")
+                raise ContractError("invalid_input", t("Each member is {\"instrument\": <the Market instrument>} copied from a Market search, or {\"symbol\": \"US:AAPL\"}."))
             instrument = await market.current(self.ctx, instrument)
             if instrument["instrumentId"] not in seen:
                 seen.add(instrument["instrumentId"])
@@ -80,7 +81,7 @@ class ResearchLists:
         record = self.read(identity)
         users = self.used_by(identity)
         if users:
-            raise ContractError("conflict", f"{record['name']} is selected in the data settings of {', '.join(users)}; choose other data there first.", {"objects": users})
+            raise ContractError("conflict", t("{name} is selected in the data settings of {users}; choose other data there first.", name=record['name'], users=', '.join(users)), {"objects": users})
         return record
 
     def delete(self, identity):

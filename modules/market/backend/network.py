@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 
 import aiohttp
 import requests
+from talyx_sdk.i18n import t
 from talyx_sdk.network import system_client_session, system_http_proxy_url
 
 from .common import NS, MarketError, now_ns
@@ -59,17 +60,17 @@ REFUSED = {402: "it needs a paid plan", 403: "access denied", 451: "not availabl
 
 def status_error(source_id: str, status: int, body: str, headers=None, url: str | None = None) -> MarketError:
     if status == 429 or status == 418:
-        return MarketError("rate_limited", f"{source_id} is rate limiting requests (HTTP {status})", source_id=source_id,
+        return MarketError("rate_limited", t("{source_id} is rate limiting requests (HTTP {status})", source_id=source_id, status=status), source_id=source_id,
                            status=status, retry_at=retry_at_of(headers))
     if status == 401:
-        return MarketError("unauthorized", f"{source_id} rejected the key (HTTP 401)", source_id=source_id, status=status)
+        return MarketError("unauthorized", t("{source_id} rejected the key (HTTP 401)", source_id=source_id), source_id=source_id, status=status)
     if status in REFUSED:
-        return MarketError("forbidden", f"{source_id} refused the request (HTTP {status}: {REFUSED[status]})",
+        return MarketError("forbidden", t("{source_id} refused the request (HTTP {status}: {REFUSED})", source_id=source_id, status=status, REFUSED=REFUSED[status]),
                            source_id=source_id, status=status)
     if status == 404:
-        return MarketError("not_found", f"{source_id} has no such data (HTTP 404)", source_id=source_id,
+        return MarketError("not_found", t("{source_id} has no such data (HTTP 404)", source_id=source_id), source_id=source_id,
                            status=status)
-    return MarketError("source_unavailable", f"{source_id} answered HTTP {status}", source_id=source_id,
+    return MarketError("source_unavailable", t("{source_id} answered HTTP {status}", source_id=source_id, status=status), source_id=source_id,
                        status=status)
 
 
@@ -137,8 +138,8 @@ class Egress:
     async def transport_failure(self, source_id: str, url: str, exc: BaseException) -> MarketError:
         words = f"{type(exc).__name__}: {exc}".strip()[:280]
         if await self.reachability.network_up(self, url):
-            return MarketError("source_unavailable", f"Cannot reach {source_id}: {words}", source_id=source_id)
-        return MarketError("network_unreachable", f"The network is unreachable ({words})", source_id=source_id)
+            return MarketError("source_unavailable", t("Cannot reach {source_id}: {words}", source_id=source_id, words=words), source_id=source_id)
+        return MarketError("network_unreachable", t("The network is unreachable ({words})", words=words), source_id=source_id)
 
     async def request(self, source_id: str, url: str, *, method: str = "GET", params=None, headers=None,
                       data=None, json_body=None, timeout: float = DEFAULT_TIMEOUT, cookies=None,
@@ -163,7 +164,7 @@ class Egress:
         try:
             return json.loads(body)
         except ValueError as exc:
-            raise MarketError("source_unavailable", f"{source_id} returned malformed JSON: {body[:200]!r}",
+            raise MarketError("source_unavailable", t("{source_id} returned malformed JSON: {body}", source_id=source_id, body=repr(body[:200])),
                               source_id=source_id) from exc
 
     async def bytes(self, source_id: str, url: str, **options) -> bytes:
@@ -232,7 +233,7 @@ def ccxt_client(exchange_id: str, *, environment: str = "production", pro: bool 
         elif (exchange_id, environment) == ("gate", "testnet"):
             client.set_sandbox_mode(True)
         else:
-            raise MarketError("unsupported", f"{exchange_id} has no {environment} market data", source_id=exchange_id)
+            raise MarketError("unsupported", t("{exchange_id} has no {environment} market data", exchange_id=exchange_id, environment=environment), source_id=exchange_id)
         client.options["fetchCurrencies"] = False
     ccxt_configure(client)
     return client
@@ -259,12 +260,12 @@ def open_tcp(host: str, port: int, timeout: float = 15.0) -> socket.socket:
         while b"\r\n\r\n" not in reply:
             chunk = tunnel.recv(4096)
             if not chunk:
-                raise OSError("Proxy closed the CONNECT tunnel")
+                raise OSError(t("Proxy closed the CONNECT tunnel"))
             reply += chunk
         status = reply.split(b"\r\n", 1)[0].split()
         if len(status) < 2 or status[1] != b"200":
             line = reply.split(b"\r\n", 1)[0].decode(errors="replace")
-            raise OSError(f"Proxy refused CONNECT {host}:{port}: {line}")
+            raise OSError(t("Proxy refused CONNECT {host}:{port}: {line}", host=host, port=port, line=line))
         return tunnel
     except BaseException:
         tunnel.close()

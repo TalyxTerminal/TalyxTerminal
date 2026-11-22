@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* Bar replay (TradingView): Replay in the top bar arms the active chart; a click on it picks the bar replay starts
    from (a line follows the pointer, what comes after is shaded). While replaying, a bar under the chart plays, pauses
    and steps the bars on, sets the speed, picks another start and goes back to real time. */
@@ -19,7 +20,7 @@ export function ReplayPicker({ ctx, panelId, chartId, binding }: { ctx: ModuleCo
     setUi(panelId, { replayPick: null });
     post(ctx, "/replay/start", { chartId, at }).catch(error => reportChartError(chartId, message(error)));
   };
-  return <div className="chart-replay-pick" role="button" aria-label="Pick the bar replay starts from" tabIndex={-1}
+  return <div className="chart-replay-pick" role="button" aria-label={t("Pick the bar replay starts from")} tabIndex={-1}
     onMouseMove={event => setX(event.nativeEvent.offsetX)} onMouseLeave={() => setX(null)} onClick={event => pick(event.nativeEvent.offsetX)}
     onKeyDown={event => { if (event.key === "Escape") setUi(panelId, { replayPick: null }); }}>
     {x !== null && <><div className="chart-replay-line" style={{ left: x }} /><div className="chart-replay-shade" style={{ left: x }} /></>}
@@ -47,15 +48,15 @@ export function ReplayBar({ ctx, panelId, chartId }: { ctx: ModuleContext; panel
   }, [playing, speed]);
   useEffect(() => { if (replay?.end) setPlaying(false); }, [replay?.end]);
   if (!replay) return null;
-  return <div className="chart-replay-bar tx-glass" role="toolbar" aria-label="Replay">
-    <TxTooltip label="Select bar"><TxButton variant="tool" size="sm" aria-label="Select bar" onClick={() => { setPlaying(false); setUi(panelId, { replayPick: chartId }); }}><ChartGlyph name="replay" /></TxButton></TxTooltip>
+  return <div className="chart-replay-bar tx-glass" role="toolbar" aria-label={t("Replay")}>
+    <TxTooltip label={t("Select bar")}><TxButton variant="tool" size="sm" aria-label={t("Select bar")} onClick={() => { setPlaying(false); setUi(panelId, { replayPick: chartId }); }}><ChartGlyph name="replay" /></TxButton></TxTooltip>
     <span className="chart-tb-divider" />
-    <TxIconButton variant="tool" size="sm" icon={playing ? "pause" : "play"} label={playing ? "Pause" : "Play"} disabled={replay.end} onClick={() => setPlaying(value => !value)} />
-    <TxTooltip label="Forward"><TxButton variant="tool" size="sm" aria-label="Forward" disabled={replay.end || playing} onClick={() => void step(1).catch(fail)}><ChartGlyph name="step-forward" /></TxButton></TxTooltip>
-    <TxMenu label="Replay speed" items={SPEEDS.map(value => ({ id: String(value), label: `${value} bar${value === 1 ? "" : "s"} a second`, checked: value === speed, onSelect: () => setSpeed(value) }))}
-      trigger={<TxButton variant="tool" size="sm" aria-label="Replay speed">{speed}×</TxButton>} />
-    {replay.end && <span className="chart-muted">No more bars</span>}
+    <TxIconButton variant="tool" size="sm" icon={playing ? "pause" : "play"} label={playing ? t("Pause") : t("Play")} disabled={replay.end} onClick={() => setPlaying(value => !value)} />
+    <TxTooltip label={t("Forward")}><TxButton variant="tool" size="sm" aria-label={t("Forward")} disabled={replay.end || playing} onClick={() => void step(1).catch(fail)}><ChartGlyph name="step-forward" /></TxButton></TxTooltip>
+    <TxMenu label={t("Replay speed")} items={SPEEDS.map(value => ({ id: String(value), label: value === 1 ? t("1 bar a second") : t("{value} bars a second", { value }), checked: value === speed, onSelect: () => setSpeed(value) }))}
+      trigger={<TxButton variant="tool" size="sm" aria-label={t("Replay speed")}>{speed}×</TxButton>} />
+    {replay.end && <span className="chart-muted">{t("No more bars")}</span>}
     <span className="chart-tb-divider" />
-    <TxButton variant="tool" size="sm" onClick={() => { setPlaying(false); post(ctx, "/replay/stop", { chartId }).catch(fail); }}><ChartGlyph name="return-live" />Jump to real time</TxButton>
+    <TxButton variant="tool" size="sm" onClick={() => { setPlaying(false); post(ctx, "/replay/stop", { chartId }).catch(fail); }}><ChartGlyph name="return-live" />{t("Jump to real time")}</TxButton>
   </div>;
 }

@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -259,7 +260,7 @@ class CryptoSource(Source):
         if kind == "open_interest" and source_id in OPEN_INTEREST_HISTORY:
             return await self._open_interest(source_id, target, start, end)
         if kind != "bars":
-            raise MarketError("unsupported", f"{source_id} history has no {kind}", source_id=source_id)
+            raise MarketError("unsupported", t("{source_id} history has no {kind}", source_id=source_id, kind=kind), source_id=source_id)
         _api_basis(source_id, price_basis)
         client = self.client(source_id, target.environment)
         markets = await self.markets(source_id, target.environment)
@@ -370,25 +371,26 @@ class CryptoSource(Source):
             if status in (403, 451) and not (venue == "bybit" and "10006" in str(exc)):
                 raise network.status_error(venue, status, "") from exc
             retry_at = getattr(exc, "retry_at", None)
-            raise MarketError("rate_limited", f"{venue} is rate limiting requests", source_id=venue, status=429,
+            raise MarketError("rate_limited", t("{venue} is rate limiting requests", venue=venue), source_id=venue, status=429,
                               retry_at=int(retry_at * 1e9) if retry_at else now_ns() + 30 * 10**9) from exc
         except ccxt.AuthenticationError as exc:
-            raise MarketError("unauthorized", f"{venue} rejected the key", source_id=venue) from exc
+            raise MarketError("unauthorized", t("{venue} rejected the key", venue=venue), source_id=venue) from exc
         except ccxt.PermissionDenied as exc:
-            raise MarketError("forbidden", f"{venue} refused the request", source_id=venue, status=_status(exc)) from exc
+            raise MarketError("forbidden", t("{venue} refused the request", venue=venue), source_id=venue, status=_status(exc)) from exc
         except ccxt.BadSymbol as exc:
-            raise MarketError("not_found", f"{venue} has no such symbol", source_id=venue) from exc
+            raise MarketError("not_found", t("{venue} has no such symbol", venue=venue), source_id=venue) from exc
         except (ccxt.NetworkError, ccxt.ExchangeNotAvailable) as exc:
             status = _status(exc)
             if status in network.REFUSED:
                 raise network.status_error(venue, status, "") from exc
             if status is not None and 400 <= status < 500:
-                raise MarketError("source_unavailable", f"{venue} answered HTTP {status}", source_id=venue, status=status) from exc
+                raise MarketError("source_unavailable", t("{venue} answered HTTP {status}", venue=venue, status=status), source_id=venue, status=status) from exc
             url = (client_url := getattr(exc, "url", None)) or f"https://{venue}.invalid/"
             raise await self.egress.transport_failure(venue, client_url or url, exc) from exc
         except ccxt.BaseError as exc:
             status = _status(exc)
-            raise MarketError("source_unavailable", f"{venue} failed the request" + (f" (HTTP {status})" if status else ""), source_id=venue,
+            raise MarketError("source_unavailable", (t("{venue} failed the request (HTTP {status})", venue=venue, status=status)
+                    if status else t("{venue} failed the request", venue=venue)), source_id=venue,
                               status=status) from exc
 
     # ── live ────────────────────────────────────────────────────────────────
@@ -419,7 +421,7 @@ class CryptoSource(Source):
         markets = await self.markets(source_id, target.environment)
         symbol = target.instrument["symbol"]
         if symbol not in markets:
-            raise MarketError("not_found", f"{source_id} has no {symbol}", source_id=source_id)
+            raise MarketError("not_found", t("{source_id} has no {symbol}", source_id=source_id, symbol=symbol), source_id=source_id)
         client = self.pro_client(source_id, target.environment)
         try:
             async for event in crypto_live.ccxt_observations(client, symbol, kind, depth):
@@ -452,7 +454,7 @@ class CryptoSource(Source):
                            ) -> tuple[dict, dict, int]:
         """Gate's options contracts (quotes, mark, open interest) and tickers (IV, greeks) for an underlying."""
         if source_id != "gate":
-            raise MarketError("unsupported", f"{source_id} has no option chain in Market", source_id=source_id)
+            raise MarketError("unsupported", t("{source_id} has no option chain in Market", source_id=source_id), source_id=source_id)
         client = self.client(source_id, environment)
         await self.markets(source_id, environment)
         query = {"underlying": f"{underlying}_USDT"}
@@ -474,10 +476,10 @@ class CryptoSource(Source):
         symbol = target.instrument["symbol"]
         market = markets.get(symbol)
         if market is None:
-            raise MarketError("not_found", f"{source_id} has no {symbol}", source_id=source_id)
+            raise MarketError("not_found", t("{source_id} has no {symbol}", source_id=source_id, symbol=symbol), source_id=source_id)
         native = market["id"]
         if kind not in ("bars", "quotes"):
-            raise MarketError("unsupported", f"{source_id} live {kind} is not available", source_id=source_id)
+            raise MarketError("unsupported", t("{source_id} live {kind} is not available", source_id=source_id, kind=kind), source_id=source_id)
         if kind == "bars":
             _api_basis(source_id, price_basis)
         if source_id == "okx" and target.environment == "production":
@@ -591,7 +593,7 @@ class CryptoSource(Source):
             symbol = target.instrument["symbol"]
             if symbol not in markets:
                 out[target.instrument["instrumentId"]] = {"problem": MarketError(
-                    "not_found", f"{source_id} has no {symbol}", source_id=source_id).problem()}
+                    "not_found", t("{source_id} has no {symbol}", source_id=source_id, symbol=symbol), source_id=source_id).problem()}
             else:
                 symbols[symbol] = target.instrument["instrumentId"]
         if not symbols:
@@ -619,7 +621,7 @@ class CryptoSource(Source):
                 continue
             ticker = tickers.get(symbol)
             out[instrument_id] = {"quote": crypto_live.quote_of_ticker(ticker)} if ticker else {
-                "problem": MarketError("no_data", f"{source_id} gave no ticker for {symbol}",
+                "problem": MarketError("no_data", t("{source_id} gave no ticker for {symbol}", source_id=source_id, symbol=symbol),
                                        source_id=source_id).problem()}
         return out
 
@@ -648,8 +650,9 @@ def _status(exc) -> int | None:
 def _api_basis(source_id: str, price_basis: str) -> None:
     """Venue APIs give last, mark and index bars; premium index bars are only in Binance's files."""
     if price_basis not in ("last", "mark", "index"):
-        raise MarketError("unsupported", f"{source_id} publishes no {price_basis} bars through its API"
-                          + (" (premium index bars come only from Binance's files)" if price_basis == "premium" else ""),
+        raise MarketError("unsupported", (t("{source_id} publishes no {price_basis} bars through its API (premium index bars come only from Binance's files)",
+                    source_id=source_id, price_basis=price_basis)
+                if price_basis == 'premium' else t("{source_id} publishes no {price_basis} bars through its API", source_id=source_id, price_basis=price_basis)),
                           source_id=source_id)
 
 
@@ -664,7 +667,7 @@ def _ohlcv_columns(raw: list, step: int, venue: str, timeframe: str) -> bars.Col
     times = array[:, 0].astype(np.int64) * MS
     grid = min(step, DAY_NS)
     if DAY_NS % grid == 0 and np.any(times % grid):
-        raise MarketError("source_unavailable", f"{venue} {timeframe} bars are not cut on the UTC grid", source_id=venue)
+        raise MarketError("source_unavailable", t("{venue} {timeframe} bars are not cut on the UTC grid", venue=venue, timeframe=timeframe), source_id=venue)
     columns = {"time": times, "close_time": times + step, "open": array[:, 1], "high": array[:, 2],
                "low": array[:, 3], "close": array[:, 4], "volume": array[:, 5]}
     return bars.sort_unique(columns)

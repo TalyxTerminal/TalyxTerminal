@@ -1,3 +1,5 @@
+import { indicatorLabel } from "../indicatorText";
+import { t } from "../i18n";
 /* One condition, as alerts and screens write it (TradingView's alert condition row): a source, the operator, what it is
    compared with (another source or a value, or a channel's two bounds), or an amount within some bars. */
 import { TxInput, TxSelect } from "@talyx/sdk";
@@ -5,14 +7,14 @@ import type { ChartEntry } from "../store";
 import type { CatalogEntry, Condition, ConditionOp, Operand } from "../wire";
 
 export const OPS: { op: ConditionOp; label: string; right: 0 | 1 | 2; amount?: boolean }[] = [
-  { op: "crossing", label: "Crossing", right: 1 }, { op: "crossing_up", label: "Crossing up", right: 1 }, { op: "crossing_down", label: "Crossing down", right: 1 },
-  { op: "greater", label: "Greater than", right: 1 }, { op: "less", label: "Less than", right: 1 },
-  { op: "entering_channel", label: "Entering channel", right: 2 }, { op: "exiting_channel", label: "Exiting channel", right: 2 },
-  { op: "inside_channel", label: "Inside channel", right: 2 }, { op: "outside_channel", label: "Outside channel", right: 2 },
-  { op: "moving_up", label: "Moving up", right: 0, amount: true }, { op: "moving_down", label: "Moving down", right: 0, amount: true },
-  { op: "moving_up_percent", label: "Moving up %", right: 0, amount: true }, { op: "moving_down_percent", label: "Moving down %", right: 0, amount: true },
+  { op: "crossing", label: t("Crossing"), right: 1 }, { op: "crossing_up", label: t("Crossing up"), right: 1 }, { op: "crossing_down", label: t("Crossing down"), right: 1 },
+  { op: "greater", label: t("Greater than"), right: 1 }, { op: "less", label: t("Less than"), right: 1 },
+  { op: "entering_channel", label: t("Entering channel"), right: 2 }, { op: "exiting_channel", label: t("Exiting channel"), right: 2 },
+  { op: "inside_channel", label: t("Inside channel"), right: 2 }, { op: "outside_channel", label: t("Outside channel"), right: 2 },
+  { op: "moving_up", label: t("Moving up"), right: 0, amount: true }, { op: "moving_down", label: t("Moving down"), right: 0, amount: true },
+  { op: "moving_up_percent", label: t("Moving up %"), right: 0, amount: true }, { op: "moving_down_percent", label: t("Moving down %"), right: 0, amount: true },
   // An indicator's own alertcondition() fires by itself: nothing to compare it with.
-  { op: "triggered", label: "Triggered", right: 0 },
+  { op: "triggered", label: t("Triggered"), right: 0 },
 ];
 
 /** The sources a condition can pick, keyed for a select. */
@@ -25,9 +27,9 @@ export function indicatorSources(entry: ChartEntry, catalog: CatalogEntry[] | nu
   for (const indicator of entry.chart!.document.indicators) {
     const definition = catalog?.find(item => item.source === indicator.definition.source && item.id === indicator.definition.id);
     if (definition?.visibleRange) continue;
-    const name = indicator.name ?? definition?.shortTitle ?? indicator.definition.id;
+    const name = indicator.name ?? indicatorLabel(indicator.definition.source, definition?.shortTitle ?? indicator.definition.id);
     for (const meta of entry.feed.indicators.get(indicator.id)?.meta ?? []) if (meta.kind === "plot")
-      sources.set(`ind:${indicator.id}:${meta.id}`, { label: `${name}: ${meta.title ?? meta.id}`, operand: { kind: "indicator", definition: indicator.definition, params: indicator.params, output: meta.id } });
+      sources.set(`ind:${indicator.id}:${meta.id}`, { label: `${name}: ${indicatorLabel(indicator.definition.source, meta.title ?? meta.id)}`, operand: { kind: "indicator", definition: indicator.definition, params: indicator.params, output: meta.id } });
     if (alertConditions) for (const condition of definition?.alertConditions ?? [])
       sources.set(`ac:${indicator.id}:${condition}`, { label: `${name}: ${condition}`, operand: { kind: "alertcondition", definition: indicator.definition, params: indicator.params, condition } });
   }
@@ -42,10 +44,10 @@ function OperandPick({ label, sources, value, onChange, allowValue }: { label: s
   if (allowValue) sources = new Map([...sources].filter(([, item]) => item.operand.kind !== "alertcondition"));
   return <div className="chart-style-row">
     <TxSelect aria-label={label} value={keyOf(value, sources)} onChange={event => onChange(event.target.value === "value" ? { kind: "value", value: value?.kind === "value" ? value.value : 0 } : sources.get(event.target.value)!.operand)}>
-      {allowValue && <option value="value">Value</option>}
+      {allowValue && <option value="value">{t("Value")}</option>}
       {[...sources].map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}
     </TxSelect>
-    {value?.kind === "value" && <TxInput numeric type="number" step="any" aria-label={`${label} value`} value={String(value.value)}
+    {value?.kind === "value" && <TxInput numeric type="number" step="any" aria-label={t("{label} value", { label })} value={String(value.value)}
       onChange={event => { const next = Number(event.target.value); if (event.target.value !== "" && Number.isFinite(next)) onChange({ kind: "value", value: next }); }} />}
   </div>;
 }
@@ -67,16 +69,16 @@ export function ConditionFields({ condition, sources, last, onChange }: { condit
       amount: next.amount ? condition.amount ?? 1 : null, bars: next.amount ? condition.bars ?? 1 : null });
   };
   return <div className="chart-condition">
-    <OperandPick label="Source" sources={sources} value={condition.left} onChange={setLeft} allowValue={false} />
-    <TxSelect aria-label="Operator" value={condition.op} onChange={event => setOp(event.target.value as ConditionOp)}>
+    <OperandPick label={t("Source")} sources={sources} value={condition.left} onChange={setLeft} allowValue={false} />
+    <TxSelect aria-label={t("Operator")} value={condition.op} onChange={event => setOp(event.target.value as ConditionOp)}>
       {OPS.filter(item => (item.op === "triggered") === firing).map(item => <option key={item.op} value={item.op}>{item.label}</option>)}
     </TxSelect>
-    {shape.right >= 1 && <OperandPick label={shape.right === 2 ? "Upper bound" : "Against"} sources={sources} value={condition.right ?? null} onChange={right => set({ right })} allowValue />}
-    {shape.right === 2 && <OperandPick label="Lower bound" sources={sources} value={condition.right2 ?? null} onChange={right2 => set({ right2 })} allowValue />}
+    {shape.right >= 1 && <OperandPick label={shape.right === 2 ? t("Upper bound") : t("Against")} sources={sources} value={condition.right ?? null} onChange={right => set({ right })} allowValue />}
+    {shape.right === 2 && <OperandPick label={t("Lower bound")} sources={sources} value={condition.right2 ?? null} onChange={right2 => set({ right2 })} allowValue />}
     {shape.amount && <div className="chart-style-row">
-      <TxInput numeric type="number" step="any" aria-label="Amount" value={String(condition.amount ?? 1)} onChange={event => set({ amount: Number(event.target.value) })} />
-      <span className="chart-muted">within</span>
-      <TxInput numeric type="number" min={1} aria-label="Bars" suffix="bars" value={String(condition.bars ?? 1)} onChange={event => set({ bars: Math.max(1, Math.round(Number(event.target.value))) })} />
+      <TxInput numeric type="number" step="any" aria-label={t("Amount")} value={String(condition.amount ?? 1)} onChange={event => set({ amount: Number(event.target.value) })} />
+      <span className="chart-muted">{t("within")}</span>
+      <TxInput numeric type="number" min={1} aria-label={t("Number of bars")} suffix={t("bars")} value={String(condition.bars ?? 1)} onChange={event => set({ bars: Math.max(1, Math.round(Number(event.target.value))) })} />
     </div>}
   </div>;
 }

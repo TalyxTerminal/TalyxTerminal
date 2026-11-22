@@ -7,6 +7,7 @@ import hashlib
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .pine.indicators import BUILTIN
 
@@ -20,7 +21,7 @@ async def read(input: dict, call=None) -> dict:
     else:
         path, language = BUILTIN / (key.removeprefix("builtin/") + ".py"), "python"
         if not key.startswith("builtin/") or path.parent != BUILTIN or not path.is_file():
-            raise ContractError("not_found", f"No indicator document {key}")
+            raise ContractError("not_found", t("No indicator document {key}", key=key))
     content = path.read_text(encoding="utf-8")
     return {"sourceKey": key, "name": path.name, "canonicalUri": None, "content": content,
             "version": hashlib.sha256(content.encode()).hexdigest(), "language": language, "readOnly": True,
@@ -28,8 +29,8 @@ async def read(input: dict, call=None) -> dict:
 
 
 async def write(input: dict, call=None) -> dict:
-    raise ContractError("permission_denied", "Chart's indicator documents are read-only.")
+    raise ContractError("permission_denied", t("Chart's indicator documents are read-only."))
 
 
 async def invoke(request: dict, call) -> dict:
-    raise ContractError("unknown_capability", "Chart's indicator support only lists documentation.")
+    raise ContractError("unknown_capability", t("Chart's indicator support only lists documentation."))

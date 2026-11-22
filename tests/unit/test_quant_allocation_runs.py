@@ -181,13 +181,16 @@ def test_cost_multiple_axis(tmp_path, monkeypatch):
         assert all(item["state"] == "completed" and item["sweep"]["id"] == started["sweepId"] for item in done) and not any("best" in str(item.get("sweep")) for item in done)
         assert sorted(item["settings"]["params"]["cost_multiple"] for item in map(lambda row: runs.read(row["id"]), done)) == [0, 0, 1, 1, 2, 2]
         from talyx_sdk import ContractError
-        for axes in ([{"name": "lookback", "values": [126]}], [{"name": "lookback", "values": list(range(60, 90))}]):
-            try:
-                await runs.start_sweep(created["id"], {"axes": axes})
-            except ContractError:
-                pass
-            else:
-                raise AssertionError("a sweep needs two or more values and at most 25 runs")
+        try:
+            await runs.start_sweep(created["id"], {"axes": [{"name": "lookback", "values": [126]}]})
+        except ContractError:
+            pass
+        else:
+            raise AssertionError("a sweep needs two or more values")
+        many = await runs.start_sweep(created["id"], {"axes": [{"name": "lookback", "values": list(range(60, 85))}, {"name": "@costMultiple", "values": [0, 1, 2, 3]}]})
+        assert len(many["runs"]) == 100   # no cap on how many runs a sweep sends
+        for run in many["runs"]:
+            await settled(runs, run["id"])
     asyncio.run(scenario())
 
 
@@ -283,9 +286,9 @@ def test_proxy_and_fx_columns_are_frozen_next_to_the_pool(tmp_path, monkeypatch)
     runs = Services(FakeContext(tmp_path, None), WorkRecords(tmp_path / "records")).allocation
     asked = stub_market(runs, monkeypatch, {"VFITX": "i-vf", "EURUSD=X": "i-fx"})
     data = {"symbols": [{"instrument": {"instrumentId": "i-ief", "displaySymbol": "IEF"}}, {"instrument": {"instrumentId": "i-sap", "displaySymbol": "SAP"}}]}
-    ready, extras = asyncio.run(runs.prepare_data(data, {"currency": "USD"}, pool_rows(proxy="VFITX", currency="EUR")))
+    ready, extras = asyncio.run(runs.prepare_data(data, {"currency": "USD"}, pool_rows(proxy="VFITX", currency="EUR"), False))
     assert asked["symbols"] == ["i-ief", "i-sap", "i-vf", "i-fx"]
-    assert extras == {"proxyColumns": {"IEF": "VFITX"}, "fxColumns": {"SAP": {"column": "EURUSD=X", "invert": False}}}
+    assert extras == {"proxyColumns": {"IEF": "VFITX"}, "fxColumns": {"SAP": {"column": "EURUSD=X", "invert": False}}, "benchmarkColumns": {}}
     assert len(data["symbols"]) == 2        # the object's own data settings are not touched
 
 
@@ -295,7 +298,7 @@ def test_fx_missing_refused(tmp_path, monkeypatch):
     stub_market(runs, monkeypatch, {})
     data = {"symbols": [{"instrument": {"instrumentId": "i-ief", "displaySymbol": "IEF"}}]}
     try:
-        asyncio.run(runs.prepare_data(data, {"currency": "USD"}, pool_rows(currency="EUR")))
+        asyncio.run(runs.prepare_data(data, {"currency": "USD"}, pool_rows(currency="EUR"), False))
     except ContractError as error:
         assert error.code == "not_found" and error.message == "EURUSD=X"
     else:
@@ -306,8 +309,22 @@ def test_dollar_stablecoin_needs_no_rate(tmp_path, monkeypatch):
     runs = Services(FakeContext(tmp_path, None), WorkRecords(tmp_path / "records")).allocation
     asked = stub_market(runs, monkeypatch, {})
     data = {"symbols": [{"instrument": {"instrumentId": "i-ief", "displaySymbol": "IEF"}}, {"instrument": {"instrumentId": "i-sap", "displaySymbol": "SAP"}}]}
-    _, extras = asyncio.run(runs.prepare_data(data, {"currency": "USD"}, pool_rows(currency="USDT")))
-    assert extras == {"proxyColumns": {}, "fxColumns": {}} and asked["symbols"] == ["i-ief", "i-sap"]
+    _, extras = asyncio.run(runs.prepare_data(data, {"currency": "USD"}, pool_rows(currency="USDT"), False))
+    assert extras == {"proxyColumns": {}, "fxColumns": {}, "benchmarkColumns": {}} and asked["symbols"] == ["i-ief", "i-sap"]
+
+
+def test_a_tracked_benchmark_is_frozen_beside_the_pool_whether_in_it_or_not(tmp_path, monkeypatch):
+    runs = Services(FakeContext(tmp_path, None), WorkRecords(tmp_path / "records")).allocation
+    asked = stub_market(runs, monkeypatch, {"QQQ": "i-qqq", "IEF": "i-ief"})
+    data = {"symbols": [{"instrument": {"instrumentId": "i-ief", "displaySymbol": "IEF"}}, {"instrument": {"instrumentId": "i-sap", "displaySymbol": "SAP"}}]}
+    tracking = {"currency": "USD", "objective": "benchmark_tracking", "benchmark": "QQQ 70%, IEF 30%"}
+    _, extras = asyncio.run(runs.prepare_data(data, tracking, pool_rows(), False))
+    assert extras["benchmarkColumns"] == {"QQQ": 70.0, "IEF": 30.0} and asked["symbols"] == ["i-ief", "i-sap", "i-qqq"]
+    # settings that do not follow it freeze none (code may: its estimator can track one)
+    _, extras = asyncio.run(runs.prepare_data(data, {**tracking, "objective": "min_risk"}, pool_rows(), False))
+    assert extras["benchmarkColumns"] == {} and asked["symbols"] == ["i-ief", "i-sap"]
+    _, extras = asyncio.run(runs.prepare_data(data, {**tracking, "objective": "min_risk"}, pool_rows(), True))
+    assert extras["benchmarkColumns"] == {"QQQ": 70.0, "IEF": 30.0}
 
 
 def test_show_code_reads_the_code_each_run_ran(tmp_path):

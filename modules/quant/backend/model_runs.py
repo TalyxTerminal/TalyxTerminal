@@ -26,6 +26,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..native import model_algorithms as A
 from ..native.model_data import quick_formula
@@ -96,6 +97,7 @@ def summary(record):
             "review": sum(1 for item in record.get("checks") or [] if item["state"] == "watch"), "passed": sum(1 for item in record.get("checks") or [] if item["state"] == "ok"),
             "combinedFrom": record.get("combinedFrom"), "of": record.get("of"), "ofNumber": record.get("ofNumber"),
             "dataTo": (record.get("data") or {}).get("dataTo"), "dataFrom": (record.get("data") or {}).get("dataFrom"), "memory": record.get("peakMemory"),
+            "dataNotes": (record.get("data") or {}).get("notes") or [],
             "estimate": record.get("estimate"), "starred": record.get("starred", False), "note": record.get("note", ""), "published": record.get("version"),
             "heldOut": record.get("heldOut"), "message": record.get("message"), "updatedAt": record.get("updatedAt"), "overrides": record.get("overrides") or {}, "overrideFrom": record.get("overrideFrom"),
             "resumedAfterClose": bool(record.get("resumedAfterClose")),
@@ -128,7 +130,7 @@ class ModelRuns:
     def read(self, identity):
         record = self.records.find(RUN, identity)
         if record is None or not is_model_run(record):
-            raise ContractError("not_found", "This model run does not exist.")
+            raise ContractError("not_found", t("This model run does not exist."))
         return record
 
     def owns(self, identity):
@@ -163,7 +165,7 @@ class ModelRuns:
     def model(self, object_id):
         obj = self.store.read(object_id)
         if obj["kind"] != "model":
-            raise ContractError("invalid_input", "Only a model trains models.")
+            raise ContractError("invalid_input", t("Only a model trains models."))
         return obj
 
     # ------------------------------------------------------------------------------------------------------------ the preparation
@@ -185,7 +187,7 @@ class ModelRuns:
             offers = list(P.BUILTIN)
         return {"objectId": obj["id"], "name": obj["name"], "mode": obj["settings"].get("mode", "standard"), "ownCode": obj["settings"].get("mode") == "code",
                 "groups": groups, "values": values, "errors": declared["errors"], "algorithms": P.algorithms(), "offers": offers,
-                "run": {**RUN_DEFAULTS, **(obj["settings"].get("run") or {})}, "data": obj["settings"].get("data") or {}, "batchLimit": P.BATCH_LIMIT,
+                "run": {**RUN_DEFAULTS, **(obj["settings"].get("run") or {})}, "data": obj["settings"].get("data") or {},
                 "running": self.running_view(), "version": obj["version"], "baseRuns": self.base_runs(obj["id"]),
                 "concepts": P.concept_sources(self.library)}
 
@@ -195,7 +197,7 @@ class ModelRuns:
         for record in self.of_object(object_id):
             params = (record.get("settings") or {}).get("params") or {}
             if record["state"] == "completed" and params.get("algorithm") in ("lstm", "gru") and record.get("runKind", "train") == "train":
-                out.append({"id": record["id"], "number": record["number"], "label": f"run #{record['number']} · {params['algorithm'].upper()}", "algorithm": params["algorithm"],
+                out.append({"id": record["id"], "number": record["number"], "label": t("run #{number} · {upper}", number=record['number'], upper=params['algorithm'].upper()), "algorithm": params["algorithm"],
                             "inputs": params.get("inputs"), "lookback": params.get("nn_lookback", 20), "width": params.get("nn_width", 64), "layers": params.get("nn_layers", 2)})
         return out
 
@@ -222,10 +224,10 @@ class ModelRuns:
         try:
             base = self.read(params["nn_base"])
         except ContractError:
-            return {"own": {}, "base": {"label": "The run", "inputs": None}}
+            return {"own": {}, "base": {"label": t("The run"), "inputs": None}}
         theirs = base["settings"]["params"]
         facts = lambda found: {"inputs": found.get("inputs"), "lookback": found.get("nn_lookback", 20), "width": found.get("nn_width", 64), "layers": found.get("nn_layers", 2)}
-        return {"own": facts(params), "base": {"label": f"run #{base['number']}", **facts(theirs)}}
+        return {"own": facts(params), "base": {"label": t("run #{number}", number=base['number']), **facts(theirs)}}
 
     def running_view(self):
         view = self.queue.view()
@@ -264,7 +266,7 @@ class ModelRuns:
         answer.pop("talyx", None)
         answer.pop("id", None)
         if not answer.get("ok"):
-            failure = answer.get("failure") or {"title": "cannot be checked", "message": "The check could not run."}
+            failure = answer.get("failure") or {"title": t("cannot be checked"), "message": t("The check could not run.")}
             return {"ok": False, "failure": failure, "blocked": True, "checks": [{"name": failure.get("title", "Data"), "value": failure["message"], "need": "", "state": "block",
                                                                                  "group": failure.get("stage", "data"), "detail": failure["message"]}],
                     "seconds": round(time.perf_counter() - started, 2)}
@@ -272,12 +274,12 @@ class ModelRuns:
         plan = []
         for index, group in enumerate(groups):
             found = estimates[index] if index < len(estimates) else {}
-            plan.append({"group": index + 1, "values": group["values"], "time": found.get("seconds"), "memory": found.get("memory"), **({"vram": found["vram"]} if found.get("vram") else {}), "blocked": found.get("blocked", False)})
+            plan.append({"group": index + 1, "values": group["values"], "time": found.get("seconds"), "memory": found.get("memory"), **({"vram": found["vram"]} if found.get("vram") else {})})
         total = sum(item["time"] or 0 for item in plan) / concurrency
         waiting = self.queue.view()["waiting"]
         answer["batch"] = {"vary": [item["name"] for item in args.get("vary") or [] if item.get("values")], "groups": plan, "total": total,
                            "peak": max([item["memory"] or 0 for item in plan] + [0]), "free": self.queue.free(), "queue": len(waiting) + 1,
-                           "concurrency": concurrency, "threads": threads, "limit": P.BATCH_LIMIT}
+                           "concurrency": concurrency, "threads": threads}
         answer["pins"] = pins
         answer["seconds"] = round(time.perf_counter() - started, 2)
         answer["dataKey"] = ready["key"]
@@ -316,17 +318,17 @@ class ModelRuns:
 
     # ------------------------------------------------------------------------------------------------------------ sending
     async def train(self, object_id, args=None):
-        """Send one run, or a batch (`vary`: settings with several values, at most 20 groups). The runs are made at once, which is the button's answer,
+        """Send one run, or a batch (`vary`: settings with several values, every combination a group). The runs are made at once, which is the button's answer,
         and the check is their first step, in the background (two or three minutes passed with nothing to show). What would fail for certain
         (too few names, an algorithm this environment cannot run, more memory than runs on this computer ever get) ends them with the reason; one that
         needs more memory than is free now waits in the queue for it."""
         if self.closed:
-            raise ContractError("unavailable", "Quant is closing.")
+            raise ContractError("unavailable", t("Quant is closing."))
         args = args or {}
         obj = self.model(object_id)
         params = P.values_of(self.store, obj, args.get("params"))
         if not params.get("algorithm"):
-            raise ContractError("invalid_input", "Choose an algorithm first.")
+            raise ContractError("invalid_input", t("Choose an algorithm first."))
         groups = P.expand(params, args.get("vary"))
         if args.get("params"):
             obj = self.store.save(obj, settings={**obj["settings"], "params": {**obj["settings"].get("params", {}), **args["params"]}})
@@ -372,17 +374,17 @@ class ModelRuns:
             try:
                 checked = await self.check(object_id, args, report=report)
             except asyncio.CancelledError:
-                await self.end_checking(identities, lambda identity: {"state": "cancelled" if identity in self.stopping else "interrupted", "message": "Stopped before training."})
+                await self.end_checking(identities, lambda identity: {"state": "cancelled" if identity in self.stopping else "interrupted", "message": t("Stopped before training.")})
                 raise
             except ContractError as error:
                 said = error.message
-                await self.end_checking(identities, lambda identity: self.check_failure(identity, {"stage": "check", "title": "cannot be checked", "message": said}))
+                await self.end_checking(identities, lambda identity: self.check_failure(identity, {"stage": "check", "title": t("cannot be checked"), "message": said}))
                 return
             except Exception as error:  # a background step must end its runs and say what broke
                 import logging
                 logging.getLogger(__name__).exception("The check of model runs failed (%s)", identities)
                 message = f"Quant hit an internal error ({type(error).__name__}) while checking; the details are in Quant's log."
-                await self.end_checking(identities, lambda identity: self.check_failure(identity, {"stage": "check", "title": "stopped", "message": message}))
+                await self.end_checking(identities, lambda identity: self.check_failure(identity, {"stage": "check", "title": t("stopped"), "message": message}))
                 return
             if checked.get("blocked"):
                 reasons = [item for item in checked["checks"] if item["state"] == "block"]
@@ -490,17 +492,17 @@ class ModelRuns:
             stopped_by_hand = identity in self.stopping
             current = self.read(identity)
             done = len(current.get("windows") or [])
-            ending = {"state": "cancelled" if stopped_by_hand else "interrupted", "message": "Stopped by hand." if stopped_by_hand else "Quant stopped; it continues from the windows done.",
+            ending = {"state": "cancelled" if stopped_by_hand else "interrupted", "message": t("Stopped by hand.") if stopped_by_hand else t("Quant stopped; it continues from the windows done."),
                       "stopped": {"window": done + 1 if done < (current.get("windowsTotal") or done + 1) else done, "at": int(time.time() * 1000), "auto": not stopped_by_hand}}
         except ContractError as error:
             failure = error.details.get("failure") if isinstance(error.details, dict) and isinstance(error.details.get("failure"), dict) else None
-            failure = failure or {"stage": self.read(identity)["stage"], "title": "stopped", "message": error.message}
+            failure = failure or {"stage": self.read(identity)["stage"], "title": t("stopped"), "message": error.message}
             ending = {"state": "failed", "message": failure["message"], "failure": self.failure_of(identity, failure), "error": {"stage": failure.get("stage"), **error.to_dict()}}
         except Exception as error:  # a background run must end and say what broke
             import logging
             logging.getLogger(__name__).exception("Model run failed (%s)", identity)
             message = f"Quant hit an internal error ({type(error).__name__}) and stopped this run; the details are in Quant's log."
-            ending = {"state": "failed", "message": message, "failure": self.failure_of(identity, {"stage": "compute", "title": "stopped", "message": message}),
+            ending = {"state": "failed", "message": message, "failure": self.failure_of(identity, {"stage": "compute", "title": t("stopped"), "message": message}),
                       "error": {"stage": "compute", "code": "internal_error", "message": message}}
         finally:
             self.tasks.pop(identity, None)
@@ -551,10 +553,10 @@ class ModelRuns:
         if ready is None:
             ready = await self.data.prepare(record["settings"]["data"])
             if ready["fingerprint"] != data.get("fingerprint"):
-                raise ContractError("unavailable", "This run's frozen data is no longer available.")
+                raise ContractError("unavailable", t("This run's frozen data is no longer available."))
             self.update(identity, data={**data, "key": ready["key"]})
         elif "fingerprint" in data and ready["fingerprint"] != data["fingerprint"]:
-            raise ContractError("unavailable", "This run's frozen data is no longer available.")
+            raise ContractError("unavailable", t("This run's frozen data is no longer available."))
         return ready
 
     async def job(self, identity, ready):
@@ -624,7 +626,7 @@ class ModelRuns:
             lines = progress_file.read_text(encoding="utf-8").splitlines()
             self.follow(identity, [json.loads(line) for line in lines if line.strip()], replay=True)
         if not answer.get("ok"):
-            failure = answer.get("failure") or {"stage": "compute", "title": "stopped", "message": "The run failed."}
+            failure = answer.get("failure") or {"stage": "compute", "title": t("stopped"), "message": t("The run failed.")}
             raise ContractError("invalid_input" if failure.get("stage") in ("code", "settings", "data") else "unavailable", failure["message"], {"failure": failure})
         return answer
 
@@ -764,14 +766,14 @@ class ModelRuns:
         args = args or {}
         record = self.read(identity)
         if record["state"] not in {"failed", "cancelled", "interrupted"}:
-            raise ContractError("conflict", "Only a stopped or failed run can be resumed.")
+            raise ContractError("conflict", t("Only a stopped or failed run can be resumed."))
         if identity in self.tasks:
-            raise ContractError("conflict", "This run is already running.")
+            raise ContractError("conflict", t("This run is already running."))
         if "epoch" in args:
             params = record["settings"]["params"]
             current = (record.get("progress") or {}).get("epoch")
             if params.get("algorithm") not in A.NEURAL_IDS or args["epoch"] != current:
-                raise ContractError("invalid_input", f"epoch must identify the saved training checkpoint ({current}).")
+                raise ContractError("invalid_input", t("epoch must identify the saved training checkpoint ({current}).", current=current))
         overrides = {**(record.get("overrides") or {}), **(args.get("override") or {})}
         if args.get("override"):
             obj = self.store.read(record["objectId"])
@@ -786,14 +788,14 @@ class ModelRuns:
     async def run_next(self, identity):
         record = self.read(identity)
         if record["state"] != "queued" or not await self.queue.promote(identity):
-            raise ContractError("conflict", "Only a run waiting in the queue can go next.")
+            raise ContractError("conflict", t("Only a run waiting in the queue can go next."))
         return summary(self.read(identity))
 
     async def remove(self, identity):
         """Take a run that has not started out of the queue; it leaves the table."""
         record = self.read(identity)
         if record["state"] != "queued":
-            raise ContractError("conflict", "Only a run waiting in the queue can be removed; stop a running one.")
+            raise ContractError("conflict", t("Only a run waiting in the queue can be removed; stop a running one."))
         task = self.tasks.get(identity)
         if task is not None:
             self.stopping.add(identity)
@@ -805,7 +807,7 @@ class ModelRuns:
     def set_concurrency(self, count):
         cpus = os.cpu_count() or 1
         if not 1 <= int(count) <= cpus:
-            raise ContractError("invalid_input", f"Run 1 to {cpus} at once.")
+            raise ContractError("invalid_input", t("Run 1 to {cpus} at once.", cpus=cpus))
         self.queue.cpus = int(count)
         self.records.put(SETTINGS, {"id": "models", "concurrency": int(count)})
         return self.running_view()
@@ -857,12 +859,11 @@ class ModelRuns:
         record = self.read(identity)
         path = self.directory(identity) / "output" / "results.json"
         if record["state"] != "completed" or not path.is_file():
-            raise ContractError("not_found", "This run has no Results yet.")
+            raise ContractError("not_found", t("This run has no Results yet."))
         results = json.loads(path.read_text(encoding="utf-8"))
         if record.get("heldOut") and record["heldOut"].get("numbers"):
             # A source run names its held-out run; the held-out run itself carries {of, ofNumber, numbers} and is its own number.
-            results.setdefault("robustness", {})["heldOut"] = {"number": record["heldOut"].get("number", record["number"]), "numbers": record["heldOut"]["numbers"],
-                                                               "shortSample": bool(record["heldOut"]["numbers"].get("shortSample"))}
+            results.setdefault("robustness", {})["heldOut"] = {"number": record["heldOut"].get("number", record["number"]), "numbers": record["heldOut"]["numbers"]}
         elif record.get("heldOut"):
             results.setdefault("robustness", {})["heldOut"] = {"state": record["heldOut"].get("state"), "window": record["heldOut"].get("window"),
                                                                "windows": record["heldOut"].get("windows"), "number": record["heldOut"].get("number")}
@@ -913,7 +914,7 @@ class ModelRuns:
             if not keys:
                 return {"runId": identity, "figures": work}
         if not path.is_file():
-            raise ContractError("not_found", "This run has no figures yet.")
+            raise ContractError("not_found", t("This run has no figures yet."))
         found = json.loads(path.read_text(encoding="utf-8"))
         chosen = {key: value for key, value in found.items() if not keys or key in keys}
         if compare:
@@ -933,9 +934,9 @@ class ModelRuns:
         the run, in its Returns, and not an experiment of its own."""
         record = self.read(identity)
         if record["state"] != "completed":
-            raise ContractError("conflict", "Only a completed run can be backtested as a portfolio.")
+            raise ContractError("conflict", t("Only a completed run can be backtested as a portfolio."))
         if (record.get("portfolio") or {}).get("state") == "running":
-            raise ContractError("conflict", "The portfolio backtest of this run is already running.")
+            raise ContractError("conflict", t("The portfolio backtest of this run is already running."))
         self.save(record, portfolio={"state": "running", "at": int(time.time() * 1000)})
         self.ctx.start(self._portfolio(identity), f"Portfolio backtest · {record['name']}", run_record={**record, **call_attribution()})
         return {"runId": identity, "state": "running"}
@@ -967,7 +968,7 @@ class ModelRuns:
     def compare_figure(self, identities):
         """The test IC window by window of up to four runs, the first in the body colour."""
         if not 1 <= len(identities) <= 4:
-            raise ContractError("invalid_input", "Compare one to four runs.")
+            raise ContractError("invalid_input", t("Compare one to four runs."))
         return compare_figure([summary(self.read(item)) for item in identities])
 
     def code(self, identity):
@@ -1016,7 +1017,7 @@ class ModelRuns:
         source = self.read(identity)
         data = source["settings"]["data"]
         if not data.get("heldOutFrom"):
-            raise ContractError("invalid_input", "Set where the held-out period starts in the run settings first.")
+            raise ContractError("invalid_input", t("Set where the held-out period starts in the run settings first."))
         start, end = day_ms(data["heldOutFrom"], False), day_ms(data["until"], True)
         windows = self.held_out_windows(source)
         # what a window took in the run being scored, the whole run over its windows (data, fitting, recording), not only the fit
@@ -1051,7 +1052,7 @@ class ModelRuns:
     async def _values(self, identity, date=None):
         record = self.read(identity)
         if record["state"] != "completed":
-            raise ContractError("conflict", "Only a completed run has values to show.")
+            raise ContractError("conflict", t("Only a completed run has values to show."))
         labels = json.loads((self.directory(identity) / "output" / "pred.json").read_text(encoding="utf-8"))["labels"] if (self.directory(identity) / "output" / "pred.json").is_file() else None
         # Without a day the engine picks the last test day whose label every name has realised (native default_day), kept as "first".
         cached = self.directory(identity) / "values" / ("first.json" if date is None else f"{int(date)}.json")
@@ -1108,7 +1109,7 @@ class ModelRuns:
         """Several runs side by side: what settings differ, the key numbers, and each window's test IC together."""
         records = [self.read(identity) for identity in identities]
         if len(records) < 2:
-            raise ContractError("invalid_input", "Compare at least two runs.")
+            raise ContractError("invalid_input", t("Compare at least two runs."))
         settings = [flat({"params": record["settings"]["params"], "run": record["settings"]["run"], "data": record["settings"]["data"]})
                     for record in records]
         keys = sorted(set().union(*settings))
@@ -1119,7 +1120,7 @@ class ModelRuns:
             windows = record.get("windows") or []
             traces.append({"type": "scatter", "mode": "lines+markers", "x": [item["k"] for item in windows], "y": [item.get("testIc") for item in windows],
                            "name": f"#{record['number']}", "meta": {"role": "main" if index == 0 else "compare", "key": f"run:{record['number']}"}})
-        figure = {"data": traces, "layout": {"meta": {"key": "model.compare.windows"}, "xaxis": {"title": {"text": "Window"}}, "yaxis": {"title": {"text": "Test rank IC"}},
+        figure = {"data": traces, "layout": {"meta": {"key": "model.compare.windows"}, "xaxis": {"title": {"text": t("Window")}}, "yaxis": {"title": {"text": t("Test rank IC")}},
                                              "showlegend": True}}
         return {"runs": [summary(record) for record in records], "settings": differ, "numbers": numbers, "figure": figure}
 
@@ -1128,7 +1129,7 @@ class ModelRuns:
         published like any run. The runs must share the data and the windows."""
         records = [self.read(identity) for identity in identities]
         if len(records) < 2 or any(record["state"] != "completed" for record in records):
-            raise ContractError("invalid_input", "Combine two or more completed runs.")
+            raise ContractError("invalid_input", t("Combine two or more completed runs."))
         shapes = [json.dumps(record["settings"]["data"], sort_keys=True) for record in records]
         if len(set(shapes)) > 1:
             first = records[0]
@@ -1139,10 +1140,10 @@ class ModelRuns:
                 stamp = datetime.fromtimestamp(end / 1000, UTC).strftime("%b %-d") if isinstance(end, (int, float)) and os.name != "nt" else (
                     datetime.fromtimestamp(end / 1000, UTC).strftime("%b %d").replace(" 0", " ") if isinstance(end, (int, float)) else str(end))
                 return f"{universe_text(record['settings']['data'])} to {stamp}"
-            raise ContractError("invalid_input", f"#{first['number']} and #{other['number']} use different data ({named(first)} vs {named(other)}); combine runs on the same data.")
+            raise ContractError("invalid_input", t("#{number} and #{number2} use different data ({first} vs {other}); combine runs on the same data.", number=first['number'], number2=other['number'], first=named(first), other=named(other)))
         spans = {json.dumps([item.get("test") for item in record.get("windows") or []], sort_keys=True) for record in records}
         if len(spans) > 1:
-            raise ContractError("invalid_input", "Combine runs with the same windows (the same split settings).")
+            raise ContractError("invalid_input", t("Combine runs with the same windows (the same split settings)."))
         obj = self.model(records[0]["objectId"])
         record = await self.create(obj, "combine", records[0]["settings"]["params"], values={"combined": [item["number"] for item in records]},
                                    estimate={"memory": GB, "seconds": 30}, windows_total=len(records[0]["windows"]), frozen=records[0]["data"],
@@ -1154,12 +1155,12 @@ class ModelRuns:
         """Score a completed run once on the held-out period: the windows there trained on the same schedule, the score kept on both."""
         source = self.read(identity)
         if source["state"] != "completed" or source["runKind"] != "train":
-            raise ContractError("invalid_input", "Validate a completed training run on the held-out period.")
+            raise ContractError("invalid_input", t("Validate a completed training run on the held-out period."))
         previous = self.records.held_out_for(identity)
         if previous is not None:
             return summary(previous)
         if not source["settings"]["data"].get("heldOutFrom"):
-            raise ContractError("invalid_input", "Set where the held-out period starts in the run settings first.")
+            raise ContractError("invalid_input", t("Set where the held-out period starts in the run settings first."))
         obj = self.model(source["objectId"])
         record = await self.create(obj, "heldout", source["settings"]["params"], estimate=source.get("estimate"), frozen=source["data"], of=source)
         record = self.save(record, settings=copy.deepcopy(source["settings"]), mode=source["mode"], pipeline=source.get("pipeline"))
@@ -1201,7 +1202,7 @@ class ModelRuns:
         in the same places, and the model now runs its own copy."""
         obj = self.model(object_id)
         if obj["settings"].get("mode") == "code":
-            raise ContractError("conflict", "This model is already written as code.")
+            raise ContractError("conflict", t("This model is already written as code."))
         developer = await self.store.write_entry(obj, obj["entry"], P.STANDARD.read_text(encoding="utf-8"))
         record = self.store.save(obj, settings={**obj["settings"], "mode": "code"})
         record = self.records.put("qobject", {**record, "developer": developer})
@@ -1212,7 +1213,7 @@ class ModelRuns:
         the shape a strategy reads a signal in; returns the number of rows written."""
         output = self.directory(record["id"]) / "output"
         if not (output / "pred.npy").is_file():
-            raise ContractError("not_found", "This run's predictions were not kept; run the model again.")
+            raise ContractError("not_found", t("This run's predictions were not kept; run the model again."))
         pred = np.load(output / "pred.npy")
         meta = json.loads((output / "pred.json").read_text(encoding="utf-8"))
         calendar = np.asarray(meta["labels"], dtype="int64")
@@ -1221,13 +1222,13 @@ class ModelRuns:
             if entry.get("test"):
                 inside |= (calendar >= entry["test"]["from"]) & (calendar <= entry["test"]["to"])
         if not inside.any():
-            raise ContractError("invalid_input", "This run has no test window, so it has no out-of-sample predictions to trade.")
+            raise ContractError("invalid_input", t("This run has no test window, so it has no out-of-sample predictions to trade."))
         pred = np.where(inside[:, None], pred, np.nan)
         ready = self.data.ready((record.get("data") or {}).get("key"))
         instruments = {item["column"]: item["instrumentId"] for item in (ready or {}).get("info", {}).get("instruments", [])}
-        t, i = np.nonzero(np.isfinite(pred))
+        dates, i = np.nonzero(np.isfinite(pred))
         columns = np.asarray(meta["columns"], dtype=object)
-        table = pd.DataFrame({"datetime": calendar[t], "instrument": [instruments.get(name, name) for name in columns[i]], "value": pred[t, i].astype(float)})
+        table = pd.DataFrame({"datetime": calendar[dates], "instrument": [instruments.get(name, name) for name in columns[i]], "value": pred[dates, i].astype(float)})
         destination.parent.mkdir(parents=True, exist_ok=True)
         table.to_parquet(destination, index=False)
         return len(table)
@@ -1238,7 +1239,7 @@ class ModelRuns:
         whether or not the model was published: started from a run, it stays on that run (choosing a library version is done in the strategy)."""
         record = self.read(identity)
         if record["state"] != "completed":
-            raise ContractError("invalid_input", "Use a completed run.")
+            raise ContractError("invalid_input", t("Use a completed run."))
         kept = self.directory(record["id"]) / "signal-values.parquet"
         await asyncio.to_thread(self.test_predictions, record, kept)
         run = record["settings"]["run"]

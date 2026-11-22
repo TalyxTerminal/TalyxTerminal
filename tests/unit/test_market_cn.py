@@ -58,6 +58,54 @@ def row_of(page, day):
 # ── 22. A-share code change ────────────────────────────────────────────────
 
 
+def test_existing_member_caches_keep_trading_dates_and_separate_monthly_weights(tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from modules.market.backend.entry import upgrade_member_dates
+
+    store = DocumentStore(tmp_path / "research", "members")
+    day = ns_of_date("2018-09-03")
+    row = {"code": "AAPL", "from": str(day), "until": None, "knownAt": str(day)}
+    store.write("sp500", {"source": "sp500_history", "rows": [row]})
+    weighted = {"source": "tushare", "rows": [{**row, "code": "000001.SZ", "weight": 0.8656}]}
+    store.write("csi300", weighted)
+    run(upgrade_member_dates(SimpleNamespace(platform=SimpleNamespace(storage=AsyncMock(
+        return_value={"dataDir": str(tmp_path)})))))
+    members = DocumentStore(tmp_path / "research", "members")
+    assert members.read("sp500")["rows"][0]["from"] == str(day + 4 * 3600 * 10**9)
+    assert members.read("csi300") is None and DocumentStore(tmp_path / "research", "weights").read("csi300") == weighted
+
+
+def test_baostock_members_follow_rebalance_date(tmp_path, monkeypatch):
+    async def scenario():
+        market = Market(None, tmp_path, egress=ReplayEgress())
+        await market.start(load_catalogs=False)
+        try:
+            listing = {"type": "listing", "market": "CN", "codeFrom": str(day_ns("2020-01-01"))}
+            market.instruments.ingest([{**listing, "code": "000300.SH", "assetClass": "index"},
+                                       *[{**listing, "code": c, "assetClass": "equity"} for c in
+                                         ("600000.SH", "600132.SH", "600066.SH")]], "baostock")
+            async def query(name, monday):
+                assert name == "query_hs300_stocks"
+                changed = {"2024-12-09": "sh.600132", "2024-12-16": "sh.600066"}[monday]
+                return [], [[monday, code, ""] for code in ("sh.600000", changed)]
+
+            monkeypatch.setattr(market.registry.entry("baostock").source.client, "query", query)
+            for day, changed in (("2024-12-13", "600132.SH"), ("2024-12-16", "600066.SH")):
+                page = await market.public.research({"data": "members", "index": {"symbol": "CN:000300.SH", "at": day}})
+                col = [c["name"] for c in page["columns"]].index("code")
+                assert {r[col] for r in page["rows"]} == {"600000.SH", changed}
+                assert page["unmapped"] == 0
+            records = await market.public.selections({"index": {"symbol": "CN:000300.SH"}, "start": "2024-12-13",
+                                                      "end": "2024-12-16"})
+            spans = {r["symbol"]: (a, b) for r, a, b in records}
+            assert spans["600132.SH"][1] == spans["600066.SH"][0] == day_ns("2024-12-16")
+        finally:
+            await market.close()
+    run(scenario())
+
+
 def test_a_code_change_is_one_instrument_with_two_code_periods(tmp_path, monkeypatch):
     replay = BaostockReplay(monkeypatch, "cn")
 
@@ -337,6 +385,53 @@ def test_tushare_takes_a_share_daily_when_configured_with_one_request_for_the_da
     run(scenario())
 
 
+def test_tushare_weights_and_daily_share_counts(tmp_path, monkeypatch):
+    async def scenario():
+        egress = ReplayEgress()
+        market = Market(None, tmp_path, egress=egress)
+        await market.start(load_catalogs=False)
+        try:
+            entry = {"type": "listing", "market": "CN", "codeFrom": str(day_ns("2005-01-01"))}
+            market.instruments.ingest([{**entry, "code": "000300.SH", "assetClass": "index"},
+                                       {**entry, "code": "000001.SZ", "assetClass": "equity"}], "baostock")
+            async def membership(name, monday):
+                assert name == "query_hs300_stocks"
+                changed = "sz.000002" if monday == "2018-09-03" else "sh.600066"
+                return [], [[monday, code, ""] for code in ("sz.000001", changed)]
+
+            market.instruments.ingest([{**entry, "code": code, "assetClass": "equity"}
+                                       for code in ("000002.SZ", "600066.SH")], "baostock")
+            monkeypatch.setattr(market.registry.entry("baostock").source.client, "query", membership)
+            # Tushare index_weight documentation, example for 2018-09-03 (percent).
+            def response(_url, params):
+                if params["api_name"] == "index_weight":
+                    assert params["index_code"] == "399300.SZ"
+                    fields, values = ["index_code", "con_code", "trade_date", "weight"], [
+                        ["399300.SZ", "000001.SZ", "20180903", 0.8656], ["399300.SZ", "000002.SZ", "20180903", 1.133]]
+                else:
+                    assert params["api_name"] == "daily_basic" and params["ts_code"] == "000001.SZ"
+                    fields, values = ["trade_date", "total_share", "float_share"], [["20180903", 1908.1234, 987.65]]
+                return {"code": 0, "data": {"fields": fields, "items": values}}
+
+            egress.add("api.tushare.pro", response)
+            await market.admin.configure("tushare", {"token": "sample"}, allow_secrets=True)
+            for day, expected in (("2018-09-07", {"000001.SZ": 0.8656, "000002.SZ": 1.133}),
+                                  ("2018-09-10", {"000001.SZ": 0.8656, "600066.SH": None})):
+                index = {"symbol": "CN:000300.SH", "at": day}
+                page = await market.public.research({"data": "members", "index": index})
+                code = [col["name"] for col in page["columns"]].index("code")
+                weight = page["columns"].index({"name": "weight", "unit": "percent"})
+                assert page["unmapped"] == 0 and {r[code]: r[weight] for r in page["rows"]} == expected
+                assert {r["symbol"] for r, _, _ in await market.public.selections({"index": index})} == set(expected)
+            doc = await market.research.read({"kind": "shares", "instruments": [await stock(market, "000001.SZ")],
+                                              "start": str(day_ns("2018-09-03")), "end": str(day_ns("2018-09-04"))})
+            assert dict(zip(doc["columns"]["kind"], doc["columns"]["shares"], strict=True)) == {
+                "outstanding": "19081234", "float": "9876500"}
+        finally:
+            await market.close()
+    run(scenario())
+
+
 # ── 23. Hong Kong: the HKEX list and a reused code ─────────────────────────
 
 
@@ -358,6 +453,13 @@ def test_hkex_list_keeps_equities_etps_and_reits_and_00013_starts_at_its_first_b
                                                   include_inactive=True, after=None, limit=1000)
             assert {r["symbol"] for r in listed} == kept
             by_code = {r["symbol"]: r for r in listed}
+            terms = await market.terms.read({"instruments": [by_code["00700.HK"], by_code["00005.HK"]]})
+            assert [(r["minQuantity"], r["quantityIncrement"]) for r in terms["items"]] == [
+                ("100", "100"), ("400", "400")]
+            # Upgraded from a version that read the list without keeping board lots: the terms read it again.
+            (tmp_path / "board-lots" / "HK.json").unlink()
+            again = await market.terms.read({"instruments": [by_code["00700.HK"]]})
+            assert again["items"][0]["minQuantity"] == "100"
             assert by_code["00823.HK"]["securityType"] == "reit" and by_code["02800.HK"]["assetClass"] == "fund"
             assert by_code["80700.HK"]["currency"] == "CNY"
 
@@ -381,3 +483,48 @@ def day_ns_hk(text: str) -> int:
     from modules.market.backend import calendars
     return int(calendars.local_midnight("XHKG", np.asarray([np.datetime64(text, "D")]))[0])
 
+
+
+def test_a_stocks_industry_over_a_window_comes_from_the_dated_whole_market_answers(tmp_path, monkeypatch):
+    """600519.SH as classified on each quarter's date: A in the answers up to 2021, B from 2022. Read over 2018-2022 it is A from the date
+    A was known until the date B was, and B after; nothing later than a date's answer is used for it."""
+    BaostockReplay(monkeypatch, "cn")
+    from modules.market.backend.research import _day, snapshot_days
+
+    async def scenario():
+        market = await open_cn(tmp_path)
+        try:
+            record = await stock(market, "600519.SH")
+            start, end = ns_of_date("2018-01-02"), ns_of_date("2022-12-31")
+            days = snapshot_days(start, end)
+            assert days[:3] == [ns_of_date("2018-01-02"), ns_of_date("2018-03-31"), ns_of_date("2018-06-30")] and days[-1] == ns_of_date("2022-12-31")
+            for day in days:
+                name, known = ("A", day_ns("2018-01-01")) if day < ns_of_date("2022-01-01") else ("B", day_ns("2022-03-28"))
+                market.research.documents["classification"].write(f"market-CN-{_day(day)}", {
+                    "source": "baostock", "fetchedAt": 0, "revision": 1,
+                    "rows": [{"stock": "600519.SH", "scheme": "csrc", "level": "industry", "code": name, "name": name,
+                              "from": None, "until": None, "knownAt": str(known)}]})
+            page = await market.research.read({"kind": "classification", "instruments": [record], "fill": "none",
+                                               "start": str(start), "end": str(end)})
+            rows = list(zip(page["columns"]["name"], page["columns"]["from"], page["columns"]["until"], strict=True))
+            assert rows == [("A", str(day_ns("2018-01-01")), str(day_ns("2022-03-28"))), ("B", str(day_ns("2022-03-28")), None)]
+            early = await market.research.read({"kind": "classification", "instruments": [record], "fill": "none",
+                                                "start": str(start), "end": str(end), "asOf": str(ns_of_date("2020-01-01"))})
+            assert early["columns"]["name"] == ["A"]  # as known in 2020
+        finally:
+            await market.close()
+    run(scenario())
+
+
+def test_a_refreshed_classification_keeps_what_was_known_before():
+    from modules.market.backend.research import classification_history, merged_classification
+    old = [{"scheme": "yahoo", "level": "sector", "code": "tech", "name": "Technology", "from": None, "until": None, "knownAt": "100"}]
+    same = [{**old[0], "knownAt": "200"}]
+    assert merged_classification(old, same) == old  # unchanged: the earlier row stays, known since its first answer
+    moved = [{"scheme": "yahoo", "level": "sector", "code": "comm", "name": "Communication", "from": None, "until": None, "knownAt": "300"}]
+    merged = merged_classification(old, moved)
+    assert [(row["name"], row["from"], row["until"]) for row in merged] == [("Technology", None, "300"), ("Communication", "300", None)]
+    row = {"scheme": "csrc", "level": "industry", "code": "C15", "name": "Liquor"}
+    history = classification_history([("10", {**row, "knownAt": "10"}), ("20", {**row, "knownAt": "20"}), ("30", None),
+                                      ("40", {**row, "code": "C16", "name": "Tobacco", "knownAt": "40"})])
+    assert [(item["code"], item["from"], item["until"]) for item in history] == [("C15", "10", "30"), ("C16", "40", None)]

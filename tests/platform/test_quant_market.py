@@ -5,7 +5,6 @@ own days."""
 
 from __future__ import annotations
 
-import json
 import shutil
 from decimal import Decimal
 from pathlib import Path
@@ -87,18 +86,18 @@ def test_quant_freezes_what_market_reads_adjusted_and_raw_and_each_bar_is_known_
     assert [Decimal(value) for value in pd.read_parquet(raw_strategy["barsPath"])["close"]] == [Decimal(100), Decimal(50), Decimal(49)]
     for field in ("open", "high", "low", "close", "volume"):
         assert [Decimal(value) for value in native[field]] == [Decimal(value) for value in expected[field]]
-        np.testing.assert_allclose(adjusted_frame[field], np.asarray(pages["split"]["columns"][field], dtype=float))
+        np.testing.assert_allclose(adjusted_frame[field], np.asarray(pages["split_dividend"]["columns"][field], dtype=float))
         np.testing.assert_allclose(raw_frame[field], np.asarray(original[field], dtype=float))
     assert prices["time"].tolist() == [int(value) // MS for value in expected["time"]]
-    assert native["ts_event"].tolist() == expected["closeTime"]
+    assert native["ts_event"].tolist() == [int(value) for value in expected["closeTime"]]
     # Known at the close; the 15-minute publish delay only decides when Market fetches the bar.
-    assert native["ts_init"].tolist() == expected["closeTime"]
+    assert native["ts_init"].tolist() == [int(value) for value in expected["closeTime"]]
     assert adjusted_frame["closeAt"].tolist() == [int(value) // MS for value in expected["closeTime"]]
     assert adjusted_frame["knownAt"].tolist() == adjusted_frame["closeAt"].tolist()
     assert pd.to_datetime(adjusted_frame["time"], unit="ms", utc=True).dt.tz_convert(
         "America/New_York").dt.hour.tolist() == [0, 0, 0]
     assert adjusted_frame["rawClose"].tolist() == raw_frame["close"].tolist()
-    assert adjusted["research"]["info"]["instruments"][0]["revision"] == pages["split"]["revision"]
+    assert adjusted["research"]["info"]["instruments"][0]["revision"] == pages["split_dividend"]["revision"]
 
 
 def test_shanghai_dates_are_kept_and_a_mixed_list_keeps_each_markets_own_days(tmp_path):
@@ -150,7 +149,7 @@ def test_shanghai_etf_and_stock_keep_exchange_ticks_and_stamp_duty(tmp_path):
 
     prepared = run(scenario())
     instruments = {item["id"]: item for item in prepared["instruments"]}
-    sessions = pd.read_parquet(prepared["stockSessions"]).set_index("instrument")
+    sessions = pd.read_parquet(prepared["stockSessions"])
     sources = {source["instrument"]["symbol"]: source["nativeInstrument"] for source in prepared["sources"]}
     bars = pd.read_parquet(prepared["barsPath"])
     etf_prices = bars.loc[bars.instrument == sources["510300.SH"], ["open", "high", "low", "close"]]
@@ -158,8 +157,10 @@ def test_shanghai_etf_and_stock_keep_exchange_ticks_and_stamp_duty(tmp_path):
     for symbol, step, precision, sell_duty in [("510300.SH", "0.001", 3, 0), ("600519.SH", "0.01", 2, 500)]:
         item = instruments[sources[symbol]]
         assert (item["priceIncrement"], item["pricePrecision"]) == (step, precision)
-        item["stock"]["sessions"] = json.loads(sessions.at[item["id"], "sessions"])
-        days = conditions(item, raw=True)["rules"]["sessions"]
+        item["stock"]["sessions"] = [{**{key: row[key] for key in ("sessionDate", "openAt", "closeAt", "lower", "upper", "priceIncrement")},
+                                      "priceMap": {"scale": row["priceScale"], "offset": row["priceOffset"], "maxError": row["priceMaxError"]}}
+                                     for row in sessions[sessions["instrument"] == item["id"]].to_dict("records")]
+        days = conditions(item)["rules"]["sessions"]
         assert [day["date"] for day in days] == ["2024-01-02", "2024-01-03"]
         for day in days:
             assert Decimal(day["priceIncrement"]) == Decimal(step)

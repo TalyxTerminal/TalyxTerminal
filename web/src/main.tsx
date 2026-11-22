@@ -1,3 +1,4 @@
+import { t } from "./shell/i18n";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -42,8 +43,8 @@ try {
 function CompatibilityFailure() {
   return (
     <ApplicationFailure
-      title="TALYX can’t start"
-      message="TALYX could not reach its Host. Start it, then reload."
+      title={t("TALYX can’t start")}
+      message={t("TALYX could not reach its Host. Start it, then reload.")}
     />
   );
 }

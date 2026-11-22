@@ -76,8 +76,8 @@ def test_a_settings_error_is_named_and_never_falls_back(found):
     row = ok(found["settings_errors"])
     assert row["linear"] == {"message": "Line 1: SPX is not in the pool", "fields": ["linear"]}
     assert row["check_linear"] == row["linear"]
-    assert row["tracking_no_benchmark"]["fields"] == ["max_tracking"] and row["check_tracking"]["fields"] == ["max_tracking"]
-    assert row["benchmark_tracking_no_benchmark"]["fields"] == ["objective"]
+    assert row["tracking_no_benchmark"]["fields"] == ["benchmark"] and row["check_tracking"]["fields"] == ["benchmark"]
+    assert row["benchmark_tracking_no_benchmark"]["fields"] == ["benchmark"]
     assert row["bad_option"]["fields"] == ["covariance_parameters"] and "alpha" in row["bad_option"]["message"]
     assert row["bad_engine"]["fields"] == ["objective_parameters"] and "nope" in row["bad_engine"]["message"]
     assert row["check_ok"] is None

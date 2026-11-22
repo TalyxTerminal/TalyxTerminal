@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import ai_views
 
@@ -15,7 +16,7 @@ def offset(args):
         return 0
     if not isinstance(value, str) or not value.isascii() or not value.isdecimal():
         raise ContractError(
-            "invalid_input", "cursor must be a continuation position returned by the previous page."
+            "invalid_input", t("cursor must be a continuation position returned by the previous page.")
         )
     return int(value)
 

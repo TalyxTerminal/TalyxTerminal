@@ -1,5 +1,6 @@
 /** All objects (the navigation expanded): every object by kind, unpublished candidates included, each row with its representative run's key
     numbers and checks; columns sort within a kind; This workspace or All. */
+import { t } from "../i18n";
 import { useMemo, useState, type ReactNode } from "react";
 import { TxButton, TxIcon, TxInput, TxObjectTitle, TxSegmented, TxSpacer } from "@talyx/sdk";
 import { nf, pc, pct, sgn } from "../factor/format";
@@ -22,7 +23,7 @@ const COLUMNS: Record<string, Column[]> = {
     column("Max drawdown", "max_drawdown", v => <span className="qv-objects-down">{pc(v, 1)}</span>)],
   strategy: [column("Return a year", "return_a_year", v => signed(v, pc(v, 1))), column("Sharpe", "sharpe", v => nf(v, 2)),
     column("Max drawdown", "max_drawdown", v => <span className="qv-objects-down">{pc(v, 1)}</span>), column("Trades", "trades", v => nf(v, 0))],
-  notebook: [{label: "Cells", value: row => row.cells ?? undefined, show: row => row.cells ?? ""}],
+  notebook: [{label: t("Cells"), value: row => row.cells ?? undefined, show: row => row.cells ?? ""}],
 };
 export const columnsFor = (kind: Kind): Column[] => COLUMNS[kind] ?? [];
 export interface Sort { label: string; dir: 1 | -1 }
@@ -42,15 +43,15 @@ export function sortRows(kind: Kind, rows: ObjectRow[], sort: Sort | null): Obje
 export function KindTable({kind, rows, sort, onSort, onOpen, showWorkspace}: {kind: Kind; rows: ObjectRow[]; sort: Sort | null; onSort(sort: Sort): void; onOpen(row: ObjectRow): void; showWorkspace: boolean}) {
   const columns = columnsFor(kind), notebook = kind === "notebook", library = PUBLISHED.includes(kind);
   const th = (label: string, left?: boolean, title?: string) => <th key={label} className={left ? "l qv-objects-sort" : "qv-objects-sort"} title={title} aria-sort={sort?.label === label ? (sort.dir > 0 ? "ascending" : "descending") : undefined}
-    onClick={() => onSort({label, dir: sort?.label === label ? (sort.dir === 1 ? -1 : 1) : label === "Name" || label === "Folder" ? 1 : -1})}>{label}{sort?.label === label ? (sort.dir > 0 ? " ↑" : " ↓") : ""}</th>;
-  return <section className="qv-objects-group"><div className="qv-objects-grouphead"><b>{KINDS[kind].plural}</b><span>{`${rows.length}${library ? ` · ${rows.filter(row => !row.library).length} not published` : ""}`}</span></div>
-    <table className="qv-table qv-objects-table"><thead><tr>{th("Name", true)}{th("Folder", true)}{showWorkspace && <th className="l">Workspace</th>}
-      {notebook ? <th className="l">Reads</th> : <>{library && <th className="l">In library</th>}<th className="l" title="Published run; else the starred one; else the latest successful">Representative run</th></>}
-      {columns.map(item => th(item.label))}{!notebook && th("Checks", false, "Checks passed on the representative run")}{!notebook && th("Runs")}{th("Changed")}</tr></thead>
+    onClick={() => onSort({label, dir: sort?.label === label ? (sort.dir === 1 ? -1 : 1) : label === "Name" || label === "Folder" ? 1 : -1})}>{t(label)}{sort?.label === label ? (sort.dir > 0 ? " ↑" : " ↓") : ""}</th>;
+  return <section className="qv-objects-group"><div className="qv-objects-grouphead"><b>{KINDS[kind].plural}</b><span>{`${rows.length}${library ? t(" · {count} not published", { count: rows.filter(row => !row.library).length }) : ""}`}</span></div>
+    <table className="qv-table qv-objects-table"><thead><tr>{th("Name", true)}{th("Folder", true)}{showWorkspace && <th className="l">{t("Workspace")}</th>}
+      {notebook ? <th className="l">{t("Reads")}</th> : <>{library && <th className="l">{t("In library")}</th>}<th className="l" title={t("Published run; else the starred one; else the latest successful")}>{t("Representative run")}</th></>}
+      {columns.map(item => th(item.label))}{!notebook && th("Checks", false, t("Checks passed on the representative run"))}{!notebook && th("Runs")}{th("Changed")}</tr></thead>
       <tbody>{sortRows(kind, rows, sort).map(row => <tr key={row.id} onClick={() => onOpen(row)}>
         <td className="l qv-objects-name">{row.name}</td><td className="l qv-objects-dim">{row.folder ?? ""}</td>
-        {showWorkspace && <td className="l qv-objects-dim">{row.inThisWorkspace ? "This workspace" : row.workspace ?? ""}</td>}
-        {notebook ? <td className="l qv-objects-dim">{row.reads ?? ""}</td> : <>{library && <td className="l">{row.library ? <span className="qv-objects-dim2">{row.library.text}</span> : <span className="qv-objects-dim">candidate</span>}</td>}<td className="l"><RepCell o={row} /></td></>}
+        {showWorkspace && <td className="l qv-objects-dim">{row.inThisWorkspace ? t("This workspace") : row.workspace ?? ""}</td>}
+        {notebook ? <td className="l qv-objects-dim">{row.reads ?? ""}</td> : <>{library && <td className="l">{row.library ? <span className="qv-objects-dim2">{row.library.text}</span> : <span className="qv-objects-dim">{t("candidate")}</span>}</td>}<td className="l"><RepCell o={row} /></td></>}
         {columns.map(item => <td key={item.label}>{item.show(row)}</td>)}{!notebook && <td><ChecksCell o={row} /></td>}{!notebook && <td className="qv-objects-dim">{row.runsCount}</td>}
         <td className="qv-objects-dim">{whenText(row.changedAt)}</td></tr>)}</tbody></table></section>;
 }
@@ -63,11 +64,11 @@ export function ObjectsPage({rows, all, onAll, onOpen, onBack, onLibrary, initia
   const pool = useMemo(() => rows.filter(row => row.name.toLowerCase().includes(query.toLowerCase())), [rows, query]);
   const kinds = kind === "all" ? ORDER : [kind];
   return <div className="qv-home-page">
-    <div className="qx-bar"><TxButton variant="quiet" size="sm" onClick={onBack}><TxIcon name="arrow-left" />Home</TxButton><TxObjectTitle name="All objects" kind={String(pool.length)} />
-      <TxSegmented label="Kind" value={kind} onChange={setKind} options={[{value: "all", label: "All"}, ...ORDER.map(item => ({value: item, label: `${KINDS[item].plural} ${pool.filter(row => row.kind === item).length}`}))]} />
-      <span className="qv-objects-search"><TxIcon name="search" /><TxInput value={query} placeholder="Name" aria-label="Name" onChange={event => setQuery(event.target.value)} /></span><TxSpacer />
-      <TxSegmented label="Scope" value={all ? "all" : "here"} onChange={value => onAll(value === "all")} options={[{value: "here", label: "This workspace"}, {value: "all", label: "All"}]} />
-      <TxButton variant="quiet" size="sm" onClick={onLibrary}><TxIcon name="bookmark" />Library</TxButton></div>
+    <div className="qx-bar"><TxButton variant="quiet" size="sm" onClick={onBack}><TxIcon name="arrow-left" />{t("Home")}</TxButton><TxObjectTitle name={t("All objects")} kind={String(pool.length)} />
+      <TxSegmented label={t("Kind")} value={kind} onChange={setKind} options={[{value: "all", label: t("All")}, ...ORDER.map(item => ({value: item, label: `${KINDS[item].plural} ${pool.filter(row => row.kind === item).length}`}))]} />
+      <span className="qv-objects-search"><TxIcon name="search" /><TxInput value={query} placeholder={t("Name")} aria-label={t("Name")} onChange={event => setQuery(event.target.value)} /></span><TxSpacer />
+      <TxSegmented label={t("Scope")} value={all ? "all" : "here"} onChange={value => onAll(value === "all")} options={[{value: "here", label: t("This workspace")}, {value: "all", label: t("All")}]} />
+      <TxButton variant="quiet" size="sm" onClick={onLibrary}><TxIcon name="bookmark" />{t("Library")}</TxButton></div>
     <div className="qv-scroll">{kinds.map(item => {
       const own = pool.filter(row => row.kind === item);
       return own.length ? <KindTable key={item} kind={item} rows={own} sort={sorts[item] ?? null} showWorkspace={all} onSort={sort => setSorts(current => ({...current, [item]: sort}))} onOpen={onOpen} /> : null;

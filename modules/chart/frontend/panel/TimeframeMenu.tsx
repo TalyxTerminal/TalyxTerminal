@@ -1,3 +1,5 @@
+import { intlLocale } from "@talyx/sdk";
+import { t } from "../i18n";
 /* The timeframes: starred ones sit on the top bar, every one in a grouped picker with stars (TradingView). Seconds and
    ticks are left out: Market has no such data. */
 import { useState } from "react";
@@ -7,15 +9,15 @@ import { timeframeLabel, timeframeMs } from "../chart/timeframes";
 import { StarList } from "./StarList";
 
 export const TIMEFRAME_GROUPS: [string, string[]][] = [
-  ["Minutes", ["1m", "3m", "5m", "15m", "30m", "45m"]],
-  ["Hours", ["1h", "2h", "3h", "4h"]],
-  ["Days", ["1d", "1w", "1M", "3M", "6M", "12M"]],
+  [t("Minutes"), ["1m", "3m", "5m", "15m", "30m", "45m"]],
+  [t("Hours"), ["1h", "2h", "3h", "4h"]],
+  [t("Days"), ["1d", "1w", "1M", "3M", "6M", "12M"]],
 ];
 
-const NAMES: Record<string, string> = { m: "minute", h: "hour", d: "day", w: "week", M: "month" };
+const units = { m: "minute", h: "hour", d: "day", w: "week", M: "month" } as const;
 const longName = (timeframe: string) => {
   const count = Number(timeframe.slice(0, -1)), unit = timeframe.slice(-1);
-  return `${count} ${NAMES[unit]}${count > 1 ? "s" : ""}`;
+  return new Intl.NumberFormat(intlLocale(), { style: "unit", unit: units[unit as keyof typeof units], unitDisplay: "long" }).format(count);
 };
 
 /** The active chart changes timeframe; with interval sync on, every chart of the layout does. False when one refused. */
@@ -33,8 +35,8 @@ export function Timeframes({ ctx, panelId, current }: { ctx: ModuleContext; pane
     {starred.map(timeframe => <TxButton key={timeframe} variant="tool" size="sm" aria-pressed={timeframe === current}
       onClick={() => void setTimeframe(ctx, panelId, timeframe)}>{timeframeLabel(timeframe)}</TxButton>)}
     {!starred.includes(current) && <TxButton variant="tool" size="sm" aria-pressed>{timeframeLabel(current)}</TxButton>}
-    <TxPopover open={open} onOpenChange={setOpen} label="Timeframes"
-      trigger={<TxButton variant="tool" size="sm" aria-label="Timeframes"><TxIcon name="chevron-down" /></TxButton>}>
+    <TxPopover open={open} onOpenChange={setOpen} label={t("Timeframes")}
+      trigger={<TxButton variant="tool" size="sm" aria-label={t("Timeframes")}><TxIcon name="chevron-down" /></TxButton>}>
       <StarList current={current} onStar={id => toggleFavorite(panelId, "timeframes", id)} onPick={id => { setOpen(false); void setTimeframe(ctx, panelId, id); }}
         groups={TIMEFRAME_GROUPS.map(([name, timeframes]) => ({ name, rows: timeframes.map(id => ({ id, label: longName(id), starred: favorites.includes(id) })) }))} />
     </TxPopover>

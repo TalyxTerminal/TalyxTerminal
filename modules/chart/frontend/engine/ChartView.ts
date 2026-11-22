@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* One chart on Lightweight Charts. This folder is the only code that touches the engine.
    - Times are real UTC seconds everywhere; the display zone lives in the horizontal scale.
    - The view reads the bars it is given in place: appends and the forming bar are applied at most once per frame.
@@ -653,7 +654,7 @@ export class ChartView implements DrawingSurface {
     for (const line of this.alertLines) this.main.removePriceLine(line);
     const { color, width, style } = this.alertLook;
     this.alertLines = prices.map(price => this.main.createPriceLine({
-      price, color: color ?? this.options.colors.accent, lineWidth: (width ?? 1) as 1, lineStyle: ALERT_STYLES[style ?? "dashed"], axisLabelVisible: false, title: "Alert",
+      price, color: color ?? this.options.colors.accent, lineWidth: (width ?? 1) as 1, lineStyle: ALERT_STYLES[style ?? "dashed"], axisLabelVisible: false, title: t("Alert"),
     }));
   }
 

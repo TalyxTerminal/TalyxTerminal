@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 def encoded(value):
@@ -72,14 +73,14 @@ class QuantTriggers:
         try:
             owner, epoch, selected, sequence = json.loads(base64.b64decode(token + "=" * (-len(token) % 4), altchars=b"-_", validate=True))
         except (ValueError, UnicodeError, binascii.Error) as error:
-            raise ContractError("invalid_input", "Invalid Quant source cursor") from error
+            raise ContractError("invalid_input", t("Invalid Quant source cursor")) from error
         if owner != source or selected != workspace or type(sequence) is not int or sequence < 0:
-            raise ContractError("invalid_input", "Quant cursor belongs to another source or workspace")
+            raise ContractError("invalid_input", t("Quant cursor belongs to another source or workspace"))
         return sequence if epoch == self.epochs[source] else None
 
     def scope(self, source, scope):
         if scope["source"] != "quant:" + source:
-            raise ContractError("permission_denied", "Quant source scope mismatch")
+            raise ContractError("permission_denied", t("Quant source scope mismatch"))
         return scope["workspaceId"]
 
     def head(self, source, scope):

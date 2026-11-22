@@ -20,6 +20,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.instruments import MarketInstrument, MarketSeries, ohlcv_series
 
@@ -27,7 +28,8 @@ from . import bars, calendars
 from .common import MarketError, now_ns
 from .data import MAX_PAGE, READ_REQUEST_LIMIT, _rebase
 from .routing import in_worker
-from .store import SeriesKey
+from .sources.hkex import URL as HKEX_LIST
+from .store import DocumentStore, SeriesKey
 
 RULES = "https://www.sse.com.cn/lawandrules/sselawsrules2025/fund/trading/c/c_20260424_10817739.shtml"
 TAX = "https://shanxi.chinatax.gov.cn/web/detail/sx-11400-545-1780448"
@@ -38,7 +40,8 @@ FIELDS = ("fees", "minQuantity", "quantityIncrement", "quantityUnit", "contractM
 HK_SPREADS = "https://www.hkex.com.hk/Services/Circulars-and-Notices/Participant-and-Members-Circulars/SEHK/2026/20260731_LSD_046_2026"
 # Minimum price steps by price, the one place for them.
 # US, Regulation NMS Rule 612: $0.01 at $1.00 and above, $0.0001 below; SEC release 34-105656 keeps this regime
-# through the first business day of November 2027 (US_TICK_RELIEF).
+# through the first business day of November 2027 (US_TICK_RELIEF); after it, stocks with narrow quoted spreads may trade
+# in $0.005 steps, which this does not tell apart yet, so $0.01 stays (a coarser step never makes a price unreachable).
 # Hong Kong, HKEX spread table for stocks, REITs and equity warrants after phase 2 of the minimum spread reduction
 # (2026-08-03, HKEX notice LSD 046 2026): "from 0.01 to 0.25", then "over" each bound "up to" the next, so a price
 # on a bound takes the lower band's step. Exchange traded products use another table, not held here.
@@ -52,9 +55,6 @@ def tick(market: str, price: float, day: str) -> Decimal:
     """The minimum price step of a US or Hong Kong stock trading at ``price`` on ``day`` (ISO date)."""
     value = Decimal(_price(price))
     if market == "US":
-        if day >= "2027-11-01":
-            raise MarketError("unsupported", f"The US tick after November 2027 ({day}) is not verified",
-                              details={"evidence": US_TICK_RELIEF})
         return Decimal("0.01") if value >= 1 else Decimal("0.0001")
     return next(step for bound, step in _HK_STEPS if value <= bound)
 
@@ -69,7 +69,7 @@ def static_terms(record: dict) -> dict:
     china = market == "CN" and code.endswith((".SH", ".SZ"))
     us = market == "US"
     if not china and not us:
-        raise MarketError("unsupported", f"Market has no verified stock trading rules for {code}")
+        raise MarketError("unsupported", t("Market has no verified stock trading rules for {code}", code=code))
     currency = record.get("currency") or ("CNY" if china else "USD")
     star = china and code.startswith("688")
     return {
@@ -96,6 +96,26 @@ def static_terms(record: dict) -> dict:
     }
 
 
+def hk_terms(record, board, observed):
+    fees = "https://www.hkex.com.hk/Services/Rules-and-Forms-and-Fees/Fees/Securities-(Hong-Kong)/Trading/Transaction"
+    return {
+        "version": VERSION, "currency": record["currency"],
+        "orderSize": {"minimum": board["size"], "increment": board["size"], "oddLotSellOnly": True,
+                      "oddLotSellAll": True, "effectiveFrom": observed, "evidence": HKEX_LIST},
+        "settlement": {"sellAfterTradingDays": 0, "calendarId": record["calendarId"],
+                       "evidence": "https://www.hkex.com.hk/Services/Settlement-and-Depository/Settlement"},
+        "commission": {"rate": "0.0008", "perShare": "0", "minimum": {"HKD": "18", "CNY": "15",
+                                                                         "USD": "2.25"}[record["currency"]],
+                       "maximumRate": None, "assumption": t("Hong Kong stock commission assumption"),
+                       "evidence": COMMISSION},
+        "taxes": [{"effectiveFrom": start, "effectiveUntil": end, "buyRate": rate, "sellRate": rate,
+                   "evidence": fees} for start, end, rate in (
+                       ("2001-09-01", "2021-07-31", "0.001"), ("2021-08-01", "2023-11-16", "0.0013"),
+                       ("2023-11-17", None, "0.001"))] if board["stampDuty"] else [],
+        "limitations": [], "sessions": [],
+    }
+
+
 def digest(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
                                      allow_nan=False).encode()).hexdigest()
@@ -113,15 +133,16 @@ def _price(value: float) -> str:
 class Terms:
     def __init__(self, market):
         self.market = market
+        self.board_lots = DocumentStore(market.root, "board-lots")
 
     async def read(self, value: dict) -> dict:
         records = [self.market.instrument_record(item) for item in value["instruments"]]
         windowed = any(name in value for name in ("series", "start", "end"))
         if windowed and not all(name in value for name in ("series", "start", "end")):
-            raise MarketError("invalid_input", "Stock sessions need series, start and end together")
+            raise MarketError("invalid_input", t("Stock sessions need series, start and end together"))
         start, end = (int(value["start"]), int(value["end"])) if windowed else (0, 0)
         if windowed and start >= end:
-            raise MarketError("invalid_input", "start must be before end")
+            raise MarketError("invalid_input", t("start must be before end"))
         selected = {}
         for item in value.get("series", []):
             series = MarketSeries.from_wire(item)
@@ -133,7 +154,7 @@ class Terms:
                     and "stock" in item:
                 series = selected.get(record["instrumentId"]) or selected.get(given["instrumentId"])
                 if series is None:
-                    raise MarketError("invalid_input", f"No series given for {record['symbol']}")
+                    raise MarketError("invalid_input", t("No series given for {symbol}", symbol=record['symbol']))
                 if series.instrumentId != record["instrumentId"]:
                     series = _rebase(series, record)
                 item["stock"] = await self._sessions(record, series, item["stock"], start, end,
@@ -153,7 +174,17 @@ class Terms:
                 item["unavailable"].update({name: reason for name in FIELDS})
                 return item
             try:
-                stock = static_terms(record)
+                if record["venueId"] == "HK" and record["assetClass"] == "equity":
+                    lots = await in_worker(self.board_lots.read, "HK")
+                    if lots is None:  # the HKEX list was last read by a version that kept no board lots: read it now
+                        await self.market.instruments.load("hkex", "HK", "listings")
+                        lots = await in_worker(self.board_lots.read, "HK")
+                    board =lots["listings"].get(record["symbol"]) if lots and record["active"] else None
+                    if board is None:
+                        raise MarketError("no_data", t("No HKEX board lot for {symbol}", symbol=record["symbol"]))
+                    stock = hk_terms(record, board, lots["date"])
+                else:
+                    stock = static_terms(record)
             except MarketError as exc:
                 item["unavailable"].update({name: exc.message for name in (*FIELDS, "stock")})
                 return item
@@ -169,7 +200,7 @@ class Terms:
             reason = f"No source gives trading terms for {record['venueId']} {record['marketType']} contracts"
             item["unavailable"].update({name: reason for name in FIELDS})
             return item
-        target = self.market.data.target(record)
+        target = self.market.data.target(record, "production", sources[0])
         found = await self.market.registry.call(sources[0], "terms", target)
         item.update({name: found.get(name) for name in FIELDS})
         item["unavailable"].update(found.get("unavailable") or {})
@@ -210,7 +241,7 @@ class Terms:
     async def _sessions(self, record: dict, series: MarketSeries, stock: dict, start: int, end: int,
                         allow_missing: bool) -> dict:
         if series.capability != "ohlcv" or series.timeframe != "1d":
-            raise MarketError("unsupported", "Stock sessions are daily: give a 1d price series")
+            raise MarketError("unsupported", t("Stock sessions are daily: give a 1d price series"))
         data = self.market.data
         instrument_id = record["instrumentId"]
         # Fill bars and actions for the window, then read both sides from the same stored rows.
@@ -226,14 +257,13 @@ class Terms:
         else:
             adjusted = await in_worker(data.local_rows, adjusted_plan, start, end)
         if not raw or not bars.length(raw):
-            raise MarketError("no_data", f"{record['symbol']}: no closed sessions in the window")
+            raise MarketError("no_data", t("{symbol}: no closed sessions in the window", symbol=record['symbol']))
         if not np.array_equal(raw["time"], adjusted["time"]):
-            raise MarketError("source_unavailable", f"{record['symbol']}: raw and adjusted sessions differ")
+            raise MarketError("source_unavailable", t("{symbol}: raw and adjusted sessions differ", symbol=record['symbol']))
         closed_end = min(end, data.closed_until(record, "1d", data.published_through(raw_plan, now_ns())))
         expected = data.bars_between(record, "1d", start, closed_end, series.sessionScope)
         if not allow_missing and bars.length(raw) < expected:
-            raise MarketError("no_data", f"{record['symbol']}: {expected - bars.length(raw)} closed sessions in the "
-                                         "window have no prices", details={"missingPriceEvidence": True})
+            raise MarketError("no_data", t("{symbol}: {expected} closed sessions in the window have no prices", symbol=record['symbol'], expected=expected - bars.length(raw)), details={"missingPriceEvidence": True})
         daily = SeriesKey(instrument_id, "ohlcv", "last", raw_plan.key.session_scope, "1d")
         times, ratios, dividends = await in_worker(self.market.actions.factors, instrument_id,
                                                   daily if series.adjustment == "split_dividend" or record["venueId"] == "CN" else None,
@@ -258,7 +288,7 @@ class Terms:
         dates = calendars.trading_day(record["calendarId"], raw["time"])
         positions = np.searchsorted(days, dates)
         if np.any(positions == len(days)) or np.any(days[positions] != dates):
-            raise MarketError("no_data", "No exchange session for a stored trading date")
+            raise MarketError("no_data", t("No exchange session for a stored trading date"))
         sessions = []
         for index in range(bars.length(raw)):
             opened = int(raw["time"][index])
@@ -267,7 +297,7 @@ class Terms:
             av = [float(adjusted[name][index]) for name in ("open", "high", "low", "close")]
             scale = Decimal(_text(price_mult[index]))
             error = max(abs(Decimal(_text(a)) - Decimal(_price(r)) * scale) for r, a in zip(rv, av, strict=True))
-            increment = Decimal(_cn_tick(record)) if china else tick("US", min(rv), day)
+            increment = Decimal(_cn_tick(record)) if china else tick(record["venueId"], min(rv), day)
             reference = None
             if china and index:
                 # The exchange's ex-rights reference: the previous close times the day's adjustment step.
@@ -282,7 +312,8 @@ class Terms:
                 "lower": None, "upper": None, "rawPriceIncrement": str(increment),
                 "priceIncrement": str(increment * scale),
                 "priceLimitEvidence": ("A-share daily limits need each day's ST status, which Market does not hold yet"
-                                       if china else
+                                       if china else t("Hong Kong stocks have no daily fixed percentage limit")
+                                       if record["venueId"] == "HK" else
                                        "US listed equities: daily fixed percentage limit not applicable; intraday "
                                        "LULD excluded"),
             })

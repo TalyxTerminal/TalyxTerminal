@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020";
 import { failure, type Json } from "@talyx/sdk";
 import vocabulary from "../../../vocabulary/schema.json";
@@ -14,6 +15,6 @@ export function validateView(schema: object | boolean, value: Json, output = fal
     validate = ajv.compile(schema);
     if (typeof schema === "object") validators.set(schema, validate);
   }
-  if (!validate(value)) throw failure(output ? "invalid_output" : "invalid_input", "View schema validation failed",
+  if (!validate(value)) throw failure(output ? "invalid_output" : "invalid_input", t("View schema validation failed"),
     { errors: JSON.parse(JSON.stringify(validate.errors)) }, output ? "failed" : "not_started");
 }

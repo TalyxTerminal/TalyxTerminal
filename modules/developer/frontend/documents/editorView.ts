@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { failure, type Json, type ModuleContext } from "@talyx/sdk";
 import type { ContractTypes } from "../../public/ts/types";
 import { documents } from "./service";
@@ -26,7 +27,7 @@ export function mountDocumentEditor(node: HTMLElement, ctx: ModuleContext) {
   const show = async () => {
     const current = ++turn;
     const id = props.documentId ?? (props.source ? (await documents.open(props.source, undefined, false)).documentId : undefined);
-    if (!id) throw failure("invalid_input", "Choose a source or an open document.");
+    if (!id) throw failure("invalid_input", t("Choose a source or an open document."));
     const [model, { createEditor }] = await Promise.all([documents.model(id), import("./monaco")]);
     if (disposed || current !== turn) return;
     marks?.dispose(); marks = undefined; editor?.dispose(); releaseView(); documentId = id; positioned = undefined;

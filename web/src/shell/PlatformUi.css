@@ -248,3 +248,24 @@ body:has([data-platform-controls]) { background: var(--tx-bg); }
 .talyx-override .tx-icon { width: var(--tx-icon-sm); height: var(--tx-icon-sm); color: var(--tx-text-4); }
 .talyx-override-global { color: var(--tx-text-3); cursor: default; }
 .talyx-override-value { color: var(--tx-text); }
+
+/* A version's notes, as the release wrote them (Markdown). */
+.talyx-update-lead { margin: 0 0 var(--tx-space-3); color: var(--tx-text-2); line-height: var(--tx-leading); }
+.talyx-update-notes {
+  max-height: var(--tx-doc-overlay-height);
+  overflow: auto;
+  padding: var(--tx-space-3);
+  border-radius: var(--tx-radius-sm);
+  background: var(--tx-field-fill);
+  color: var(--tx-text-2);
+  font-size: var(--tx-size-sm);
+  line-height: var(--tx-leading-note);
+  overflow-wrap: anywhere;
+}
+.talyx-update-notes > :first-child { margin-top: 0; }
+.talyx-update-notes > :last-child { margin-bottom: 0; }
+.talyx-update-notes :is(h1, h2, h3, h4) { margin: var(--tx-space-3) 0 var(--tx-space-2); color: var(--tx-text); font-size: var(--tx-size-sm); font-weight: var(--tx-weight-medium); }
+.talyx-update-notes :is(p, ul, ol) { margin: 0 0 var(--tx-space-2); }
+.talyx-update-notes :is(ul, ol) { padding-left: var(--tx-space-5); }
+.talyx-update-notes code { font-family: var(--tx-font-mono); }
+.talyx-update-progress { margin-top: var(--tx-space-3); }

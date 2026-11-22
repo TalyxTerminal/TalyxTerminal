@@ -1,6 +1,6 @@
 [project]
 name = "talyx"
-version = "0.1.0"
+version = "0.2.0"
 description = "TALYX — local-first modular workspace (new-era repository)"
 requires-python = ">=3.11"
 dependencies = [

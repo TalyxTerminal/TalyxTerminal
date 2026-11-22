@@ -24,14 +24,21 @@ Exchange data comes from the official APIs and history files: minute bars, fundi
 Prices, financial statements, industries and share counts for US, China A-share and Hong Kong stocks come from free public sources. They are enough for everyday research. Three things are worth knowing:
 
 - **Listed companies only.** Free sources cover companies that trade today, so companies delisted during a backtest period are not in the sample. Long backtests over broad universes are where this matters most.
-- **Today's industries.** Industry classifications are current ones, applied across the whole history.
+- **Industry history.** China A-share classifications use quarterly CSRC snapshots. US and Hong Kong stocks use their current industry throughout the historical period.
 - **No securities-lending data.** Short positions assume the shares can always be borrowed.
 
 When you need delisted companies, point-in-time industries or other institutional data, add a key for a paid source such as Sharadar, Alpaca, Tushare or Databento in Market's sources. Market switches to the better source automatically and the other modules need no change.
 
+**Historical universes.** Nasdaq's list contains active listings. Sharadar TICKERS and SEP add delisted US stocks with price history. The day after the last observed price approximates delisting. On a missing price tail, a backtest exits at the last close, which may differ from the eventual proceeds.
+
+Baostock supplies weekly CSI 300, CSI 500 and SSE 50 membership. Tushare's monthly weights apply from their snapshot date. Hong Kong board lots use the latest HKEX list. Historical board-lot changes and odd-lot prices are unavailable.
+
+Adjusted series are anchored to the latest price. Use raw prices for historical absolute-price screens.
+
 Two more details:
 
 - **Hong Kong hourly bars** go back about 60 days. Yahoo's 60-minute bars do not line up with HKEX sessions, so hourly bars are built from 15-minute bars, which Yahoo keeps for about 60 days.
+- **Databento US equities.** XNAS.ITCH covers Nasdaq trades and EQUS.MINI aggregates its included venues. EQUS.SUMMARY provides daily bars with extended-hours volume. Hourly bars follow trading sessions.
 - **Intraday stock data** carries the source's publication delay.
 
 ## Fetching and real time

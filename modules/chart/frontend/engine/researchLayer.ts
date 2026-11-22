@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { tokenValue } from "@talyx/sdk";
 import { AreaSeries, LineSeries, LineStyle, LineType, createSeriesMarkers, createTextWatermark,
   type ISeriesApi, type ITextWatermarkPluginApi, type SeriesMarker, type SeriesType } from "lightweight-charts";
@@ -16,9 +17,9 @@ const paneId = (layer: string, pane: string) => pane === "price" ? pane : JSON.s
 
 export function checkLayerSize(layer: ResearchLayer): void {
   function limit(name: string, count: number, maximum: number) {
-    if (count > maximum) throw failure("too_large", `${name} contains ${count} entries, ${count - maximum} over the ${maximum} limit`);
+    if (count > maximum) throw failure("too_large", t("{name} contains {count} entries, {value} over the {maximum} limit", { name, count, value: count - maximum, maximum }));
   }
-  limit("Trade markers", layer.markers.length, 20_000);
+  limit(t("Trade markers"), layer.markers.length, 20_000);
   for (const series of layer.series) limit(series.name, series.points.length, 200_000);
 }
 
@@ -85,7 +86,7 @@ export function drawResearch(view: ChartView, layers: ResearchLayer[], panes: Pa
       markers.push({ time: open, position: buy ? "belowBar" : "aboveBar", shape: buy ? "arrowUp" : "arrowDown",
         color: buy ? palette.up : palette.down });
       const details = fills.get(open) ?? [];
-      details.push(`${buy ? "Buy" : "Sell"} ${marker.quantity} @ ${marker.price}`);
+      details.push(`${buy ? t("Buy") : t("Sell")} ${marker.quantity} @ ${marker.price}`);
       fills.set(open, details);
     }
   }
@@ -99,7 +100,7 @@ export function drawResearch(view: ChartView, layers: ResearchLayer[], panes: Pa
     return (time: number | undefined) => {
       const fields = legend.names.map((name, i) => {
         const value = time === undefined ? undefined : legend.values[i].get(time);
-        return `${name} ${value === undefined ? "—" : value.toLocaleString(undefined, {maximumFractionDigits: Math.abs(value) >= 1 ? 2 : 4})}`;
+        return `${name} ${value === undefined ? "—" : value.toLocaleString("en-US", {maximumFractionDigits: Math.abs(value) >= 1 ? 2 : 4})}`;
       });
       const title = legend.names.length === 1 && legend.names[0] === legend.title ? "" : legend.title;
       // One line per series: the watermark scales a line down to the pane width, so a joined line shrinks on narrow charts.

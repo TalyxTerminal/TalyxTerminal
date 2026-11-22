@@ -16,6 +16,7 @@ from uuid import uuid4
 from jupyter_client import write_connection_file
 from jupyter_client.asynchronous import AsyncKernelClient
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import research_process
 from .materials import plain
@@ -164,7 +165,7 @@ class KernelSession:
         self.set_state("preparing")
         ctx = self.manager.ctx
         # The workspace owns the reusable kernel. A cell's caller waits for the cell, not the kernel's lifetime.
-        activity = ctx.sdk.activity(self.workspace_id, f"Notebook kernel · {self.name}", call_id=None,
+        activity = ctx.sdk.activity(self.workspace_id, t("Notebook kernel · {name}", name=self.name), call_id=None,
                                     open_target={"module": "quant", "panelType": "workspace",
                                                  "objectId": "object:" + self.object_id})
         self.task = ctx.start(self.run(), activity=activity)
@@ -250,10 +251,10 @@ class KernelSession:
                     if task not in done:
                         task.cancel()
                 if exited in done:
-                    raise ContractError("unavailable", "The kernel stopped while it was starting.", {"stderr": self.stderr_tail(directory)})
+                    raise ContractError("unavailable", t("The kernel stopped while it was starting."), {"stderr": self.stderr_tail(directory)})
                 waiting.result()
         except TimeoutError as error:
-            raise ContractError("unavailable", "The kernel did not answer within three minutes.", {"stderr": self.stderr_tail(directory)}) from error
+            raise ContractError("unavailable", t("The kernel did not answer within three minutes."), {"stderr": self.stderr_tail(directory)}) from error
         self.ready.set()
         self.set_state("idle")
 
@@ -298,7 +299,7 @@ class KernelSession:
                 # A pump that ends while the process lives is a bug or a broken connection, never a normal stop.
                 for task in done:
                     task.result()
-                raise ContractError("unavailable", "The connection to the kernel closed.")
+                raise ContractError("unavailable", t("The connection to the kernel closed."))
             exited.result()
         finally:
             for task in (*pumps, exited):
@@ -315,7 +316,7 @@ class KernelSession:
     async def close_process(self):
         for target, _ in self.table_queries.values():
             if isinstance(target, asyncio.Future) and not target.done():
-                target.set_exception(ContractError("unavailable", "The notebook kernel stopped during the variable read."))
+                target.set_exception(ContractError("unavailable", t("The notebook kernel stopped during the variable read.")))
         self.table_queries.clear()
         self.requests.clear()
         if self.client is not None:
@@ -586,7 +587,7 @@ class KernelSession:
         if self.failed is not None:
             raise self.failed
         if self.client is None:
-            raise ContractError("unavailable", "The kernel is not running. Restart it to continue.", {"state": self.state})
+            raise ContractError("unavailable", t("The kernel is not running. Restart it to continue."), {"state": self.state})
         return self.client
 
     async def execute(self, cell_id, code, *, wait=False, allow_stdin=False):
@@ -609,13 +610,13 @@ class KernelSession:
     def interrupt(self):
         """Stop the running cell now: variables stay. Windows has no message interrupt, so the launch script's event does it."""
         if self.event is None or self.state not in {"idle", "busy"}:
-            raise ContractError("conflict", "The kernel is not running.", {"state": self.state})
+            raise ContractError("conflict", t("The kernel is not running."), {"state": self.state})
         self.event.set()
         self.close_inputs()
 
     def check_restart(self):
         if self.state in {"preparing", "starting", "restarting"}:
-            raise ContractError("conflict", "The kernel is already starting.", {"state": self.state})
+            raise ContractError("conflict", t("The kernel is already starting."), {"state": self.state})
 
     async def restart(self):
         """A new kernel process in the same session: every variable is lost and the running cells are interrupted."""
@@ -658,14 +659,14 @@ class Kernels:
     def session(self, object_id):
         session = self.find(object_id)
         if session is None:
-            raise ContractError("not_found", "This notebook has no kernel in this workspace. Open it in a panel to start one.")
+            raise ContractError("not_found", t("This notebook has no kernel in this workspace. Open it in a panel to start one."))
         return session
 
     def ensure(self, record):
         """The notebook's kernel in this workspace, started if it was not running."""
         workspace, object_id = self.key(record["id"])
         if workspace is None:
-            raise ContractError("invalid_input", "A notebook's kernel belongs to a workspace.")
+            raise ContractError("invalid_input", t("A notebook's kernel belongs to a workspace."))
         session = self.sessions.get((workspace, object_id))
         if session is None:
             session = self.sessions[(workspace, object_id)] = KernelSession(self, workspace, record)

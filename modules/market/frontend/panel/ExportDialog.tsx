@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useState } from "react";
 import { TxButton, TxDialog, TxField, TxInput, TxSegmented, TxStatus } from "@talyx/sdk";
 import { errorText, formatBytes, formatCount, listOf, marketCall, panelCall, selectionsOf, today, type ExportInput, type Series } from "./data";
@@ -32,20 +33,20 @@ export function ExportDialog({ title, series, adjustable, onClose }: { title: st
         allowEmpty: true, destination: { folder }, ...(adjustable ? { adjustment: adjust } : {}) }))
       .then(setDone).catch(error => setProblem(errorText(error))).finally(() => setBusy(false));
   };
-  return <TxDialog open onOpenChange={value => { if (!value) onClose(); }} title={`Export ${title}`} size="standard" footer={<>
-    <span className="tx-secondary tx-num">{done ? `${done.files.length} files · ${formatCount(done.files.reduce((sum, file) => sum + file.rows, 0))} rows written`
-      : `${series.length.toLocaleString("en-US")} series · ${formatCount(rows)} rows · ≈ ${formatBytes(bytes)}`}</span>
+  return <TxDialog open onOpenChange={value => { if (!value) onClose(); }} title={t("Export {title}", { title })} size="standard" footer={<>
+    <span className="tx-secondary tx-num">{done ? t("{filesCount} files · {files} rows written", { filesCount: done.files.length, files: formatCount(done.files.reduce((sum, file) => sum + file.rows, 0)) })
+      : t("{seriesCount} series · {rows} rows · ≈ {bytes}", { seriesCount: series.length.toLocaleString("en-US"), rows: formatCount(rows), bytes: formatBytes(bytes) })}</span>
     <span className="tx-spacer" />
-    <TxButton size="sm" variant="quiet" onClick={onClose}>{done ? "Close" : "Cancel"}</TxButton>
-    {!done && <TxButton size="sm" variant="primary" loading={busy} disabled={!folder || busy} onClick={exportAll}>Export {series.length.toLocaleString("en-US")} series</TxButton>}
+    <TxButton size="sm" variant="quiet" onClick={onClose}>{done ? t.c("action", "Close") : t("Cancel")}</TxButton>
+    {!done && <TxButton size="sm" variant="primary" loading={busy} disabled={!folder || busy} onClick={exportAll}>{t("Export {seriesCount} series", { seriesCount: series.length.toLocaleString("en-US") })}</TxButton>}
   </>}>
     <div className="market-export">
       <div className="market-import-folder">
-        <TxField label="Folder"><TxInput value={folder} onChange={event => setFolder(event.target.value)} placeholder="A folder in the workspace, or a full path" /></TxField>
+        <TxField label={t("Folder")}><TxInput value={folder} onChange={event => setFolder(event.target.value)} placeholder={t("A folder in the workspace, or a full path")} /></TxField>
       </div>
-      <TxField label="Format"><TxSegmented value={format} onChange={setFormat} label="Format" options={[{ value: "parquet", label: "Parquet" }, { value: "csv", label: "CSV" }]} /></TxField>
-      {adjustable && <TxField label="Adjustment"><TxSegmented value={adjust} onChange={setAdjust} label="Adjustment" options={[
-        { value: "raw", label: "Raw" }, { value: "split", label: "Splits" }, { value: "split_dividend", label: "Splits + dividends" },
+      <TxField label={t("Format")}><TxSegmented value={format} onChange={setFormat} label={t("Format")} options={[{ value: "parquet", label: t("Parquet") }, { value: "csv", label: "CSV" }]} /></TxField>
+      {adjustable && <TxField label={t("Adjustment")}><TxSegmented value={adjust} onChange={setAdjust} label={t("Adjustment")} options={[
+        { value: "raw", label: t("Raw") }, { value: "split", label: t("Splits") }, { value: "split_dividend", label: t("Splits + dividends") },
       ]} /></TxField>}
       {problem && <TxStatus tone="failed" label={problem} />}
       {done?.files.map(file => <div key={file.path ?? ""} className="tx-num tx-secondary market-clip" title={file.path ?? ""}>{file.path}</div>)}

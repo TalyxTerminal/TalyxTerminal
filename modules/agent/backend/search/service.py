@@ -12,6 +12,7 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.network import await_network_route, system_http_proxy_url
 
 from ..providers.presets import OFFICIAL_SITES, SEARCH_ENDPOINTS
@@ -33,25 +34,25 @@ class SearchService:
 
     def configure(self, *, provider, secret_ref=None, mode="fixed", connection_id=None, prices=None):
         if mode not in {"auto", "fixed"} or provider not in {"exa", "tavily", "deepseek", "moonshotai", "zhipuai"}:
-            raise ContractError("invalid_input", "Choose automatic search or a supported fixed provider")
+            raise ContractError("invalid_input", t("Choose automatic search or a supported fixed provider"))
         if mode == "auto" and provider not in {"exa", "tavily"}:
-            raise ContractError("invalid_input", "Automatic search requires Exa or Tavily as the configured alternate source")
+            raise ContractError("invalid_input", t("Automatic search requires Exa or Tavily as the configured alternate source"))
         if provider == "tavily" and not secret_ref:
-            raise ContractError("credential_missing", "Tavily requires a configured API key")
+            raise ContractError("credential_missing", t("Tavily requires a configured API key"))
         if secret_ref is not None and not isinstance(secret_ref, str):
-            raise ContractError("invalid_input", "Search credential reference must be a string")
+            raise ContractError("invalid_input", t("Search credential reference must be a string"))
         if provider not in {"exa", "tavily"}:
             if connection_id is None or self.catalog is None:
-                raise ContractError("invalid_input", "Official search requires a configured model connection")
+                raise ContractError("invalid_input", t("Official search requires a configured model connection"))
             connection = self.catalog.connection(connection_id)
             if self._official(connection) is None or connection.providerId != provider:
-                raise ContractError("invalid_input", "Search must use the selected provider's official connection")
+                raise ContractError("invalid_input", t("Search must use the selected provider's official connection"))
         prices = {} if prices is None else prices
         try:
             for value in prices.values():
                 Price(**value)
         except (TypeError, ValueError, ArithmeticError) as error:
-            raise ContractError("invalid_input", "Invalid search price") from error
+            raise ContractError("invalid_input", t("Invalid search price")) from error
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps({"mode": mode, "provider": provider, "secretRef": secret_ref,
@@ -84,10 +85,10 @@ class SearchService:
         elif settings["provider"] not in {"exa", "tavily"}:
             connection = self.catalog.connection(settings["connectionId"])
             if self._official(connection) is None or connection.providerId != settings["provider"]:
-                raise ContractError("conflict", "The selected search connection no longer matches its official site")
+                raise ContractError("conflict", t("The selected search connection no longer matches its official site"))
             key = await self.get_secret(connection.secretRef)
             if not key:
-                raise ContractError("credential_missing", "Configure the selected search connection's API key")
+                raise ContractError("credential_missing", t("Configure the selected search connection's API key"))
         if connection is not None:
             provider, site = connection.providerId, connection.site
             price_key = provider + ":" + (site or "global")
@@ -97,14 +98,14 @@ class SearchService:
         provider = settings["provider"]
         key = await self.get_secret(settings["secretRef"]) if settings["secretRef"] is not None else None
         if provider == "tavily" and not key:
-            raise ContractError("credential_missing", "Configure the Tavily API key")
+            raise ContractError("credential_missing", t("Configure the Tavily API key"))
         price_key = provider + ":global"
         return {"provider": provider, "site": None, "connectionId": "search:" + provider, "key": key,
                 "price": Price(**settings["prices"][price_key]) if price_key in settings["prices"] else None}
 
     async def search(self, query, objective="", *, model_id=None, usage_context=None):
         if not query.strip() or len(query) > 4000 or len(objective) > 4000:
-            raise ContractError("invalid_input", "Search requires a nonempty query of at most 4000 characters")
+            raise ContractError("invalid_input", t("Search requires a nonempty query of at most 4000 characters"))
         selected = await self.select(model_id)
         if usage_context is not None and usage_context.unattended:
             return await retry_request(lambda: self._selected_search(selected, query, objective, usage_context))
@@ -145,13 +146,13 @@ class SearchService:
     def _payload(provider, site, query, objective):
         if provider == "deepseek":
             if len(query) > 128 or len(objective) > 128:
-                raise ContractError("invalid_input", "DeepSeek search query and objective each allow at most 128 characters")
+                raise ContractError("invalid_input", t("DeepSeek search query and objective each allow at most 128 characters"))
             return {"query": query, "count": 5, "need_content": False, **({"ori_question": objective} if objective else {})}
         text = query + ("\n" + objective if objective else "")
         if provider == "moonshotai":
             return {"text_query": text, "limit": 5, "timeout_seconds": 25}
         if site == "domestic" and len(text) > 70:
-            raise ContractError("invalid_input", "Zhipu domestic search allows at most 70 query characters")
+            raise ContractError("invalid_input", t("Zhipu domestic search allows at most 70 query characters"))
         return {"search_query": text, "search_engine": "search_pro" if site == "domestic" else "search-prime", "count": 5,
                 **({"search_intent": False} if site == "domestic" else {})}
 
@@ -161,16 +162,16 @@ class SearchService:
             async with httpx.AsyncClient(proxy=proxy, trust_env=False, timeout=30) as client:
                 async with client.stream("POST", endpoint, headers={"Authorization": "Bearer " + key}, json=payload) as response:
                     if response.status_code in {401, 403}:
-                        raise ContractError("credential_invalid", "The selected search site rejected its configured key")
+                        raise ContractError("credential_invalid", t("The selected search site rejected its configured key"))
                     if response.status_code == 429:
-                        raise ContractError("quota_exceeded", "The selected search site's quota or rate limit was reached") from httpx.HTTPStatusError(
+                        raise ContractError("quota_exceeded", t("The selected search site's quota or rate limit was reached")) from httpx.HTTPStatusError(
                             "Search request rate limited", request=response.request, response=response)
                     response.raise_for_status()
                     body = bytearray()
                     async for chunk in response.aiter_bytes():
                         body.extend(chunk)
                         if len(body) > 2 * 1024 * 1024:
-                            raise ContractError("invalid_output", "Search response exceeds the download limit")
+                            raise ContractError("invalid_output", t("Search response exceeds the download limit"))
                 data = json.loads(body)
             items = data["results"] if provider == "deepseek" else data["search_results"] if provider == "moonshotai" else data["search_result"]
             sources, text = [], []
@@ -189,7 +190,7 @@ class SearchService:
                 text.append(item["title"] + "\n" + url + "\n" + content)
             return {"provider": provider, "text": "\n\n".join(text), "sources": sources, "billingUnits": {unit: 1}}
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
-            raise ContractError("search_failed", "The selected search site returned an invalid response or could not be reached") from error
+            raise ContractError("search_failed", t("The selected search site returned an invalid response or could not be reached")) from error
 
     async def _exa(self, query, objective, proxy):
         async with httpx.AsyncClient(proxy=proxy, trust_env=False, timeout=30) as client:
@@ -199,7 +200,7 @@ class SearchService:
                     tools = await session.list_tools()
                     tool = next((item for item in tools.tools if item.name == "web_search_exa"), None)
                     if tool is None:
-                        raise ContractError("unavailable", "Exa's web search tool is not available")
+                        raise ContractError("unavailable", t("Exa's web search tool is not available"))
                     arguments = {"query": query + ("\n" + objective if objective else "")}
                     if "numResults" in tool.inputSchema["properties"]:
                         arguments["numResults"] = 5
@@ -207,7 +208,7 @@ class SearchService:
                         arguments["contextMaxCharacters"] = 12000
                     response = await session.call_tool(tool.name, arguments)
                     if response.isError:
-                        raise ContractError("search_failed", "Exa search failed or its free quota was exceeded; choose Tavily in Search settings to change provider")
+                        raise ContractError("search_failed", t("Exa search failed or its free quota was exceeded; choose Tavily in Search settings to change provider"))
                     text = "\n".join(block.text for block in response.content if block.type == "text")
                     urls = list(dict.fromkeys(url.rstrip(".,);]") for url in re.findall(r"https?://[^\s<>\"']+", text)))
                     return {"provider": "exa", "text": text, "sources": [self.source(url, url) for url in urls if safe_source(url)],
@@ -220,9 +221,9 @@ class SearchService:
                     json={"query": query + ("\n" + objective if objective else ""), "max_results": 5,
                           "search_depth": "basic", "include_raw_content": False})
                 if response.status_code in {401, 403}:
-                    raise ContractError("credential_invalid", "Tavily rejected the configured API key")
+                    raise ContractError("credential_invalid", t("Tavily rejected the configured API key"))
                 if response.status_code == 429:
-                    raise ContractError("quota_exceeded", "Tavily quota reached; change the key or wait for the quota reset") from httpx.HTTPStatusError(
+                    raise ContractError("quota_exceeded", t("Tavily quota reached; change the key or wait for the quota reset")) from httpx.HTTPStatusError(
                         "Search request rate limited", request=response.request, response=response)
                 response.raise_for_status()
                 data = response.json()
@@ -231,7 +232,7 @@ class SearchService:
                     "sources": [self.source(item["url"], item["title"]) for item in results if safe_source(item["url"])],
                     "billingUnits": {"tavily_credit": 1}}
         except (httpx.HTTPError, ValueError, KeyError) as error:
-            raise ContractError("search_failed", "Tavily search failed; check Search settings and the network") from error
+            raise ContractError("search_failed", t("Tavily search failed; check Search settings and the network")) from error
 
     @staticmethod
     def source(url, title, published=None):

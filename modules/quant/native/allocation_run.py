@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from native import allocation_results as R  # noqa: E402
 from native import allocation_work as W  # noqa: E402
+from native import i18n
 from native.allocation_holdings import benchmark_returns, hold_period, new_period  # noqa: E402
 from native.allocation_prices import aligned_lookback, daily_returns  # noqa: E402
 from native.figures import num  # noqa: E402
@@ -46,9 +47,12 @@ def clean(value):
 
 
 def returns_of(job):
-    """Daily returns of the pool from the frozen bars (see `daily_returns`)."""
+    """Daily returns of the pool from the frozen bars (see `daily_returns`), and in `info["benchmark"]` the benchmark's on the same days (`benchmark_daily`)."""
     bars = pd.read_parquet(job["data"]["barsPath"], columns=["label", "column", "close"])
-    return daily_returns(bars, [row["ticker"] for row in job["settings"].get("pool", [])], job["settings"], job["data"].get("info", {}).get("sessionZones"))
+    zones = job["data"].get("info", {}).get("sessionZones")
+    returns, info = daily_returns(bars, [row["ticker"] for row in job["settings"].get("pool", [])], job["settings"], zones)
+    info["benchmark"] = W.benchmark_daily(bars, job["settings"]["benchmarkColumns"], info["closes"].index, zones)
+    return returns, info
 
 
 RETURNS = {}  # frozen bars path -> (returns, info): the resident process keeps the newest two
@@ -56,7 +60,8 @@ RETURNS = {}  # frozen bars path -> (returns, info): the resident process keeps 
 
 def cached_returns(job):
     settings = job["settings"]
-    key = (job["data"]["barsPath"], tuple(row["ticker"] for row in settings.get("pool", [])), settings.get("align"), str(settings.get("proxyColumns")), str(settings.get("fxColumns")))
+    key = (job["data"]["barsPath"], tuple(row["ticker"] for row in settings.get("pool", [])), settings.get("align"), str(settings.get("proxyColumns")), str(settings.get("fxColumns")),
+           str(settings["benchmarkColumns"]))
     if key not in RETURNS:
         RETURNS[key] = returns_of(job)
         while len(RETURNS) > 2:
@@ -83,11 +88,6 @@ def annualization(job, info):
     return int(info.get("annualization") or job["data"]["info"]["annualization"])
 
 
-def benchmark_of(returns):
-    """The 60/40 of SPY and IEF the tracking limits, the 60/40 line and the attribution are against; None when the pool lacks either."""
-    return returns["SPY"] * 0.6 + returns["IEF"] * 0.4 if {"SPY", "IEF"} <= set(returns.columns) else None
-
-
 def trial(job, fitter=None):
     """One period, the same fit as the backtest's: {ok, period, rows, seconds, ...}. Fitted at the close before `job.heldFrom` from the holding `job.previous` when
     they are given (the period of the run it is compared with, or a published period under review: the moment those weights were fitted); else at the newest
@@ -105,7 +105,7 @@ def trial(job, fitter=None):
     pool = list(returns.columns)
     settings = {**settings, "pool": [row for row in settings.get("pool", []) if row["ticker"] in pool], "lookback": aligned_lookback(settings),
                 "annualization": annualization(job, info)}
-    benchmark = benchmark_of(returns)
+    benchmark = info["benchmark"]
     try:
         W.check_feasible(settings, pool)
         if fitter is None:
@@ -166,16 +166,18 @@ def allocate(settings, estimator=None):
         job = ACTIVE["job_input"]
         returns, info = cached_returns(job)
         effective = {**job["settings"], **settings, "annualization": annualization(job, info)}
-        fitter = (lambda window, previous: W.fit_custom(window, estimator, previous, effective, benchmark_of(returns))) if estimator is not None else None
+        fitter = (lambda window, previous: W.fit_custom(window, estimator, previous, effective, info["benchmark"])) if estimator is not None else None
         result = ACTIVE["operation"]({**job, "settings": effective}, fitter)
         ACTIVE["result"] = result
         return result
     if "returns" in ACTIVE:
-        returns, annual, rate = ACTIVE["returns"], ACTIVE["annualization"], ACTIVE["riskFree"]
+        returns, annual, rate, benchmark = ACTIVE["returns"], ACTIVE["annualization"], ACTIVE["riskFree"], ACTIVE["benchmark"]
     else:
         data = q.data()
         pool = [row["ticker"] for row in settings.get("pool", [])]
         returns, info = daily_returns(data.bars, pool, settings, data.info.get("sessionZones"))
+        # a notebook's q.allocate follows a benchmark only when its settings name the columns (`benchmarkColumns`) of bars it holds
+        benchmark = W.benchmark_daily(data.bars, settings.get("benchmarkColumns"), info["closes"].index, data.info.get("sessionZones"))
         annual = int(info.get("annualization") or data.annualization)
         frozen_rate = (q._Run.invocation or {}).get("riskFree")
         rate = W.risk_free_per_bar(frozen_rate, returns.index, annual) if frozen_rate else 0.0
@@ -185,7 +187,6 @@ def allocate(settings, estimator=None):
     settings = {**settings, "pool": [row for row in settings.get("pool", []) if row["ticker"] in returns.columns] or [{"ticker": c, "group": "Other"} for c in returns.columns],
                 "annualization": annual}
     returns = returns[[row["ticker"] for row in settings["pool"]]]
-    benchmark = benchmark_of(returns)
     fitter = None
     if estimator is not None:
         fitter = lambda window, previous: W.fit_custom(window, estimator, previous, settings, benchmark)  # noqa: E731
@@ -214,7 +215,7 @@ def values(job, fitter=None):
     pool = list(returns.columns)
     settings = {**settings, "pool": [row for row in settings.get("pool", []) if row["ticker"] in pool], "annualization": annualization(job, info)}
     lookback, every = aligned_lookback(settings), job.get("every", "month")
-    benchmark = benchmark_of(returns)   # a benchmark-tracking allocation goes on tracking the same 60/40
+    benchmark = info["benchmark"]   # a benchmark-tracking allocation goes on tracking the same benchmark
     if fitter is None:
         W.check_settings(settings, pool, benchmark)
     rate = W.risk_free_per_bar(job["riskFree"], returns.index, settings["annualization"])
@@ -271,7 +272,7 @@ def run(job):
     if problem:
         raise ValueError(problem)
     W.check_feasible(settings, pool)
-    benchmark = benchmark_of(returns)
+    benchmark = info["benchmark"]
     if not job.get("code"):
         W.check_settings(settings, pool, benchmark)  # a setting that cannot work stops the run here, named, before any period
     rate = W.risk_free_per_bar(job["riskFree"], returns.index, annual)   # the run's risk-free rate an observation; None when Market has none
@@ -288,7 +289,7 @@ def run(job):
             stream.write(json.dumps(row) + "\n")
 
     if job.get("code"):  # the allocation is written as code: the file runs and its q.allocate does the walk-forward on these returns
-        result = run_code(job, settings, returns=returns, annualization=annual, riskFree=rate, progress=progress, on_period=on_period)
+        result = run_code(job, settings, returns=returns, annualization=annual, riskFree=rate, benchmark=benchmark, progress=progress, on_period=on_period)
         if ACTIVE.get("estimator"):
             settings = {**settings, "estimator": ACTIVE["estimator"]}
     else:
@@ -422,7 +423,7 @@ def main():
     except Exception as error:  # noqa: BLE001
         traceback.print_exc()
         fields = list(getattr(error, "fields", []))
-        answer = {"ok": False, "failure": {"stage": "settings" if fields else "compute", "title": "stopped", "message": str(error).splitlines()[0] if str(error) else type(error).__name__,
+        answer = {"ok": False, "failure": {"stage": "settings" if fields else "compute", "title": i18n.t("stopped"), "message": str(error).splitlines()[0] if str(error) else type(error).__name__,
                                            "fields": fields, "traceback": traceback.format_exc()[-1500:]}}
     write_json(output / "answer.json", answer)
     return 0 if answer.get("ok") else 1

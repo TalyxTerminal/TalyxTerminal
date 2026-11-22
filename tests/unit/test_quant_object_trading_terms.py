@@ -9,6 +9,7 @@ import pytest
 from talyx_sdk import ContractError
 
 from modules.quant.backend import object_data
+from tests.fixtures.quant_index import frozen_index
 from tests.unit.quant_runtime_fakes import adapt
 from tests.unit.test_quant_object_runs import INDEX, FakeContext
 from vocabulary.instruments import MarketInstrument
@@ -66,7 +67,7 @@ def test_dated_terms_fail_explicit_lists_and_disclose_failed_index_members(code,
         calls.append(args)
         raise ContractError(code, "source result")
 
-    index = {"exclusions": [], "intervals": [{"since": 0, "until": 100, "members": [{"assetId": STOCK["instrumentId"], "instrument": STOCK}]}]} if indexed else None
+    index = frozen_index({"exclusions": [], "intervals": [{"since": 0, "until": 100, "members": [{"assetId": STOCK["instrumentId"], "instrumentId": STOCK["instrumentId"], "symbol": STOCK["displaySymbol"]}]}]}) if indexed else None
     ctx = adapt(SimpleNamespace(require=lambda name: SimpleNamespace(terms=read)))
     request = object_data.trading_terms(ctx, [STOCK], selections=[{"instrument": STOCK, "series": {"instrumentId": STOCK["instrumentId"]}}],
         since=0, until=100, allow_missing_prices=indexed, index=index)
@@ -107,8 +108,8 @@ def test_index_stocks_share_one_cash_account_without_losing_listing_identity():
 def test_missing_dividend_price_evidence_is_disclosed_with_the_source_reason():
     async def read(args):
         raise ContractError('history_unavailable', 'ABC: no previous source session for dividend share basis', {'missingPriceEvidence': True})
-    index = {'exclusions': [], 'intervals': [{'since': 0, 'until': 100,
-        'members': [{'assetId': STOCK['instrumentId'], 'instrument': STOCK}]}]}
+    index = frozen_index({'exclusions': [], 'intervals': [{'since': 0, 'until': 100,
+        'members': [{'assetId': STOCK['instrumentId'], 'instrumentId': STOCK['instrumentId'], 'symbol': STOCK['displaySymbol']}]}]})
     ctx = adapt(SimpleNamespace(require=lambda _: SimpleNamespace(terms=read)))
     result = asyncio.run(object_data.trading_terms(ctx, [STOCK], selections=[{'instrument': STOCK, 'series': {}}],
         since=0, until=100, allow_missing_prices=True, index=index))
@@ -121,8 +122,8 @@ def test_missing_dividend_price_evidence_is_disclosed_with_the_source_reason():
 def test_an_index_member_whose_price_evidence_market_refuses_is_left_out_not_failing_the_run():
     async def read(args):
         raise ContractError('unavailable', 'ABC 2025-09-15: Yahoo dividend share basis does not match its adjusted price evidence')
-    index = {'exclusions': [], 'intervals': [{'since': 0, 'until': 100,
-        'members': [{'assetId': STOCK['instrumentId'], 'instrument': STOCK}]}]}
+    index = frozen_index({'exclusions': [], 'intervals': [{'since': 0, 'until': 100,
+        'members': [{'assetId': STOCK['instrumentId'], 'instrumentId': STOCK['instrumentId'], 'symbol': STOCK['displaySymbol']}]}]})
     ctx = adapt(SimpleNamespace(require=lambda _: SimpleNamespace(terms=read)))
     result = asyncio.run(object_data.trading_terms(ctx, [STOCK], selections=[{'instrument': STOCK, 'series': {}}],
         since=0, until=100, allow_missing_prices=True, index=index))
@@ -138,7 +139,7 @@ def prepared_context(tmp_path, instruments):
     """Market's task export is a long table; real Materials/capture splits it by identity."""
     market_terms = {item["instrumentId"]: terms(item) for item in instruments}
     for value in market_terms.values():
-        value["stock"]["sessions"] = [{"openAt": "1970-01-01T00:00:00Z", "closeAt": "1970-01-01T00:00:00.001Z", "adjustedOHLC": ["100.5", "101", "99.5", "100"]}]
+        value["stock"]["sessions"] = [{"sessionDate": "1970-01-01", "lower": None, "upper": None, "priceIncrement": "0.01", "priceMap": {"scale": "1", "offset": "0", "maxError": "0"}, "openAt": "1970-01-01T00:00:00Z", "closeAt": "1970-01-01T00:00:00.001Z", "adjustedOHLC": ["100.5", "101", "99.5", "100"]}]
     market = Market(market_terms)
     artifacts = {}
 
@@ -247,26 +248,34 @@ def entries(*pairs):
     return {"BINANCE": [(native(instrument, market)[0], market, instrument["displaySymbol"]) for instrument, market in pairs]}
 
 
-def test_the_venue_fee_is_markets_and_the_taker_rate_reaches_every_traded_instrument():
+def test_each_traded_instrument_carries_its_own_market_fee():
     venues = entries((PERP, terms(PERP)))
     venue, = object_data.venue_for(venues, {})
-    assert venue["fees"] == {"type": "maker_taker", "maker": 0.0002, "taker": 0.0005} and venue["accountType"] == "MARGIN"
-    assert venues["BINANCE"][0][0]["takerFee"] == "0.0005"
+    assert venue["fees"] == {"type": "per_instrument"} and venue["accountType"] == "MARGIN"
+    assert (venues["BINANCE"][0][0]["makerFee"], venues["BINANCE"][0][0]["takerFee"]) == ("0.0002", "0.0005")
 
 
 def test_the_account_fee_wins_and_makes_a_missing_market_fee_irrelevant():
     venues = entries((SPOT, terms(SPOT, fees=None)))
     venue, = object_data.venue_for(venues, {"fee": {"maker": 0.0001, "taker": 0.0002}})
-    assert venue["fees"]["taker"] == 0.0002 and venues["BINANCE"][0][0]["takerFee"] == "0.0002"
+    assert venues["BINANCE"][0][0]["takerFee"] == "0.0002"
 
 
-def test_no_fee_is_made_up_when_market_has_none_or_the_markets_disagree():
+def test_no_fee_is_made_up_and_symbols_charged_differently_each_keep_their_own():
     with pytest.raises(ContractError, match=r"Market has no fees for BTC/USDT .*account settings") as error:
         object_data.venue_for(entries((SPOT, terms(SPOT, fees=None))), {})
     assert error.value.code == "unavailable"
-    with pytest.raises(ContractError, match="different fees") as error:
-        object_data.venue_for(entries((SPOT, terms(SPOT, fees=(0.001, 0.001))), (PERP, terms(PERP))), {})
-    assert error.value.code == "invalid_input"
+    venues = entries((SPOT, terms(SPOT, fees=(0.001, 0.001))), (PERP, terms(PERP)))
+    object_data.venue_for(venues, {})
+    assert [(item["makerFee"], item["takerFee"]) for item, _, _ in venues["BINANCE"]] == [("0.001", "0.001"), ("0.0002", "0.0005")]
+
+
+def test_a_fee_from_the_venues_standard_tier_is_assumed():
+    standard = terms(PERP)
+    standard["fees"] = {**standard["fees"], "basis": "market_fee_table"}
+    assert object_data.assumed_fees(entries((PERP, standard)), {}) == ["BINANCE"]
+    assert object_data.assumed_fees(entries((PERP, terms(PERP))), {}) == []
+    assert object_data.assumed_fees(entries((PERP, standard)), {"fee": {"maker": 0.0001, "taker": 0.0002}}) == []
 
 
 def test_stocks_keep_their_fixed_zero_commission():
@@ -399,9 +408,10 @@ def test_data_progress_is_kept_in_memory_and_read_while_the_data_is_fetched(tmp_
 def test_a_strategy_run_says_which_names_its_data_left_out():
     from modules.quant.backend.strategy_views import left_out
     record = {'data': {'traded': 2, 'skipped': [{'symbol': 'META', 'reason': 'META 2024-06-14: Yahoo dividend share basis does not match its adjusted price evidence'}]}}
-    assert left_out(record) == ['Left out 1 of 3 names, so it traded 2: META 2024-06-14: Yahoo dividend share basis does not match its adjusted price evidence']
-    many = {'data': {'traded': 0, 'skipped': [{'symbol': name} for name in 'ABCDE']}}
-    assert left_out(many) == ['Left out 5 of 5 names, so it traded 0: A; B; C; and 2 more'] and left_out({'data': {}}) == []
+    assert left_out(record) == ['1 of 3 names have no prices: META 2024-06-14: Yahoo dividend share basis does not match its adjusted price evidence']
+    many = {'data': {'traded': 1, 'skipped': [{'symbol': name, 'reason': 'no prices'} for name in 'ABCDEFG']}}
+    assert left_out(many) == ['7 of 8 names have no prices: A: no prices; B: no prices; C: no prices; D: no prices; E: no prices; and 2 more']
+    assert left_out({'data': {}}) == []
 
 
 def test_a_strategy_run_says_when_its_library_signal_stops_long_before_the_period_ends():
@@ -431,7 +441,9 @@ def test_a_listed_symbol_missing_a_session_runs_through_it_and_the_data_names_th
     settings = {"data": {"symbols": [{"instrument": abc}], "timeframe": "1d", "since": "1970-01-01", "until": "1970-01-02"}, "account": {"capital": 1000}}
     result = asyncio.run(object_data.prepare(ctx, settings, "run", tmp_path))
     assert asked == [True]
-    assert result["summary"]["gaps"] == [{"symbol": "ABC", "days": ["1970-01-02"]}]
+    # Its prices stop before the run's last session: that is the name's end (sold at its last close), not a gap.
+    assert result["summary"]["gaps"] == []
+    assert [item["symbol"] for item in result["summary"]["ended"]] == ["ABC"]
     assert result["summary"]["instruments"][0]["missingBars"] == 1 and result["summary"]["traded"] == 1
 
 

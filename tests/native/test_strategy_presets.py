@@ -31,7 +31,7 @@ def instrument_id(name, perpetual):
 def bars(root, perpetual, count):
     rng = np.random.default_rng(3)
     opened = pd.date_range("2024-01-01", periods=HOURS, freq="h", tz="UTC")
-    ends = [str(value) for value in opened.as_unit("ns").asi8 + HOUR_NS]
+    ends = opened.as_unit("ns").asi8 + HOUR_NS
     frames, terms = [], []
     for number, name in enumerate(NAMES[:count]):
         identity = instrument_id(name, perpetual)

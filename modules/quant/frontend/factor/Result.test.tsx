@@ -89,13 +89,6 @@ describe("Factor Work: the page says nothing the data does not", () => {
     const work = {kind: "heldout" as const, numbers: numbers({days: 400}), years: [], figures: {heldout: figures.groups}, from: Date.UTC(2025, 6, 1), to: Date.UTC(2026, 10, 5), dataTo: 0, dataFrom: 0, notes: [], seconds: 1};
     expect(html(createElement(HeldOutBlock, {run: run({kind: "heldout", of: "r1", ofNumber: 1}), work, source: run({id: "r1", number: 1}), handlers: handlers()}))).not.toContain("Publish");
   });
-  it("held-out under 250 days says short sample", () => {
-    const heldOut = (days: number) => html(createElement(HeldOutBlock, {run: run({kind: "heldout", of: "r1", ofNumber: 1}), source: run({id: "r1", number: 1}), handlers: handlers(),
-      work: {kind: "heldout", numbers: numbers({days}), years: [], figures: {heldout: figures.groups}, from: Date.UTC(2026, 3, 1), to: Date.UTC(2026, 10, 5), dataTo: 0, dataFrom: 0, notes: [], seconds: 1}}));
-    expect(heldOut(120)).toContain("short sample");
-    expect(heldOut(120)).not.toContain("annual number from so few days");
-    expect(heldOut(400)).not.toContain("short sample");
-  });
   it("confirm names earlier uses", () => {
     expect(heldOutUsedLine(3)).toBe("This held-out period was already used 3 times for this formula.");
     expect(heldOutUsedLine(0)).toBeNull();

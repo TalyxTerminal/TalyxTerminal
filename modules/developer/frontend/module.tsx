@@ -1,5 +1,6 @@
+import { t } from "./i18n";
 import { createRoot } from "react-dom/client";
-import { ModuleContextProvider, TxRoot, failure, type Json, type ModuleContext, type PanelRef } from "@talyx/sdk";
+import { language, ModuleContextProvider, TxRoot, failure, type Json, type ModuleContext, type PanelRef } from "@talyx/sdk";
 import { DeveloperWorkbench, type WorkbenchState } from "./workbench/DeveloperWorkbench";
 import { documents } from "./documents/service";
 import { mountProjectEditor } from "./documents/projectEditorView";
@@ -24,7 +25,7 @@ async function openTarget(objectId: unknown) {
 }
 
 export function mountDeveloperPanel(element: HTMLElement, ctx: ModuleContext) {
-  if (!ctx.panelRef) throw failure("invalid_target", "Developer requires a mounted panel.");
+  if (!ctx.panelRef) throw failure("invalid_target", t("Developer requires a mounted panel."));
   const { objectId, ...initial } = (ctx.initialState ?? {}) as WorkbenchState & { objectId?: unknown };
   const existing = liveInstances(ctx).find(record => record.ref.panelId !== ctx.panelRef!.panelId);
   if (existing) {
@@ -57,7 +58,8 @@ export function mountDeveloperPanel(element: HTMLElement, ctx: ModuleContext) {
     prepareLeave: () => documents.prepareViewLeave(ctx.panelRef!.mountId), dispose };
 }
 
-export function activate(ctx: ModuleContext): void {
+export async function activate(ctx: ModuleContext): Promise<void> {
+  if (language() === "zh-CN") await import("monaco-editor/esm/nls.messages.zh-cn.js");
   ctx.onDispose(documents.bind(ctx));
   ctx.onDispose(mountCloseProtection(ctx));
   ctx.onDispose(bindLanguage(ctx));

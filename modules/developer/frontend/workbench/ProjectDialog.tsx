@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useState } from "react";
 import { TxAlert, TxButton, TxDialog, TxDisclosure, TxField, TxInput, type ModuleContext } from "@talyx/sdk";
 import { createClient } from "../../public/ts/types";
@@ -27,16 +28,16 @@ export function ProjectDialog({ ctx, mode, onClose, onCreated }: {
     finally { setWorking(false); }
   };
   const ready = mode === "new" ? !!name.trim() && !invalidId : !!directory.trim();
-  return <TxDialog open onOpenChange={open => { if (!open && !working) onClose(); }} title={mode === "new" ? "New TALYX module" : "Open folder"} footer={<>
-    <TxButton disabled={working} onClick={onClose}>Cancel</TxButton>
-    <TxButton variant="primary" loading={working} disabled={!ready} onClick={() => void submit()}>{mode === "new" ? "Create module" : "Open"}</TxButton>
+  return <TxDialog open onOpenChange={open => { if (!open && !working) onClose(); }} title={mode === "new" ? t("New TALYX module") : t("Open folder")} footer={<>
+    <TxButton disabled={working} onClick={onClose}>{t("Cancel")}</TxButton>
+    <TxButton variant="primary" loading={working} disabled={!ready} onClick={() => void submit()}>{mode === "new" ? t("Create module") : t("Open")}</TxButton>
   </>}>
-    {error && <TxAlert title="Unable to continue">{error}</TxAlert>}
-    {mode === "new" && <TxField label="Name"><TxInput autoFocus value={name} disabled={working} onChange={event => setName(event.target.value)} /></TxField>}
-    {mode === "new" && <TxDisclosure label="Advanced" open={invalidId || undefined}>
-      <TxField label="Module id" error={invalidId ? "Use lowercase letters, numbers and underscores; start with a letter." : undefined}>
+    {error && <TxAlert title={t("Unable to continue")}>{error}</TxAlert>}
+    {mode === "new" && <TxField label={t("Name")}><TxInput autoFocus value={name} disabled={working} onChange={event => setName(event.target.value)} /></TxField>}
+    {mode === "new" && <TxDisclosure label={t("Advanced")} open={invalidId || undefined}>
+      <TxField label={t("Module id")} error={invalidId ? t("Use lowercase letters, numbers and underscores; start with a letter.") : undefined}>
         <TxInput value={moduleId} disabled={working} onChange={event => setIdentifier(event.target.value)} /></TxField>
     </TxDisclosure>}
-    {mode === "open" && <TxField label="Location"><TxInput aria-label="Location" autoFocus placeholder="D:\Projects\folder" value={directory} disabled={working} onChange={event => setDirectory(event.target.value)} /></TxField>}
+    {mode === "open" && <TxField label={t("Location")}><TxInput aria-label={t("Location")} autoFocus placeholder={t("D:\\Projects\\folder")} value={directory} disabled={working} onChange={event => setDirectory(event.target.value)} /></TxField>}
   </TxDialog>;
 }

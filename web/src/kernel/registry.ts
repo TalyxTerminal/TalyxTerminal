@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* The window's module registry: the modules' declarations as the Host lists them (manifest and contract, version 5),
    their running frontends, and the panels and views they draw here. Calls to public actions go to the Host as they
    are; the module that receives one checks its input. What stays in the window: panels, views, a panel's own actions
@@ -99,7 +100,7 @@ export class FrontendKernel {
   private reach(owner: string, name: string): void {
     const target = name.split(".", 1)[0];
     if (target !== "platform" && target !== owner && owner !== "platform" && !this.definitions.get(owner)?.manifest.requires?.[target])
-      throw failure("permission_denied", `${owner} does not list ${target} in its requires`);
+      throw failure("permission_denied", t("{owner} does not list {target} in its requires", { owner, target }));
   }
 
   /* ── frontends ──────────────────────────────────────────────────────────────────────────────────────────── */
@@ -107,7 +108,7 @@ export class FrontendKernel {
   /** Runs a module's frontend entry; it must provide every panel and view its manifest declares. */
   async activate(definition: ModuleDefinition, activate: (ctx: ModuleContext) => unknown | Promise<unknown>): Promise<void> {
     const owner = definition.id;
-    if (this.modules.has(owner)) throw failure("conflict", `${owner} is already running here`);
+    if (this.modules.has(owner)) throw failure("conflict", t("{owner} is already running here", { owner }));
     const scope = this.scope.child(`${owner}:${crypto.randomUUID()}`);
     const live = { definition, scope, ready: false } as LiveModule;
     live.ctx = this.context(live, scope);
@@ -116,7 +117,7 @@ export class FrontendKernel {
       await activate(live.ctx);
       const declared = [...Object.keys(definition.manifest.panels ?? {}), ...Object.keys(definition.manifest.views ?? {})].map(local => `${owner}.${local}`);
       const missing = declared.filter(name => !this.factories.has(name));
-      if (missing.length) throw failure("invalid_input", `The frontend does not provide ${missing.join(", ")}`);
+      if (missing.length) throw failure("invalid_input", t("The frontend does not provide {join}", { join: missing.join(", ") }));
       live.ready = true;
     } catch (error) {
       this.modules.delete(owner);
@@ -147,7 +148,7 @@ export class FrontendKernel {
   }
   prepareLeave(reason: string): LeaveDecision[] { return [...this.panels.values()].map(p => p.instance.prepareLeave?.(reason) ?? { decision: "allow" }); }
   private register(scope: Scope, name: string, value: { mount: Mount; styles?: string }): void {
-    if (this.factories.has(name)) throw failure("invalid_input", `${name} is provided twice`);
+    if (this.factories.has(name)) throw failure("invalid_input", t("{name} is provided twice", { name }));
     this.factories.set(name, value);
     scope.track(() => { this.factories.delete(name); });
   }
@@ -177,10 +178,10 @@ export class FrontendKernel {
     const panel = this.panel(target);
     const [module, local] = name.split(".", 2);
     const declared = this.panelType(panel.type);
-    if (!declared || declared.owner !== module || !declared.spec.actions?.[local]) throw failure("unknown_capability", `${panel.type} has no action ${name}`);
+    if (!declared || declared.owner !== module || !declared.spec.actions?.[local]) throw failure("unknown_capability", t("{type} has no action {name}", { type: panel.type, name }));
     validateView(withDefinitions(declared.spec.actions[local] as Schema, this.definitions.get(module)!), input);
     const handler = this.panelActions.get(`${name}#${panel.ref.panelId}/${panel.ref.mountId}`);
-    if (!handler) throw failure("unavailable", `${name} is not handled by this panel`);
+    if (!handler) throw failure("unavailable", t("{name} is not handled by this panel", { name }));
     const caller: Caller = { origin: "user", module: owner === "platform" ? null : owner };
     return await handler(copy(input), { caller, signal: signal ?? new AbortController().signal });
   }
@@ -195,8 +196,8 @@ export class FrontendKernel {
   /** Opens a panel of a running module. `owner` opening another module's panel needs it to be public. */
   async openPanel(owner: string, input: { type: string; state?: Json }): Promise<PanelRef> {
     const declared = this.panelType(input.type);
-    if (!declared) throw failure("unknown_capability", `No panel type ${input.type}`);
-    if (declared.owner !== owner && owner !== "platform" && declared.spec.visibility === "private") throw failure("permission_denied", `${input.type} is private to its module`);
+    if (!declared) throw failure("unknown_capability", t("No panel type {type}", { type: input.type }));
+    if (declared.owner !== owner && owner !== "platform" && declared.spec.visibility === "private") throw failure("permission_denied", t("{type} is private to its module", { type: input.type }));
     return this.mountable(input.type).open(input.type, input.state ?? null);
   }
   /** Opens one object in the panel its module declares for it; the caller needs no dependency on that module. A panel
@@ -205,7 +206,7 @@ export class FrontendKernel {
   async openTarget(target: { module: string; panelType: string; objectId: string }): Promise<PanelRef> {
     const type = `${target.module}.${target.panelType}`;
     const declared = this.panelType(type);
-    if (!declared || declared.spec.visibility === "private") throw failure("invalid_input", `${type} is not a public panel`);
+    if (!declared || declared.spec.visibility === "private") throw failure("invalid_input", t("{type} is not a public panel", { type }));
     const shows = (panel: LivePanel) => {
       const reported = this.viewReports.get(panel.ref.panelId)?.openTargets;
       return reported ? reported.some(item => item.key === target.objectId)
@@ -216,8 +217,8 @@ export class FrontendKernel {
     return this.mountable(type).open(type, { objectId: target.objectId });
   }
   private mountable(type: string): PanelShell {
-    if (!this.modules.get(type.split(".", 1)[0])?.ready || !this.factories.has(type)) throw failure("unavailable", `${type} is not available`);
-    if (!this.shell) throw failure("ui_required", "No workspace is shown in this window");
+    if (!this.modules.get(type.split(".", 1)[0])?.ready || !this.factories.has(type)) throw failure("unavailable", t("{type} is not available", { type }));
+    if (!this.shell) throw failure("ui_required", t("No workspace is shown in this window"));
     return this.shell;
   }
   /** The panels as the Host reads them (panels.list). */
@@ -231,7 +232,7 @@ export class FrontendKernel {
     : { ref: PanelRef; instance: Instance; setPresentation(active: boolean, visible: boolean): void } {
     const declared = this.panelType(type), live = declared && this.modules.get(declared.owner), factory = this.factories.get(type);
     if (!declared || !live?.ready || !factory) throw failure("unavailable");
-    if (new TextEncoder().encode(JSON.stringify(state)).length > maxStateBytes) throw failure("invalid_input", "Panel state exceeds 512 KB");
+    if (new TextEncoder().encode(JSON.stringify(state)).length > maxStateBytes) throw failure("invalid_input", t("Panel state exceeds 512 KB"));
     const owner = declared.owner;
     const scope = live.scope.child(`panel:${panelId}`), ref = { sessionId: this.sessionId, panelId, mountId: crypto.randomUUID() };
     const active = signalValue(false), visible = signalValue(true);
@@ -275,7 +276,7 @@ export class FrontendKernel {
     });
     try {
       instance = factory.mount(container, ctx);
-      if (!instance || typeof instance.dispose !== "function") throw failure("invalid_output", "Invalid panel lifecycle");
+      if (!instance || typeof instance.dispose !== "function") throw failure("invalid_output", t("Invalid panel lifecycle"));
       const ownLeave = instance.prepareLeave?.bind(instance);
       instance = { ...instance, prepareLeave: reason => {
         const decision = ownLeave?.(reason) ?? { decision: "allow" as const };
@@ -287,7 +288,7 @@ export class FrontendKernel {
         }
         return decision;
       } };
-      if (scope.disposed) throw failure("unavailable", "Panel reported a render fault while mounting");
+      if (scope.disposed) throw failure("unavailable", t("Panel reported a render fault while mounting"));
     } catch (error) {
       this.reportFault?.(owner, error);
       try { instance?.dispose(); } finally { this.disposeScope(scope, owner); container.remove(); overlay.remove(); }
@@ -332,7 +333,7 @@ export class FrontendKernel {
     this.reach(caller, name);
     const [owner, local] = name.split(".", 2);
     const live = this.modules.get(owner), factory = this.factories.get(name), spec = live?.definition.manifest.views?.[local];
-    if (!live?.ready || !factory || !spec) throw failure("unavailable", `${name} is not available`);
+    if (!live?.ready || !factory || !spec) throw failure("unavailable", t("{name} is not available", { name }));
     const propsSchema = withDefinitions(spec.props, live.definition);
     validateView(propsSchema, props);
     const scope = parentScope.child(`view:${name}`);
@@ -353,7 +354,7 @@ export class FrontendKernel {
     try {
       if (factory.styles) { style = document.createElement("style"); style.textContent = factory.styles; const target = container.getRootNode(); (target instanceof Document ? target.head : target).appendChild(style); }
       instance = factory.mount(container, ctx);
-      if (!instance || typeof instance.dispose !== "function") throw failure("invalid_output", "Invalid view lifecycle");
+      if (!instance || typeof instance.dispose !== "function") throw failure("invalid_output", t("Invalid view lifecycle"));
     } catch (error) { this.reportFault?.(owner, error); this.disposeScope(scope, owner); style?.remove(); container.remove(); overlay.remove(); throw error; }
     const dispose = () => { void releasePlaceholder?.(); this.disposeScope(scope, owner); };
     this.views.set(ref.viewInstanceId, { owner, scope, parentPanel, prepareLeave: instance.prepareLeave?.bind(instance), dispose: () => { dispose(); unavailable(); } });
@@ -369,7 +370,7 @@ export class FrontendKernel {
   /** The views of the last panel the user looked at report; a flush asks them to report now. */
   async flushViews(panelId?: string): Promise<void> {
     const selected = panelId ?? this.lastBusinessPanel?.panelId;
-    if (selected && !this.panels.has(selected)) throw failure("target_gone", "The observed panel has closed");
+    if (selected && !this.panels.has(selected)) throw failure("target_gone", t("The observed panel has closed"));
     if (selected) for (const flush of this.viewFlushers.get(selected) ?? []) await flush();
   }
 
@@ -406,14 +407,14 @@ export class FrontendKernel {
       active: ownedSignal(active), visible: ownedSignal(visible), overlayRoot: overlayRoot ?? document.createElement("div"),
       view: this.viewApi(scope, panel, ensureLive),
       panel: panel ? {
-        setTitle: title => { if (scope.disposed) return; if (typeof title !== "string") throw failure("invalid_input", "Panel title must be text"); panel.notifications.onTitleChange(title); },
+        setTitle: title => { if (scope.disposed) return; if (typeof title !== "string") throw failure("invalid_input", t("Panel title must be text")); panel.notifications.onTitleChange(title); },
         stateChanged: change => { if (scope.disposed) return; panel.notifications.onStateChange({ derived: change?.derived === true }); },
       } : undefined,
       reportFault: fault => { const message = faultGate.report(fault); if (message === null) return; this.reportFault?.(owner, message); onFault?.(message); this.disposeScope(scope, owner); },
       emit: (name, payload) => {
-        if (!view) throw failure("invalid_input", "Only embedded views emit");
+        if (!view) throw failure("invalid_input", t("Only embedded views emit"));
         const schema = view.emits[name];
-        if (schema === undefined) throw failure("invalid_output", `Undeclared view event ${name}`, null, "failed");
+        if (schema === undefined) throw failure("invalid_output", t("Undeclared view event {name}", { name }), null, "failed");
         ensureLive();
         validateView(schema, payload, true);
         view.on[name]?.(copy(payload));
@@ -421,11 +422,11 @@ export class FrontendKernel {
       actions: {
         handle: (local, handler) => {
           ensureLive();
-          if (!panel) throw failure("invalid_input", "Panel actions are handled by a panel");
+          if (!panel) throw failure("invalid_input", t("Panel actions are handled by a panel"));
           const name = `${owner}.${local}`, key = `${name}#${panel.ref.panelId}/${panel.ref.mountId}`;
           const declared = Object.values(live.definition.manifest.panels ?? {}).some(spec => spec.actions?.[local]);
-          if (!declared) throw failure("invalid_input", `${name} is not a declared panel action`);
-          if (this.panelActions.has(key)) throw failure("invalid_input", `${name} is handled twice`);
+          if (!declared) throw failure("invalid_input", t("{name} is not a declared panel action", { name }));
+          if (this.panelActions.has(key)) throw failure("invalid_input", t("{name} is handled twice", { name }));
           this.panelActions.set(key, handler);
           scope.track(() => { this.panelActions.delete(key); });
         },
@@ -434,13 +435,13 @@ export class FrontendKernel {
       streams: { subscribe },
       events: { subscribe: (name, callback, options) => subscribe(name, {}, callback, options) },
       views: {
-        provide: (name, mount, options) => { if (!live.definition.manifest.views?.[name]) throw failure("invalid_input", `${owner}.${name} is not a declared view`); this.register(scope, `${owner}.${name}`, { mount, ...options }); },
+        provide: (name, mount, options) => { if (!live.definition.manifest.views?.[name]) throw failure("invalid_input", t("{owner}.{name} is not a declared view", { owner, name })); this.register(scope, `${owner}.${name}`, { mount, ...options }); },
         mount: (name, root, props, on) => this.mountView(owner, scope, panel?.ref ?? parentRef, name, root, props, on),
       },
-      panels: { provide: (name, mount) => { if (!live.definition.manifest.panels?.[name]) throw failure("invalid_input", `${owner}.${name} is not a declared panel`); this.register(scope, `${owner}.${name}`, { mount }); } },
+      panels: { provide: (name, mount) => { if (!live.definition.manifest.panels?.[name]) throw failure("invalid_input", t("{owner}.{name} is not a declared panel", { owner, name })); this.register(scope, `${owner}.${name}`, { mount }); } },
       status: { set: (id, value) => {
         ensureLive();
-        if (!live.definition.manifest.provides?.["platform.status_item"]?.some(item => item.id === id)) throw failure("invalid_input", `Status item ${id} is not declared`);
+        if (!live.definition.manifest.provides?.["platform.status_item"]?.some(item => item.id === id)) throw failure("invalid_input", t("Status item {id} is not declared", { id }));
         this.statusValues.set(`${owner}.${id}`, value); this.changed();
       } },
       routes: this.routesApi(owner, scope, ensureLive),
@@ -468,12 +469,12 @@ export class FrontendKernel {
       },
       report: value => {
         ensureLive();
-        if (!panel) throw failure("invalid_input", "View reports require a panel");
-        if (value.summary.length > 2000 || JSON.stringify(value).length > 5800) throw failure("invalid_input", "View report exceeds its summary budget");
+        if (!panel) throw failure("invalid_input", t("View reports require a panel"));
+        if (value.summary.length > 2000 || JSON.stringify(value).length > 5800) throw failure("invalid_input", t("View report exceeds its summary budget"));
         this.viewReports.set(panel.ref.panelId, { ...copy(value), generation: value.generation ?? panel.ref.mountId });
       },
       onFlush: callback => {
-        if (!panel) throw failure("invalid_input", "View flush belongs to a panel");
+        if (!panel) throw failure("invalid_input", t("View flush belongs to a panel"));
         let callbacks = this.viewFlushers.get(panel.ref.panelId);
         if (!callbacks) { callbacks = new Set(); this.viewFlushers.set(panel.ref.panelId, callbacks); }
         callbacks.add(callback);
@@ -485,7 +486,7 @@ export class FrontendKernel {
   private routesApi(owner: string, scope: Scope, ensureLive: () => void): ModuleContext["routes"] {
     const url = (path: string) => {
       if (path.includes("\\") || path.startsWith("//") || /^[a-z]+:/i.test(path) || path.split(/[/?#]/).some(part => decodeURIComponent(part) === ".."))
-        throw failure("permission_denied", "Private path must stay inside the module");
+        throw failure("permission_denied", t("Private path must stay inside the module"));
       return `/m/${owner}/${path.replace(/^\//, "")}`;
     };
     return {
@@ -520,7 +521,7 @@ export class FrontendKernel {
         // The window's session and workspace ride as `talyx-` parameters, which the Host takes off; every other
         // parameter is the module's and reaches its route untouched. So a module cannot name one `talyx-...`.
         if ([...address.searchParams.keys()].some(name => name.startsWith("talyx-")))
-          throw failure("invalid_input", "A module's socket parameters cannot start with talyx- (the window's own)");
+          throw failure("invalid_input", t("A module's socket parameters cannot start with talyx- (the window's own)"));
         address.searchParams.set("talyx-session", this.sessionId);
         const shown = this.workspace.identity.get()?.workspaceId;
         if (shown) address.searchParams.set("talyx-workspace", shown);
@@ -538,8 +539,8 @@ export class FrontendKernel {
         active: type => [...this.panels.values()].find(p => p.active.get() && (!type || p.type === type))?.ref ?? null,
         setStatus: (ref, value) => {
           ensureLive();
-          if (this.panel(ref).type.split(".", 1)[0] !== owner) throw failure("permission_denied", "Panel status belongs to its module");
-          if (!["idle", "running", "attention"].includes(value.state) || typeof value.text !== "string") throw failure("invalid_input", "Invalid panel status");
+          if (this.panel(ref).type.split(".", 1)[0] !== owner) throw failure("permission_denied", t("Panel status belongs to its module"));
+          if (!["idle", "running", "attention"].includes(value.state) || typeof value.text !== "string") throw failure("invalid_input", t("Invalid panel status"));
           this.panelStatuses.set(ref.panelId, copy(value)); this.changed();
         },
         activate: ref => { this.panel(ref); this.shell?.activate(ref); },

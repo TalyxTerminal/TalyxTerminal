@@ -848,6 +848,87 @@
     "$ref": "#/$defs/TaskId"
    }
   },
+  "updates.check": {
+   "description": "Ask GitHub for the latest published version now.",
+   "effects": [
+    "external"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/UpdateState"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "updates.download": {
+   "description": "Download the newer version's installer and check its SHA-256 against the release's; returns at once, the progress\nfollows on updates.changes. The desktop installs it when the user asks (it quits, installs and opens again).",
+   "effects": [
+    "external",
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/UpdateState"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "updates.notes_seen": {
+   "description": "This version's notes have been read: they are not shown again.",
+   "effects": [
+    "write"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/UpdateState"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "updates.open": {
+   "description": "Open the newer version's release page (with its installer) in the default browser.",
+   "effects": [
+    "external"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/Empty"
+   },
+   "examples": [
+    {}
+   ]
+  },
+  "updates.read": {
+   "description": "This installation's version and the newer published one, if the last check found one.",
+   "effects": [
+    "read"
+   ],
+   "task": false,
+   "input": {
+    "$ref": "#/$defs/Empty"
+   },
+   "output": {
+    "$ref": "#/$defs/UpdateState"
+   },
+   "examples": [
+    {}
+   ]
+  },
   "workspace.close": {
    "description": "Close a workspace: everything running for it (listed by activity.list) is stopped first, for real. A workspace\nnever saved is deleted as workspace.delete deletes one.",
    "effects": [
@@ -1113,6 +1194,17 @@
     "$ref": "#/$defs/SettingsChange"
    }
   },
+  "updates.changes": {
+   "description": "The update state now, then after each check, download step and change.",
+   "cursor": false,
+   "trigger": false,
+   "params": {
+    "$ref": "#/$defs/Empty"
+   },
+   "item": {
+    "$ref": "#/$defs/UpdateState"
+   }
+  },
   "workspace.changes": {
    "description": "Workspaces opening, closing and being copied, from now on.",
    "cursor": false,
@@ -1171,6 +1263,34 @@
   }
  },
  "settings": {
+  "language": {
+   "title": "Language",
+   "description": "The language of TALYX's words. Windows reload to change it; unsaved work is kept.",
+   "globalOnly": true,
+   "group": "Appearance",
+   "schema": {
+    "enum": [
+     "en",
+     "zh-CN"
+    ],
+    "type": "string"
+   },
+   "default": "en",
+   "options": {
+    "en": "English",
+    "zh-CN": "简体中文"
+   }
+  },
+  "checkForUpdates": {
+   "title": "Tell me when a new version is out",
+   "description": "The desktop app asks GitHub for the latest release when it starts and once a day. Nothing about you is sent.",
+   "globalOnly": true,
+   "group": "Updates",
+   "schema": {
+    "type": "boolean"
+   },
+   "default": true
+  },
   "upColor": {
    "title": "Up color",
    "description": "Which color means up for prices, P&L, buy and sell, everywhere in TALYX.",
@@ -3259,6 +3379,71 @@
    "title": "PointInput",
    "type": "object"
   },
+  "Release": {
+   "additionalProperties": false,
+   "properties": {
+    "version": {
+     "title": "Version",
+     "type": "string"
+    },
+    "url": {
+     "description": "The release page, with the installer",
+     "title": "Url",
+     "type": "string"
+    },
+    "notes": {
+     "description": "What changed, as the release says (Markdown)",
+     "title": "Notes",
+     "type": "string"
+    },
+    "publishedAt": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Publishedat"
+    },
+    "installer": {
+     "description": "Whether the release has a Windows installer with a published SHA-256, so TALYX can download and install it itself",
+     "title": "Installer",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "version",
+    "url",
+    "notes",
+    "publishedAt",
+    "installer"
+   ],
+   "title": "Release",
+   "type": "object"
+  },
+  "ReleaseNotes": {
+   "additionalProperties": false,
+   "properties": {
+    "version": {
+     "description": "This installation's version",
+     "title": "Version",
+     "type": "string"
+    },
+    "notes": {
+     "description": "What changed in it, as its release says (Markdown)",
+     "title": "Notes",
+     "type": "string"
+    }
+   },
+   "required": [
+    "version",
+    "notes"
+   ],
+   "title": "ReleaseNotes",
+   "type": "object"
+  },
   "RevertChange": {
    "additionalProperties": false,
    "properties": {
@@ -4234,6 +4419,153 @@
     "nextCursor"
    ],
    "title": "ToolsPage",
+   "type": "object"
+  },
+  "UpdateDownload": {
+   "additionalProperties": false,
+   "properties": {
+    "version": {
+     "title": "Version",
+     "type": "string"
+    },
+    "state": {
+     "description": "ready: downloaded and its SHA-256 matches the release's",
+     "enum": [
+      "downloading",
+      "ready",
+      "failed"
+     ],
+     "title": "State",
+     "type": "string"
+    },
+    "received": {
+     "description": "Bytes downloaded so far",
+     "title": "Received",
+     "type": "integer"
+    },
+    "total": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "The installer's size in bytes, or null when unknown",
+     "title": "Total"
+    },
+    "problem": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Why it failed (a checksum that does not match deletes the download), or null",
+     "title": "Problem"
+    },
+    "path": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "The checked installer on this machine, once ready",
+     "title": "Path"
+    }
+   },
+   "required": [
+    "version",
+    "state",
+    "received",
+    "total",
+    "problem",
+    "path"
+   ],
+   "title": "UpdateDownload",
+   "type": "object"
+  },
+  "UpdateState": {
+   "additionalProperties": false,
+   "properties": {
+    "current": {
+     "description": "This installation's version",
+     "title": "Current",
+     "type": "string"
+    },
+    "latest": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Release"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "A newer published version, or null when none is known"
+    },
+    "checkedAt": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "When GitHub was last asked (ms), or null",
+     "title": "Checkedat"
+    },
+    "problem": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "Why the last check (or the last update's installer) failed, or null",
+     "title": "Problem"
+    },
+    "download": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/UpdateDownload"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "The newer version's installer being downloaded, or null"
+    },
+    "notes": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ReleaseNotes"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "This version's notes, until they have been seen once after it was installed; null otherwise"
+    }
+   },
+   "required": [
+    "current",
+    "latest",
+    "checkedAt",
+    "problem",
+    "download",
+    "notes"
+   ],
+   "title": "UpdateState",
    "type": "object"
   },
   "WindowOf": {

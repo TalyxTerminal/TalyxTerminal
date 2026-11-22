@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t
 
 from .materials import plain
 from .native_environment import bundled_wheels, prepare_lock
@@ -29,9 +30,9 @@ BASE_LOCKS = {"research": RUNTIME / "research.lock", "strategy": RUNTIME / "stra
 # What uv resolves for, and the interpreter version an environment is named by (runs use the same names, so a lock without user packages is the same environment).
 RESOLVE_FOR = {"research": "3.12", "strategy": "3.13"}
 PYTHON = {"research": "3.12", "strategy": "3.13.13", "deep": "3.12"}
-DEEP_VARIANTS = {"cpu": {"lock": "deep-cpu.lock", "torch": "2.15.0+cpu", "size": "about 1.5 GB", "label": "PyTorch 2.15 (CPU)"},
-                 "cuda": {"lock": "deep-cuda.lock", "torch": "2.15.0+cu132", "size": "about 3.4 GB", "label": "PyTorch 2.15 (CUDA 13.2)"},
-                 "xpu": {"lock": "deep-xpu.lock", "torch": "2.15.0+xpu", "size": "about 4 GB", "label": "PyTorch 2.15 (Intel XPU)"}}
+DEEP_VARIANTS = {"cpu": {"lock": "deep-cpu.lock", "torch": "2.15.0+cpu", "size": "about 1.5 GB", "label": mark("PyTorch 2.15 (CPU)")},
+                 "cuda": {"lock": "deep-cuda.lock", "torch": "2.15.0+cu132", "size": "about 3.4 GB", "label": mark("PyTorch 2.15 (CUDA 13.2)")},
+                 "xpu": {"lock": "deep-xpu.lock", "torch": "2.15.0+xpu", "size": "about 4 GB", "label": mark("PyTorch 2.15 (Intel XPU)")}}
 CUDA_NEEDED = (13, 2)
 MIN_COMPUTE = 7.5
 
@@ -107,7 +108,7 @@ def merge_locks(base, resolved):
     fixed, found = lock_blocks(base), lock_blocks(resolved)
     for name, block in found.items():
         if name in fixed and block[0].split(" \\")[0] != fixed[name][0].split(" \\")[0]:
-            raise ContractError("conflict", f"The resolution would move {name}, which the environment fixes.", {"package": name})
+            raise ContractError("conflict", t("The resolution would move {name}, which the environment fixes.", name=name), {"package": name})
     added = [line for name, block in found.items() if name not in fixed for line in block]
     return base.rstrip("\n") + "\n" + "\n".join(added) + "\n" if added else base
 
@@ -183,11 +184,11 @@ class UserPackages:
     # which environment a notebook's kernel runs in
     def kernel_environments(self):
         """The environments a kernel can run in: the research one, and the deep-learning one once the platform has it (D adds `deep_status` and `deep_environment`)."""
-        found = [{"id": "research", "label": f"Research, Python {PYTHON['research']}", "python": PYTHON["research"], "installed": True}]
+        found = [{"id": "research", "label": t("Research, Python {research}", research=PYTHON['research']), "python": PYTHON["research"], "installed": True}]
         if True:
             status = self.deep_status()
             devices = status["devices"] if "devices" in status else []
-            found.append({"id": "deep", "label": "Deep learning, Python 3.12, PyTorch", "python": "3.12", "installed": bool(status["installed"]),
+            found.append({"id": "deep", "label": t("Deep learning, Python 3.12, PyTorch"), "python": "3.12", "installed": bool(status["installed"]),
                           **({"device": devices[0]["label"]} if devices else {})})
         return found
 
@@ -197,9 +198,9 @@ class UserPackages:
             return await self.research_environment(publish)
         if environment == "deep":
             if not self.deep_status()["installed"]:
-                raise ContractError("deep_not_installed", "The deep-learning environment is not installed.", {"offer": self.deep_status().get("offer")})
+                raise ContractError("deep_not_installed", t("The deep-learning environment is not installed."), {"offer": self.deep_status().get("offer")})
             return await self.deep_environment()
-        raise ContractError("invalid_input", f"There is no kernel environment named {environment}.", {"environments": [item["id"] for item in self.kernel_environments()]})
+        raise ContractError("invalid_input", t("There is no kernel environment named {environment}.", environment=environment), {"environments": [item["id"] for item in self.kernel_environments()]})
 
     # the deep learning environment: the research packages plus one PyTorch build, installed once for every neural network
     def devices(self, run=subprocess.run):
@@ -217,9 +218,9 @@ class UserPackages:
         installed = self.state.get("deep")
         devices = self.devices()
         offer = deep_offer(devices)
-        listing = [{"id": "cpu", "kind": "cpu", "label": f"CPU · {devices['cpu']['cores']} cores"}]
+        listing = [{"id": "cpu", "kind": "cpu", "label": t("CPU · {cores} cores", cores=devices['cpu']['cores'])}]
         if installed and installed["variant"] == "cuda":
-            listing = [{"id": f"cuda:{card['index']}", "kind": "cuda", "label": f"{card['name']} · {card['memoryTotal'] / 2**30:.0f} GB",
+            listing = [{"id": f"cuda:{card['index']}", "kind": "cuda", "label": t("{name} · {memoryTotal} GB", name=card['name'], memoryTotal=f"{card['memoryTotal'] / 2 ** 30:.0f}"),
                         "memoryTotal": card["memoryTotal"], "memoryFree": card["memoryFree"]} for card in devices["nvidia"]] + listing
         job = self.deep_job
         mismatch = bool(installed) and installed["variant"] != offer["variant"] and offer["variant"] == "cuda"
@@ -234,18 +235,18 @@ class UserPackages:
         """The installed deep learning environment (the same one when it was already prepared)."""
         installed = self.state.get("deep")
         if not installed:
-            raise ContractError("unavailable", "The deep learning environment is not installed; install it from a model's Algorithm settings.")
+            raise ContractError("unavailable", t("The deep learning environment is not installed; install it from a model's Algorithm settings."))
         effective = self.deep_lock(installed["variant"])
         return {**await prepare_lock(self.ctx, bundled_wheels(effective["lock"], RUNTIME), effective["origin"], publish),
                 "lockDigest": effective["digest"], "lockPath": str(RUNTIME / DEEP_VARIANTS[installed["variant"]]["lock"])}
 
     def install_deep(self, variant=None):
         if self.deep_task is not None and not self.deep_task.done():
-            raise ContractError("conflict", "The deep learning environment is already being installed.")
+            raise ContractError("conflict", t("The deep learning environment is already being installed."))
         offer = deep_offer(self.devices())
         variant = variant or offer["variant"]
         if variant not in DEEP_VARIANTS or (variant != offer["variant"] and variant not in offer.get("choices", ["cpu"])):
-            raise ContractError("invalid_input", f"This machine cannot use the {variant} build.")
+            raise ContractError("invalid_input", t("This machine cannot use the {variant} build.", variant=variant))
         self.deep_job = {"state": "running", "variant": variant, "fraction": None, "message": None, "startedAt": int(time.time() * 1000)}
 
         async def run():
@@ -275,7 +276,7 @@ class UserPackages:
 
     async def cancel_deep(self):
         if self.deep_task is None or self.deep_task.done():
-            raise ContractError("conflict", "The deep learning environment is not being installed.")
+            raise ContractError("conflict", t("The deep learning environment is not being installed."))
         task, job = self.deep_task, self.deep_job
         task.cancel()
         job["state"] = "cancelled"
@@ -296,7 +297,7 @@ class UserPackages:
     async def uv(self, arguments, cwd):
         uv = shutil.which("uv")
         if uv is None:
-            raise ContractError("unavailable", "Install uv to add packages.")
+            raise ContractError("unavailable", t("Install uv to add packages."))
         process = await asyncio.create_subprocess_exec(uv, *arguments, cwd=cwd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         try:
             _, stderr = await process.communicate()
@@ -320,7 +321,7 @@ class UserPackages:
                                        "--generate-hashes", "--no-header", "-o", "resolved.lock"], directory)
         if code != 0:
             cause = next((line.strip() for line in message.splitlines() if line.strip().startswith("cause:")), message.strip()[-1500:]).removeprefix("cause:").strip()
-            raise ContractError("conflict", f"These packages cannot be added to the {environment} environment: {cause}",
+            raise ContractError("conflict", t("These packages cannot be added to the {environment} environment: {cause}", environment=environment, cause=cause),
                                 {"environment": environment, "requested": requested, "cause": cause})
         return merge_locks(base, output.read_text(encoding="utf-8"))
 
@@ -371,7 +372,7 @@ class UserPackages:
 
     def start_install(self):
         if self.task is not None and not self.task.done():
-            raise ContractError("conflict", "Packages are already being installed.")
+            raise ContractError("conflict", t("Packages are already being installed."))
         self.preparations = {}
         self.job = {"state": "running", "stage": "starting", "startedAt": int(time.time() * 1000), "environments": {}, "failures": {}, "endedAt": None}
 
@@ -395,7 +396,7 @@ class UserPackages:
 
     async def cancel(self):
         if self.task is None or self.task.done():
-            raise ContractError("conflict", "No package installation is running.")
+            raise ContractError("conflict", t("No package installation is running."))
         task, job = self.task, self.job
         task.cancel()
         for preparation in self.preparations.values():
@@ -411,7 +412,7 @@ class UserPackages:
     def activity(self, workspace_id):
         if self.task is None or self.task.done():
             return []
-        return [{"id": "packages", "kind": "calculation", "title": "Installing packages", "target": {"panel": "quant.workspace"}}]
+        return [{"id": "packages", "kind": "calculation", "title": t("Installing packages"), "target": {"panel": "quant.workspace"}}]
 
     # VS Code
     async def point_vscode(self, installed, records=None):
@@ -438,7 +439,7 @@ class UserPackages:
                 try:
                     current = jsonc(path.read_text(encoding="utf-8"))
                 except (ValueError, IndexError) as error:
-                    raise ContractError("invalid_input", ".vscode/settings.json is not valid JSON. Fix it in VS Code, then retry.") from error
+                    raise ContractError("invalid_input", t(".vscode/settings.json is not valid JSON. Fix it in VS Code, then retry.")) from error
             if current.get("python.defaultInterpreterPath") != interpreter:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(json.dumps({**current, "python.defaultInterpreterPath": interpreter}, indent=2) + "\n", encoding="utf-8")
@@ -446,18 +447,18 @@ class UserPackages:
         if path.is_file():
             opened = plain(await self.ctx.call(documents["open"], {"source": {"kind": "file", "uri": path.as_uri()}}))
             if opened["dirty"] or opened["conflict"]:
-                raise ContractError("conflict", "Save or resolve .vscode/settings.json before the interpreter is updated.")
+                raise ContractError("conflict", t("Save or resolve .vscode/settings.json before the interpreter is updated."))
             try:
                 current = jsonc(path.read_text(encoding="utf-8"))
             except (ValueError, IndexError) as error:
-                raise ContractError("invalid_input", ".vscode/settings.json is not valid JSON. Fix it in VS Code, then retry.") from error
+                raise ContractError("invalid_input", t(".vscode/settings.json is not valid JSON. Fix it in VS Code, then retry.")) from error
             if current.get("python.defaultInterpreterPath") == interpreter:
                 return
             content = json.dumps({**current, "python.defaultInterpreterPath": interpreter}, indent=2) + "\n"
             edited = plain(await self.ctx.call(documents["edit"], {"documentId": opened["documentId"], "expectedVersion": opened["version"], "content": content}))
             saved = plain(await self.ctx.call(documents["save"], {"documentId": edited["documentId"], "expectedVersion": edited["version"]}))
             if saved["status"] not in {"saved", "clean"}:
-                raise ContractError("conflict", ".vscode/settings.json changed before the interpreter was saved.")
+                raise ContractError("conflict", t(".vscode/settings.json changed before the interpreter was saved."))
         else:
             content = json.dumps({"python.defaultInterpreterPath": interpreter}, indent=2) + "\n"
             await self.ctx.call(documents["create"], {"projectId": record["developer"]["projectId"], "relativePath": SETTINGS, "content": content})

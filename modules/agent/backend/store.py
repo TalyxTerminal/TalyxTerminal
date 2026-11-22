@@ -11,6 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted", "budget_exceeded"}
 PERMISSIONS = {"read_only", "auto", "full"}
@@ -132,25 +133,25 @@ class ConversationStore:
 
     def configure_defaults(self, changes, workspace=None, *, kind="chat", reset=None):
         if kind not in {"general", "chat", "bot"}:
-            raise ContractError("invalid_input", "Choose general, chat or bot defaults")
+            raise ContractError("invalid_input", t("Choose general, chat or bot defaults"))
         if "defaultPermission" in changes:
             self.permission(changes["defaultPermission"])
         for name in ("botRoundLimit", "botApprovalMinutes", "memoryTokens"):
             if name in changes and (type(changes[name]) is not int or changes[name] < 1):
-                raise ContractError("invalid_input", "The bot limit must be a positive integer")
+                raise ContractError("invalid_input", t("The bot limit must be a positive integer"))
         if any(type(changes[x]) is not int or changes[x] < 0 for x in {"botRunMinutes", "botFailureLimit"} & changes.keys()):
-            raise ContractError("invalid_input", "Choose a nonnegative duration")
+            raise ContractError("invalid_input", t("Choose a nonnegative duration"))
         if any(type(changes[key]) is not bool for key in {"childrenEnabled", "memoryEnabled", "notifyNeedsYou", "notifyResults"} & changes.keys()):
-            raise ContractError("invalid_input", "This setting requires a boolean")
+            raise ContractError("invalid_input", t("This setting requires a boolean"))
         if "chatNotification" in changes and changes["chatNotification"] not in {"background","never","always"}:
-            raise ContractError("invalid_input", "Choose a chat notification preference")
+            raise ContractError("invalid_input", t("Choose a chat notification preference"))
         if "compactAt" in changes and (type(changes["compactAt"]) is not int or not 0 < changes["compactAt"] <= 100):
-            raise ContractError("invalid_input", "Choose a compaction percentage between 1 and 100")
+            raise ContractError("invalid_input", t("Choose a compaction percentage between 1 and 100"))
         if "autoCompact" in changes and type(changes["autoCompact"]) is not bool:
-            raise ContractError("invalid_input", "Automatic compaction takes a boolean")
+            raise ContractError("invalid_input", t("Automatic compaction takes a boolean"))
         value = self.defaults()
         if set(changes) - set(value):
-            raise ContractError("invalid_input", "Unknown Agent default")
+            raise ContractError("invalid_input", t("Unknown Agent default"))
         if workspace or kind == "bot":
             selected = self.overrides(workspace, kind)
             if reset:
@@ -198,12 +199,12 @@ class ConversationStore:
     @staticmethod
     def permission(value):
         if value not in PERMISSIONS:
-            raise ContractError("invalid_input", "Choose read_only, auto or full permission")
+            raise ContractError("invalid_input", t("Choose read_only, auto or full permission"))
 
     def conversation(self, conversation_id, workspace=None):
         row = self.db.execute("SELECT workspace,value FROM conversations WHERE id=?", (conversation_id,)).fetchone()
         if row is None or workspace is not None and row["workspace"] != workspace:
-            raise ContractError("target_gone", "This conversation is unavailable in this workspace")
+            raise ContractError("target_gone", t("This conversation is unavailable in this workspace"))
         return json.loads(row["value"])
 
     def save_conversation(self, value):
@@ -230,19 +231,19 @@ class ConversationStore:
         allowed = {"title", "modelId", "thinking", "permission", "childrenEnabled", "memoryEnabled",
                    "planMode", "pinned", "archived"}
         if any(type(changes[key]) is not bool for key in ("planMode", "pinned", "archived") if key in changes):
-            raise ContractError("invalid_input", "Plan, pinned and archived take boolean values")
+            raise ContractError("invalid_input", t("Plan, pinned and archived take boolean values"))
         if set(changes) - allowed:
-            raise ContractError("invalid_input", "Unknown conversation setting")
+            raise ContractError("invalid_input", t("Unknown conversation setting"))
         if "permission" in changes:
             self.permission(changes["permission"])
         if "title" in changes and (not isinstance(changes["title"], str) or not 1 <= len(changes["title"]) <= 160):
-            raise ContractError("invalid_input", "Conversation title must contain 1–160 characters")
+            raise ContractError("invalid_input", t("Conversation title must contain 1–160 characters"))
         with self.transaction():
             previous = self.conversation(conversation_id, workspace)
             runtime = self.runtime_settings(conversation_id)
             runtime_changes = {key: changes[key] for key in ("childrenEnabled", "memoryEnabled") if key in changes}
             if any(type(value) is not bool for value in runtime_changes.values()):
-                raise ContractError("invalid_input", "Runtime switches must be booleans")
+                raise ContractError("invalid_input", t("Runtime switches must be booleans"))
             runtime.update(runtime_changes)
             self.db.execute("UPDATE conversation_runtime SET value=? WHERE conversation=?", (encode(runtime), conversation_id))
             changes = {key: value for key, value in changes.items() if key not in runtime_changes}
@@ -362,7 +363,7 @@ class ConversationStore:
     def turn(self, turn_id):
         row = self.db.execute("SELECT value FROM turns WHERE id=?", (turn_id,)).fetchone()
         if row is None:
-            raise ContractError("target_gone", "This turn is unavailable")
+            raise ContractError("target_gone", t("This turn is unavailable"))
         return json.loads(row[0])
 
     def save_turn(self, value):
@@ -374,7 +375,7 @@ class ConversationStore:
     def new_turn(self, conversation_id, workspace, text, *, view=None, attachments=(), wake=None):
         conversation = self.conversation(conversation_id, workspace)
         if not isinstance(text, str) or not text.strip() or len(text) > 100000:
-            raise ContractError("invalid_input", "Enter a message of at most 100000 characters")
+            raise ContractError("invalid_input", t("Enter a message of at most 100000 characters"))
         value = {"id": uuid4().hex, "conversationId": conversation_id, "workspaceId": workspace,
                  "state": "queued", "createdAt": time.time(), "startedAt": None, "finishedAt": None,
                  "text": text, "view": view, "attachments": list(attachments), "inbox": [], "interrupts": {}, "error": None,
@@ -420,7 +421,7 @@ class ConversationStore:
 
     def supplement(self, turn_id, text, *, view=None, attachments=()):
         if not isinstance(text, str) or not text.strip() or len(text) > 100000:
-            raise ContractError("invalid_input", "Enter a supplemental message of at most 100000 characters")
+            raise ContractError("invalid_input", t("Enter a supplemental message of at most 100000 characters"))
         with self.transaction():
             turn = self.turn(turn_id)
             message_id = "user_" + uuid4().hex
@@ -462,7 +463,7 @@ class ConversationStore:
         if row is None:
             return None
         if row[0] != identity:
-            raise ContractError("conflict", "This send request id was already used for different input")
+            raise ContractError("conflict", t("This send request id was already used for different input"))
         return self.turn(row[1])
 
     def remember_send(self, conversation_id, request_id, identity, turn_id):
@@ -480,7 +481,7 @@ class ConversationStore:
     def approval(self, approval_id, workspace):
         row = self.db.execute("SELECT conversation,value FROM approvals WHERE id=?", (approval_id,)).fetchone()
         if row is None:
-            raise ContractError("target_gone", "This approval is unavailable")
+            raise ContractError("target_gone", t("This approval is unavailable"))
         self.conversation(row["conversation"], workspace)
         return json.loads(row["value"])
 
@@ -500,11 +501,11 @@ class ConversationStore:
 
     def decide(self, approval_id, workspace, version, decision, reason="", *, expired=False):
         if decision not in {"allow", "allow_conversation", "deny"}:
-            raise ContractError("invalid_input", "Choose allow, allow_conversation or deny")
+            raise ContractError("invalid_input", t("Choose allow, allow_conversation or deny"))
         with self.transaction():
             value = self.approval(approval_id, workspace)
             if value["state"] != "waiting" or value["version"] != version or self.turn(value["turnId"])["state"] in TERMINAL:
-                raise ContractError("conflict", "This approval is no longer waiting")
+                raise ContractError("conflict", t("This approval is no longer waiting"))
             state = "expired" if expired else "denied" if decision == "deny" else "allowed"
             value.update(state=state, decision=decision, reason=reason, version=version + 1)
             self.db.execute("UPDATE approvals SET state=?,value=? WHERE id=?", (value["state"], encode(value), approval_id))
@@ -518,7 +519,7 @@ class ConversationStore:
             row = self.db.execute("SELECT value FROM approvals WHERE id=?", (approval_id,)).fetchone()
             value = json.loads(row[0])
             if value["state"] != "allowed":
-                raise ContractError("permission_denied", "This one-time approval has already been consumed")
+                raise ContractError("permission_denied", t("This one-time approval has already been consumed"))
             value["state"] = "consumed"
             self.db.execute("UPDATE approvals SET state='consumed',value=? WHERE id=?", (encode(value), approval_id))
         return value
@@ -580,7 +581,7 @@ class ConversationStore:
     def delete(self, conversation_id, workspace):
         self.conversation(conversation_id, workspace)
         if self.active(conversation_id) is not None:
-            raise ContractError("conflict", "Stop the conversation before deleting it")
+            raise ContractError("conflict", t("Stop the conversation before deleting it"))
         with self.transaction():
             for table in ("turns", "cards", "events", "approvals", "calls", "send_requests", "attachments", "references_data"):
                 self.db.execute(f"DELETE FROM {table} WHERE conversation=?", (conversation_id,))

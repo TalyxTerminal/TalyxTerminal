@@ -15,6 +15,7 @@ from typing import Any
 import orjson
 
 from .errors import ContractError
+from .i18n import platform_t
 
 HEADER = struct.Struct("<II")
 # One frame carries at most this much; larger results go as a file reference.
@@ -44,7 +45,7 @@ def encode(value: Any, *, checked: bool = False) -> bytes:
     try:
         data = orjson.dumps(value, option=orjson.OPT_STRICT_INTEGER, default=_default)
     except orjson.JSONEncodeError as exc:
-        raise ContractError("invalid_output", f"The output is not JSON: {exc.__cause__ or exc}", execution="failed") from exc
+        raise ContractError("invalid_output", platform_t("The output is not JSON: {value}", value=exc.__cause__ or exc), execution="failed") from exc
     if not checked:
         finite(value)
     return data
@@ -61,7 +62,7 @@ def finite(value: Any) -> None:
         kind = type(item)
         if kind is float:
             if not math.isfinite(item):
-                raise ContractError("invalid_output", "The output holds a NaN or infinite number", execution="failed")
+                raise ContractError("invalid_output", platform_t("The output holds a NaN or infinite number"), execution="failed")
         elif kind is dict or kind is list or kind is tuple:
             values = item.values() if kind is dict else item
             # Long lists of text (columns) are passed over at C speed when they hold nothing else.
@@ -77,8 +78,7 @@ def decode(data: bytes | memoryview) -> Any:
 def frame(envelope: dict, body: bytes = b"") -> bytes:
     head = orjson.dumps(envelope)
     if len(body) > MAX_BODY:
-        raise ContractError("too_large", f"A frame carries at most {MAX_BODY} bytes; this one has {len(body)}. "
-                            "Page the result or hand over a file reference", {"bytes": len(body)}, execution="failed")
+        raise ContractError("too_large", platform_t("A frame carries at most {MAX_BODY} bytes; this one has {value}. Page the result or hand over a file reference", MAX_BODY=MAX_BODY, value=len(body)), {"bytes": len(body)}, execution="failed")
     return HEADER.pack(len(head), len(body)) + head + body
 
 

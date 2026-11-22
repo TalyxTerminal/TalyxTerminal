@@ -20,6 +20,7 @@ import zipfile
 from datetime import UTC, datetime
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from .. import bars
 from ..common import NS, MarketError
@@ -107,5 +108,5 @@ class OkxFiles:
         try:
             return await in_worker(_csv, body)
         except (zipfile.BadZipFile, StopIteration, ValueError, UnicodeDecodeError) as exc:
-            raise MarketError("source_unavailable", f"okx file {url.rsplit('/', 1)[-1]} is unreadable: {exc}",
+            raise MarketError("source_unavailable", t("okx file {value} is unreadable: {exc}", value=url.rsplit('/', 1)[-1], exc=exc),
                               source_id="okx") from exc

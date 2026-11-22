@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* Symbol search: TradingView's large search overlay, with Market's search box inside (Market owns the catalog, the
    categories and the rows). Picking switches the chart's symbol, or adds a comparison when opened from "+". */
 import { ModuleView, TxDialog, type Json, type ModuleContext } from "@talyx/sdk";
@@ -24,8 +25,8 @@ export function SymbolSearch({ ctx, panelId, mode, query, watchlistId }: { ctx: 
     }
     switchSymbol(ctx, panelId, instrument.instrumentId);
   };
-  const props: ContractTypes["view:search_box"] = { query, placeholder: mode === "symbol" ? "Symbol, name or code" : mode === "compare" ? "Compare symbol" : "Add symbol", ...(current ? { currentInstrumentId: current } : {}) };
-  return <TxDialog open onOpenChange={open => { if (!open) close(); }} title={mode === "compare" ? "Compare symbol" : mode === "watchlist" ? "Add symbol" : "Symbol search"} size="wide" footer={false}>
+  const props: ContractTypes["view:search_box"] = { query, placeholder: mode === "symbol" ? t("Symbol, name or code") : mode === "compare" ? t("Compare symbol") : t("Add symbol"), ...(current ? { currentInstrumentId: current } : {}) };
+  return <TxDialog open onOpenChange={open => { if (!open) close(); }} title={mode === "compare" ? t("Compare symbol") : mode === "watchlist" ? t("Add symbol") : t("Symbol search")} size="wide" footer={false}>
     <div className="chart-search">
       <ModuleView context={ctx} id="market.search_box" props={props as unknown as Json}
         on={{ selected: payload => picked((payload as unknown as { instrument: Instrument }).instrument), closed: close }} />

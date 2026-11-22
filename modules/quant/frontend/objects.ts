@@ -1,4 +1,6 @@
+import { intlLocale } from "@talyx/sdk";
 /* The Quant object shell's private routes (backend/object_routes.py) and the shapes they return. */
+import { t } from "./i18n";
 import { useEffect, useRef } from "react";
 import type { IconName, Json, ModuleContext } from "@talyx/sdk";
 import type { ContractTypes as MarketTypes } from "../../market/public/ts/types";
@@ -8,12 +10,12 @@ import type { RestoredObject } from "./shared/restored";
 
 export type Kind = "notebook" | "factor" | "model" | "allocation" | "strategy" | "library";
 export const KINDS: Record<Kind, {label: string; plural: string; icon: IconName}> = {
-  notebook: {label: "Notebook", plural: "Notebooks", icon: "file"},
-  factor: {label: "Factor", plural: "Factors", icon: "bars"},
-  model: {label: "Model", plural: "Models", icon: "box"},
-  allocation: {label: "Allocation", plural: "Allocations", icon: "layers"},
-  strategy: {label: "Strategy", plural: "Strategies", icon: "bolt"},
-  library: {label: "Library", plural: "Library", icon: "bookmark"},
+  notebook: {label: t("Notebook"), plural: t("Notebooks"), icon: "file"},
+  factor: {label: t("Factor"), plural: t("Factors"), icon: "bars"},
+  model: {label: t("Model"), plural: t("Models"), icon: "box"},
+  allocation: {label: t("Allocation"), plural: t("Allocations"), icon: "layers"},
+  strategy: {label: t("Strategy"), plural: t("Strategies"), icon: "bolt"},
+  library: {label: t("Library"), plural: t("Library"), icon: "bookmark"},
 };
 
 export type Instrument = NonNullable<NonNullable<MarketTypes["instruments.get"]["input"]["records"]>[number]>;
@@ -219,12 +221,12 @@ export function plain(value: number, digits = 8): string {
 export const percent = (value: number | null | undefined, digits = 2) =>
   typeof value === "number" ? `${value > 0 ? "+" : ""}${(value * 100).toFixed(digits)}%` : "—";
 
-const STAGES: Record<RunStage, string> = {check: "Checking the settings", code: "Saving code", data: "Fetching data", environment: "Preparing environment", backtest: "Backtesting", sweep: "Backtesting", run: "Running the code",
-  history: "Reading the values", checks: "Checking for future data", commit: "Adding to the library"};
+const STAGES: Record<RunStage, string> = {check: t("Checking the settings"), code: t("Saving code"), data: t("Fetching data"), environment: t("Preparing environment"), backtest: t("Backtesting"), sweep: t("Backtesting"), run: t("Running the code"),
+  history: t("Reading the values"), checks: t("Checking for future data"), commit: t("Adding to the library")};
 /** What a run is doing or how it ended, in words. */
 export function runStatus(run: {state: RunState; stage: RunStage}): string {
   if (run.state === "preparing" || run.state === "running") return STAGES[run.stage];
-  return {cancel_requested: "Cancelling", completed: "Completed", failed: "Failed", cancelled: "Cancelled", interrupted: "Interrupted"}[run.state];
+  return {cancel_requested: t("Cancelling"), completed: t("Completed"), failed: t("Failed"), cancelled: t("Cancelled"), interrupted: t("Interrupted")}[run.state];
 }
 
 const DAY = 86_400_000;
@@ -237,29 +239,28 @@ export function monthsBack(months: number, from = new Date()): string {
 }
 /** The day an `until` stands for when it is shown: the last full day for "latest" (the run records the day the backend resolved), else the date. */
 export const untilDay = (data: {until?: string}): string | undefined => data.until === "latest" ? lastFullDay() : data.until;
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const monthYear = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+const monthYear = (iso: string) => new Date(iso + "T00:00:00Z").toLocaleDateString(intlLocale(), { timeZone: "UTC", month: "short", year: "numeric" });
 /** "Jan 2016 – latest": the period of a data setting for the head of a page. */
-export const periodText = (since: string, until: string) => `${monthYear(since)} – ${until === "latest" ? "latest" : monthYear(until)}`;
+export const periodText = (since: string, until: string) => `${monthYear(since)} – ${until === "latest" ? t("latest") : monthYear(until)}`;
 /** "2Y", "6M" or the dates, for a since–until range ending today or yesterday. */
 export function rangeLabel(since: string, until: string, now = new Date()): string {
   if (until === "latest") {
     for (const [months, label] of [[6, "6M"], [12, "1Y"], [24, "2Y"], [60, "5Y"], [120, "10Y"]] as const) if (since === monthsBack(months, now)) return label;
-    return `${since} – latest`;
+    return t("{since} – latest", {since});
   }
   const end = Date.parse(until + "T00:00:00Z"), last = Date.parse(now.toISOString().slice(0, 10) + "T00:00:00Z");
   if (last - end <= DAY) for (const [months, label] of [[6, "6M"], [12, "1Y"], [24, "2Y"], [60, "5Y"], [120, "10Y"]] as const) if (since === monthsBack(months, now)) return label;
   return `${since} – ${until}`;
 }
 /** A historical index the way runs name it: the index's name and that its members follow their effective dates. */
-export const indexText = (name: string) => `${name} members`;
+export const indexText = (name: string) => t("{name} members", {name});
 /** What the symbols are: the symbols themselves, the research list's name, the historical index or the code's rule; null when nothing is chosen. */
 export function universeText(data: DataSettings, lists: ResearchListSummary[] | null, indexes: IndexMaterial[] | null = null): string | null {
   const symbols = data.symbols ?? [];
   if (symbols.length) return symbols.length > 2 ? `${symbols[0].instrument.displaySymbol} +${symbols.length - 1}` : symbols.map(item => item.instrument.displaySymbol).join(", ");
   if (data.list) {
     const found = lists === null ? undefined : lists.find(item => item.id === data.list);
-    return found === undefined ? "Research list" : `${found.name} (${found.count})`;
+    return found === undefined ? t("Research list") : `${found.name} (${found.count})`;
   }
   if (data.index) {
     const selected = data.index;
@@ -267,7 +268,7 @@ export function universeText(data: DataSettings, lists: ResearchListSummary[] | 
     const instrument = found === undefined ? selected.instrument : found.index;
     return indexText(instrument.name ?? instrument.displaySymbol);
   }
-  return data.universe === "code" ? "Rule in the code" : null;
+  return data.universe === "code" ? t("Rule in the code") : null;
 }
 /** Whether a run has what it needs: the symbols chosen one way, a bar period and a range. */
 export const dataReady = (data: DataSettings) => universeText(data, null) !== null && Boolean(data.timeframe && data.since && data.until);
@@ -275,10 +276,9 @@ export function dataSummary(data: DataSettings, lists: ResearchListSummary[] | n
   const universe = universeText(data, lists, indexes);
   if (universe === null || !data.timeframe || !data.since || !data.until) return null;
   // The draft's line: name, how often, the months it covers and, when there is one, where the held-out period starts.
-  const month = (day: string) => new Date(day + "T00:00:00Z").toLocaleString("en-US", {month: "short", year: "numeric", timeZone: "UTC"});
-  const often = data.timeframe === "1d" ? "each day" : data.timeframe;
-  const range = data.until === "latest" ? rangeLabel(data.since, data.until) : `${month(data.since)} – ${month(data.until)}`;
-  const held = data.heldOutFrom ? ` · held out from ${month(data.heldOutFrom)}` : "";
+  const often = data.timeframe === "1d" ? t("each day") : data.timeframe;
+  const range = data.until === "latest" ? rangeLabel(data.since, data.until) : `${monthYear(data.since)} – ${monthYear(data.until)}`;
+  const held = data.heldOutFrom ? t(" · held out from {date}", { date: monthYear(data.heldOutFrom) }) : "";
   return `${universe} ${often} · ${range}${held}`;
 }
 

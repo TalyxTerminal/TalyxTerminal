@@ -27,6 +27,9 @@ export interface TalyxDesktop {
   openFolder(path: string): Promise<void>;
   /** The interface's Exit: the same path as the tray, previewing before any exit. */
   requestExit(): Promise<void>;
+  /** Quits as requestExit does (previewing what stops), then installs the downloaded, checked update (platform.updates.download)
+   * with the installer's own progress window and opens TALYX again. Fails when no download is ready. */
+  installUpdate(): Promise<void>;
   confirmExit(requestId: string): Promise<void>;
   cancelExit(requestId: string): Promise<void>;
 }

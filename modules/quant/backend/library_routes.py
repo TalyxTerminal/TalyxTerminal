@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import Field
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import library_ai
 from .object_routes import Input
@@ -228,7 +229,7 @@ def handle_library_actions(ctx, services):
             return services.model_library.plan(run["id"], name)
         if run["objectKind"] == "allocation":
             return services.allocation.plan_publication(run["id"], name)
-        raise ContractError("invalid_input","A strategy cannot be published to this library.")
+        raise ContractError("invalid_input",t("A strategy cannot be published to this library."))
 
     async def publish_run(args, call):
         run = services.runs.read(args["runId"])
@@ -246,13 +247,13 @@ def handle_library_actions(ctx, services):
 
     async def read_library_item(args, call):
         if bool(args.get("itemId")) == bool(args.get("name")):
-            raise ContractError("invalid_input","Choose either name or itemId.")
+            raise ContractError("invalid_input",t("Choose either name or itemId."))
         if args.get("itemId"):
             identity = args["itemId"]
         else:
             found = library.store.find_item(args["name"])
             if not found:
-                raise ContractError("not_found","Library item not found.")
+                raise ContractError("not_found",t("Library item not found."))
             identity = found[0]["id"]
         result = await thread(library_ai.detail,library,identity,args.get("versionId"))
         if args.get("compareTo"):
@@ -293,11 +294,11 @@ def handle_library_actions(ctx, services):
 
     async def read_library_values(args, call):
         if bool(args.get("versionId")) == bool(args.get("name")) or "version" in args and not args.get("name"):
-            raise ContractError("invalid_input","Choose name and optionally version, or versionId.")
+            raise ContractError("invalid_input",t("Choose name and optionally version, or versionId."))
         version = args.get("versionId") or library.resolve_values(args["name"],args.get("version"))["versionId"]
         if args.get("date"):
             if any(k in args for k in ("start","end")):
-                raise ContractError("invalid_input","date selects a cross section; use start and end for history.")
+                raise ContractError("invalid_input",t("date selects a cross section; use start and end for history."))
             opts = {"date":milliseconds(args["date"]),"order":args.get("order","top"),"field":args.get("field")}
             if args.get("asOf"):
                 opts["as_of"] = milliseconds(args["asOf"], end=True)
@@ -307,7 +308,7 @@ def handle_library_actions(ctx, services):
                 raw.extend((await thread(library.values_page,version,**opts,page=index))["rows"])
         else:
             if "order" in args:
-                raise ContractError("invalid_input","order applies to a dated cross section.")
+                raise ContractError("invalid_input",t("order applies to a dated cross section."))
             bounds = {k:milliseconds(args[k],end=k in {"asOf","end"}) for k in ("start","end") if args.get(k)}
             if "end" in bounds:
                 bounds.setdefault("asOf",bounds["end"])
@@ -360,7 +361,7 @@ def handle_library_actions(ctx, services):
         rows = []
         for row in args["rows"]:
             if bool(row.get("date")) == bool(row.get("time")):
-                raise ContractError("invalid_input","A value row needs one date or time.")
+                raise ContractError("invalid_input",t("A value row needs one date or time."))
             rows.append({"datetime":milliseconds(row.get("date") or row["time"]),"instrument":labels[row["symbol"]],
                          "field":row["field"],"value":row["value"]})
         return await library.publish_values({**args,"rows":rows})
@@ -368,7 +369,7 @@ def handle_library_actions(ctx, services):
     async def update_library_version(args, call):
         identity = args["versionId"]
         if args.get("dryRun") and (args.get("producing") is not False or "autoUpdate" in args):
-            raise ContractError("invalid_input","dryRun previews stopping one version.")
+            raise ContractError("invalid_input",t("dryRun previews stopping one version."))
         if "producing" in args:
             result = library.resume(identity) if args["producing"] else library.stop(identity,dry_run=args.get("dryRun",False))
             if args.get("dryRun"):
@@ -437,7 +438,7 @@ def handle_library_actions(ctx, services):
         before = await read_research_list(args,call)
         edits = {k:args[k] for k in ("add","remove") if k in args}
         if "symbols" in args and edits:
-            raise ContractError("invalid_input","Choose symbols or add/remove.")
+            raise ContractError("invalid_input",t("Choose symbols or add/remove."))
         changes = {"name":args["name"]} if args.get("name") else {}
         if "symbols" in args or edits:
             names = args["symbols"] if "symbols" in args else edit_list(before["symbols"],edits,"symbols")

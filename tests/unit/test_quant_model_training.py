@@ -85,14 +85,13 @@ def test_too_few_names_and_too_short_data_say_why():
     assert error.value.failure["title"] == "has no window" and "12 months of training" in error.value.failure["message"]
 
 
-def test_a_batch_is_every_combination_up_to_twenty_groups():
+def test_a_batch_is_every_combination():
     params = {"lgb_lr": 0.05, "lgb_leaves": 63, "label_days": 5}
     groups = P.expand(params, [{"name": "lgb_lr", "values": [0.02, 0.05]}, {"name": "label_days", "values": [5, 10]}])
     assert [group["values"] for group in groups] == [{"lgb_lr": 0.02, "label_days": 5}, {"lgb_lr": 0.02, "label_days": 10}, {"lgb_lr": 0.05, "label_days": 5},
                                                      {"lgb_lr": 0.05, "label_days": 10}]
     assert P.expand(params, None) == [{"values": {}, "params": params}]
-    with pytest.raises(ContractError, match="at most 20 groups"):
-        P.expand(params, [{"name": "lgb_lr", "values": list(range(5))}, {"name": "lgb_leaves", "values": list(range(5))}])
+    assert len(P.expand(params, [{"name": "lgb_lr", "values": list(range(5))}, {"name": "lgb_leaves", "values": list(range(5))}])) == 25   # no cap
 
 
 def test_the_standard_names_become_the_data_set_settings_and_each_algorithm_has_its_own_parameters():

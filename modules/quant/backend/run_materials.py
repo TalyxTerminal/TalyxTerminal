@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 SKIP_TOP = {"source", "common"}
 
@@ -91,18 +92,20 @@ class RunMaterials:
         if len(found) > 1:
             kinds = sorted(item["kind"] for item in found)
             if len(set(kinds)) == len(kinds):
-                raise ContractError("invalid_input", f"{len(found)} objects are named {name} ({', '.join(kinds)}); pass kind=… or the run id", {"kinds": kinds})
+                raise ContractError("invalid_input", t("{found} objects are named {name} ({kinds}); pass kind=… or the run id", found=len(found), name=name, kinds=', '.join(kinds)), {"kinds": kinds})
             if not by_run:
-                raise ContractError("invalid_input", f"{len(found)} objects are named {name}; give them different names", {"kinds": kinds})
+                raise ContractError("invalid_input", t("{found} objects are named {name}; give them different names", found=len(found), name=name), {"kinds": kinds})
             choices = [self._choice(item, number) for item in sorted(found, key=lambda item: item.get("createdAt", 0))]
             plural = f"{kinds[0]}s" if len(set(kinds)) == 1 else "objects"
-            raise ContractError("invalid_input", f"{len(found)} {plural} are named {name}; choose one by its run: " + "; ".join(choices), {"kinds": kinds})
+            raise ContractError("invalid_input", t("{count} {plural} are named {name}; choose one by its run: {choices}",
+                    count=len(found), plural=plural, name=name, choices='; '.join(choices)), {"kinds": kinds})
         if not found:
             # Say which objects there are (a library item is read with q.library.read, by its own name), so the next call can be right
             names = sorted({item["name"] for item in self.store.records.list("qobject") if not item.get("deleted") and (kind is None or item["kind"] == kind)})
             close = [other for other in names if name.lower() in other.lower() or other.lower() in name.lower()] or names[:12]
-            raise ContractError("not_found", f"There is no {kind or 'object'} named {name}" + (f"; there are: {', '.join(close)}" if close else "")
-                                + ". A library item is read with q.library.read(name).", {"names": close})
+            raise ContractError("not_found", (t("There is no {kind} named {name}; there are: {matches}. A library item is read with q.library.read(name).",
+                        kind=kind or 'object', name=name, matches=', '.join(close))
+                    if close else t("There is no {kind} named {name}. A library item is read with q.library.read(name).", kind=kind or 'object', name=name)), {"names": close})
         return found[0]
 
     def _choice(self, item, number):
@@ -132,27 +135,27 @@ class RunMaterials:
         if args.get("runId"):
             record = self.runs.records.find("qrun", args["runId"])
             if record is None:
-                raise ContractError("not_found", "This run no longer exists.", {"runId": args["runId"]})
+                raise ContractError("not_found", t("This run no longer exists."), {"runId": args["runId"]})
             return record
         obj = self.objects_named(args["object"], args.get("kind"), number=args.get("number"))
         ordered = self.ordered(obj["id"])
         number = args.get("number")
         if number is None:
             if not ordered:
-                raise ContractError("not_found", f"{obj['name']} has no runs yet.")
+                raise ContractError("not_found", t("{name} has no runs yet.", name=obj['name']))
             return ordered[-1]
         found = next((item for item in ordered if item.get("number") == number), None)
         if found is None and 1 <= number <= len(ordered):
             found = ordered[number - 1]
         if found is None:
-            raise ContractError("not_found", f"Run #{number} of {obj['name']} no longer exists")
+            raise ContractError("not_found", t("Run #{number} of {name} no longer exists", number=number, name=obj['name']))
         return found
 
     def read(self, args, brief=False):
         """`brief` is the answer for an AI caller: the paths and the numbers, with the instrument table and the index exclusions left in info.json (its path is given)."""
         record = self.run_of(args)
         if "data" not in record:
-            raise ContractError("unavailable", f"Run #{record.get('number') or '?'} was made before this TALYX version; open it in a new run")
+            raise ContractError("unavailable", t("Run #{number} was made before this TALYX version; open it in a new run", number=record.get('number') or '?'))
         directory = run_directory(self.runs, record)
         state = record["state"]
         data = self.frozen_data(record, directory)

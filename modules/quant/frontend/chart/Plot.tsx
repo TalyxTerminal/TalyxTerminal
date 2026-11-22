@@ -1,8 +1,9 @@
 /* Quant's charts: a Plotly figure built by the backend, drawn on the panel's surface and read the platform's way (Quant's own: no other module draws
    Plotly). Colours come from paint.ts, the read-out and axes from look.ts, the charts of one section or tab work together through group.ts. */
+import { t } from "../i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { TxSegmented } from "@talyx/sdk";
+import { intlLocale, TxSegmented } from "@talyx/sdk";
 import { crosshairLook, hoverMarks, hoverModel, isZoomable, plainLayout, spreadLabels, thinLine, axisUnits, type HoverPoint } from "./look";
 import { drawOrder, drawsNothing, endLabel, figureKeys, paintFigure, type ChartKey, type PlotFigure } from "./paint";
 import { chartGroup, chartSection, offersLog, type ChartGroup, type ChartMember } from "./group";
@@ -31,6 +32,11 @@ function Keys({ keys }: { keys: ChartKey[] }) {
   return <span className="qc-keys">{keys.map(key => <span key={key.name} className="qc-key" data-weak={key.weak ? "" : undefined}>
     <i data-mark={key.mark} style={key.mark === "box" ? { background: key.colour } : { borderColor: key.colour }} />{key.name}</span>)}</span>;
 }
+
+const plotLocale = intlLocale();
+const monthName = new Intl.DateTimeFormat(plotLocale, {month: "short", timeZone: "UTC"});
+const shortMonths = Array.from({length: 12}, (_, month) => monthName.format(Date.UTC(2000, month, 1)));
+const locales = { [plotLocale]: { format: { shortMonths } } };
 
 const NO_GROUP = { subscribe: () => () => undefined, snapshot: () => 0 };
 
@@ -566,7 +572,7 @@ export function Plot({ figure, ariaLabel, height, keepTitle = false, onPoint, on
     }
     void loadPlotly().then(async Plotly => {
       if (!active) return;
-      await Plotly.react(node, padded, layout, { responsive: false, displaylogo: false, displayModeBar: false, showTips: false, scrollZoom: false, doubleClickDelay: 300, doubleClick: zoomable || boxZoom || handlers.current.onSelect ? "reset" : false });
+      await Plotly.react(node, padded, layout, { locale: plotLocale, locales, responsive: false, displaylogo: false, displayModeBar: false, showTips: false, scrollZoom: false, doubleClickDelay: 300, doubleClick: zoomable || boxZoom || handlers.current.onSelect ? "reset" : false });
       if (!active) return;
       const events = node as unknown as { on?(name: string, handler: (event: any) => void): void; removeAllListeners?(name: string): void };
       for (const name of ["plotly_click", "plotly_doubleclick", "plotly_relayout", "plotly_relayouting", "plotly_selected", "plotly_deselect", "plotly_hover", "plotly_unhover"]) events.removeAllListeners?.(name);
@@ -787,11 +793,11 @@ export function Plot({ figure, ariaLabel, height, keepTitle = false, onPoint, on
     const node = element.current;
     return () => { if (node) void loadPlotly().then(Plotly => Plotly.purge(node)).catch(() => undefined); };
   }, []);
-  if (failed) return <p className="qc-plot-note" role="alert">This chart could not be drawn. {failed}</p>;
-  if ((figure.data ?? []).length > 0 && (figure.data ?? []).every(drawsNothing)) return <p className="qc-plot-note">No values to draw.</p>;
+  if (failed) return <p className="qc-plot-note" role="alert">{t("This chart could not be drawn. {failed}", { failed })}</p>;
+  if ((figure.data ?? []).length > 0 && (figure.data ?? []).every(drawsNothing)) return <p className="qc-plot-note">{t("No values to draw.")}</p>;
   const slot = section?.slot ?? null;
-  const scale = (value: boolean, change: (log: boolean) => void) => <TxSegmented label="Value scale" value={value ? "log" : "linear"} onChange={next => change(next === "log")}
-    options={[{ value: "linear", label: "Linear" }, { value: "log", label: "Log" }]} />;
+  const scale = (value: boolean, change: (log: boolean) => void) => <TxSegmented label={t("Value scale")} value={value ? "log" : "linear"} onChange={next => change(next === "log")}
+    options={[{ value: "linear", label: t("Linear") }, { value: "log", label: t("Log") }]} />;
   const head = group && slot ? (group.members[0] === member.current ? createPortal(<>
     <Keys keys={group.keys()} />{group.scales() && scale(group.log, next => group.setLog(next))}</>, slot) : null) : null;
   return <div ref={root} className="qc-plot" role="img" aria-label={ariaLabel} style={height ? { height } : undefined}>

@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { ContractError, TxButton, TxDialog, TxIcon, TxInput, TxPopover, TxSelect, TxToastProvider, type Json, type LeaveDecision, type ModuleContext, type TxMenuItem } from "@talyx/sdk";
 import { ObjectNavigation, type FolderAction, type ObjectAction } from "./ObjectNavigation";
@@ -59,12 +60,15 @@ export function browsingOnly(before: ShellState, after: ShellState): boolean {
 }
 /**
  * What the panel itself provides beyond its context: the module's context, whose routes outlive the panel, and how the panel
- * is being left. A notebook sets `guard` to say whether leaving needs the user's word; `reason` is "close" when the panel or
- * the notebook is closed for good (its kernel may stop), "detach" when only this view goes (the workspace is replaced).
+ * is being left. A notebook sets `guard` to say whether closing the panel needs the user's word; `reason` is "close" when the panel
+ * is closed (its notebooks' kernels stop), "detach" when only the view goes (another page of the panel, the workspace replaced).
+ * `detached`: the notebooks this panel showed and left, whose kernels go on running until the panel closes (with how many cells
+ * were running when they were left, for the question on closing).
  */
 export interface PanelHost {
   module: ModuleContext;
   leave: {reason: "close" | "detach"; confirmed: boolean; guard: (() => LeaveDecision) | null};
+  detached: Map<string, {name: string; running: number}>;
 }
 
 /** Reads a saved panel state; anything from the old research shell is dropped, so such a panel opens on the Quant home. */
@@ -100,7 +104,6 @@ export function QuantShell({ctx, host, stateRef, register}: {ctx: ModuleContext;
   const [navOpen, setNavOpen] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [wide, setWide] = useState(false);
-  const [leaving, setLeaving] = useState<{message: string; go(): void} | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const root = useRef<HTMLDivElement>(null);
   const fail = (reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason));
@@ -112,38 +115,24 @@ export function QuantShell({ctx, host, stateRef, register}: {ctx: ModuleContext;
     stateRef.current = clean; setState(clean); ctx.panel?.stateChanged({derived});
   };
   const update = (patch: Partial<ShellState>) => replace({...stateRef.current, ...patch});
-  /** Going elsewhere in the panel closes the notebook shown, as closing the panel does: with cells running it asks first. */
-  const guarded = (go: () => void) => {
-    const guard = host.leave.guard;
-    const decision = guard === null ? {decision: "allow" as const} : guard();
-    const close = (confirmed: boolean) => {host.leave.reason = "close"; host.leave.confirmed = confirmed; go();};
-    if (decision.decision === "confirm") setLeaving({message: decision.message ?? "", go: () => close(true)});
-    else close(false);
-  };
   const openObject = (objectId: string | undefined, runId?: string) => {
     setNavOpen(false); setError(null);
     // Choosing what is already open keeps its view as it is.
     if (objectId !== undefined && objectId === stateRef.current.objectId && runId === undefined && !stateRef.current.packages) return;
-    const go = () => replace(forObject(stateRef.current, objectId, runId));
-    if (objectId === stateRef.current.objectId && !stateRef.current.packages) go(); else guarded(go);
+    replace(forObject(stateRef.current, objectId, runId));
   };
   const openLibrary = (itemId?: string, versionId?: string) => {
     setNavOpen(false); setError(null);
-    guarded(() => replace({...forObject(stateRef.current, undefined), library: true, ...(itemId ? {itemId} : {}), ...(versionId ? {versionId} : {})}));
+    replace({...forObject(stateRef.current, undefined), library: true, ...(itemId ? {itemId} : {}), ...(versionId ? {versionId} : {})});
   };
   const openObjects = () => {
     setNavOpen(false); setError(null);
-    guarded(() => replace({...forObject(stateRef.current, undefined), objects: true}));
+    replace({...forObject(stateRef.current, undefined), objects: true});
   };
   const openPackages = () => {
     setNavOpen(false); setError(null);
-    // A notebook stays open, its kernel and variables kept, while packages install in a panel of their own; it then asks for the restart.
-    if (detail !== null && detail.kind === "notebook" && detail.id === stateRef.current.objectId) {
-      void ctx.platform.panels.open({type: "quant.workspace", state: {packages: true}}).catch(fail);
-      return;
-    }
     const from = stateRef.current.objectId;
-    guarded(() => replace({...forObject(stateRef.current, undefined), packages: true, ...(from !== undefined ? {from} : {})}));
+    replace({...forObject(stateRef.current, undefined), packages: true, ...(from !== undefined ? {from} : {})});
   };
   /** A publication's version, shown in the library. */
   const showVersion = (versionId: string) => void api.libraryVersion(versionId).then(version => openLibrary(version.itemId, versionId), fail);
@@ -200,25 +189,25 @@ export function QuantShell({ctx, host, stateRef, register}: {ctx: ModuleContext;
   });
   const libraryItem = state.library && state.itemId !== undefined && library.items !== null ? library.items.find(item => item.itemId === state.itemId) ?? null : null;
   // The panel's tab (the drafts): Quant on home and all objects, Library on the library with or without an item open.
-  const name = state.packages ? "Packages" : state.objects ? "Quant" : state.library ? "Library"
-    : detail === null ? "Quant" : detail.name;
+  const name = state.packages ? t("Packages") : state.objects ? t("Quant") : state.library ? t("Library")
+    : detail === null ? t("Quant") : detail.name;
   useEffect(() => {
     ctx.panel?.setTitle(name);
     if (state.packages) {
-      ctx.view.report({summary: "Quant packages", refs: {objectId: null, runId: null}, facts: ["Quant packages"], openTargets: []});
+      ctx.view.report({summary: t("Quant packages"), refs: {objectId: null, runId: null}, facts: [t("Quant packages")], openTargets: []});
       return;
     }
     if (state.library) {
-      ctx.view.report({summary: libraryItem === null ? "Quant library" : `Library item ${libraryItem.name}`, refs: {objectId: null, runId: null},
-        facts: libraryItem === null ? ["Quant library"] : [`Library item: ${libraryItem.name}`, `Status: ${libraryItem.stateLabel}`], openTargets: []});
+      ctx.view.report({summary: libraryItem === null ? t("Quant library") : t("Library item {name}", { name: libraryItem.name }), refs: {objectId: null, runId: null},
+        facts: libraryItem === null ? [t("Quant library")] : [t("Library item: {name}", { name: libraryItem.name }), t("Status: {state}", { state: libraryItem.stateLabel })], openTargets: []});
       return;
     }
-    ctx.view.report({summary: detail === null ? "Quant home" : `${KINDS[detail.kind].label} ${detail.name}`,
+    ctx.view.report({summary: detail === null ? t("Quant home") : `${KINDS[detail.kind].label} ${detail.name}`,
       refs: {objectId: detail === null ? null : detail.id, runId: state.runId ?? null},
-      facts: detail === null ? ["Quant home"] : [`${KINDS[detail.kind].label}: ${detail.name}`],
+      facts: detail === null ? [t("Quant home")] : [`${KINDS[detail.kind].label}: ${detail.name}`],
       // What is on screen, as the open targets (the manifest's) that lead here.
-      openTargets: detail === null ? [{kind: "home", key: "research", label: "Quant home"}]
-        : [{kind: detail.kind, key: `object:${detail.id}`, label: detail.name}, ...(state.runId ? [{kind: "run", key: `run:${state.runId}`, label: `${detail.name} run`}] : [])]});
+      openTargets: detail === null ? [{kind: "home", key: "research", label: t("Quant home")}]
+        : [{kind: detail.kind, key: `object:${detail.id}`, label: detail.name}, ...(state.runId ? [{kind: "run", key: `run:${state.runId}`, label: t("{name} run", { name: detail.name })}] : [])]});
   }, [detail?.id, name, state.runId, state.library, state.packages]);
 
   const create = async (kind: Kind, folder?: string, preset?: string) => {
@@ -234,10 +223,10 @@ export function QuantShell({ctx, host, stateRef, register}: {ctx: ModuleContext;
   };
   const onObject = (action: ObjectAction, item: ObjectSummary) => setDialog({kind: action, item});
   const menu: TxMenuItem[] = detail === null ? [] : [
-    {id: "packages", label: "Packages", icon: "box", detail: "Python packages for notebooks, research and strategies", separated: true, onSelect: openPackages},
-    {id: "rename", label: "Rename…", icon: "edit", separated: true, onSelect: () => onObject("rename", detail)},
-    {id: "move", label: "Move to folder…", icon: "folder", onSelect: () => onObject("move", detail)},
-    {id: "delete", label: "Delete…", icon: "trash", tone: "danger", onSelect: () => onObject("delete", detail)},
+    {id: "packages", label: t("Packages"), icon: "box", detail: t("Python packages for notebooks, research and strategies"), separated: true, onSelect: openPackages},
+    {id: "rename", label: t("Rename…"), icon: "edit", separated: true, onSelect: () => onObject("rename", detail)},
+    {id: "move", label: t("Move to folder…"), icon: "folder", onSelect: () => onObject("move", detail)},
+    {id: "delete", label: t("Delete…"), icon: "trash", tone: "danger", onSelect: () => onObject("delete", detail)},
   ];
   const navigation = <ObjectNavigation list={list} all={all} onAll={value => update({all: value})} query={query} onQuery={setQuery} current={state.library ? undefined : state.objectId}
     workspaceId={workspaceId} onOpen={id => openObject(id)} onCreate={(kind, folder, preset) => void create(kind, folder, preset).catch(fail)} presets={presets} onFolder={onFolder} onObject={onObject}
@@ -248,19 +237,19 @@ export function QuantShell({ctx, host, stateRef, register}: {ctx: ModuleContext;
   // An object's page fills the panel: the navigation opens from the button before its name and lays over the page.
   const onObjectPage = state.objectId !== undefined && !state.library && !state.packages && !state.objects;
   const title = onObjectPage
-    ? <><TxPopover open={navOpen} onOpenChange={setNavOpen} label="Quant navigation" className="qx-nav-pop"
-        trigger={<button type="button" className="qx-navbtn" title="All objects" aria-label="All objects"><TxIcon name="list" /></button>}>{navigation}</TxPopover>
-      <button type="button" className="qx-title" disabled={detail === null} onClick={() => {if (detail !== null) onObject("rename", detail);}} title="Rename">{titleText}</button></>
+    ? <><TxPopover open={navOpen} onOpenChange={setNavOpen} label={t("Quant navigation")} className="qx-nav-pop"
+        trigger={<button type="button" className="qx-navbtn" title={t("All objects")} aria-label={t("All objects")}><TxIcon name="list" /></button>}>{navigation}</TxPopover>
+      <button type="button" className="qx-title" disabled={detail === null} onClick={() => {if (detail !== null) onObject("rename", detail);}} title={t("Rename")}>{titleText}</button></>
     : wide
     ? <button type="button" className="qx-title" onClick={() => {if (detail !== null && !state.library && !state.packages) onObject("rename", detail); else if (!state.library) openObject(undefined);}}
-      title={detail !== null && !state.library && !state.packages ? "Rename" : name}>{titleText}</button>
-    : <TxPopover open={navOpen} onOpenChange={setNavOpen} label="Quant navigation" className="qx-nav-pop"
+      title={detail !== null && !state.library && !state.packages ? t("Rename") : name}>{titleText}</button>
+    : <TxPopover open={navOpen} onOpenChange={setNavOpen} label={t("Quant navigation")} className="qx-nav-pop"
       trigger={<button type="button" className="qx-title">{titleText}<TxIcon name="chevron" className="qx-title-chevron" /></button>}>{navigation}</TxPopover>;
   return <TxToastProvider><div className="qx" ref={root}>
     {/* Home, the library and all objects have their own heads (output/quant-design): the navigation column stays with the pages that have none. */}
     {wide && state.packages && <aside className="qx-nav">{navigation}</aside>}
     <main className="qx-main">
-      {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>Dismiss</TxButton></div>}
+      {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>{t("Dismiss")}</TxButton></div>}
       {state.packages ? <PackagesPage ctx={ctx} api={api} title={title} onBack={state.from !== undefined ? () => openObject(state.from) : undefined} />
         : state.objects ? <ObjectsPage initialSort={state.objectsSort} rows={(list?.items ?? []) as ObjectRow[]} all={all} onAll={value => update({all: value})} onBack={() => openObject(undefined)}
           onLibrary={() => openLibrary()} onOpen={row => openObject(row.id, row.representative.run ?? undefined)} />
@@ -282,10 +271,6 @@ export function QuantShell({ctx, host, stateRef, register}: {ctx: ModuleContext;
           : <><QuantHome ctx={ctx} list={list} presets={presets} onOpen={id => openObject(id)}
               onCreate={(kind, preset) => void create(kind, undefined, preset).catch(fail)} onOpenObjects={openObjects} onOpenLibrary={openLibrary} onOpenVersion={showVersion} /></>}
     </main>
-    {leaving !== null && <TxDialog open title="Leave the notebook?" onOpenChange={open => {if (!open) setLeaving(null);}}
-      footer={<><TxButton onClick={() => setLeaving(null)}>Stay</TxButton><TxButton variant="primary" onClick={() => {const {go} = leaving; setLeaving(null); go();}}>Stop and leave</TxButton></>}>
-      <p className="qx-pre-line">{leaving.message}</p>
-    </TxDialog>}
     {dialog !== null && <ShellDialog dialog={dialog} list={list} onClose={() => setDialog(null)} onDone={action => action.then(() => setDialog(null), fail)} api={api}
       onDeleted={id => {if (id === stateRef.current.objectId) openObject(undefined);}} />}
   </div></TxToastProvider>;
@@ -307,14 +292,14 @@ function ShellDialog({dialog, list, api, onClose, onDone, onDeleted}: {dialog: D
     else if (dialog.kind === "move") onDone(api.update(dialog.item.id, {folder: text.trim() || null}));
     else {const id = dialog.item.id; onDone(api.remove(id).then(() => onDeleted(id)));}
   };
-  const titles = {rename: "Rename", move: "Move to folder", delete: "Delete", folder: dialog.kind === "folder" && dialog.action === "rename" ? "Rename folder" : "New folder"};
+  const titles = {rename: t("Rename"), move: t("Move to folder"), delete: "Delete", folder: dialog.kind === "folder" && dialog.action === "rename" ? t("Rename folder") : t("New folder")};
   return <TxDialog open onOpenChange={open => {if (!open) onClose();}} title={titles[dialog.kind]}
-    footer={<><TxButton onClick={onClose}>Cancel</TxButton><TxButton variant="primary" onClick={submit}>{dialog.kind === "delete" ? "Delete" : dialog.kind === "move" ? "Move" : dialog.kind === "folder" && dialog.action === "create" ? "Create" : "Rename"}</TxButton></>}>
-    {dialog.kind === "delete" ? <p>Delete {dialog.item.name}? Its code is removed with it.</p>
-      : dialog.kind === "move" && !fresh ? <TxSelect aria-label="Folder" value={text} onChange={event => {if (event.target.value === "\u0000new") {setFresh(true); setText("");} else setText(event.target.value);}}>
-        <option value="">No folder</option>{folders.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}<option value={"\u0000new"}>New folder…</option>
+    footer={<><TxButton onClick={onClose}>{t("Cancel")}</TxButton><TxButton variant="primary" onClick={submit}>{dialog.kind === "delete" ? t("Delete") : dialog.kind === "move" ? t("Move") : dialog.kind === "folder" && dialog.action === "create" ? t("Create") : t("Rename")}</TxButton></>}>
+    {dialog.kind === "delete" ? <p>{t("Delete {name}? Its code is removed with it.", { name: dialog.item.name })}</p>
+      : dialog.kind === "move" && !fresh ? <TxSelect aria-label={t("Folder")} value={text} onChange={event => {if (event.target.value === "\u0000new") {setFresh(true); setText("");} else setText(event.target.value);}}>
+        <option value="">{t("No folder")}</option>{folders.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}<option value={"\u0000new"}>{t("New folder…")}</option>
       </TxSelect>
-        : <TxInput ref={field} autoFocus aria-label="Name" placeholder={dialog.kind === "move" || dialog.kind === "folder" ? "Folder name" : "Name"} value={text} aria-invalid={asked && !valid || undefined}
+        : <TxInput ref={field} autoFocus aria-label={t("Name")} placeholder={dialog.kind === "move" || dialog.kind === "folder" ? t("Folder name") : t("Name")} value={text} aria-invalid={asked && !valid || undefined}
           onChange={event => setText(event.target.value)} onKeyDown={event => {if (event.key === "Enter") submit();}} />}
   </TxDialog>;
 }

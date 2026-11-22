@@ -18,6 +18,7 @@ import orjson
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 
 from .files import finish_before_cancel, write_atomic
 
@@ -31,6 +32,8 @@ class Settings:
         self.path, self.declarations, self.workspace_exists = path, declarations, workspace_exists
         self.values: dict = orjson.loads(path.read_bytes()) if path.exists() else {"global": {}, "workspaces": {}}
         self.listeners: set[asyncio.Queue] = set()
+        # The Host's own reactions to a change, ``(module, workspace_id, keys)``, run before the change is announced.
+        self.observers: list[Callable[[str, str, list[str]], None]] = []
         self.saving = asyncio.Lock()
 
     async def _save(self) -> None:
@@ -43,13 +46,13 @@ class Settings:
         declared, definitions = self.declarations(module)
         unknown = [key for key in (keys or []) if key not in declared]
         if unknown:
-            raise ContractError("invalid_input", f"{module} declares no setting {', '.join(unknown)}")
+            raise ContractError("invalid_input", t("{module} declares no setting {keys}", module=module, keys=", ".join(unknown)))
         return declared, definitions
 
     def _scope(self, workspace_id: str) -> None:
         if workspace_id != GLOBAL and not self.workspace_exists(workspace_id):
-            raise ContractError("invalid_input", f"Workspace {workspace_id} is not open; name an open workspace or "
-                                '"global"')
+            raise ContractError("invalid_input", t('Workspace {workspace} is not open; name an open workspace or "global"',
+                                                   workspace=workspace_id))
 
     def read(self, module: str, workspace_id: str, keys: list[str] | None = None) -> dict:
         self._scope(workspace_id)
@@ -73,7 +76,7 @@ class Settings:
         for key, value in values.items():
             spec = declared[key]
             if workspace_id != GLOBAL and spec["globalOnly"]:
-                raise ContractError("permission_denied", f"{key} is a global setting; a workspace follows it")
+                raise ContractError("permission_denied", t("{key} is a global setting; a workspace follows it", key=key))
             try:
                 validator(orjson.dumps({**spec["schema"], "$defs": definitions})).validate(value)
             except ValidationError as exc:
@@ -90,7 +93,7 @@ class Settings:
         self._scope(workspace_id)
         self._declared(module, keys)
         if workspace_id == GLOBAL:
-            raise ContractError("invalid_input", "Resetting to global applies to a workspace")
+            raise ContractError("invalid_input", t("Resetting to global applies to a workspace"))
         local = self.values["workspaces"].get(workspace_id, {}).get(module, {})
         for key in keys:
             local.pop(key, None)
@@ -108,6 +111,8 @@ class Settings:
         await self._save()
 
     def _changed(self, module: str, workspace_id: str, keys: list[str]) -> None:
+        for observer in self.observers:
+            observer(module, workspace_id, keys)
         for queue in self.listeners:
             queue.put_nowait({"module": module, "workspaceId": workspace_id, "keys": keys})
 

@@ -1,4 +1,5 @@
 /* The page's validation actions in one place: the run button and its menu, what a check's button starts, and the two confirmations. */
+import { t } from "../../i18n";
 import {useMemo, useState, type ReactNode} from "react";
 import type {ModuleContext, TxRunKind} from "@talyx/sdk";
 import type {Parameter} from "../../objects";
@@ -34,50 +35,49 @@ export function useValidation({ctx, objectId, parameters, ranges, selected, usab
   const of = usable && selected ? selected.id : sweepSource ?? undefined;
   const withOf = <T extends SweepRequest>(body: T): T => (of ? {...body, of} : body);
 
-  const sweep = async (body: SweepRequest, label = "Sweep") => {
+  const sweep = async (body: SweepRequest, label = t("Sweep")) => {
     const estimate = await api.estimateSweep(objectId, body);
     const go = () => api.startSweep(objectId, body);
     if (isSlow(estimate)) setPending({label, estimate, go}); else await sent(go);
   };
   const walk = async () => {
-    if (plan.total < 2) {fail(new Error("Give a code setting a range to pick from, like 24, 48, 96")); return;}
+    if (plan.total < 2) {fail(new Error(t("Give a code setting a range to pick from, like 24, 48, 96"))); return;}
     const body: WalkRequest = withOf({axes: plan.axes, ...(walkSettings ?? WALK_DEFAULT)});
     const estimate = await api.estimateWalk(objectId, body);
     const go = () => api.startWalk(objectId, body);
-    if (isSlow(estimate)) setPending({label: "Walk-forward", estimate, go}); else await sent(go);
+    if (isSlow(estimate)) setPending({label: t("Walk-forward"), estimate, go}); else await sent(go);
   };
   const years = async () => {
-    if (!selected) {fail(new Error("Run a backtest first")); return;}
+    if (!selected) {fail(new Error(t("Run a backtest first"))); return;}
     const {since, until} = selected.settings.data;
-    if (!since || !until) {fail(new Error("This run has no period")); return;}
-    await sweep(withOf({axes: [{name: "@period", values: calendarYears(since, until)}]}), "Each year separately");
+    if (!since || !until) {fail(new Error(t("This run has no period"))); return;}
+    await sweep(withOf({axes: [{name: "@period", values: calendarYears(since, until)}]}), t("Each year separately"));
   };
   const costs = async (only?: "cost") => {
-    if (!selected || !of) {fail(new Error("Run a backtest first")); return;}
+    if (!selected || !of) {fail(new Error(t("Run a backtest first"))); return;}
     const bodies = only ? [{axes: [{name: "@costMultiple", values: [0, 1, 2]}], of}] : costRequests(of, selected.settings.run.capital);
     for (const body of bodies) await api.startSweep(objectId, body);
     await reload();
   };
   const validate = async () => {
     const id = usable && selected ? selected.id : backtestId;
-    if (!id) {fail(new Error("Run a backtest first")); return;}
+    if (!id) {fail(new Error(t("Run a backtest first"))); return;}
     try {setHeld(await api.heldStatus(id)); setHeldMissing(false);}
     catch (reason) {
       if ((reason as {code?: string})?.code === "no_held_out_period") setHeldMissing(true); else throw reason;
     }
   };
   const swept = async () => {
-    if (plan.total < 2) {fail(new Error("Give a code setting a range to sweep, like 24, 48, 96")); return;}
-    await sweep(withOf({axes: plan.axes}), `Sweep`);
+    if (plan.total < 2) {fail(new Error(t("Give a code setting a range to sweep, like 24, 48, 96"))); return;}
+    await sweep(withOf({axes: plan.axes}), t("Sweep"));
   };
   const guarded = (task: () => Promise<unknown>) => void task().catch(fail);
 
-  const kinds: TxRunKind[] = [{id: "run", label: plan.total > 1 ? runWord(plan) : "Run backtest", current: true}, {id: "walk", label: "Walk-forward"},
-    {id: "years", label: "Each year separately"}, {id: "costs", label: "Costs and capacity"}, {id: "held", label: "Validate on held-out", separated: true}];
+  const kinds: TxRunKind[] = [{id: "run", label: plan.total > 1 ? runWord(plan) : t("Run backtest"), current: true}, {id: "walk", label: t("Walk-forward")},
+    {id: "years", label: t("Each year separately")}, {id: "costs", label: t("Costs and capacity")}, {id: "held", label: t("Validate on held-out"), separated: true}];
   return {
     plan, label: runWord(plan), kinds, heldMissing,
     run: start => {
-      if (plan.tooMany) {fail(new Error(plan.tooMany)); return;}
       if (Object.keys(plan.errors).length) {fail(new Error(Object.values(plan.errors)[0])); return;}
       if (plan.total > 1) guarded(swept); else start();
     },

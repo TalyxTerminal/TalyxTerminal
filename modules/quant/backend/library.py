@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import library_figures, library_inputs, library_summary
 from .library_loop import EXPIRES_AFTER
@@ -56,7 +57,7 @@ class Library:
         """The frozen research environment a version or run names, if the platform still has it."""
         state = plain(self.ctx.environments.get(environment["preparationId"]))
         if state["state"] != "completed":
-            raise ContractError("unavailable", "The environment this library version was made in is no longer available.", {"preparation": state})
+            raise ContractError("unavailable", t("The environment this library version was made in is no longer available."), {"preparation": state})
         return {"interpreterPath": environment["interpreterPath"]}
 
     # --- the list ------------------------------------------------------------------------------------------------------
@@ -187,18 +188,18 @@ class Library:
             failure = version["failure"] or {}
             location = failure.get("location")
             where = f" in {location['file']} line {location['line']}" if location and location.get("file") else ""
-            rows += [{"label": "Reason", "text": (failure.get("message") or last.get("why") or "The code failed").rstrip(".") + where + "."}]
+            rows += [{"label": t("Reason"), "text": (failure.get("message") or last.get("why") or "The code failed").rstrip(".") + where + "."}]
             if where:
                 links.append({"kind": "source", "file": location["file"], "line": location["line"], "versionId": version["id"]})
             tries = failure.get("tries") or 1
-            rows.append({"label": "Tried", "text": f"{tries} {'time' if tries == 1 else 'times'} since {_clock_text(since)}; "
+            rows.append({"label": t("Tried"), "text": f"{tries} {'time' if tries == 1 else 'times'} since {_clock_text(since)}; "
                          + (f"next automatic try {_clock_text(version['retry_after'])}" if version["retry_after"] else "no automatic try scheduled")})
         elif state == "miss":
             # library.js: "Missing 1 period", due when; the period, why, and the next one with the rule that stops it.
-            rows += [{"label": "Period", "text": _date_text(last["label"]) if last.get("label") else "—"},
-                     {"label": "Reason", "text": last.get("why") or "The source has no bar"}]
+            rows += [{"label": t("Period"), "text": _date_text(last["label"]) if last.get("label") else "—"},
+                     {"label": t("Reason"), "text": last.get("why") or t("The source has no bar")}]
             if version["state"] != "expired":  # five in a row stopped it: there is no next one
-                rows.append({"label": "Next settlement", "text": (f"due {_clock_text(next_due['at'])}" if next_due and next_due.get("at") else "with the next bar")
+                rows.append({"label": t("Next settlement"), "text": (f"due {_clock_text(next_due['at'])}" if next_due and next_due.get("at") else "with the next bar")
                              + f"; {EXPIRES_AFTER} missing in a row stops it"})
         elif state == "up":
             # library.js: "Upstream missing N periods"; the input that has no value and why, how many others came on time, who goes without.
@@ -213,37 +214,36 @@ class Library:
                 links.append({"kind": "item", "itemId": entry.get("itemId"), "versionId": entry["versionId"], "name": entry["name"]})
                 why = reasons.get(entry["state"]) if entry["state"] != "producing" else reasons.get(entry["health"])
                 texts.append(f"{entry['name']} v{entry['version']} has no value for {days}" + (f", {why}" if why else ""))
-            rows.append({"label": "Missing input", "text": ("; ".join(texts) or (last.get("why") or "An input has no value").rstrip("."))
+            rows.append({"label": t("Missing input"), "text": ("; ".join(texts) or (last.get("why") or "An input has no value").rstrip("."))
                          + "; an input with no new value for a period counts as missing"})
             if len(inputs) > len(short):
-                rows.append({"label": "Other inputs", "text": f"{len(inputs) - len(short)} on time"})
+                rows.append({"label": t("Other inputs"), "text": t("{inputs} on time", inputs=len(inputs) - len(short))})
         elif state == "weak":
             published, after = version["meta"].get("published") or {}, version["after"] or {}
             spread = f" ± {after['se']:.4f}" if after.get("se") is not None else ""
-            rows.append({"label": version["meta"].get("measure") or "Rank IC",
-                         "text": f"published {_signed(published.get('value'))}, after {_signed(after.get('value'))}{spread}: "
-                                 f"{library_summary.weak_how(published.get('value') or 0, after.get('value') or 0)}"})
+            rows.append({"label": version["meta"].get("measure") or t("Rank IC"),
+                         "text": t("published {value}, after {value2}{spread}: {value3}", value=_signed(published.get('value')), value2=_signed(after.get('value')), spread=spread, value3=library_summary.weak_how(published.get('value') or 0, after.get('value') or 0))})
         elif state == "drift":
             after = version["after"] or {}
             multiple = after.get("multiple")
-            rows.append({"label": "Volatility", "text": f"realised 63-day {_percent(after.get('value'))}, published {_percent(after.get('published'))}"
+            rows.append({"label": t("Volatility"), "text": f"realised 63-day {_percent(after.get('value'))}, published {_percent(after.get('published'))}"
                          + (f": {multiple:.2f}×" + (", over 1.5×" if multiple > 1.5 else "") if multiple else "")})
             worst = after.get("worst")
             if worst:
                 shares = after.get("shares") or {}
                 names = {item["instrumentId"]: item.get("displaySymbol") or item.get("column") for item in (version["meta"].get("info") or {}).get("instruments", [])}
                 now, then = (shares.get("now") or {}).get(worst["asset"]), (shares.get("published") or {}).get(worst["asset"])
-                rows.append({"label": "Risk share", "text": f"{names.get(worst['asset'], worst['asset'])} {_percent(now)}, published {_percent(then)}: {worst['delta'] * 100:+.1f} pt".replace("-", "−")
+                rows.append({"label": t("Risk share"), "text": f"{names.get(worst['asset'], worst['asset'])} {_percent(now)}, published {_percent(then)}: {worst['delta'] * 100:+.1f} pt".replace("-", "−")
                              + (", over 10 pt" if abs(worst["delta"]) > 0.10 else "")})
         elif state == "late":
             why = last.get("why") or "Made after it was due"
-            rows.append({"label": "Why", "text": why})
+            rows.append({"label": t("Why"), "text": why})
         affected = [f"{item['name']} v{item['version']}" for item in downstream]
         if state in ("fail", "up", "weak", "drift"):
             text = ", ".join(affected) or "nobody"
             if state == "up" and affected and last.get("label"):
                 text += f" {'gets' if len(affected) == 1 else 'get'} no {_day_text(last['label'])} value"
-            rows.append({"label": "Downstream", "text": text})
+            rows.append({"label": t("Downstream"), "text": text})
         count = len(streak)
         plural = f"{count} periods" if count > 1 else "1 period"
         title = {"fail": f"{name} failed", "miss": f"Missing {plural}", "up": f"Upstream missing {plural}", "weak": "Weaker since publication",
@@ -336,7 +336,7 @@ class Library:
     def report(self, version_id):
         path = self.version_directory(version_id) / "report" / "result-index.json"
         if not path.is_file():
-            raise ContractError("not_found", "This version has no report.")
+            raise ContractError("not_found", t("This version has no report."))
         return json.loads(path.read_text(encoding="utf-8"))
 
     def report_file(self, version_id, name):
@@ -344,7 +344,7 @@ class Library:
         path = (directory / name).resolve()
         listed = any(item["name"] == name for item in self.report(version_id)["artifacts"])
         if not listed or not path.is_relative_to(directory) or not path.is_file():
-            raise ContractError("not_found", "This report file has not been published.")
+            raise ContractError("not_found", t("This report file has not been published."))
         return path
 
     def source_file(self, version_id, name):
@@ -355,7 +355,7 @@ class Library:
         directory = (self.version_directory(version_id) / "source").resolve()
         path = (directory / name).resolve()
         if not path.is_relative_to(directory) or not path.is_file():
-            raise ContractError("not_found", "This frozen source file is unavailable.")
+            raise ContractError("not_found", t("This frozen source file is unavailable."))
         return {"name": name, "content": path.read_text(encoding="utf-8"), "readOnly": True}
 
     def source_files(self, version_id, version=None):
@@ -370,7 +370,7 @@ class Library:
         and why. Only that day's rows (and the day before's) are read."""
         version = self.store.version(version_id)
         if version["archived_at"] is not None:
-            raise ContractError("not_found", "This version was archived; its values were dropped.")
+            raise ContractError("not_found", t("This version was archived; its values were dropped."))
         meta = version["meta"]
         field = field or (meta.get("fields") or [None])[0]
         days = [label for label, _ in self.store.days(version_id)]
@@ -445,7 +445,7 @@ class Library:
         (mean daily rank correlation) and which names only one had; the code difference by file and the settings difference."""
         a, b = self.read_version(version_a), self.read_version(version_b)
         if a["itemId"] != b["itemId"]:
-            raise ContractError("invalid_input", "Compare two versions of the same item.")
+            raise ContractError("invalid_input", t("Compare two versions of the same item."))
         older, newer = (a, b) if a["version"] < b["version"] else (b, a)
         field = (newer["fields"] or [None])[0]
         overlap = None
@@ -521,31 +521,31 @@ class Library:
         """The version a name means: its newest producing one unless `version` says another."""
         items = self.store.find_item(name, kind)
         if not items:
-            raise ContractError("not_found", f"The library has nothing named {name}.")
+            raise ContractError("not_found", t("The library has nothing named {name}.", name=name))
         versions = self.store.item_versions(items[0]["id"])
         if version is None:
             return next((item for item in versions if item["state"] in ("updating", "failed", "fixed") and item["archivedAt"] is None), versions[0])
         found = next((item for item in versions if item["version"] == version), None)
         if found is None:
-            raise ContractError("not_found", f"{name} has no version {version}.", {"versions": [item["version"] for item in versions]})
+            raise ContractError("not_found", t("{name} has no version {version}.", name=name, version=version), {"versions": [item["version"] for item in versions]})
         return found
 
     def resolve_values(self, name, version=None):
         found = self.resolve(name, version)
         if not found["fields"]:
-            raise ContractError("invalid_input", f"{name} holds no values to read.")
+            raise ContractError("invalid_input", t("{name} holds no values to read.", name=name))
         return found
 
     async def values(self, args):
         """Rows of one version, page by page: `asOf` limits to what could be known then; `latest` gives each instrument's newest known value."""
         if not args.get("versionId") and not args.get("name"):
-            raise ContractError("invalid_input", "Choose a name or versionId from list_library.")
+            raise ContractError("invalid_input", t("Choose a name or versionId from list_library."))
         if args.get("latest") and args.get("asOf") is None:
-            raise ContractError("invalid_input", "Give asOf in epoch milliseconds to read the latest values known at that moment.")
+            raise ContractError("invalid_input", t("Give asOf in epoch milliseconds to read the latest values known at that moment."))
         version = args.get("versionId") or self.resolve_values(args["name"], args.get("version"))["versionId"]
         read = self.store.version(version)
         if read["archived_at"] is not None:
-            raise ContractError("not_found", "This library version was archived; its values were dropped.")
+            raise ContractError("not_found", t("This library version was archived; its values were dropped."))
         async with self.reading:
             if args.get("latest"):
                 rows = await asyncio.to_thread(self.store.latest_available, version, args["asOf"], field=args.get("field"))
@@ -591,7 +591,7 @@ class Library:
         version_id = "ver-" + uuid4().hex[:12]
         frame = pd.DataFrame(rows)
         if frame.empty or set(frame.columns) != {"datetime", "instrument", "field", "value"}:
-            raise ContractError("invalid_input", "Give rows with datetime (milliseconds), instrument, field and value.")
+            raise ContractError("invalid_input", t("Give rows with datetime (milliseconds), instrument, field and value."))
         origin = args.get("origin") or {}
         table = pd.DataFrame({"instrument": frame["instrument"].astype(str), "field": frame["field"].astype(str), "datetime": frame["datetime"].astype("int64"),
                               "value": frame["value"].astype(float), "availableAt": frame["datetime"].astype("int64"), "recordedAt": recorded, "mode": "history"})
@@ -683,7 +683,7 @@ class Library:
 
     def retry(self, version_id):
         if self.loop is None:
-            raise ContractError("unavailable", "The library's production is not running.")
+            raise ContractError("unavailable", t("The library's production is not running."))
         result = self.loop.retry_now(version_id)
         self.publish_change(self.store.version(version_id)["item_id"], version_id)
         return result
@@ -692,12 +692,12 @@ class Library:
         """The version when it may be archived (stopped, not archived, nothing uses it), with the same refusals the archive gives."""
         version = self.store.version(version_id)
         if version["archived_at"] is not None:
-            raise ContractError("conflict", "This version is archived already.")
+            raise ContractError("conflict", t("This version is archived already."))
         if version["state"] != "delisted":
-            raise ContractError("conflict", "Stop this version first; a stopped version nobody uses can be archived.")
+            raise ContractError("conflict", t("Stop this version first; a stopped version nobody uses can be archived."))
         users = self.store.users(version_id)
         if users:
-            raise ContractError("conflict", "Something still uses this version: " + ", ".join(row["name"] or row["owner_id"] for row in users) + ".", {"users": users})
+            raise ContractError("conflict", t("Something still uses this version: {users}.", users=', '.join(row['name'] or row['owner_id'] for row in users)), {"users": users})
         return version
 
     async def archive(self, version_id):

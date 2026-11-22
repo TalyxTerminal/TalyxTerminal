@@ -5,6 +5,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from langchain_core.tools import StructuredTool
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..store import encode
 from ..tools import TOOL_CALL
@@ -48,13 +49,13 @@ def bot_tools(service, turn):
         if operation == "post_to_group":
 
             if not owner:
-                raise ContractError("invalid_input", "A group post must come from a member bot")
-            group = bots.entry(ws, text_value(value.get("groupId"), "the group ID"), "group")
+                raise ContractError("invalid_input", t("A group post must come from a member bot"))
+            group = bots.entry(ws, text_value(value.get("groupId"), t("Enter the group ID")), "group")
             if owner not in group["members"]:
                 raise ContractError(
-                    "permission_denied", "This bot is not a member of the destination group"
+                    "permission_denied", t("This bot is not a member of the destination group")
                 )
-            message = text_value(value.get("text"), "a group message")
+            message = text_value(value.get("text"), t("Enter a group message"))
             tag = "post:" + call_id
             with bots.store.transaction():
                 if bots.db.execute("SELECT 1 FROM bot_messages WHERE turn_id=?", (tag,)).fetchone():
@@ -103,7 +104,7 @@ def bot_tools(service, turn):
             return encode(result)
         if operation == "run_routine":
             if bots.db.execute("SELECT 1 FROM bot_wakes WHERE id=?", (call_id,)).fetchone() is None:
-                bots.test_routine(ws, text_value(value.get("id"), "the routine ID"), run=call_id)
+                bots.test_routine(ws, text_value(value.get("id"), t("Enter the routine ID")), run=call_id)
             return "Started. The run shows in the bot's runs; its answer comes in the bot's own chat."
         existing = bots.db.execute(
             "SELECT * FROM bot_edits WHERE workspace=? AND id=?", (ws, call_id)
@@ -137,7 +138,7 @@ def bot_tools(service, turn):
             bot = bots.entry(ws, value.get("id") or owner, "bot")
             selected = {key: value[key] for key in ("skills", "knowledge") if key in value}
             if not selected:
-                raise ContractError("invalid_input", "Choose skills or knowledge")
+                raise ContractError("invalid_input", t("Choose skills or knowledge"))
             with bots.store.transaction():
                 before = {key: bot[key] for key in selected}
                 bots.edit(ws, bot["id"], selected)
@@ -152,7 +153,7 @@ def bot_tools(service, turn):
             return "Saved"
         if operation == "set_duty":
             bot = bots.entry(ws, value.get("id") or owner, "bot")
-            before, after = bot["duty"], text_value(value.get("duty"), "a duty")
+            before, after = bot["duty"], text_value(value.get("duty"), t("Enter a duty"))
             with bots.store.transaction():
                 bots.edit(ws, bot["id"], {"duty": after})
                 record(bot["id"], "duty", bot["id"], before, after, bot["name"] + " duty")
@@ -181,20 +182,20 @@ def bot_tools(service, turn):
                     result = bots.save_routine(ws, args, key=call_id)
                 else:
                     bots.toggle_routine(
-                        ws, text_value(value.get("id"), "the routine ID"), value.get("active")
+                        ws, text_value(value.get("id"), t("Enter the routine ID")), value.get("active")
                     )
                     result = {"id": value["id"]}
                 after = bots.routine(ws, result["id"])
                 record(after["botId"] or "", "routine", result["id"], before, after, after["name"])
             return encode(result)
-        raise ContractError("invalid_input", "Unknown bot management operation")
+        raise ContractError("invalid_input", t("Unknown bot management operation"))
 
     async def delete(id: str, kind: str):
         """Delete a routine (kind=routine) or a bot or group (kind=bot or group) by its workspace ID."""
         if kind not in {"routine", "bot", "group"}:
-            raise ContractError("invalid_input", "Choose routine, bot or group")
+            raise ContractError("invalid_input", t("Choose routine, bot or group"))
         if id == owner:
-            raise ContractError("invalid_input", "Stop the current bot before deleting it")
+            raise ContractError("invalid_input", t("Stop the current bot before deleting it"))
         await dispatch(bots, ws, "delete_routine" if kind == "routine" else "delete", {"id": id})
         return "Deleted"
 

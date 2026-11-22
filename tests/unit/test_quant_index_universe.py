@@ -8,6 +8,7 @@ from talyx_sdk import ContractError
 
 from modules.quant.backend.index_universe import active, check_prices, freeze
 from modules.quant.backend.object_store import check_data
+from tests.fixtures.quant_index import frozen_index
 from tests.unit.quant_runtime_fakes import adapt
 
 SELECTION = {'instrument': {'instrumentId': 'index', 'displaySymbol': '^GSPC', 'symbol': '^GSPC', 'venueId': 'cboe'}}
@@ -42,7 +43,7 @@ def test_union_preserves_removed_member_and_inclusive_boundary():
 
 def test_unmapped_historical_asset_is_reported_without_shrinking_the_universe():
     index = asyncio.run(freeze(fixture(True), SELECTION, 0, 20))
-    assert index['intervals'][1]['members'][0]['assetId'] == 'unmapped:ETH:1970-01-01T00:00:00.010Z'
+    assert index['members'][index['intervals'][1]['members'][0]]['assetId'] == 'unmapped:ETH:1970-01-01T00:00:00.010Z'
     assert index['exclusions'][0] == {'assetId': 'unmapped:ETH:1970-01-01T00:00:00.010Z', 'instrumentId': None, 'symbol': 'ETH', 'since': 10, 'until': 20,
         'kind': 'unmapped', 'reason': 'The free source has no prices for this past member'}
     assert not active(index, 'ETH', 15)
@@ -164,12 +165,13 @@ def test_benchmarks_buy_first_day_members_and_equal_weight_each_days_members(mon
     closes = (days + pd.Timedelta(hours=21)).as_unit("ns").asi8
     ms = closes // 1_000_000
     def members(names):
-        return [{"instrument": {"instrumentId": name}} for name in names]
+        return [found[name] for name in names]
+    found = {name: {"assetId": name, "instrumentId": name} for name in "ABC"}
     report = object.__new__(Report)
     report.display = {}
-    report.invocation = {"index": {"nativeInstruments": {name: name for name in "ABC"}, "exclusions": [],
+    report.invocation = {"index": frozen_index({"nativeInstruments": {name: name for name in "ABC"}, "exclusions": [],
                                    "intervals": [{"since": int(ms[0]), "until": int(ms[2] - 1), "members": members("AB")},
-                                                 {"since": int(ms[2]), "until": int(ms[2]), "members": members("ABC")}]}}
+                                                 {"since": int(ms[2]), "until": int(ms[2]), "members": members("ABC")}]})}
     report.frame = pd.DataFrame([{"ts_event": at, "instrument": name, "open": 100, "close": price}
                                  for name, prices in {"A": [100, 100, 100], "B": [100, 100, 100], "C": [100, 200, 400]}.items()
                                  for at, price in zip(closes, prices, strict=True)])

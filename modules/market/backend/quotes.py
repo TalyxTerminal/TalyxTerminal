@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 
+from talyx_sdk.i18n import t
+
 from .common import MarketError, now_ns
 from .live import BACKOFF, FATAL
 from .routing import in_worker
@@ -68,11 +70,11 @@ class Feed:
         market = self.hub.market
         ranked = market.registry.rank(self.instrument, "quotes")
         if not ranked:
-            self.set(None, MarketError("unsupported", f"No source quotes {self.instrument['symbol']}").problem())
+            self.set(None, MarketError("unsupported", t("No source quotes {symbol}", symbol=self.instrument['symbol'])).problem())
             return
         source_id, row = ranked[0]
         entry = market.registry.entry(source_id)
-        target = await in_worker(market.data.target, self.instrument, self.environment)
+        target = await in_worker(market.data.target, self.instrument, self.environment, source_id)
         attempt = 0
         while True:
             try:
@@ -83,7 +85,7 @@ class Feed:
                             self.set(event["quote"], None)
                         elif event["type"] == "gap" and event.get("problem"):
                             self.problem = event["problem"]
-                    raise MarketError("source_unavailable", f"{source_id} ended the quote stream",
+                    raise MarketError("source_unavailable", t("{source_id} ended the quote stream", source_id=source_id),
                                       source_id=source_id)
                 result = await market.registry.call(source_id, "quotes", [target], "rolling_24h")
                 item = result.get(self.instrument["instrumentId"], {})
@@ -210,12 +212,12 @@ class Quotes:
             ranked = self.market.registry.rank(instrument, "quotes")
             if not ranked:
                 items[record["instrumentId"]] = {"quote": None, "problem": MarketError(
-                    "unsupported", f"No source quotes {instrument['symbol']}").problem()}
+                    "unsupported", t("No source quotes {symbol}", symbol=instrument['symbol'])).problem()}
                 continue
             groups.setdefault(ranked[0][0], []).append((record["instrumentId"], instrument))
 
         async def ask(source_id: str, members: list) -> None:
-            targets = await in_worker(lambda: [self.market.data.target(instrument, environment)
+            targets = await in_worker(lambda: [self.market.data.target(instrument, environment, source_id)
                                                for _id, instrument in members])
             key = (source_id, environment, basis, tuple(sorted(i for i, _ in members)))
             future = self._inflight.get(key)
@@ -244,7 +246,7 @@ class Quotes:
         entry = self.market.registry.entries.get(venue)
         chain = getattr(entry.source, "option_chain", None) if entry else None
         if chain is None:
-            raise MarketError("unsupported", f"{venue} has no option chain in Market")
+            raise MarketError("unsupported", t("{venue} has no option chain in Market", venue=venue))
         if environment != "production":
             records = await self.market.instruments.environment_catalog(venue, environment)
         else:
@@ -258,7 +260,7 @@ class Quotes:
             members = [r for r in members if r.get("expiry") == str(expiry)]
         members.sort(key=lambda r: (int(r["expiry"] or 0), float(r["strike"] or 0), r.get("optionSide") or ""))
         if len(members) > MAX_CHAIN:
-            raise MarketError("too_large", f"The {underlying} chain has {len(members)} contracts; choose an expiry")
+            raise MarketError("too_large", t("The {underlying} chain has {members} contracts; choose an expiry", underlying=underlying, members=len(members)))
         offset = int(value.get("cursor") or 0)
         page = members[offset:offset + value["limit"]]
         key = (venue, environment, underlying, expiry)

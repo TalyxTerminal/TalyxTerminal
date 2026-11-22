@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useState } from "react";
 import { mdy } from "./format";
 import type { LibraryApi } from "./api";
@@ -15,15 +16,15 @@ export function useCode(api: LibraryApi, itemId: string, versionId: string | und
       const version = detail.versions.find(item => item.versionId === detail.versionId) ?? detail.versions[0];
       const full = await api.version(version.versionId);
       const files: string[] = await api.source(version.versionId).then(value => value.files ?? [], () => [] as string[]);
-      const title = `${detail.summary.name} v${version.version}`, from = `from ${version.origin?.runNumber ? `#${version.origin.runNumber}, ` : ""}${mdy(version.publishedAt)}`, frozen = `Frozen with v${version.version}, read-only`;
+      const title = `${detail.summary.name} v${version.version}`, from = t("from {run}{date}", { run: version.origin?.runNumber ? `#${version.origin.runNumber}, ` : "", date: mdy(version.publishedAt) }), frozen = t("Frozen with v{version}, read-only", { version: version.version });
       if (files.length > 0) {
         const name = file && files.includes(file) ? file : files[0];
         const source = await api.source(version.versionId, name);
         return {title, file: name, lines: (source.content ?? "").split("\n"), frozen, from};
       }
       const settings = JSON.stringify(full.settings ?? {}, null, 2).split("\n");
-      return {title, file: detail.summary.kind === "allocation" ? "allocation settings" : "model settings", lines: [full.formula ? `formula: ${full.formula}` : "", ...settings].filter((line, index) => index > 0 || line), frozen, from};
-    })().then(value => {if (live) setView(value);}, () => {if (live) setView({title: "Frozen code", file: "unavailable", lines: ["The frozen code could not be read."], frozen: "", from: ""});});
+      return {title, file: detail.summary.kind === "allocation" ? t("allocation settings") : t("model settings"), lines: [full.formula ? t("formula: {formula}", { formula: full.formula }) : "", ...settings].filter((line, index) => index > 0 || line), frozen, from};
+    })().then(value => {if (live) setView(value);}, () => {if (live) setView({title: t("Frozen code"), file: "unavailable", lines: [t("The frozen code could not be read.")], frozen: "", from: ""});});
     return () => {live = false;};
   }, [api, itemId, versionId, file]);
   return view;

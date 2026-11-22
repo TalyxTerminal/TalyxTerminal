@@ -296,7 +296,7 @@ def test_combined_day_values_keep_fractional_midranks(ranked_combination):
     np.testing.assert_array_equal(rows["rank"], pd.Series(ranks + other).rank())
 
 
-def test_the_check_before_training_takes_seconds_and_blocks_only_what_must_fail(bars):
+def test_the_check_before_training_takes_seconds_and_memory_only_warns(bars):
     root, data, _ = bars
     job = {"data": data, "inputs": INPUTS, "settings": SETTINGS, "algorithm": "lightgbm", "params": {"rounds": 40}, "threads": 4, "budget": 16 * 1024 ** 3}
     answer = check(root, "check", job)
@@ -306,7 +306,7 @@ def test_the_check_before_training_takes_seconds_and_blocks_only_what_must_fail(
     assert answer["axis"]["windows"] and answer["axis"]["gap"] == 5
     small = check(root, "check-small", {**job, "budget": 0.2 * 1024 ** 3})
     memory = next(item for item in small["checks"] if item["name"] == "Memory")
-    assert small["blocked"] and memory["state"] == "block" and "0.2 GB" in memory["detail"]
+    assert not small["blocked"] and memory["state"] == "watch"  # over the budget it waits and runs alone; it is not refused on an estimate
     inspected = check(root, "inspect", {**job, "input": "b"}, op="model_inspect")
     assert inspected["ok"] and len(inspected["before"]) == 40 and inspected["stats"][0]["label"] == "Mean"
     drawn = inspected["figures"]
@@ -850,21 +850,6 @@ def test_break_even_is_none_when_gross_is_not_positive(s_bars):
     if gross <= 0:
         assert numbers["breakeven"] is None and numbers["breakevenNote"] == "Gross long–short is not positive"
         assert next(item for item in work_of(output)["checks"] if item["id"] == "cost_room")["state"] == "watch"
-
-
-def test_short_test_period_says_short_sample(s_bars):
-    root, data, labels, opens, project = s_bars
-    _, output = run(root, "p3-short", s_job(data, project, split={"firstTest": str(pd.Timestamp(int(labels[-100]), unit="ms").date())}))
-    numbers = work_of(output)["numbers"]
-    assert numbers["shortSample"] == (numbers["testDays"] < 250)
-
-
-def test_short_held_out_says_short_sample(s_bars):
-    root, data, labels, opens, project = s_bars
-    held = int(labels[-60])
-    _, source = run(root, "p3-ho-src", s_job(data, project, heldOutFrom=held))
-    answer, held_run = run(root, "p3-ho", s_job(data, project, kind="heldout", heldOutFrom=held))
-    assert answer["ok"] and work_of(held_run)["numbers"]["shortSample"] is True  # the backend carries it to the Robustness row
 
 
 def test_importance_basis_names_each_algorithm(s_bars):

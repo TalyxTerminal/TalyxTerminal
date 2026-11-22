@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import object_data
 from .allocation_runs import AllocationRuns
@@ -230,7 +231,7 @@ class Services:
         data = record["settings"]["data"]
         if data.get("universe") == "code":
             return {"universe": "code", "instruments": [], "account": None,
-                    "message": "This object's code picks its own symbols, so the venue, fees and capital defaults are known only when it runs."}
+                    "message": t("This object's code picks its own symbols, so the venue, fees and capital defaults are known only when it runs.")}
         if data.get("list"):
             data = {**data, "symbols": self.lists.members(data["list"])}
         return await object_data.defaults(self.store.ctx, {**record["settings"], "data": data})
@@ -247,7 +248,7 @@ class Services:
         directory = (self.runs.directory(identity) / "output").resolve()
         path = (directory / name).resolve()
         if not listed or not path.is_relative_to(directory) or not path.is_file():
-            raise ContractError("not_found", "This result file has not been published.")
+            raise ContractError("not_found", t("This result file has not been published."))
         return path
 
 
@@ -520,11 +521,11 @@ def mount(ctx, records, router: APIRouter, services: Services):
     async def read_source(run_id: str, name: str):
         record = runs.read(run_id)
         if record["code"] is None:
-            raise ContractError("not_found", "This run never fixed its code.")
+            raise ContractError("not_found", t("This run never fixed its code."))
         root = Path(record["code"]["snapshotPath"]).resolve()
         path = (root / name).resolve()
         if not path.is_relative_to(root) or not path.is_file():
-            raise ContractError("not_found", "This fixed source file is unavailable.")
+            raise ContractError("not_found", t("This fixed source file is unavailable."))
         return {"name": name, "content": path.read_text(encoding="utf-8"), "readOnly": True, "digest": record["code"]["digest"]}
 
     @router.get("/object-runs/{run_id}/logs/{stream}")
@@ -597,7 +598,7 @@ def handle_actions(ctx, services: Services):
         elif kind == "strategy":
             record = await runs.start(identity,{})
         else:
-            raise ContractError("invalid_input","A notebook runs one cell at a time.")
+            raise ContractError("invalid_input",t("A notebook runs one cell at a time."))
         return public_runs.receipt(record)
 
     async def list_presets(args, call):
@@ -631,7 +632,7 @@ def handle_actions(ctx, services: Services):
         obj = store.read(identity)
         kind = obj["kind"]
         if kind != "strategy" and ("metric" in args or "of" in args):
-            raise ContractError("invalid_input","metric and of apply to strategy sweeps.")
+            raise ContractError("invalid_input",t("metric and of apply to strategy sweeps."))
         axes = args["axes"]
         if kind == "strategy":
             # A period axis takes the public start and end; the sweep keeps the data settings' since and until.
@@ -648,7 +649,7 @@ def handle_actions(ctx, services: Services):
                 normalized.append({"name":next(iter(values[0])), "values":[next(iter(v.values())) for v in values]})
             record = (await allocations.start_sweep(identity,{"axes":normalized}))["runs"][0]
         else:
-            raise ContractError("invalid_input","A notebook has no parameter sweep.")
+            raise ContractError("invalid_input",t("A notebook has no parameter sweep."))
         return public_runs.receipt(record)
 
     async def start_walk_forward(args, call):
@@ -668,7 +669,7 @@ def handle_actions(ctx, services: Services):
         else:
             data = record["settings"]["data"]
             if not data.get("heldOutFrom"):
-                raise ContractError("no_held_out_period", "Set run.heldOutFrom before running.")
+                raise ContractError("no_held_out_period", t("Set run.heldOutFrom before running."))
             found = {"from": data["heldOutFrom"], "to": data.get("until"), "uses": factors.uses_of(record)}
         return {**{k: v for k, v in found.items() if k not in {"from", "to"}}, "start": found["from"], "end": found["to"]}
 
@@ -712,12 +713,12 @@ def handle_actions(ctx, services: Services):
             result = await models.resume(identity,args)
         else:
             if "epoch" in args or "override" in args:
-                raise ContractError("invalid_input","epoch and override apply to training.")
+                raise ContractError("invalid_input",t("epoch and override apply to training."))
             record = runs.read(identity)
             if record["objectKind"] == "factor":
                 return public_runs.receipt(await factors.retry(identity))
             if record["objectKind"] != "strategy" or record["runKind"] not in ("sweep", "walk"):
-                raise ContractError("invalid_input","resume_run continues a model run, or a strategy sweep or walk-forward.")
+                raise ContractError("invalid_input",t("resume_run continues a model run, or a strategy sweep or walk-forward."))
             result = await sweeps.resume(identity)
         return public_runs.receipt(result)
 
@@ -741,7 +742,7 @@ def handle_actions(ctx, services: Services):
         record = runs.read(identity)
         kind = record["objectKind"]
         if cell is not None and kind in {"model","allocation"}:
-            raise ContractError("invalid_input","Choose the batch member's runId to apply its values.")
+            raise ContractError("invalid_input",t("Choose the batch member's runId to apply its values."))
         if kind == "factor":
             detail = await factors.apply(identity,version,cell)
         elif kind == "allocation":
@@ -775,7 +776,7 @@ def handle_actions(ctx, services: Services):
         elif record["objectKind"] == "model" and "cell" not in args:
             await models.portfolio(identity)
         else:
-            raise ContractError("invalid_input","Only a factor, a factor sweep cell or a model can build a report.")
+            raise ContractError("invalid_input",t("Only a factor, a factor sweep cell or a model can build a report."))
         return public_runs.receipt(record)
 
     async def validate_factor_formula(args, call):

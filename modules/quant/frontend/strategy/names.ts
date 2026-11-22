@@ -1,5 +1,6 @@
 /* What a setting is called on screen: the label the code declares for a parameter, the form's label for a run or data setting, each with its unit
    as the draft writes it ("Taker fee, %"). A variable name (stop_atr, costs.feePct) is never shown. */
+import { t } from "../i18n";
 import type { Parameter } from "../objects";
 
 /** A parameter's label as the code declares it; a short trailing "(bars)" is its unit ("Lookback (bars)" → Lookback, bars). */
@@ -9,14 +10,14 @@ export function paramLabel(item: Pick<Parameter, "name" | "label">): {label: str
 }
 
 const NAMES: Record<string, string> = {
-  capital: "Capital", currency: "Currency", reportCurrency: "Report currency", maxPosition: "Max position, × equity", fill: "Fill at", accounts: "Capital by venue",
-  "benchmark.kind": "Benchmark", "benchmark.symbol": "Benchmark symbol", heldOutFrom: "Held out from", limitThroughTicks: "Limit orders, ticks through",
-  "exchange.leverage": "Leverage, ×", "exchange.maxLeverage": "Leverage cap, ×", "exchange.marginModel": "Margin", "exchange.liquidation": "Liquidate below maintenance",
-  "exchange.maintenancePct": "Maintenance, %", "exchange.stopTrigger": "Stop trigger", "exchange.positionMode": "Position mode",
-  "costs.feePct": "Taker fee, %", "costs.makerPct": "Maker fee, %", "costs.feeSource": "Fees", "costs.commissionBps": "Commission, bps", "costs.halfSpreadBps": "Half spread, bps",
-  "costs.impact": "Impact, σ√q", "costs.volumeCapPct": "Volume cap, % ADV", "costs.funding": "Funding", "costs.borrowPct": "Borrow, % a year",
-  shorting: "Shorting", halted: "Halted names", "riskFree.basis": "Risk-free", "riskFree.pct": "Risk-free rate, %",
-  "data.since": "From", "data.until": "To", "data.timeframe": "Timeframe", "data.fillBars": "Fill bars", "data.heldOutFrom": "Held out from", code: "Code",
+  capital: t("Capital"), currency: t("Currency"), reportCurrency: t("Report currency"), maxPosition: t("Max position, × equity"), fill: t("Fill at"), accounts: t("Capital by venue"),
+  "benchmark.kind": t("Benchmark"), "benchmark.symbol": t("Benchmark symbol"), heldOutFrom: t("Held out from"), limitThroughTicks: t("Limit orders, ticks through"),
+  "exchange.leverage": t("Leverage, ×"), "exchange.maxLeverage": t("Leverage cap, ×"), "exchange.marginModel": t("Margin"), "exchange.liquidation": t("Liquidate below maintenance"),
+  "exchange.maintenancePct": t("Maintenance, %"), "exchange.stopTrigger": t("Stop trigger"), "exchange.positionMode": t("Position mode"),
+  "costs.feePct": t("Taker fee, %"), "costs.makerPct": t("Maker fee, %"), "costs.feeSource": t("Fees"), "costs.commissionBps": t("Commission, bps"), "costs.halfSpreadBps": t("Half spread, bps"),
+  "costs.impact": t("Impact, σ√q"), "costs.volumeCapPct": t("Volume cap, % ADV"), "costs.funding": t("Funding"), "costs.borrowPct": t("Borrow, % a year"),
+  shorting: t("Shorting"), halted: t("Halted names"), "riskFree.basis": t("Risk-free"), "riskFree.pct": t("Risk-free rate, %"),
+  "data.since": t("From"), "data.until": "To", "data.timeframe": t("Timeframe"), "data.fillBars": t("Fill bars"), "data.heldOutFrom": t("Held out from"), code: t("Code"),
 };
 
 /** Words for a name nobody labelled yet: "volumeCapPct" → "Volume cap", "stop_atr" → "Stop atr" (still not the variable). */
@@ -39,6 +40,6 @@ export function paramsLine(params: Record<string, unknown>, parameters: readonly
   return Object.entries(params).slice(0, count).map(([name, value]) => {
     const declared = parameters.find(item => item.name === name);
     const label = (declared ? paramLabel(declared).label : words(name)).toLowerCase();
-    return `${label} ${typeof value === "boolean" ? (value ? "on" : "off") : String(value)}`;
+    return `${label} ${typeof value === "boolean" ? (value ? t("on") : t("off")) : String(value)}`;
   }).join(", ");
 }

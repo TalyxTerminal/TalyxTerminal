@@ -1,6 +1,5 @@
 """Direct Market 2.0 boundary rules: adjustment, export identity, clocks and exact native values."""
 import asyncio
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,6 +14,7 @@ from modules.quant.backend import market_inputs as M
 from modules.quant.backend import object_data as O
 from modules.quant.backend import research_data as R
 from modules.quant.backend.materials import ExportFiles, read_selection, run_task
+from tests.fixtures.quant_index import frozen_index
 from tests.unit.quant_runtime_fakes import adapt
 from vocabulary.instruments import MarketInstrument
 
@@ -115,7 +115,7 @@ def test_ns_boundary_and_native_event_availability_are_distinct(tmp_path):
     close = 1704229200000
     terms = {"instrumentId": instrument["instrumentId"], "priceIncrement": "0.01", "stock": {
         "acquiredAt": "2024-01-01T00:00:00Z", "commission": {},
-        "sessions": [{"openAt":"2024-01-02T14:30:00Z","closeAt":M.timestamp(close), "adjustedOHLC": ["98"] * 4}],
+        "sessions": [{"sessionDate": "2024-01-02", "lower": None, "upper": None, "priceIncrement": "0.01", "priceMap": {"scale": "1", "offset": "0", "maxError": "0"}, "openAt":"2024-01-02T14:30:00Z","closeAt":M.timestamp(close), "adjustedOHLC": ["98"] * 4}],
         "corporateActions": [{"effectiveTime":"2024-01-01","publishedAt":"2024-01-01T00:00:00Z"}]}}
     converted = M.stock_times(terms)
     assert converted["stock"]["acquiredAt"] == 1704067200000
@@ -129,10 +129,10 @@ def test_ns_boundary_and_native_event_availability_are_distinct(tmp_path):
     with ExportFiles() as exports:
         O.write_strategy_input(chosen, {}, {}, {}, converted, exports, write, None, close, [(1704171600000, close)])
     sessions = pd.read_parquet(tmp_path / "stock-sessions.parquet")
-    assert json.loads(sessions.sessions.item())[0]["closeAt"] == close
+    assert sessions.closeAt.tolist() == [close]
     bars = pd.read_parquet(tmp_path / "bars.parquet")
-    assert bars.ts_event.tolist() == ["1704229200000000000"]
-    assert bars.ts_init.tolist() == ["1704230100000000000"]
+    assert bars.ts_event.tolist() == [1704229200000000000]
+    assert bars.ts_init.tolist() == [1704230100000000000]
     assert R.labels_of(pd.Series([1704171600000]), "1d", "America/New_York").tolist() == [1704153600000]
     local = pd.Timestamp("2026-11-09T16:00:00Z")
     assert R.labels_of(pd.Series([local.value // M.MS]), "1d", "Asia/Shanghai").tolist() == [pd.Timestamp("2026-11-10T00:00:00Z").value // M.MS]
@@ -281,7 +281,7 @@ def test_revision_change_reexports_and_releases_the_superseded_artifact(tmp_path
 
 @pytest.mark.parametrize("stage", ["export", "terms"])
 @pytest.mark.parametrize("indexed", [False, True])
-def test_failed_member_is_five_requested_four_traded_or_stops_the_list(tmp_path, monkeypatch, stage, indexed):
+def test_failed_member_is_five_requested_four_traded_for_a_list_as_for_an_index(tmp_path, monkeypatch, stage, indexed):
     from unittest.mock import AsyncMock
 
     from test_quant_object_trading_terms import INDEX, prepared_context
@@ -314,18 +314,14 @@ def test_failed_member_is_five_requested_four_traded_or_stops_the_list(tmp_path,
         data = {**data, "index": {"instrument": INDEX}}
         index = {"selection": data["index"], "since": 0, "until": 86_399_999, "instruments": instruments, "exclusions": [],
                  "unmappedCount": 0, "intervals": [{"since": 0, "until": 86_399_999,
-                    "members": [{"assetId": item["instrumentId"], "instrument": item} for item in instruments]}]}
+                    "members": [{"assetId": item["instrumentId"], "instrumentId": item["instrumentId"], "symbol": item["displaySymbol"]} for item in instruments]}]}
+        index = frozen_index(index)
         monkeypatch.setattr(index_universe, "freeze", AsyncMock(return_value=index))
-    if not indexed:
-        with pytest.raises(ContractError) as error:
-            asyncio.run(O.prepare(ctx, {"data": data, "account": {"capital": 1000}}, "run", tmp_path))
-        assert error.value.code == problem["code"] and problem["message"] in error.value.message
-    else:
-        result = asyncio.run(O.prepare(ctx, {"data": data, "account": {"capital": 1000}}, "run", tmp_path))
-        summary = result["summary"]
-        assert (summary["requested"], summary["traded"]) == (5, 4)
-        assert summary["skipped"] == [{"symbol": "S4", "reason": problem["message"], "code": problem["code"]}]
-        assert left_out({"data": summary}) == ["Left out 1 of 5 names, so it traded 4: S4 unavailable from fixture"]
+    result = asyncio.run(O.prepare(ctx, {"data": data, "account": {"capital": 1000}}, "run", tmp_path))
+    summary = result["summary"]
+    assert (summary["requested"], summary["traded"]) == (5, 4)
+    assert summary["skipped"] == [{"symbol": "S4", "reason": problem["message"], "code": problem["code"]}]
+    assert left_out({"data": summary}) == ["1 of 5 names have no prices: S4 unavailable from fixture"]
 
 
 def test_cancellation_during_keeping_a_file_still_lets_it_go(tmp_path):

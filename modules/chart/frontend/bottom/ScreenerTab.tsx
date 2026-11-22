@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* The screener tab: a saved screen picks the members of a watchlist whose latest closed bar on a timeframe meets every
    condition (prices, the active chart's indicator outputs, values). Run saves the screen first; progress and results
    come back on the workspace stream; a running screen can be cancelled. Matching rows, then failed ones; a click shows
@@ -33,10 +34,10 @@ export function ScreenerTab({ ctx, panelId }: { ctx: ModuleContext; panelId: str
   const saved = selected === "new" ? null : list.find(item => item.id === selected) ?? list[0] ?? null;
   const last = entry ? entry.feed.bars.close[entry.feed.bars.close.length - 1] ?? 0 : 0;
   const fresh = (): ScreenSpec => ({
-    name: `Screen ${list.length + 1}`, scope: { kind: "watchlist", watchlistId: lists[0].id }, timeframe: entry?.chart?.document.series.timeframe ?? "1d",
+    name: t("Screen {number}", { number: list.length + 1 }), scope: { kind: "watchlist", watchlistId: lists[0].id }, timeframe: entry?.chart?.document.series.timeframe ?? "1d",
     conditions: [{ left: { kind: "price", field: "close" }, op: "greater", right: { kind: "value", value: last } }],
   });
-  if (!lists.length) return <div className="chart-bottom-body"><TxEmpty title="No watchlist" /></div>;
+  if (!lists.length) return <div className="chart-bottom-body"><TxEmpty title={t("No watchlist")} /></div>;
   const spec = draft ?? saved ?? fresh();
   const edit = (change: Partial<ScreenSpec>) => setDraft({ ...spec, ...change });
   const sources: Sources = new Map([...PRICES, ...(entry?.chart ? indicatorSources(entry, catalog, false) : [])]);
@@ -57,37 +58,37 @@ export function ScreenerTab({ ctx, panelId }: { ctx: ModuleContext; panelId: str
   const matched = run ? run.rows.filter(row => row.matched) : [], failed = run ? run.rows.filter(row => row.error) : [];
   const columns = [...new Set([...matched, ...failed].flatMap(row => Object.keys(row.values)))];
   return <div className="chart-bottom-body">
-    <div className="chart-bottom-toolbar" role="toolbar" aria-label="Screener">
-      <TxMenu label="Screens" items={[
+    <div className="chart-bottom-toolbar" role="toolbar" aria-label={t("Screener")}>
+      <TxMenu label={t("Screens")} items={[
         ...list.map(item => ({ id: item.id, label: item.name, checked: item.id === saved?.id, onSelect: () => { setSelected(item.id); setDraft(null); } })),
-        { id: "new", label: "New screen", icon: "plus" as const, separated: list.length > 0, onSelect: () => { setSelected("new"); setDraft(null); } },
-        ...(saved ? [{ id: "delete", label: "Delete screen", icon: "trash" as const, tone: "danger" as const, onSelect: () => void remove() }] : []),
-      ]} trigger={<TxButton variant="tool" size="sm" aria-label="Screens"><TxIcon name="list" /></TxButton>} />
-      <TxInput className="chart-screen-name" aria-label="Screen name" value={spec.name} onChange={event => edit({ name: event.target.value })} />
-      <TxSelect aria-label="Watchlist" value={spec.scope.kind === "watchlist" ? spec.scope.watchlistId : ""} onChange={event => edit({ scope: { kind: "watchlist", watchlistId: event.target.value } })}>
+        { id: "new", label: t("New screen"), icon: "plus" as const, separated: list.length > 0, onSelect: () => { setSelected("new"); setDraft(null); } },
+        ...(saved ? [{ id: "delete", label: t("Delete screen"), icon: "trash" as const, tone: "danger" as const, onSelect: () => void remove() }] : []),
+      ]} trigger={<TxButton variant="tool" size="sm" aria-label={t("Screens")}><TxIcon name="list" /></TxButton>} />
+      <TxInput className="chart-screen-name" aria-label={t("Screen name")} value={spec.name} onChange={event => edit({ name: event.target.value })} />
+      <TxSelect aria-label={t("Watchlist")} value={spec.scope.kind === "watchlist" ? spec.scope.watchlistId : ""} onChange={event => edit({ scope: { kind: "watchlist", watchlistId: event.target.value } })}>
         {lists.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </TxSelect>
-      <TxSelect aria-label="Timeframe" value={spec.timeframe} onChange={event => edit({ timeframe: event.target.value })}>
+      <TxSelect aria-label={t("Timeframe")} value={spec.timeframe} onChange={event => edit({ timeframe: event.target.value })}>
         {TIMEFRAME_GROUPS.flatMap(([, timeframes]) => timeframes).map(timeframe => <option key={timeframe} value={timeframe}>{timeframeLabel(timeframe)}</option>)}
       </TxSelect>
       {running
-        ? <TxButton size="sm" onClick={() => void post(ctx, "/screens/cancel", { screenId: saved!.id }).catch(fail)}>Cancel</TxButton>
-        : <TxButton size="sm" variant="primary" disabled={!spec.name.trim()} onClick={() => void start()}>Run</TxButton>}
+        ? <TxButton size="sm" onClick={() => void post(ctx, "/screens/cancel", { screenId: saved!.id }).catch(fail)}>{t("Cancel")}</TxButton>
+        : <TxButton size="sm" variant="primary" disabled={!spec.name.trim()} onClick={() => void start()}>{t("Run")}</TxButton>}
       {running && <TxProgress value={run.total ? run.done / run.total : null} label={`${run.done} / ${run.total}`} />}
       {problem && <span className="chart-alert-error" role="alert">{problem}</span>}
       <span className="chart-tb-spacer" />
-      {run && !running && <span className="chart-muted">{run.state === "failed" ? run.error : `${matched.length} of ${run.total} match`}</span>}
+      {run && !running && <span className="chart-muted">{run.state === "failed" ? run.error : t("{length} of {total} match", { length: matched.length, total: run.total })}</span>}
     </div>
     <div className="chart-screen-conditions">
       {spec.conditions.map((condition, index) => <div key={index} className="chart-screen-condition">
         <ConditionFields condition={condition} sources={sources} last={last} onChange={next => setCondition(index, next)} />
-        {spec.conditions.length > 1 && <TxIconButton size="sm" icon="close" label="Remove condition" onClick={() => edit({ conditions: spec.conditions.filter((_, at) => at !== index) })} />}
+        {spec.conditions.length > 1 && <TxIconButton size="sm" icon="close" label={t("Remove condition")} onClick={() => edit({ conditions: spec.conditions.filter((_, at) => at !== index) })} />}
       </div>)}
-      {spec.conditions.length < MAX_CONDITIONS && <TxButton size="sm" variant="quiet" onClick={() => edit({ conditions: [...spec.conditions, fresh().conditions[0]] })}><TxIcon name="plus" />Condition</TxButton>}
+      {spec.conditions.length < MAX_CONDITIONS && <TxButton size="sm" variant="quiet" onClick={() => edit({ conditions: [...spec.conditions, fresh().conditions[0]] })}><TxIcon name="plus" />{t("Condition")}</TxButton>}
     </div>
     {run && <div className="chart-bottom-view chart-screen-results">
       <TxTable density="compact" stickyHead>
-        <thead><tr><TxTh>Symbol</TxTh>{columns.map(column => <TxTh key={column} numeric>{column}</TxTh>)}<TxTh /></tr></thead>
+        <thead><tr><TxTh>{t("Symbol")}</TxTh>{columns.map(column => <TxTh key={column} numeric>{column}</TxTh>)}<TxTh /></tr></thead>
         <tbody>
           {[...matched, ...failed].map(row => <tr key={row.instrument.instrumentId} className="chart-screen-row" onClick={() => switchSymbol(ctx, panelId, row.instrument.instrumentId)}>
             <TxTd>{row.instrument.displaySymbol}</TxTd>

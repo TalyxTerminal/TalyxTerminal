@@ -19,6 +19,7 @@ from uuid import uuid4
 
 import yaml
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import read_dictionary, t
 
 from .files import write_json
 
@@ -59,12 +60,11 @@ def read_manifest(directory: Path) -> dict:
     try:
         manifest = json.loads((directory / MANIFEST).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        raise ContractError("invalid_module", f"{directory.name}: the manifest cannot be read ({exc})") from exc
+        raise ContractError("invalid_module", t("{name}: the manifest cannot be read ({exc})", name=directory.name, exc=exc)) from exc
     if not isinstance(manifest, dict):
-        raise ContractError("invalid_module", f"{directory.name}: the manifest must be an object")
+        raise ContractError("invalid_module", t("{name}: the manifest must be an object", name=directory.name))
     if manifest.get("manifestVersion") != MANIFEST_VERSION:
-        raise ContractError("invalid_module", f"{directory.name}: manifest version {manifest.get('manifestVersion')} "
-                            f"is not {MANIFEST_VERSION}")
+        raise ContractError("invalid_module", t("{name}: manifest version {value} is not {MANIFEST_VERSION}", name=directory.name, value=manifest.get('manifestVersion'), MANIFEST_VERSION=MANIFEST_VERSION))
     errors = sorted(_manifest_schema().iter_errors(manifest), key=lambda error: list(error.path))
     if errors:
         raise ContractError("invalid_module", f"{directory.name}: the manifest is not valid: " + "; ".join(
@@ -75,7 +75,7 @@ def read_manifest(directory: Path) -> dict:
 def _markdown(directory: Path, declared: str, field: str) -> Path:
     path = (directory / declared).resolve()
     if Path(declared).is_absolute() or not path.is_relative_to(directory.resolve()) or path.suffix.lower() != ".md":
-        raise ContractError("invalid_module", f"{directory.name}: {field} must name a Markdown file inside the module")
+        raise ContractError("invalid_module", t("{name}: {field} must name a Markdown file inside the module", name=directory.name, field=field))
     return path
 
 
@@ -94,7 +94,7 @@ def read_guide(directory: Path, declared: str) -> dict[str, str]:
             raise ValueError(f"guide body is {len(body)} characters; maximum is 2500")
         return {"name": metadata["name"], "description": metadata["description"], "text": body}
     except (ValueError, OSError, yaml.YAMLError) as exc:
-        raise ContractError("invalid_module", f"{directory.name}: cannot read ai.guide {declared}: {exc}") from exc
+        raise ContractError("invalid_module", t("{name}: cannot read ai.guide {declared}: {exc}", name=directory.name, declared=declared, exc=exc)) from exc
 
 
 def read_docs(directory: Path, declared: list[dict]) -> dict[str, dict[str, str]]:
@@ -102,14 +102,30 @@ def read_docs(directory: Path, declared: list[dict]) -> dict[str, dict[str, str]
     docs = {}
     for entry in declared:
         if entry["topic"] in docs:
-            raise ContractError("invalid_module", f"{directory.name}: ai.docs names the topic {entry['topic']} twice")
+            raise ContractError("invalid_module", t("{name}: ai.docs names the topic {topic} twice", name=directory.name, topic=entry['topic']))
         path = _markdown(directory, entry["file"], "ai.docs")
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, ValueError) as exc:
-            raise ContractError("invalid_module", f"{directory.name}: cannot read ai.docs {entry['file']}: {exc}") from exc
+            raise ContractError("invalid_module", t("{name}: cannot read ai.docs {file}: {exc}", name=directory.name, file=entry['file'], exc=exc)) from exc
         docs[entry["topic"]] = {"title": entry["title"], "text": text}
     return docs
+
+
+def locale_files(directory: Path, manifest: dict) -> dict[str, Path]:
+    """The module's dictionaries by language, each checked to be one (a module with a broken dictionary does not load:
+    its frontend and backend would show English where it says otherwise)."""
+    files = {}
+    for language, declared in manifest.get("locales", {}).items():
+        path = (directory / declared).resolve()
+        if Path(declared).is_absolute() or not path.is_relative_to(directory.resolve()):
+            raise ContractError("invalid_module", t("{name}: locales.{language} must name a file inside the module", name=directory.name, language=language))
+        try:
+            read_dictionary(path)
+        except (OSError, ValueError) as exc:
+            raise ContractError("invalid_module", t("{name}: cannot read locales.{language} {declared}: {exc}", name=directory.name, language=language, declared=declared, exc=exc)) from exc
+        files[language] = path
+    return files
 
 
 @functools.cache
@@ -119,12 +135,14 @@ def _manifest_schema():
 
 
 def _digest(directory: Path, manifest: dict, contract: dict) -> str:
-    """Changes with the declarations and the frontend entry's code, so a window loads the frontend again after a
-    reload that changed it."""
+    """Changes with the declarations, the frontend entry's code and the dictionaries, so a window loads the frontend
+    (and its words) again after a reload that changed them."""
     value = hashlib.sha256(json.dumps([manifest, contract], sort_keys=True).encode())
     frontend = directory / manifest["entries"]["frontend"] if "frontend" in manifest["entries"] else None
     if frontend is not None and frontend.is_file():
         value.update(frontend.read_bytes())
+    for language in sorted(manifest.get("locales", {})):
+        value.update((directory / manifest["locales"][language]).read_bytes())
     return value.hexdigest()[:32]
 
 
@@ -173,7 +191,7 @@ class Catalog:
 
     def register(self, item: Installed) -> None:
         if item.id in self.modules:
-            raise ContractError("conflict", f"{item.id} is already installed")
+            raise ContractError("conflict", t("{id} is already installed", id=item.id))
         self.modules[item.id] = item
         self.skipped.pop(f"{item.source}:{item.directory.name}", None)
 
@@ -183,11 +201,12 @@ class Catalog:
         try:
             contract = json.loads((directory / "public" / "contract.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
-            raise ContractError("invalid_module", f"{manifest['id']}: the contract cannot be read ({exc})") from exc
+            raise ContractError("invalid_module", t("{id}: the contract cannot be read ({exc})", id=manifest['id'], exc=exc)) from exc
         if not isinstance(contract, dict):
-            raise ContractError("invalid_module", f"{directory.name}: the contract must be an object")
+            raise ContractError("invalid_module", t("{name}: the contract must be an object", name=directory.name))
         if contract.get("module") != manifest["id"]:
-            raise ContractError("invalid_module", f"{manifest['id']}: the contract belongs to {contract.get('module')}")
+            raise ContractError("invalid_module", t("{id}: the contract belongs to {value}", id=manifest['id'], value=contract.get('module')))
+        locale_files(directory, manifest)
         item = Installed(manifest["id"], directory, manifest, contract, source, _digest(directory, manifest, contract),
                          enabled=manifest["id"] not in self.disabled)
         if item.enabled and "ai" in manifest:
@@ -208,7 +227,7 @@ class Catalog:
         try:
             return self.modules[module_id]
         except KeyError:
-            raise ContractError("not_found", f"No module {module_id} is installed") from None
+            raise ContractError("not_found", t("No module {module_id} is installed", module_id=module_id)) from None
 
     def dependents(self, module_id: str) -> list[str]:
         """Enabled modules that cannot work without ``module_id``."""
@@ -229,9 +248,9 @@ class Catalog:
         if source.is_dir() and source.resolve().parent == self.installed_root.resolve():
             item = self.load(source, "installed")
             if item.id in self.modules:
-                raise ContractError("conflict", f"{item.id} is already installed; uninstall it first")
+                raise ContractError("conflict", t("{id} is already installed; uninstall it first", id=item.id))
             if item.id != source.name:
-                raise ContractError("invalid_module", f"The folder of module {item.id} must be named {item.id}")
+                raise ContractError("invalid_module", t("The folder of module {id} must be named {id}", id=item.id))
             self.register(item)
             return item
         staging = self.installed_root / f".install-{uuid4().hex}"
@@ -245,17 +264,17 @@ class Catalog:
                     for member in archive.namelist():
                         target = (staging / member).resolve()
                         if not target.is_relative_to(staging.resolve()):
-                            raise ContractError("invalid_module", f"The archive writes outside its folder: {member}")
+                            raise ContractError("invalid_module", t("The archive writes outside its folder: {member}", member=member))
                     archive.extractall(staging)
             else:
-                raise ContractError("invalid_input", f"{source} is neither a folder nor a zip file")
+                raise ContractError("invalid_input", t("{source} is neither a folder nor a zip file", source=source))
             roots = [path for path in staging.iterdir() if (path / MANIFEST).exists()]
             root = staging if (staging / MANIFEST).exists() else roots[0] if len(roots) == 1 else None
             if root is None:
-                raise ContractError("invalid_module", "The package has no talyx.module.json")
+                raise ContractError("invalid_module", t("The package has no talyx.module.json"))
             item = self.load(root, "installed")
             if item.id in self.modules:
-                raise ContractError("conflict", f"{item.id} is already installed; uninstall it first")
+                raise ContractError("conflict", t("{id} is already installed; uninstall it first", id=item.id))
             target = self.installed_root / item.id
             root.rename(target)
         finally:

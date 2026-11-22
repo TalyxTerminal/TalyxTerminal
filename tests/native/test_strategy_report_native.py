@@ -332,13 +332,13 @@ def test_all_orders_rejected_says_how_many(tmp_path):
     assert work["stats"]["trades"] == 0 and work["notes"] == ["No trades: 1 orders rejected"]
 
 
-def test_short_sample_no_annualized(tmp_path):
+def test_short_run_no_annualized(tmp_path):
     frame = B.perp_bars(24 * 20)  # 20 daily returns
     prepare(tmp_path, CODE, frame=frame)
     _, work, results = E.completed(tmp_path)
     stats = work["stats"]
     assert stats["sharpe"] is None and stats["sortino"] is None and stats["cagr"] is None
-    assert stats["totalReturn"] is not None and work["shortSample"] is True
+    assert stats["totalReturn"] is not None
     assert results["sections"]["rolling"]["longerThanRun"] is True
 
 
@@ -422,21 +422,17 @@ def test_risk_free_irx_and_zero(tmp_path):
     assert work["stats"]["sharpe"] < other["stats"]["sharpe"]  # the same returns minus 5% a year
 
 
-def test_beta_benchmark_matches_regression(tmp_path):
-    """benchmark `beta`: each day the risk-free rate plus beta times the index's excess return; beta is the run's own regression slope."""
+def test_symbol_benchmark_follows_its_closes(tmp_path):
+    """benchmark `series` (a Market symbol such as SPY or CSI 300): each day's benchmark return is that symbol's close-to-close return."""
     frame, ids = B.daily_universe(2, 260, halted=())
     index = frame[frame["instrument"] == ids[1]]
     stock_run(tmp_path, REBALANCE.replace("SCHEDULE", "{2: {0: .5}}"), ids[:1], frame[frame["instrument"] == ids[0]],
-              extra={"benchmark": {"kind": "beta", "label": "Cash + beta x S&P 500", "rows": [[int(row.ts_event) // 1_000_000, float(row.close)] for row in index.itertuples()]}})
+              extra={"benchmark": {"kind": "series", "label": "000300.SH", "rows": [[int(row.ts_event) // 1_000_000, float(row.close)] for row in index.itertuples()]}})
     _, work, _ = E.completed(tmp_path)
-    assert work["benchmarkLabel"].startswith("Cash + ")
-    beta = work["benchmarkBeta"]
+    assert work["benchmarkLabel"] == "000300.SH"
     closes = pd.Series([float(value) for value in index["close"]], index=pd.to_datetime(index["ts_event"].astype("int64"), unit="ns", utc=True).dt.normalize())
-    market = closes.pct_change()
-    level = pd.Series([point[1] for point in work["benchmark"]], index=pd.to_datetime([point[0] for point in work["benchmark"]], unit="ms", utc=True).normalize())
-    daily = level.pct_change().dropna()
-    expected = beta * market.reindex(daily.index)
-    assert (daily - expected).abs().max() < 1e-7  # the equity points are written to 4 decimals
+    daily = pd.Series({pd.Timestamp(at, unit="ms", tz="UTC"): bench for at, _, bench in work["dailyReturns"]}).iloc[1:]
+    assert (daily - closes.pct_change().reindex(daily.index)).abs().max() < 1e-9
 
 
 def test_equal_weight_benchmark_uses_members_on_each_day(tmp_path):
@@ -497,7 +493,7 @@ def test_stock_short_pays_borrow(tmp_path):
     """Short one share at 100 for a year: about 100 x 0.3% = 0.30; `borrowPct` is a rate a year, charged on each day held."""
     rows = [FLAT_HOUR[0]] * 400
     frame = B.hand_bars(rows, instrument="S00.XNAS", bar_type="S00.XNAS-1-DAY-LAST-EXTERNAL", step="D", span_ns=0, price_digits=2)
-    frame[["ts_event", "ts_init"]] = frame[["ts_event", "ts_init"]].map(lambda value: str(int(value) + 21 * 3_600_000_000_000))
+    frame[["ts_event", "ts_init"]] = frame[["ts_event", "ts_init"]].map(lambda value: int(value) + 21 * 3_600_000_000_000)
     code = PRELUDE + '''
 
 class Short(q.Strategy):
@@ -1002,7 +998,7 @@ def test_a_source_that_publishes_late_still_fills_at_the_next_open(tmp_path):
     """bars known 15 minutes after they close (a source's publication delay): the engine's clock runs on when bars are known, and the fill
     model found no bar at those moments, so every market order was refused as halted. It fills at the next bar's open, as with no delay."""
     frame = B.perp_bars(24 * 10)
-    frame["ts_init"] = (frame["ts_event"].astype("int64") + 15 * 60_000_000_000).astype(str)
+    frame["ts_init"] = frame["ts_event"].astype("int64") + 15 * 60_000_000_000
     prepare(tmp_path, HOLD, frame=frame, settings={"costs": {"halfSpreadBps": 0, "impact": 0, "funding": False}}, funding=False)
     _, work, results = E.completed(tmp_path)
     assert not [row for row in E.rows(tmp_path, "orders") if row["status"] != "Filled"]

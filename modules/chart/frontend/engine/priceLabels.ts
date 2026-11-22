@@ -178,7 +178,7 @@ export class PriceLabels {
       this.probe.fillStyle = color;
       const value = String(this.probe.fillStyle);
       const [r, g, b] = value.startsWith("#") ? [1, 3, 5].map(at => parseInt(value.slice(at, at + 2), 16)) : value.match(/[\d.]+/g)!.slice(0, 3).map(Number);
-      found = { back: `rgb(${r}, ${g}, ${b})`, text: 0.199 * r + 0.687 * g + 0.114 * b > 160 ? "black" : "white" };
+      found = { back: `rgb(${r}, ${g}, ${b})`, text: 0.199 * r + 0.687 * g + 0.114 * b > 160 ? "black" : "white" }; // i18n-ignore: CSS colors
       this.contrast.set(color, found);
     }
     return found;

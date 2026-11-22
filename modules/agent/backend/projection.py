@@ -6,6 +6,7 @@ import contextvars
 import time
 
 from langchain_core.callbacks import AsyncCallbackHandler
+from talyx_sdk.i18n import t
 
 from .children import CHILD
 from .providers import project_message
@@ -48,8 +49,8 @@ class ProviderProjection(AsyncCallbackHandler):
 
     def _process(self, run_id, record, state):
         self.service.runtime_card(record["turn"], {
-            "id": "model_" + run_id, "type": "process_group", "title": "Composing response",
-            "steps": [{"id": run_id, "title": "Model response", "state": state, "startedAt": record["startedAt"],
+            "id": "model_" + run_id, "type": "process_group", "title": t("Composing response"),
+            "steps": [{"id": run_id, "title": t("Model response"), "state": state, "startedAt": record["startedAt"],
                 "finishedAt": time.time() if state != "running" else None,
                 "details": {"text": record["text"]}}]})
         if record["reasoning"]:

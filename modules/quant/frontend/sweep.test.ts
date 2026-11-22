@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CASES, defaultRange, rangeCount, sweepPlan } from "./sweep";
+import { defaultRange, rangeCount, sweepPlan } from "./sweep";
 import type { Parameter } from "./objects";
 
 const parameter = (name: string, type: Parameter["type"], extra: Partial<Parameter> = {}): Parameter =>
@@ -17,13 +17,13 @@ describe("Sweep ranges", () => {
     expect(rangeCount("fast", "int", {from: 15, to: 5, step: 1})).toHaveProperty("error");
     expect(rangeCount("fast", "int", {from: 5.5, to: 15, step: 1})).toHaveProperty("error");
   });
-  it("multiplies the ticked ranges and stops above the limit", () => {
+  it("multiplies the ticked ranges, as many as they make", () => {
     const parameters = [parameter("fast", "int"), parameter("slow", "int"), parameter("stake", "float")];
     const plan = sweepPlan(parameters, {fast: {on: true, from: 5, to: 15, step: 5}, slow: {on: true, from: 20, to: 40, step: 10}, stake: {on: false, from: 1, to: 9, step: 1}});
     expect(plan).toEqual({ranges: {fast: {from: 5, to: 15, step: 5}, slow: {from: 20, to: 40, step: 10}}, total: 9, error: null});
     const big = sweepPlan(parameters, {fast: {on: true, from: 1, to: 100, step: 1}, slow: {on: true, from: 1, to: 3, step: 1}});
     expect(big.total).toBe(300);
-    expect(big.error).toContain(String(MAX_CASES));
+    expect(big.error).toBeNull();
     expect(sweepPlan(parameters, {}).error).not.toBeNull();
   });
   it("keeps values inside the parameter's bounds", () => {

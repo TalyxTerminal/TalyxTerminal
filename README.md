@@ -73,6 +73,10 @@ The design is described in [docs/architecture.md](docs/architecture.md).
 
 **[Developer](modules/developer/README.md): where modules and indicators are written.** Code, documentation and examples in one place, with breakpoint debugging in VS Code.
 
+## User guide
+
+New to TALYX? The [user guide](docs/user-guide.md) walks through installing, workspaces, Market, Chart, Quant, Agent and Developer, and where your data lives. 中文版：[使用指南](docs/user-guide.zh-CN.md)。
+
 ## Quick start
 
 Download the installer from [Releases](https://github.com/talyxterminal/TalyxTerminal/releases) and run it. Or run from source:

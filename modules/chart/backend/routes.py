@@ -15,6 +15,7 @@ from collections.abc import AsyncIterator
 import orjson
 from fastapi import FastAPI, Request, WebSocket
 from talyx_sdk import ContractError, wire
+from talyx_sdk.i18n import t
 
 from .wire import ROUTES
 
@@ -22,7 +23,7 @@ from .wire import ROUTES
 def _workspace(headers) -> str:
     workspace = headers.get("x-talyx-workspace")
     if not workspace:
-        raise ContractError("invalid_input", "Chart's panel works in a workspace; this request names none")
+        raise ContractError("invalid_input", t("Chart's panel works in a workspace; this request names none"))
     return workspace
 
 

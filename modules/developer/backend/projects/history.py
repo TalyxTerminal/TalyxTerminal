@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 MAX_FILE = 16 * 1024 * 1024
 MAX_PROJECT = 64 * 1024 * 1024
@@ -39,7 +40,7 @@ class FileHistory:
 
     def _directory(self, project_id: str):
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", project_id):
-            raise ContractError("invalid_input", "The project identity is invalid.")
+            raise ContractError("invalid_input", t("The project identity is invalid."))
         return self.root / "file-history" / project_id
 
     def _index(self, project_id: str):
@@ -107,14 +108,14 @@ class FileHistory:
             source = self._source(self._index(project_id), relative)
             item = next((item for item in source["revisions"] if item["revisionId"] == revision_id), None)
             if not item:
-                raise ContractError("source_unavailable", "This file revision is no longer available.")
+                raise ContractError("source_unavailable", t("This file revision is no longer available."))
             data = (self._directory(project_id) / "blobs" / item["version"]).read_bytes()
             if hashlib.sha256(data).hexdigest() != item["version"]:
-                raise ContractError("invalid_material", "The saved revision is damaged. The current file is unchanged.")
+                raise ContractError("invalid_material", t("The saved revision is damaged. The current file is unchanged."))
             try:
                 content = data.decode("utf-8" if keep_bom else "utf-8-sig")
                 if "\x00" in content:
                     raise UnicodeError()
             except UnicodeError:
-                raise ContractError("binary_resource", "This revision is a binary resource.") from None
+                raise ContractError("binary_resource", t("This revision is a binary resource.")) from None
             return {"content": content, "version": item["version"]}

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useMemo, useState } from "react";
 import {
   TxButton, TxDialog, TxEmpty, TxField, TxIconButton, TxInput, TxMenu, TxSearch, TxSegmented, TxSelect, TxSettingsGroup, TxSettingsNote, TxSettingsPage, TxSwitch,
@@ -14,13 +15,13 @@ type Choice = { kind: "official"; provider: string } | { kind: "local" | "relay"
 
 /* The chooser: the four US providers, the three Chinese ones, then this computer and anything else (0104). */
 const OFFICIAL_TILES: { id: string; detail: string }[] = [
-  { id: "anthropic", detail: "Claude · its own web search" },
-  { id: "openai", detail: "GPT · its own web search" },
-  { id: "google", detail: "Gemini · its own web search" },
-  { id: "xai", detail: "Grok · its own web search" },
-  { id: "deepseek", detail: "DeepSeek's own search, same key" },
-  { id: "moonshotai", detail: "Kimi's own search, same key · China or international" },
-  { id: "zhipuai", detail: "GLM · Zhipu's own search, same key · China or international" },
+  { id: "anthropic", detail: t("Claude · its own web search") },
+  { id: "openai", detail: t("GPT · its own web search") },
+  { id: "google", detail: t("Gemini · its own web search") },
+  { id: "xai", detail: t("Grok · its own web search") },
+  { id: "deepseek", detail: t("DeepSeek's own search, same key") },
+  { id: "moonshotai", detail: t("Kimi's own search, same key · China or international") },
+  { id: "zhipuai", detail: t("GLM · Zhipu's own search, same key · China or international") },
 ];
 
 export function ModelsSection({ ctx }: { ctx: ModuleContext }) {
@@ -38,29 +39,29 @@ function Models({ settings, client, refresh }: { settings: AgentSettings; client
     await refresh();
   });
   const removeModel = (model: AgentModel) => actions.run(model.id, async () => { await client.settings("delete_model", { id: model.id }); await refresh(); });
-  return <TxSettingsPage data-settings-section="agent-models" lede="Connect the models Agent can use. Keys stay in Windows Credential Manager; each chat picks its own model.">
+  return <TxSettingsPage data-settings-section="agent-models" lede={t("Connect the models Agent can use. Keys stay in Windows Credential Manager; each chat picks its own model.")}>
     <div className="agent-settings-toolbar">
-      <TxButton size="sm" variant="primary" onClick={() => setAdding(true)}>Add provider…</TxButton>
+      <TxButton size="sm" variant="primary" onClick={() => setAdding(true)}>{t("Add provider…")}</TxButton>
       <span className="agent-spacer" />
-      <TxButton size="sm" variant="quiet" disabled={profiles.running} title="Windows, abilities, thinking levels and prices from models.dev. Also refreshed daily and when you add a provider."
+      <TxButton size="sm" variant="quiet" disabled={profiles.running} title={t("Windows, abilities, thinking levels and prices from models.dev. Also refreshed daily and when you add a provider.")}
         onClick={() => void profiles.start(signal => client.refreshProfiles(signal)).catch(error => actions.run("profiles", () => Promise.reject(error)))}>
-        {profiles.running ? "Refreshing model info…" : "Refresh model info"}
+        {profiles.running ? t("Refreshing model info…") : t("Refresh model info")}
       </TxButton>
     </div>
-    {profiles.record?.state === "failed" && <p className="tx-error" role="alert">Model info wasn't refreshed: {profiles.record.error?.message}</p>}
+    {profiles.record?.state === "failed" && <p className="tx-error" role="alert">{t("Model info wasn't refreshed:")} {profiles.record.error?.message}</p>}
     {actions.error?.id === "profiles" && <p className="tx-error" role="alert">{actions.error.text}</p>}
-    {!settings.connections.length && <TxSettingsGroup><TxEmpty title="No models yet" text="Add a provider with your own key, a model on this computer or a relay." /></TxSettingsGroup>}
+    {!settings.connections.length && <TxSettingsGroup><TxEmpty title={t("No models yet")} text={t("Add a provider with your own key, a model on this computer or a relay.")} /></TxSettingsGroup>}
     {settings.connections.map(connection => {
       const models = settings.models.filter(model => model.connectionId === connection.id);
       return <TxSettingsGroup key={connection.id} title={connection.name} detail={connectionDetail(connection)} action={<>
-        <TxButton size="sm" onClick={() => setAddModel(connection)}>Add model…</TxButton>
-        <TxMenu label={`${connection.name} actions`} align="end" trigger={<TxIconButton size="sm" label={`${connection.name} actions`} icon="more" disabled={actions.busy === connection.id} />} items={[
-          ...(connection.secretRef ? [{ id: "key", label: connection.credential.configured ? "Replace key…" : "Add key…", onSelect: () => setReplacing(connection) }] : []),
-          { id: "remove", label: "Remove connection", tone: "danger" as const, disabled: models.length > 0, onSelect: () => void removeConnection(connection) },
+        <TxButton size="sm" onClick={() => setAddModel(connection)}>{t("Add model…")}</TxButton>
+        <TxMenu label={t("{name} actions", { name: connection.name })} align="end" trigger={<TxIconButton size="sm" label={t("{name} actions", { name: connection.name })} icon="more" disabled={actions.busy === connection.id} />} items={[
+          ...(connection.secretRef ? [{ id: "key", label: connection.credential.configured ? t("Replace key…") : t("Add key…"), onSelect: () => setReplacing(connection) }] : []),
+          { id: "remove", label: t("Remove connection"), tone: "danger" as const, disabled: models.length > 0, onSelect: () => void removeConnection(connection) },
         ]} />
       </>}>
         {actions.error?.id === connection.id && <TxSettingsNote tone="error">{actions.error.text}</TxSettingsNote>}
-        {!models.length && <TxSettingsNote>No models from this connection yet.</TxSettingsNote>}
+        {!models.length && <TxSettingsNote>{t("No models from this connection yet.")}</TxSettingsNote>}
         {models.map(model => <ModelRow key={model.id} model={model} connection={connection} client={client}
           busy={actions.busy === model.id} error={actions.error?.id === model.id ? actions.error.text : null}
           onEdit={() => setEditing(model)} onRemove={() => void removeModel(model)} />)}
@@ -77,22 +78,22 @@ function Models({ settings, client, refresh }: { settings: AgentSettings; client
 }
 
 function connectionDetail(connection: ModelConnection): string {
-  if (connection.kind === "local") return `This computer · ${connection.baseUrl}`;
-  const key = connection.credential.configured ? `Key ${connection.credential.mask}` : "No key";
-  return connection.kind === "relay" ? `Relay · ${connection.protocol === "anthropic" ? "Anthropic" : "OpenAI"}-compatible · ${connection.baseUrl} · ${key}` : key;
+  if (connection.kind === "local") return t("This computer · {url}", { url: connection.baseUrl });
+  const key = connection.credential.configured ? t("Key {mask}", { mask: connection.credential.mask ?? "••••" }) : t("No key");
+  return connection.kind === "relay" ? t("Relay · {protocol}-compatible · {url} · {key}", { protocol: connection.protocol === "anthropic" ? "Anthropic" : "OpenAI", url: connection.baseUrl, key }) : key;
 }
 
 /* ── A model and its connection test ─────────────────────── */
 
-const CHECKS: [string, string][] = [["connection", "Connects"], ["tools", "Calls tools"], ["search", "Built-in web search"]];
-const CHECK_STATES: Record<string, string> = { passed: "Yes", failed: "No", not_tested: "Not tested", unsupported: "Not offered" };
+const CHECKS: [string, string][] = [["connection", t("Connects")], ["tools", t("Calls tools")], ["search", t("Built-in web search")]];
+const CHECK_STATES: Record<string, string> = { passed: t("Yes"), failed: t("No"), not_tested: t("Not tested"), unsupported: t("Not offered") };
 
 function ModelRow({ model, connection, client, busy, error, onEdit, onRemove }: {
   model: AgentModel; connection: ModelConnection; client: AgentClient; busy: boolean; error: string | null; onEdit: () => void; onRemove: () => void;
 }) {
   const test = useTask(), [testError, setTestError] = useState<string | null>(null);
   // Without a price, spend is still counted in tokens (0106).
-  const price = priceText(model) ?? "No price · usage counted in tokens";
+  const price = priceText(model) ?? t("No price · usage counted in tokens");
   const runTest = () => {
     setTestError(null);
     test.start(signal => client.testConnection(model.id, signal)).catch(failure => setTestError(errorText(failure)));
@@ -102,22 +103,22 @@ function ModelRow({ model, connection, client, busy, error, onEdit, onRemove }: 
     <div className="agent-settings-row">
       <div className="agent-settings-copy">
         <span className="agent-settings-name">{modelName(model)}{modelName(model) !== model.model && <span className="agent-settings-mono"> {model.model}</span>}</span>
-        <span className="agent-settings-detail">{[abilities(model), model.searchMode === "provider" ? "Built-in web search" : null, price].filter(Boolean).join(" · ")}</span>
+        <span className="agent-settings-detail">{[abilities(model), model.searchMode === "provider" ? t("Built-in web search") : null, price].filter(Boolean).join(" · ")}</span>
       </div>
-      {test.running ? <TxButton size="sm" onClick={() => void test.cancel()}>Cancel test</TxButton>
-        : <TxButton size="sm" disabled={busy} onClick={runTest}>Test</TxButton>}
-      <TxMenu label={`${modelName(model)} actions`} align="end" trigger={<TxIconButton size="sm" label={`${modelName(model)} actions`} icon="more" disabled={busy || test.running} />} items={[
-        { id: "edit", label: "Edit…", onSelect: onEdit },
-        { id: "remove", label: "Remove model", tone: "danger", onSelect: onRemove },
+      {test.running ? <TxButton size="sm" onClick={() => void test.cancel()}>{t("Cancel test")}</TxButton>
+        : <TxButton size="sm" disabled={busy} onClick={runTest}>{t("Test")}</TxButton>}
+      <TxMenu label={t("{modelName} actions", { modelName: modelName(model) })} align="end" trigger={<TxIconButton size="sm" label={t("{modelName} actions", { modelName: modelName(model) })} icon="more" disabled={busy || test.running} />} items={[
+        { id: "edit", label: t("Edit…"), onSelect: onEdit },
+        { id: "remove", label: t("Remove model"), tone: "danger", onSelect: onRemove },
       ]} />
     </div>
     {error && <TxSettingsNote tone="error">{error}</TxSettingsNote>}
     {testError && <TxSettingsNote tone="error">{testError}</TxSettingsNote>}
-    {test.running && <TxSettingsNote>Testing {connection.name}… this sends a few short requests.</TxSettingsNote>}
+    {test.running && <TxSettingsNote>{t("Testing {name}… this sends a few short requests.", { name: connection.name })}</TxSettingsNote>}
     {record && record.state !== "running" && record.state !== "completed" && <TxSettingsNote tone={record.state === "cancelled" ? "muted" : "error"}>
-      {record.state === "cancelled" ? "Test cancelled; nothing was saved." : `Test failed: ${record.error?.message}`}
+      {record.state === "cancelled" ? t("Test cancelled; nothing was saved.") : record.error?.message ? t("Test failed: {reason}", { reason: record.error.message }) : t("Test failed.")}
     </TxSettingsNote>}
-    {checks && <ul className="agent-checks" aria-label="Connection test">
+    {checks && <ul className="agent-checks" aria-label={t("Connection test")}>
       {CHECKS.map(([key, label]) => {
         const check = checks[key];
         return <li key={key} data-state={check.state}><span>{label}</span><span>{CHECK_STATES[check.state] ?? check.state}{check.message && check.state !== "passed" ? ` · ${check.message}` : ""}</span></li>;
@@ -143,29 +144,29 @@ function ConnectionDialog({ settings, client, onClose, onAdded }: {
 }) {
   const [choice, setChoice] = useState<Choice | null>(null);
   const form = useConnectionForm(choice ?? { kind: "relay" }, settings, client, onAdded);
-  const title = !choice ? "Add a model provider" : choice.kind === "official" ? `Add ${PROVIDERS.find(item => item.id === choice.provider)!.name}`
-    : choice.kind === "local" ? "Add a model on this computer" : "Add another service";
+  const title = !choice ? t("Add a model provider") : choice.kind === "official" ? t("Add {name}", { name: PROVIDERS.find(item => item.id === choice.provider)!.name })
+    : choice.kind === "local" ? t("Add a model on this computer") : t("Add another service");
   return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={title} size="standard"
     footer={choice ? <>
-      <TxButton variant="quiet" onClick={() => setChoice(null)}>Back</TxButton>
-      <TxButton variant="primary" disabled={!form.ready || form.busy} onClick={() => void form.save()}>{form.busy ? "Saving…" : "Continue"}</TxButton>
-    </> : <TxButton variant="quiet" onClick={onClose}>Cancel</TxButton>}>
+      <TxButton variant="quiet" onClick={() => setChoice(null)}>{t("Back")}</TxButton>
+      <TxButton variant="primary" disabled={!form.ready || form.busy} onClick={() => void form.save()}>{form.busy ? t("Saving…") : t("Continue")}</TxButton>
+    </> : <TxButton variant="quiet" onClick={onClose}>{t("Cancel")}</TxButton>}>
     {!choice ? <div className="agent-settings-form">
-      <div className="agent-provider-grid" role="list" aria-label="Providers">
+      <div className="agent-provider-grid" role="list" aria-label={t("Providers")}>
         {OFFICIAL_TILES.map(tile => <TxButton variant="row" key={tile.id} type="button" role="listitem" className="agent-provider"
           onClick={() => setChoice({ kind: "official", provider: tile.id })}>
           <span className="agent-provider-name">{PROVIDERS.find(item => item.id === tile.id)!.name}</span>
           <span className="agent-provider-detail">{tile.detail}</span>
         </TxButton>)}
       </div>
-      <div className="agent-provider-grid" role="list" aria-label="Other connections">
+      <div className="agent-provider-grid" role="list" aria-label={t("Other connections")}>
         <TxButton variant="row" type="button" role="listitem" className="agent-provider" onClick={() => setChoice({ kind: "local" })}>
-          <span className="agent-provider-name">This computer</span>
-          <span className="agent-provider-detail">Ollama or LM Studio, found automatically</span>
+          <span className="agent-provider-name">{t("This computer")}</span>
+          <span className="agent-provider-detail">{t("Ollama or LM Studio, found automatically")}</span>
         </TxButton>
         <TxButton variant="row" type="button" role="listitem" className="agent-provider" onClick={() => setChoice({ kind: "relay" })}>
-          <span className="agent-provider-name">Another service</span>
-          <span className="agent-provider-detail">A relay for official models, or any OpenAI- or Anthropic-compatible API</span>
+          <span className="agent-provider-name">{t("Another service")}</span>
+          <span className="agent-provider-detail">{t("A relay for official models, or any OpenAI- or Anthropic-compatible API")}</span>
         </TxButton>
       </div>
     </div> : form.body}
@@ -210,21 +211,21 @@ function useConnectionForm(choice: Choice, settings: AgentSettings, client: Agen
   });
   const body = <div className="agent-settings-form">
     {preset && <>
-      {sites && <TxField label="Site" hint="Keys from the China site and the international site are separate; use the one your key came from.">
-        <TxSegmented label="Site" value={site} options={sites.map(item => ({ value: item.id, label: item.name }))} onChange={setSite} />
+      {sites && <TxField label={t("Site")} hint={t("Keys from the China site and the international site are separate; use the one your key came from.")}>
+        <TxSegmented label={t("Site")} value={site} options={sites.map(item => ({ value: item.id, label: item.name }))} onChange={setSite} />
       </TxField>}
-      <TxField label="API key" hint="Stored in Windows Credential Manager. TALYX never shows it again."><TxInput type="password" autoComplete="off" autoFocus value={key} onChange={event => setKey(event.target.value)} /></TxField>
+      <TxField label={t("API key")} hint={t("Stored in Windows Credential Manager. TALYX never shows it again.")}><TxInput type="password" autoComplete="off" autoFocus value={key} onChange={event => setKey(event.target.value)} /></TxField>
     </>}
     {kind === "local" && <>
-      <TxField label="App"><TxSegmented label="App" value={local} options={[{ value: "ollama", label: "Ollama" }, { value: "lmstudio", label: "LM Studio" }]}
+      <TxField label={t("App")}><TxSegmented label={t("App")} value={local} options={[{ value: "ollama", label: t("Ollama") }, { value: "lmstudio", label: t("LM Studio") }]}
         onChange={value => { setLocal(value); setAddress(value === "ollama" ? "http://127.0.0.1:11434" : "http://127.0.0.1:1234"); }} /></TxField>
-      <TxField label="Address" hint="Where the app listens on this computer."><TxInput value={address} onChange={event => setAddress(event.target.value)} /></TxField>
+      <TxField label={t("Address")} hint={t("Where the app listens on this computer.")}><TxInput value={address} onChange={event => setAddress(event.target.value)} /></TxField>
     </>}
     {kind === "relay" && <>
-      <TxField label="Name"><TxInput value={name} placeholder="My relay" autoFocus onChange={event => setName(event.target.value)} /></TxField>
-      <TxField label="Speaks"><TxSegmented label="Protocol" value={protocol} options={[{ value: "openai", label: "OpenAI-compatible" }, { value: "anthropic", label: "Anthropic-compatible" }]} onChange={setProtocol} /></TxField>
-      <TxField label="Address" hint="The service's base URL, for example https://relay.example.com/v1"><TxInput value={address} onChange={event => setAddress(event.target.value)} /></TxField>
-      <TxField label="API key"><TxInput type="password" autoComplete="off" value={key} onChange={event => setKey(event.target.value)} /></TxField>
+      <TxField label={t("Name")}><TxInput value={name} placeholder={t("My relay")} autoFocus onChange={event => setName(event.target.value)} /></TxField>
+      <TxField label={t("Speaks")}><TxSegmented label={t("Protocol")} value={protocol} options={[{ value: "openai", label: t("OpenAI-compatible") }, { value: "anthropic", label: t("Anthropic-compatible") }]} onChange={setProtocol} /></TxField>
+      <TxField label={t("Address")} hint={t("The service's base URL, for example https://relay.example.com/v1")}><TxInput value={address} onChange={event => setAddress(event.target.value)} /></TxField>
+      <TxField label={t("API key")}><TxInput type="password" autoComplete="off" value={key} onChange={event => setKey(event.target.value)} /></TxField>
     </>}
     {actions.error && <p className="tx-error" role="alert">{actions.error.text}</p>}
   </div>;
@@ -237,12 +238,12 @@ function KeyDialog({ connection, client, onClose, onSaved }: { connection: Model
     await client.settings("credential", { reference: connection.secretRef, value: key.trim(), connectionId: connection.id });
     await onSaved();
   });
-  return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={`${connection.name} API key`} size="compact" footer={<>
-    <TxButton variant="quiet" onClick={onClose}>Cancel</TxButton>
-    <TxButton variant="primary" disabled={!key.trim() || actions.busy !== null} onClick={() => void save()}>Save key</TxButton>
+  return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={t("{name} API key", { name: connection.name })} size="compact" footer={<>
+    <TxButton variant="quiet" onClick={onClose}>{t("Cancel")}</TxButton>
+    <TxButton variant="primary" disabled={!key.trim() || actions.busy !== null} onClick={() => void save()}>{t("Save key")}</TxButton>
   </>}>
     <div className="agent-settings-form">
-      <TxField label="New key" hint={connection.credential.configured ? `Replaces the key ending ${connection.credential.mask}. Saved tests are cleared.` : undefined}>
+      <TxField label={t("New key")} hint={connection.credential.mask ? t("Replaces the key ending {mask}. Saved tests are cleared.", { mask: connection.credential.mask }) : undefined}>
         <TxInput type="password" autoComplete="off" autoFocus value={key} onChange={event => setKey(event.target.value)} />
       </TxField>
       {actions.error && <p className="tx-error" role="alert">{actions.error.text}</p>}
@@ -305,22 +306,22 @@ function AddModelDialog({ connection, settings, client, onClose, onAdded }: {
     await client.settings("put_model", { ...value, ...(local && found ? { thinking: found.thinking } : {}) });
     await onAdded();
   });
-  return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={`Add a model · ${connection.name}`} size="standard" footer={<>
-    <TxButton variant="quiet" onClick={onClose}>Cancel</TxButton>
-    <TxButton variant="primary" disabled={!ready || actions.busy !== null} onClick={() => void save()}>Add model</TxButton>
+  return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={t("Add a model · {name}", { name: connection.name })} size="standard" footer={<>
+    <TxButton variant="quiet" onClick={onClose}>{t("Cancel")}</TxButton>
+    <TxButton variant="primary" disabled={!ready || actions.busy !== null} onClick={() => void save()}>{t("Add model")}</TxButton>
   </>}>
     <div className="agent-settings-form">
-      {connection.kind === "relay" && <TxField label="Same model as" hint="Window, abilities and price come from the official model. Leave as Other to fill them in yourself.">
+      {connection.kind === "relay" && <TxField label={t("Same model as")} hint={t("Window, abilities and price come from the official model. Leave as Other to fill them in yourself.")}>
         <TxSelect value={official} onChange={event => setOfficial(event.target.value)}>
-          <option value="">Other</option>
+          <option value="">{t("Other")}</option>
           {PROVIDERS.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
         </TxSelect>
       </TxField>}
       {(local || connection.kind === "official" || official) && <>
-        <TxSearch value={query} onValueChange={setQuery} placeholder={local ? "Search models on this computer" : "Search models"} />
-        <div className="agent-settings-pick" role="listbox" aria-label="Models">
+        <TxSearch value={query} onValueChange={setQuery} placeholder={local ? t("Search models on this computer") : t("Search models")} />
+        <div className="agent-settings-pick" role="listbox" aria-label={t("Models")}>
           {loadError && <p className="tx-error" role="alert">{loadError}</p>}
-          {!loadError && (local ? discovered : profiles) === null && <p className="agent-settings-muted">Loading models…</p>}
+          {!loadError && (local ? discovered : profiles) === null && <p className="agent-settings-muted">{t("Loading models…")}</p>}
           {listed.slice(0, 200).map(name => {
             const info = local ? discovered!.find(item => item.model === name)! : null;
             const profile = local ? null : profiles!.find(item => item.model === name)!.profile;
@@ -329,24 +330,24 @@ function AddModelDialog({ connection, settings, client, onClose, onAdded }: {
             return <TxButton variant="row" key={name} type="button" role="option" aria-selected={picked} className="agent-settings-option" disabled={!local && connection.kind !== "relay" && existing.has(name)}
               onClick={() => { if (connection.kind === "relay") { setOfficialModel(name); if (!model) setModel(name); } else setModel(name); }}>
               <span>{local ? name : typeof profile!.name === "string" ? `${profile!.name}` : name}</span>
-              <span className="agent-settings-mono">{local ? "" : name}{typeof size === "number" ? ` · ${compact(size)}` : ""}{info?.tools === false ? " · can't use tools" : ""}{existing.has(name) ? " · added" : ""}</span>
+              <span className="agent-settings-mono">{local ? "" : name}{typeof size === "number" ? ` · ${compact(size)}` : ""}{info?.tools === false ? t(" · can't use tools") : ""}{existing.has(name) ? t(" · added") : ""}</span>
             </TxButton>;
           })}
-          {listed.length === 0 && query.trim() !== "" && (local ? discovered : profiles)?.length !== 0 && <p className="agent-settings-muted">No model matches “{query.trim()}”.{local ? "" : " Type its exact name below."}</p>}
-          {(local ? discovered : profiles)?.length === 0 && !loadError && <p className="agent-settings-muted">{local ? "No models found. Download one in the app first." : "No model info for this provider yet. Type the model name below, or refresh model info."}</p>}
+          {listed.length === 0 && query.trim() !== "" && (local ? discovered : profiles)?.length !== 0 && <p className="agent-settings-muted">{local ? t("No model matches “{query}”.", { query: query.trim() }) : t("No model matches “{query}”. Type its exact name below.", { query: query.trim() })}</p>}
+          {(local ? discovered : profiles)?.length === 0 && !loadError && <p className="agent-settings-muted">{local ? t("No models found. Download one in the app first.") : t("No model info for this provider yet. Type the model name below, or refresh model info.")}</p>}
         </div>
       </>}
-      {!local && <TxField label={connection.kind === "relay" ? "Model name on the relay" : "Model name"}>
+      {!local && <TxField label={connection.kind === "relay" ? t("Model name on the relay") : t("Model name")}>
         <TxInput className="agent-settings-mono-input" value={model} onChange={event => setModel(event.target.value)} />
       </TxField>}
-      <TxField label="Context window (tokens)" hint={knownWindow ? `From model info: ${compact(Number(knownWindow))}. Fill in only to change it.` : "Required: how many tokens this model reads at once."}>
+      <TxField label={t("Context window (tokens)")} hint={knownWindow ? t("From model info: {compact}. Fill in only to change it.", { compact: compact(Number(knownWindow)) }) : t("Required: how many tokens this model reads at once.")}>
         <TxInput inputMode="numeric" value={windowSize} placeholder={knownWindow ? String(knownWindow) : "128000"} onChange={event => setWindowSize(event.target.value.replace(/\D/g, ""))} />
       </TxField>
-      <TxField label="Maximum output (tokens)">
-        <TxInput inputMode="numeric" placeholder="Automatic" value={outputLimit} onChange={event => setOutputLimit(event.target.value.replace(/\D/g, ""))} />
+      <TxField label={t("Maximum output (tokens)")}>
+        <TxInput inputMode="numeric" placeholder={t("Automatic")} value={outputLimit} onChange={event => setOutputLimit(event.target.value.replace(/\D/g, ""))} />
       </TxField>
-      {toolless && <p className="tx-error" role="alert">This model can't call tools, so Agent can't use it.</p>}
-      {existing.has(model.trim()) && <p className="agent-settings-muted">This model is already added.</p>}
+      {toolless && <p className="tx-error" role="alert">{t("This model can't call tools, so Agent can't use it.")}</p>}
+      {existing.has(model.trim()) && <p className="agent-settings-muted">{t("This model is already added.")}</p>}
       {actions.error && <p className="tx-error" role="alert">{actions.error.text}</p>}
     </div>
   </TxDialog>;
@@ -378,45 +379,45 @@ function EditModelDialog({ model, connection, client, onClose, onSaved }: {
       tools: untri(tools), images: untri(images), pdf: untri(pdf), price, priceMultiplier: multiplier.trim() || "1", showPrice, searchMode: search });
     await onSaved();
   });
-  const from = (value: boolean | null | undefined) => value === true ? "yes" : value === false ? "no" : "unknown";
+  const from = (value: boolean | null | undefined) => value === true ? t("yes") : value === false ? t("no") : t("unknown");
   const ability = (label: string, value: Tri, set: (value: Tri) => void, profile: Json | undefined) => <TxField label={label}>
     <TxSelect value={value} onChange={event => set(event.target.value as Tri)}>
-      <option value="">From model info ({from(profile as boolean | null | undefined)})</option>
-      <option value="yes">Yes</option><option value="no">No</option>
+      <option value="">{t("From model info ({value})", { value: from(profile as boolean | null | undefined) })}</option>
+      <option value="yes">{t("Yes")}</option><option value="no">{t("No")}</option>
     </TxSelect>
   </TxField>;
   return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={modelName(model)} size="standard" footer={<>
-    <TxButton variant="quiet" onClick={onClose}>Cancel</TxButton>
-    <TxButton variant="primary" disabled={actions.busy !== null} onClick={() => void save()}>Save</TxButton>
+    <TxButton variant="quiet" onClick={onClose}>{t("Cancel")}</TxButton>
+    <TxButton variant="primary" disabled={actions.busy !== null} onClick={() => void save()}>{t("Save")}</TxButton>
   </>}>
     <div className="agent-settings-form">
-      <TxField label="Context window (tokens)" hint={model.profile.max_input_tokens ? `Model info says ${compact(Number(model.profile.max_input_tokens))}.` : "Model info has no window for this model."}>
+      <TxField label={t("Context window (tokens)")} hint={model.profile.max_input_tokens ? t("Model info says {compact}.", { compact: compact(Number(model.profile.max_input_tokens)) }) : t("Model info has no window for this model.")}>
         <TxInput inputMode="numeric" value={windowSize} placeholder={String(model.contextWindow)} onChange={event => setWindowSize(event.target.value.replace(/\D/g, ""))} />
       </TxField>
-      <TxField label="Maximum output (tokens)" hint={`Currently requests ${compact(model.maxOutputTokens)} tokens.`}>
-        <TxInput inputMode="numeric" placeholder="Automatic" value={outputLimit} onChange={event => setOutputLimit(event.target.value.replace(/\D/g, ""))} />
+      <TxField label={t("Maximum output (tokens)")} hint={t("Currently requests {compact} tokens.", { compact: compact(model.maxOutputTokens) })}>
+        <TxInput inputMode="numeric" placeholder={t("Automatic")} value={outputLimit} onChange={event => setOutputLimit(event.target.value.replace(/\D/g, ""))} />
       </TxField>
       <div className="agent-settings-columns">
-        {ability("Calls tools", tools, setTools, model.profile.tool_calling)}
-        {ability("Reads images", images, setImages, model.profile.image_inputs)}
-        {ability("Reads PDF", pdf, setPdf, model.profile.pdf_inputs)}
+        {ability(t("Calls tools"), tools, setTools, model.profile.tool_calling)}
+        {ability(t("Reads images"), images, setImages, model.profile.image_inputs)}
+        {ability(t("Reads PDF"), pdf, setPdf, model.profile.pdf_inputs)}
       </div>
       <div className="agent-settings-columns">
-        <TxField label="Input price, $ per 1M tokens"><TxInput inputMode="decimal" value={input} placeholder={model.price && !overrides.price ? model.price.input : ""} onChange={event => setInput(event.target.value)} /></TxField>
-        <TxField label="Output price, $ per 1M tokens"><TxInput inputMode="decimal" value={output} placeholder={model.price && !overrides.price ? model.price.output : ""} onChange={event => setOutput(event.target.value)} /></TxField>
+        <TxField label={t("Input price, $ per 1M tokens")}><TxInput inputMode="decimal" value={input} placeholder={model.price && !overrides.price ? model.price.input : ""} onChange={event => setInput(event.target.value)} /></TxField>
+        <TxField label={t("Output price, $ per 1M tokens")}><TxInput inputMode="decimal" value={output} placeholder={model.price && !overrides.price ? model.price.output : ""} onChange={event => setOutput(event.target.value)} /></TxField>
       </div>
       <div className="agent-settings-columns">
-        <TxField label="Cached input, $ per 1M tokens" hint="Most providers charge less for repeated context. Needed for work while you're away.">
+        <TxField label={t("Cached input, $ per 1M tokens")} hint={t("Most providers charge less for repeated context. Needed for work while you're away.")}>
           <TxInput inputMode="decimal" value={cacheRead} placeholder={model.price && !overrides.price ? model.price.cache_read ?? "" : ""} onChange={event => setCacheRead(event.target.value)} />
         </TxField>
-        <TxField label="Cache write, $ per 1M tokens" hint="Only some providers charge for writing the cache.">
+        <TxField label={t("Cache write, $ per 1M tokens")} hint={t("Only some providers charge for writing the cache.")}>
           <TxInput inputMode="decimal" value={cacheWrite} placeholder={model.price && !overrides.price ? model.price.cache_write ?? "" : ""} onChange={event => setCacheWrite(event.target.value)} />
         </TxField>
-        <TxField label="Price multiplier" hint="For relays that charge a multiple of the official price."><TxInput inputMode="decimal" value={multiplier} onChange={event => setMultiplier(event.target.value)} /></TxField>
+        <TxField label={t("Price multiplier")} hint={t("For relays that charge a multiple of the official price.")}><TxInput inputMode="decimal" value={multiplier} onChange={event => setMultiplier(event.target.value)} /></TxField>
       </div>
-      <TxSwitch label="Show estimated cost in Usage" checked={showPrice} onCheckedChange={setShowPrice} />
-      {nativeSearch && <TxField label="Web search" hint={connection.kind === "relay" ? "Use the relay's built-in search only after a connection test shows it works." : undefined}>
-        <TxSegmented label="Web search" value={search} options={[{ value: "provider", label: "Model's built-in search" }, { value: "talyx", label: "TALYX search" }]} onChange={setSearch} />
+      <TxSwitch label={t("Show estimated cost in Usage")} checked={showPrice} onCheckedChange={setShowPrice} />
+      {nativeSearch && <TxField label={t("Web search")} hint={connection.kind === "relay" ? t("Use the relay's built-in search only after a connection test shows it works.") : undefined}>
+        <TxSegmented label={t("Web search")} value={search} options={[{ value: "provider", label: t("Model's built-in search") }, { value: "talyx", label: t("TALYX search") }]} onChange={setSearch} />
       </TxField>}
       {actions.error && <p className="tx-error" role="alert">{actions.error.text}</p>}
     </div>

@@ -76,18 +76,6 @@ def test_equal_weight_counts_reopening_return(tmp_path):
     assert level.tolist() == pytest.approx([1, 1, 1, 1.1])
 
 
-def test_heldout_beta_is_fixed_before_scoring(tmp_path):
-    made = report(tmp_path)
-    days = pd.date_range(DAYS[0], periods=7, tz="UTC")
-    daily = pd.Series([0, .01, -.01, .02, -.02, .03, -.03], index=days)
-    market = (1 + daily).cumprod()
-    made.invocation["heldOutFrom"] = days[4].value // MS
-    daily.iloc[4:] *= 4
-    level, beta = made.beta_benchmark(market, daily, daily * 0)
-    assert beta == pytest.approx(1)
-    assert level.tolist() == pytest.approx(market.tolist())
-
-
 def test_risk_free_is_unknown_before_first_observation(tmp_path):
     made = report(tmp_path)
     days = pd.date_range(DAYS[0], periods=80, tz="UTC")

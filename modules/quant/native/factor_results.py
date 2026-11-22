@@ -28,6 +28,7 @@ sys.path.insert(0, str(native_directory.parent))
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from native import factor_work as W  # noqa: E402
+from native import i18n
 from native import metrics as M  # noqa: E402
 from native import styles as S  # noqa: E402
 
@@ -104,8 +105,8 @@ class Results:
             data["factor_quantile"] = ev.groups[t, i].astype(int)
             frame = pd.DataFrame(data, index=index)
             if panel.industry is not None:
-                labels = np.asarray([item if item else "Unknown" for item in panel.industry], dtype=object)
-                frame["group"] = labels[i]
+                codes, names = panel.industry_codes("Unknown")
+                frame["group"] = np.asarray(names, dtype=object)[codes[t, i]]  # each value's industry on its own day
             self._factor_data = (frame, t, i)
         return self._factor_data[0]
 
@@ -119,7 +120,7 @@ class Results:
             if self.group_adjust:
                 if panel.industry is None:
                     raise Missing("Group neutral needs an industry for each name, and Market gives none for these names")
-                codes = pd.factorize(np.asarray([item or "Unknown" for item in panel.industry], dtype=object))[0]
+                codes = panel.industry_codes("Unknown")[0]
             close = panel.fields["close"]
             series = {self.column(p): ev.ic if p == self.h else W.rank_ic(ev.after, close, p, self.delay, codes=codes)[0] for p in self.periods}
             frame = pd.DataFrame(series, index=pd.Index(panel.dates, name="date"))
@@ -241,7 +242,7 @@ class Results:
             traces = [trace("bar", "group", f"period:{p}", x=labels, y=nums(found["rate"][self.column(p)] * BPS, 4), name=self.label(p), index=k, of=len(self.periods),
                             hovertemplate=f"%{{x}} {self.label(p)}<br>%{{y:+.1f}} bps<extra></extra>") for k, p in enumerate(self.periods)]
             self.put(tab, "meanByGroup", "Mean return by group", figure("factor.results.mean-by-group", traces, barmode="group", showlegend=True,
-                                                                        yaxis={"title": {"text": "Mean return (bps)"}, "side": "right", "zeroline": True}))
+                                                                        yaxis={"title": {"text": "Mean return (bps)"}, "side": "right", "zeroline": True}))  # Axis title discarded by figure().  # i18n: ignore
         self.section(tab, "meanByGroup", means, figure_keys=[("meanByGroup", "Mean return by group")])
 
         def violin():
@@ -346,7 +347,7 @@ class Results:
                 reference([mean, mean], [0, int(counts.max())], "mean", "Mean")],
                 bargap=0, xaxis={"range": [-1, 1]}, yaxis={"side": "right"},
                 annotations=[{"x": 0.01, "y": 0.98, "xref": "paper", "yref": "paper", "xanchor": "left", "yanchor": "top", "showarrow": False, "align": "left",
-                              "text": f"Mean {mean:.3f}<br>Std. {observed.std(ddof=1):.3f}", "name": "summary"}]))
+                              "text": i18n.t("Mean {mean}<br>Std. {std}", mean=f'{mean:.3f}', std=f'{observed.std(ddof=1):.3f}'), "name": "summary"}]))
             import statsmodels.api as sm
             plot = sm.ProbPlot(observed, stats.norm, fit=True)
             theory, sample = plot.theoretical_quantiles, plot.sample_quantiles
@@ -371,7 +372,7 @@ class Results:
                 trace("bar", "updown", "rank-ic", x=names, y=[item["rankIc"] for item in rows], name="Rank IC", customdata=[item.get("t") for item in rows],
                       hovertemplate="%{x}<br>Rank IC %{y:+.4f}<br>t %{customdata:+.2f}<extra></extra>"), *marks],
                 xaxis={"type": "category"}, yaxis={"side": "right", "tickformat": ".3f", "zeroline": True},
-                annotations=[{"x": names[-1], "y": num(whole), "text": "whole period", "name": "whole-period", "showarrow": False, "xanchor": "right", "yanchor": "bottom"}] if marks else []))
+                annotations=[{"x": names[-1], "y": num(whole), "text": i18n.t("whole period"), "name": "whole-period", "showarrow": False, "xanchor": "right", "yanchor": "bottom"}] if marks else []))
         self.section(tab, "years", years, figure_keys=[("years", "Rank IC by year")])
 
         def monthly():
@@ -410,7 +411,7 @@ class Results:
     # ---------------------------------------------------------------- Industry and size
     def tab_industry(self, tab):
         ev, panel = self.ev, self.panel
-        has_industry = panel.industry is not None and any(panel.industry)
+        has_industry = panel.industry is not None and bool(panel.industry.notna().to_numpy().any())
 
         def sectors():
             if not has_industry:
@@ -461,7 +462,7 @@ class Results:
                 middle = len(daily) // 2
                 for part, name in ((daily.iloc[:middle], "First half"), (daily.iloc[middle:], "Second half")):
                     rows.append({"name": f"{name}, {part.index[0].year}–{part.index[-1].year}", "kind": "period", "rankIc": num(part.mean()),
-                                 "note": f"{part.index[0].strftime('%b %Y')} to {part.index[-1].strftime('%b %Y')}"})
+                                 "note": i18n.t("{start} to {end}", start=part.index[0].strftime(i18n.t("%b %Y")), end=part.index[-1].strftime(i18n.t("%b %Y")))})
             if not rows:
                 raise Missing("Too few days and names to split by size or by period")
             tab["sizeAndPeriod"] = rows
@@ -489,8 +490,7 @@ class Results:
         def method():
             about = " ".join(note for note in panel.notes or [] if "industry" in note.lower())  # only the notes about industry
             tab["method"] = {"neutralize": self.settings["neutralize"], "extremes": self.settings["extremes"], "scale": self.settings["scale"],
-                             "industry": about or ("Current industry for every year; the source has no industry history (approximate)" if has_industry
-                                                   else "No industry for these names"),
+                             "industry": about or ("Each name's industry as known on each date" if has_industry else "No industry for these names"),
                              "size": "Log market value from close × shares outstanding" if panel.shares is not None else "Log of the 30-bar mean dollar volume (no shares outstanding)",
                              "notes": list(panel.notes or [])}
         self.section(tab, "method", method)
@@ -604,7 +604,7 @@ class Results:
                      hovertemplate="Rank autocorrelation %{y:.3f}<extra></extra>")],
                 hovermode="x unified", xaxis={"type": "date"}, yaxis={"side": "right", "zeroline": True},
                 annotations=[{"x": 0.01, "y": 0.98, "xref": "paper", "yref": "paper", "xanchor": "left", "yanchor": "top", "showarrow": False,
-                              "text": f"Mean {series.mean():.3f}", "name": "summary"}]))
+                              "text": i18n.t("Mean {mean}", mean=f'{series.mean():.3f}'), "name": "summary"}]))
         self.section(tab, "autocorrelation", autocorr, figure_keys=[("autocorrelation", "Factor rank autocorrelation")])
 
     # ---------------------------------------------------------------- Costs
@@ -636,13 +636,13 @@ class Results:
             nets = [None if gross is None or traded is None else num(gross - x / BPS * traded * self.A - (borrow or 0.0)) for x in xs]
             top_y = [value for value in nets if value is not None]
             even = ev.numbers["breakEven"]
-            marks, notes = [], [{"x": cost_bps, "y": 1, "yref": "paper", "text": "assumed", "name": "assumed", "showarrow": False, "xanchor": "left", "yanchor": "top", "xshift": 4}]
+            marks, notes = [], [{"x": cost_bps, "y": 1, "yref": "paper", "text": i18n.t("assumed"), "name": i18n.t("assumed"), "showarrow": False, "xanchor": "left", "yanchor": "top", "xshift": 4}]
             if even is not None and even >= 0 and gross is not None and traded is not None:
                 at = num(gross - even / BPS * traded * self.A - (borrow or 0.0))
                 marks.append(trace("scatter", "main", "break-even", mode="markers", x=[num(even, 1)], y=[at], name="Break-even", marker={"size": 7}, hoverinfo="skip"))
-                notes.append({"x": num(even, 1), "y": at, "text": f"break-even {even:.1f}", "name": "break-even", "showarrow": False, "xanchor": "left", "yanchor": "bottom", "xshift": 6})
+                notes.append({"x": num(even, 1), "y": at, "text": i18n.t("break-even {value}", value=f'{even:.1f}'), "name": "break-even", "showarrow": False, "xanchor": "left", "yanchor": "bottom", "xshift": 6})
             elif even is not None:
-                notes.append({"x": 0.99, "y": 0.02, "xref": "paper", "yref": "paper", "text": "loses before costs", "name": "loses", "showarrow": False, "xanchor": "right", "yanchor": "bottom"})
+                notes.append({"x": 0.99, "y": 0.02, "xref": "paper", "yref": "paper", "text": i18n.t("loses before costs"), "name": "loses", "showarrow": False, "xanchor": "right", "yanchor": "bottom"})
             self.put(tab, "byCost", "Net by cost a trade", figure("factor.results.net-by-cost", [
                 line(nums(xs, 2), nets, "main", "net", "Net", hovertemplate="%{x} bps a trade<br>Long–short, net %{y:+.2%}<extra></extra>"),
                 reference([cost_bps, cost_bps], [min(top_y, default=0), max(top_y, default=0)], "assumed", f"{cost_bps:g} bps assumed"), *marks],
@@ -690,7 +690,7 @@ class Results:
             if self.group_adjust:
                 if panel.industry is None:
                     raise Missing("Group neutral needs an industry for each name, and Market gives none for these names")
-                codes = pd.factorize(np.asarray([item or "Unknown" for item in panel.industry], dtype=object))[0]
+                codes = panel.industry_codes("Unknown")[0]
             tab["basis"] = "group" if codes is not None else "all" if self.demeaned else "raw"
             groups = sorted(int(g) for g in np.unique(ev.groups[valued]))
             if not groups:
@@ -711,8 +711,8 @@ class Results:
                     if codes is not None:
                         relative = np.array(shifted, copy=True)
                         for code in np.unique(codes):
-                            inside = codes == code
-                            relative[:, inside] = shifted[:, inside] - np.nanmean(universe[:, inside], axis=1, keepdims=True)
+                            inside = codes == code  # each name's industry that day
+                            relative = np.where(inside, shifted - np.nanmean(np.where(inside, universe, np.nan), axis=1, keepdims=True), relative)
                     elif self.demeaned:
                         relative = shifted - np.nanmean(universe, axis=1, keepdims=True)
                     else:
@@ -743,7 +743,7 @@ class Results:
             annotations = [{"x": labels[-1], "y": num(path[k, -1], 8), "text": f"Q{g}", "name": f"group:{g}", "showarrow": False, "xanchor": "left", "xshift": 4}
                            for k, g in enumerate(groups) if len(groups) <= 10 or k in (0, len(groups) - 1)]
             self.put(tab, "event", "Around the signal", figure("factor.results.event", traces, hovermode="x unified", annotations=annotations,
-                                                               xaxis={"type": "category", "title": {"text": "Bars from the value"}},
+                                                               xaxis={"type": "category", "title": {"text": "Bars from the value"}},  # Axis title discarded by figure().  # i18n: ignore
                                                                yaxis={"side": "right", "zeroline": True, "tickformat": ".1%"}))
         self.section(tab, "event", event, figure_keys=[("event", "Around the signal")])
 
@@ -822,7 +822,7 @@ def main():
     except Exception as error:  # noqa: BLE001 - the run shows what broke, not a folder or an internal id
         traceback.print_exc()
         output.mkdir(parents=True, exist_ok=True)
-        write_json(output / "answer.json", {"ok": False, "message": f"The Results stopped: {reason_of(error)}"})
+        write_json(output / "answer.json", {"ok": False, "message": i18n.t("The Results stopped: {reason}", reason=reason_of(error))})
         return 1
 
 

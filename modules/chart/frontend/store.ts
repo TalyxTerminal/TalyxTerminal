@@ -95,7 +95,7 @@ export interface State {
 }
 
 export const store = createStore<State>(() => ({ charts: {}, overlays: {}, layouts: {}, ui: {}, alerts: {}, watchlists: {}, screens: {}, templates: {}, fired: [], alertDefaults: null, catalog: null, indicatorsFolder: null, health: null, workspaceError: null, unsaved: {} }));
-export const useStore = <T>(select: (state: State) => T): T => useZustand(store, select);
+export const useStore = <T,>(select: (state: State) => T): T => useZustand(store, select);
 
 export function newPanelUi(): PanelUi {
   return { tool: null, magnet: "off", keepDrawing: false, drawingsLocked: false, drawingsHidden: false, rightPanel: null, rightWidth: 300, bottomPanel: null, bottomHeight: 300, script: null, replayPick: null };

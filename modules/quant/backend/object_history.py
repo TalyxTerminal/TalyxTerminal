@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 ACCOUNT_FIELDS = ("totalReturn", "maximumDrawdown", "dailySharpe", "initialEquityNumeric", "finalEquityNumeric", "equityChangeNumeric")
 NAMES = {"initialEquityNumeric": "initialEquity", "finalEquityNumeric": "finalEquity", "equityChangeNumeric": "equityChange"}
@@ -152,7 +153,7 @@ class RunHistory:
     def compare(self, identity, other):
         current, previous = self.runs.read(identity), self.runs.read(other)
         if current["objectId"] != previous["objectId"]:
-            raise ContractError("invalid_input", "Compare runs of the same object.")
+            raise ContractError("invalid_input", t("Compare runs of the same object."))
         left, right = current["metrics"], previous["metrics"]
         metrics = {}
         for key in sorted(left.keys() | right.keys()):

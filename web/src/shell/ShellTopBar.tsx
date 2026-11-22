@@ -1,6 +1,8 @@
+import { t } from "./i18n";
 import { type PointerEvent, type ReactNode, type WheelEvent, useLayoutEffect, useRef, useState } from "react";
 import { TxIcon, TxMenu, TxTooltip, TxTooltipProvider, type TxMenuItem } from "@talyx/sdk";
 import { PlatformControls } from "./PlatformControls";
+import { UpdateNotice } from "./UpdateNotice";
 import { useDesktop, useWindowMaximized, type ShellAttention, type ShellWorkspaceTab } from "./shellChrome";
 import type { TalyxDesktop } from "../../../host/desktop/preload";
 import logoMark from "./assets/talyx-logo-round.png";
@@ -24,21 +26,21 @@ function ShellLogo({ attention, places, onHome, onCommunity, onFault }: {
 }) {
   const failing = attention.length > 0;
   const mark = <span className="talyx-logo" data-fault={failing || undefined}
-    aria-label={failing ? "TALYX, a module couldn't start" : "TALYX"} role={places || failing ? undefined : "img"}>
+    aria-label={failing ? t("TALYX, a module couldn't start") : "TALYX"} role={places || failing ? undefined : "img"}>
     <img src={logoMark} alt="" draggable={false} />
     {failing && <span className="talyx-logo-dot" aria-hidden="true" />}
   </span>;
   const faults: TxMenuItem[] = attention.slice(0, 3).map((item, index) => ({
-    id: `fault-${item.id}`, label: `${item.title} couldn't start`, tone: "danger",
+    id: `fault-${item.id}`, label: t("{title} couldn't start", { title: item.title }), tone: "danger",
     separated: places && index === 0, onSelect: () => onFault(item),
   }));
   const items: TxMenuItem[] = [
-    ...(places ? [{ id: "home", label: "Home", onSelect: onHome }, { id: "community", label: "Community", onSelect: onCommunity }] : []),
+    ...(places ? [{ id: "home", label: t("Home"), onSelect: onHome }, { id: "community", label: t("Community"), onSelect: onCommunity }] : []),
     ...faults,
   ];
   if (!items.length) return mark;
   return <TxMenu label="TALYX" openOnHover items={items}
-    trigger={<button type="button" className="talyx-logo-trigger" aria-label={failing ? "TALYX, a module couldn't start" : "TALYX"}>{mark}</button>} />;
+    trigger={<button type="button" className="talyx-logo-trigger" aria-label={failing ? t("TALYX, a module couldn't start") : "TALYX"}>{mark}</button>} />;
 }
 
 
@@ -81,7 +83,7 @@ function WorkspaceTab({ tab, current, onSelect, onMenu }: {
   const name = useRef<HTMLSpanElement>(null);
   const [cut, setCut] = useState(false);
   useLayoutEffect(() => { const span = name.current; setCut(Boolean(span && span.scrollWidth > span.clientWidth)); }, [tab.name, current]);
-  const label = tab.running ? `${tab.name} · Running` : tab.name;
+  const label = tab.running ? t("{name} · Running", { name: tab.name }) : tab.name;
   const button = <button type="button" className="talyx-ws-tab" aria-pressed={current} aria-haspopup={current && onMenu ? "menu" : undefined}
     aria-label={label}
     onClick={event => { if (current) onMenu?.(event.currentTarget); else onSelect(tab); }}
@@ -103,7 +105,7 @@ function WorkspaceRow({ tabs, currentId, onSelect, onMenu, add }: {
   add?: ReactNode;
 }) {
   const row = useSlidingRow(currentId, tabs.length);
-  return <div className="tx-seg talyx-capsule talyx-ws-row" role="group" aria-label="Open workspaces" data-size="md" data-variant="pill">
+  return <div className="tx-seg talyx-capsule talyx-ws-row" role="group" aria-label={t("Open workspaces")} data-size="md" data-variant="pill">
     <div ref={row.clip} className="talyx-ws-clip" data-fade={row.fade} onWheel={row.onWheel}>
       <div ref={row.track} className="talyx-ws-track" style={{ transform: `translateX(${-row.offset}px)` }}>
     {tabs.map(tab => <WorkspaceTab key={tab.id} tab={tab} current={tab.id === currentId} onSelect={onSelect} onMenu={onMenu} />)}
@@ -116,17 +118,17 @@ function WorkspaceRow({ tabs, currentId, onSelect, onMenu, add }: {
 /** Minimize, maximize (restore), close. The desktop window has no system title bar; these are the shell's own. Close
     is the system's close: the window goes to the tray. */
 function WindowControls({ desktop, maximized }: { desktop: TalyxDesktop; maximized: boolean }) {
-  return <div className="talyx-window-controls" role="group" aria-label="Window">
-    <button type="button" className="talyx-window-btn" aria-label="Minimize" title="Minimize" onClick={() => void desktop.minimizeWindow()}>
+  return <div className="talyx-window-controls" role="group" aria-label={t("Window")}>
+    <button type="button" className="talyx-window-btn" aria-label={t("Minimize")} title={t("Minimize")} onClick={() => void desktop.minimizeWindow()}>
       <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5.5h10" /></svg>
     </button>
-    <button type="button" className="talyx-window-btn" aria-label={maximized ? "Restore" : "Maximize"} title={maximized ? "Restore" : "Maximize"}
+    <button type="button" className="talyx-window-btn" aria-label={maximized ? t("Restore") : t("Maximize")} title={maximized ? t("Restore") : t("Maximize")}
       onClick={() => void desktop.toggleMaximizeWindow()}>
       {maximized
         ? <svg viewBox="0 0 10 10" aria-hidden="true"><rect x=".5" y="2.5" width="7" height="7" rx="1" /><path d="M2.5 2.5V1.5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1" /></svg>
         : <svg viewBox="0 0 10 10" aria-hidden="true"><rect x=".5" y=".5" width="9" height="9" rx="1" /></svg>}
     </button>
-    <button type="button" className="talyx-window-btn" data-close="" aria-label="Close" title="Close" onClick={() => void desktop.closeWindow()}>
+    <button type="button" className="talyx-window-btn" data-close="" aria-label={t("Close")} title={t("Close")} onClick={() => void desktop.closeWindow()}>
       <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M.5.5l9 9M9.5.5l-9 9" /></svg>
     </button>
   </div>;
@@ -142,6 +144,7 @@ function SettingsGear({ alert }: { alert: boolean }) {
 
 function BarEnd({ settingsAlert, desktop, maximized }: { settingsAlert: boolean; desktop: TalyxDesktop | undefined; maximized: boolean }) {
   return <div className="talyx-topbar-end">
+    <UpdateNotice />
     <SettingsGear alert={settingsAlert} />
     {desktop && <>
       <span className="talyx-topbar-divider" aria-hidden="true" />
@@ -194,7 +197,7 @@ export function ShellTopBar({ tabs, currentId, attention, settingsAlert, onHome,
     <header className="talyx-topbar" onPointerDown={onPointerDown}>
       {desktop && !maximized && <WindowEdges desktop={desktop} />}
       <ShellLogo attention={attention} places onHome={onHome} onCommunity={onCommunity} onFault={onFault} />
-      <nav className="talyx-topbar-workspaces" aria-label="Workspaces">
+      <nav className="talyx-topbar-workspaces" aria-label={t("Workspaces")}>
         <WorkspaceRow tabs={tabs} currentId={currentId} onSelect={onSelectWorkspace} onMenu={onWorkspaceMenu} add={addWorkspace} />
       </nav>
       <div className="talyx-topbar-drag" aria-hidden="true" />
@@ -224,11 +227,11 @@ export function ShellHomeBar({ active, attention, settingsAlert, onNavigate, onF
         <ShellLogo attention={attention} places={false} onHome={() => onNavigate("home")} onCommunity={() => onNavigate("community")} onFault={onFault} />
         <span className="talyx-wordmark">TALYX</span>
       </div>
-      <nav className="tx-seg talyx-capsule talyx-places" aria-label="Primary navigation" data-size="md" data-variant="pill">
-        {([["home", "Home"], ["workspace", "Workspace"], ["community", "Community"]] as const).map(([target, label]) =>
+      <nav className="tx-seg talyx-capsule talyx-places" aria-label={t("Primary navigation")} data-size="md" data-variant="pill">
+        {([["home", t("Home")], ["workspace", t("Workspace")], ["community", t("Community")]] as const).map(([target, label]) =>
           <button type="button" key={target}
             aria-pressed={active === target} aria-current={active === target ? "page" : undefined} onClick={() => onNavigate(target)}>{label}</button>)}
-        <button type="button" disabled>News</button>
+        <button type="button" disabled>{t("News")}</button>
       </nav>
       <BarEnd settingsAlert={settingsAlert} desktop={desktop} maximized={maximized} />
     </header>

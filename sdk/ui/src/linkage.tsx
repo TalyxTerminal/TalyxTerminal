@@ -87,6 +87,8 @@ export interface ModuleContext {
 export interface Manifest {
   manifestVersion: 5; id: string; name: string; version: string; description?: string;
   entries: { backend?: string; frontend?: string };
+  /** The module's dictionaries by language (files inside the module). */
+  locales?: Record<string, string>;
   requires?: Record<string, { optional?: boolean }>;
   panels?: Record<string, { title: string; icon?: string; launcher?: boolean; description?: string; visibility?: "public" | "private"; actions?: Record<string, Schema> }>;
   views?: Record<string, { description?: string; props?: Schema; emits?: Record<string, Schema> }>;
@@ -101,7 +103,7 @@ export interface Contract {
   events: Record<string, { description: string; payload: Schema }>;
   /** A point with neither actions nor streams is a place in the window: what others provide there is a descriptor. */
   extensionPoints: Record<string, { description: string; descriptor?: Schema; actions?: Record<string, Schema>; streams?: Record<string, Schema> }>;
-  settings: Record<string, { title: string; description?: string; globalOnly: boolean; group?: string; schema: Schema; default: Json }>;
+  settings: Record<string, { title: string; description?: string; globalOnly: boolean; group?: string; schema: Schema; default: Json; options?: Record<string, string> }>;
   $defs: Record<string, Schema>;
 }
 /** One installed module (or the platform), as platform.modules.definitions lists it. */
@@ -154,6 +156,7 @@ export * as Platform from "./platform";
 export * from "./ui/index";
 
 export * from "./workspaceContext";
+export * from "./i18n";
 /** Generic JSON and render fault values shared with the shell. */
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };

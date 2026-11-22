@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect } from "react";
 import type { Json, ModuleContext } from "@talyx/sdk";
 
@@ -35,7 +36,7 @@ export function useAgentNavigation(ctx: ModuleContext, controls: AgentNavigation
     return () => { slot.controls = null; };
   });
   useEffect(() => {
-    ctx.view.report({ summary: selection ? `Agent · ${selection.label}` : "Agent · No conversation selected",
+    ctx.view.report({ summary: selection ? t("Agent · {label}", { label: selection.label }) : t("Agent · No conversation selected"),
       refs: selection ? { kind: selection.kind, key: selection.id } : {},
       facts: selection ? [`Selected ${selection.kind}: ${selection.label}`] : [],
       openTargets: selection ? [{ kind: selection.kind, key: selection.id, label: selection.label }] : [] });

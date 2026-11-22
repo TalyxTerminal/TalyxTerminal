@@ -17,7 +17,7 @@ const run = (over: Partial<ModelRun> = {}): ModelRun => ({
   id: "r1", objectId: "o", number: 12, kind: "train", batch: null, group: null, status: "completed", state: "completed", stage: "done", createdAt: 0, started: 0, finished: 1, time: 600,
   mode: "standard", algo: "lightgbm", label: "5D rank", inputs: [], params: {label: "CSRank(Ref($open, -6) / Ref($open, -1) - 1)"}, values: {}, run: {cost: 5, topN: 50}, progress: null, queue: null,
   failure: null, stopped: null, windowsTotal: 23, windowsDone: 23, windows: [], perWindow: true, metrics: {ric: 0.0123, t: 2.1, lsNet: 0.04, turnover: 0.3, trainIc: 0.05, windows: 23, positive: 15},
-  baselines: null, checks: [], review: 0, passed: 7, combinedFrom: null, of: null, ofNumber: null, dataTo: Date.UTC(2026, 9, 30), dataFrom: null, memory: null, estimate: null, starred: false,
+  baselines: null, checks: [], review: 0, passed: 7, combinedFrom: null, of: null, ofNumber: null, dataTo: Date.UTC(2026, 9, 30), dataFrom: null, dataNotes: [], memory: null, estimate: null, starred: false,
   note: "", published: null, heldOut: null, message: null, overrides: {}, pipeline: null, horizon: 5, heldOutFrom: null, ...over,
 } as unknown as ModelRun);
 const mapi = {figures: vi.fn(), compareFigure: vi.fn()} as unknown as ModelApi;
@@ -80,7 +80,7 @@ describe("model page", () => {
     expect(markup).not.toContain("disabled");
     expect(markup).not.toContain("Neural");  // the neural-network group is D's, and is not here unless it can run
   });
-  const prep = {objectId: "o", name: "m", mode: "standard", ownCode: false, values: {algorithm: "lightgbm", engine_params: "min_leaf=50"}, offers: [], batchLimit: 20, running: {}, version: 1,
+  const prep = {objectId: "o", name: "m", mode: "standard", ownCode: false, values: {algorithm: "lightgbm", engine_params: "min_leaf=50"}, offers: [], running: {}, version: 1,
     run: {cost: 5, topN: 50}, data: {}, algorithms: [{id: "lightgbm", label: "LightGBM", groupLabel: "Trees", objectives: [{id: "mse", label: "Regression · L2", weights: true}]}],
     groups: [{name: "Algorithm", settings: [{name: "algorithm", label: "Algorithm", type: "choice", default: "lightgbm", options: []},
       {name: "engine_params", label: "Engine parameters", type: "text", default: ""}]}, {name: "Inputs", settings: [{name: "inputs", label: "Inputs", type: "list", default: []}]}]};
@@ -100,8 +100,8 @@ describe("model page", () => {
   it("key numbers open their results tab", () => {
     const text = source("./Selected.tsx");
     for (const [label, tab] of [["Test Rank IC", "information"], ["t", "information"], ["vs best input", "robustness"], ["L–S net", "returns"], ["Turnover", "turnover"], ["Train − test", "windows"], ["Windows above 0", "windows"]])
-      expect(text, label).toMatch(new RegExp(`label: "${label}"[\\s\\S]{0,160}?tab: "${tab}"`));
-    expect(text).not.toMatch(/label: "Checks"[^}]*tab:/);
+      expect(text, label).toMatch(new RegExp(`label: (?:t\\()?"${label}"(?:\\))?[\\s\\S]{0,160}?tab: "${tab}"`));
+    expect(text).not.toMatch(/label: t\("Checks"\)[^}]*tab:/);
   });
   it("a finished batch does not select its best group", () => {
     // newest first, as the list comes: #14 finished last with the lower IC, #13 is the batch's best
@@ -151,7 +151,7 @@ describe("model page", () => {
   it("held-out asks once and lists earlier uses", () => {
     expect(heldOutUses([])).toBe("none");
     expect(heldOutUses([{number: 4, version: 2, objectName: "Momentum"}, {number: 9, version: null, objectName: "Value"}])).toBe("#4 (v2) in Momentum, #9 in Value");
-    expect(source("./ModelPage.tsx")).toMatch(/title=\{`Validate #\$\{confirm\.run\.number\} on held-out\?`\}/);
+    expect(source("./ModelPage.tsx")).toContain('title={t("Validate #{number} on held-out?", { number: confirm.run.number })}');
     expect(source("./ModelPage.tsx")).toContain('data-autofocus=""');  // the main button has the focus
   });
   it("results of a running run show finished windows", () => {
@@ -174,8 +174,8 @@ describe("model page", () => {
   });
   it("old run shows its own code", () => {
     const text = source("./ModelPage.tsx");
-    expect(text).toContain("Standard pipeline ${snap.pipeline.version} as #${snapRun.number} ran it, read-only");
-    expect(text).toContain("Code of #${snapRun.number}, read-only");
+    expect(text).toContain("Standard pipeline {version} as #{number} ran it, read-only");
+    expect(text).toContain("Code of #{number}, read-only");
     expect(text).toContain("mapi.code(snapRun.id)");  // the code that run kept, not the file now
   });
   it("new listings are left out by default", () => {

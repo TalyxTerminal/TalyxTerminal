@@ -1,10 +1,10 @@
+import { intlLocale } from "@talyx/sdk";
 /* The look of a drawn Plotly figure beyond colours: the hover read-out, which figures zoom, and where end labels sit. Pure functions so they can be tested;
    Plot in workbench.tsx wires them to the library's events. Nothing here knows a module: it works from the figure's own templates and axes. */
 
 import { paintFigure } from "./paint";
 
 const MINUS = "−";
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** One value by a d3-style spec (`.1%`, `.3f`, `,.0f`, `+.2f`, `.2e`); a spec this cannot read gives the value as it is. */
 export function formatSpec(spec: string | undefined, value: unknown): string {
@@ -36,7 +36,7 @@ const plain = (value: number) => {
 export function dateText(value: unknown): string {
   const text = String(value);
   const found = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
-  return found ? `${MONTHS[Number(found[2]) - 1]} ${Number(found[3])}, ${found[1]}` : text;
+  return found ? new Date(Date.UTC(Number(found[1]), Number(found[2]) - 1, Number(found[3]))).toLocaleDateString(intlLocale(), { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }) : text;
 }
 
 export interface HoverRow { colour: string; dashed: boolean; label: string; value: string; weak: boolean; number: number | null }

@@ -1,0 +1,2 @@
+.qx-datanotes { color: var(--tx-text-2); }
+.qx-notelist { margin: 0; padding: 10px 14px 10px 28px; max-width: 520px; display: grid; gap: 6px; font-size: var(--tx-size-sm); color: var(--tx-text-2); line-height: 1.45; }

@@ -185,7 +185,7 @@ def test_historical_members_are_read_by_id_and_only_while_in_the_index(tmp_path,
     for record in (apple, dash):
         seed(market, record, "1d", stamps)
 
-    async def membership(record, kind):
+    async def membership(record, kind, start=None, end=None):
         assert record["instrumentId"] == index["instrumentId"] and kind == "members"
         return {
             "rows": [
@@ -210,7 +210,7 @@ def test_historical_members_are_read_by_id_and_only_while_in_the_index(tmp_path,
     )["rows"]
     assert len(rows) == 3 and {r[0] for r in rows} == {"AAPL"}
 
-    async def reentry(record, kind):
+    async def reentry(record, kind, start=None, end=None):
         doc = await membership(record, kind)
         doc["rows"][0]["until"] = str(stamps[1])
         doc["rows"].append({"code": "DASH", "from": str(stamps[2]), "until": None})

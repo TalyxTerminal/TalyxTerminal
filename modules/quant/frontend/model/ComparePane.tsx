@@ -1,4 +1,5 @@
 /* Several runs side by side under the table: where their settings differ, their key numbers, and their test IC window by window. */
+import { t } from "../i18n";
 import { useEffect, useState } from "react";
 import { TxButton } from "@talyx/sdk";
 import type { ModelApi, ModelRun } from "./api";
@@ -30,13 +31,13 @@ export function ComparePane({mapi, runs, onClose, error}: {mapi: ModelApi; runs:
   const labels = new Set(runs.map(run => String(run.params.label ?? run.label)));
   const row = (label: string, value: (run: ModelRun) => string) => <tr><td data-align="left">{label}</td>{runs.map(run => <td key={run.id}>{value(run)}</td>)}</tr>;
   return <div className="mx-compare">
-    <div className="mx-selhead"><b>Comparing {runs.map(run => `#${run.number}`).join(", ")}</b>{!sameEnd && <span className="mx-t3">data to different days</span>}<span className="tx-spacer" /><TxButton size="sm" variant="quiet" onClick={onClose}>Close</TxButton></div>
+    <div className="mx-selhead"><b>{t("Comparing {run}", { run: runs.map(run => `#${run.number}`).join(", ") })}</b>{!sameEnd && <span className="mx-t3">{t("data to different days")}</span>}<span className="tx-spacer" /><TxButton size="sm" variant="quiet" onClick={onClose}>{t.c("action", "Close")}</TxButton></div>
     <div className="mx-selbody"><div className="mx-cmptable"><table className="mx-rtable"><thead><tr><th data-align="left" />{runs.map(run => <th key={run.id}>#{run.number}</th>)}</tr></thead><tbody>
-      {row("Model", run => algoLabel(run.algo))}{row("Label", run => labels.size > 1 ? String(run.params.label ?? run.label) : run.label)}
+      {row(t("Model"), run => algoLabel(run.algo))}{row(t("Label"), run => labels.size > 1 ? String(run.params.label ?? run.label) : run.label)}
       {settings.map(item => <tr key={item.what}><td data-align="left">{item.what}</td>{item.values.map((value, index) => <td key={index}>{show(value)}</td>)}</tr>)}
-      {!sameEnd && row("Data to", run => dayYear(run.dataTo))}
-      {row("Test Rank IC", run => sgn(num(run.metrics?.ric)))}{row("t", run => sgn(num(run.metrics?.t), 2))}{row("L–S net", run => pct(num(run.metrics?.lsNet)))}
-      {row("Turnover", run => num(run.metrics?.turnover) === null ? "—" : `${((run.metrics!.turnover as number) * 100).toFixed(0)}%`)}{row("Time", run => minutes(run.time))}
-      {horizons.size > 1 && row("Predicts", run => run.horizon ? `${run.horizon} bars` : "—")}</tbody></table></div>
-      <div className="mx-chart">{figure && <Plot figure={figure} ariaLabel="Test rank IC window by window" />}</div></div></div>;
+      {!sameEnd && row(t("Data to"), run => dayYear(run.dataTo))}
+      {row(t("Test Rank IC"), run => sgn(num(run.metrics?.ric)))}{row("t", run => sgn(num(run.metrics?.t), 2))}{row(t("L–S net"), run => pct(num(run.metrics?.lsNet)))}
+      {row(t("Turnover"), run => num(run.metrics?.turnover) === null ? "—" : `${((run.metrics!.turnover as number) * 100).toFixed(0)}%`)}{row(t("Time"), run => minutes(run.time))}
+      {horizons.size > 1 && row(t("Predicts"), run => run.horizon ? t("{bars} bars", { bars: run.horizon }) : "—")}</tbody></table></div>
+      <div className="mx-chart">{figure && <Plot figure={figure} ariaLabel={t("Test rank IC window by window")} />}</div></div></div>;
 }

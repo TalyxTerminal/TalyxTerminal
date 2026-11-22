@@ -194,7 +194,7 @@ def train_rolling(invocation, task, *, step):
     windows = "windows"
     tasks = rolling_tasks(task, step)
     recorders = TrainerR(experiment_name=experiment(windows), train_func=checked_task_train)(tasks)
-    collected = RecorderCollector(experiment=windows, artifacts_key=["pred", "label"], artifacts_path={"pred": "pred.pkl", "label": "label.pkl"},
+    collected = RecorderCollector(experiment=windows, artifacts_key=["pred", "label"], artifacts_path={"pred": "pred.pkl", "label": "label.pkl"},  # i18n: ignore
                                   process_list=[RollingEnsemble()])()
     with R.start(experiment_name=experiment("main"), recorder_name="summary"):
         R.log_params(window_experiment=windows)

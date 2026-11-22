@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError as ToolError
+from talyx_sdk.i18n import t
 
 
 def _filesystem_path(path: Path) -> Path:
@@ -32,10 +33,10 @@ def _project_files(root: Path, selected_paths=None) -> tuple[list[Path], list[Pa
         candidates = set()
         for relative in selected_paths:
             if Path(relative).is_absolute() or ".." in Path(relative).parts or Path(relative) == Path("."):
-                raise ToolError("invalid_input", "Selected runtime paths must stay inside their source", {})
+                raise ToolError("invalid_input", t("Selected runtime paths must stay inside their source"), {})
             selected = root / relative
             if not selected.exists():
-                raise ToolError("unavailable", "A selected runtime input is missing", {"path": str(selected)})
+                raise ToolError("unavailable", t("A selected runtime input is missing"), {"path": str(selected)})
             candidates.add(selected)
             if selected.is_dir() and not selected.is_symlink() and not selected.is_junction():
                 candidates.update(selected.rglob("*"))
@@ -47,7 +48,7 @@ def _project_files(root: Path, selected_paths=None) -> tuple[list[Path], list[Pa
         if path.is_symlink() or path.is_junction():
             raise ToolError(
                 "invalid_input",
-                "Runtime project snapshots do not follow symbolic links",
+                t("Runtime project snapshots do not follow symbolic links"),
                 {"path": os.fspath(path)},
             )
         if path.is_file():
@@ -55,10 +56,10 @@ def _project_files(root: Path, selected_paths=None) -> tuple[list[Path], list[Pa
         elif path.is_dir():
             directories.append(path)
     if not files:
-        raise ToolError("invalid_input", "Runtime project has no files", {"path": os.fspath(root)})
+        raise ToolError("invalid_input", t("Runtime project has no files"), {"path": os.fspath(root)})
     if len(files) > 10_000:
         raise ToolError(
-            "invalid_input", "Runtime project contains too many files", {"count": len(files)}
+            "invalid_input", t("Runtime project contains too many files"), {"count": len(files)}
         )
     return files, directories
 
@@ -76,7 +77,7 @@ def snapshot_project(data_dir: Path, project_path: str, *, selected_paths=None) 
     source = _filesystem_path(source_path)
     if not source.is_dir():
         raise ToolError(
-            "invalid_input", "projectPath must name a directory", {"path": project_path}
+            "invalid_input", t("projectPath must name a directory"), {"path": project_path}
         )
     files, directories = _project_files(source, selected_paths)
     digest = hashlib.sha256()
@@ -98,7 +99,7 @@ def snapshot_project(data_dir: Path, project_path: str, *, selected_paths=None) 
         if total > 1024 * 1024 * 1024:
             raise ToolError(
                 "invalid_input",
-                "Runtime project snapshot exceeds 1 GiB",
+                t("Runtime project snapshot exceeds 1 GiB"),
                 {"path": os.fspath(source)},
             )
         file_digest = content_digest.hexdigest()
@@ -133,7 +134,7 @@ def snapshot_project(data_dir: Path, project_path: str, *, selected_paths=None) 
                 ):
                     raise ToolError(
                         "conflict",
-                        "Runtime project changed while its snapshot was being created",
+                        t("Runtime project changed while its snapshot was being created"),
                         {"path": os.fspath(source_file)},
                     )
             try:
@@ -158,14 +159,14 @@ def snapshot_project(data_dir: Path, project_path: str, *, selected_paths=None) 
         ):
             raise ToolError(
                 "conflict",
-                "An existing Runtime snapshot failed content verification",
+                t("An existing Runtime snapshot failed content verification"),
                 {"digest": project_digest, "path": record["path"]},
             )
     for directory in directories:
         if not (destination_filesystem / directory.relative_to(source)).is_dir():
             raise ToolError(
                 "conflict",
-                "An existing Runtime snapshot is missing a source directory",
+                t("An existing Runtime snapshot is missing a source directory"),
                 {"digest": project_digest, "path": directory.relative_to(source).as_posix()},
             )
     return {

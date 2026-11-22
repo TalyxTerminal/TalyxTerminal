@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TxButton, TxIcon, TxSearch, type IconName } from "@talyx/sdk";
 import type { ModuleEntry } from "./communityData";
@@ -10,16 +11,16 @@ import { Byline, Cover, Linked, matches } from "./communityParts";
 type Section = "all" | "official" | Shared;
 type Shared = "module" | "forum";
 
-const TITLES: Record<Section, string> = {
-  all: "All", official: "Official", module: "Modules", forum: "Discussions",
-};
+const titles = (): Record<Section, string> => ({
+  all: t("All"), official: t("Official"), module: t("Modules"), forum: t("Discussions"),
+});
 const ICONS: Record<Section, IconName> = {
   all: "grid", official: "verified", module: "package", forum: "messages",
 };
-const EMPTY: Record<Shared, string> = {
-  module: "No shared modules yet",
-  forum: "No discussions yet",
-};
+const empty = (): Record<Shared, string> => ({
+  module: t("No shared modules yet"),
+  forum: t("No discussions yet"),
+});
 
 export interface DiscoverActions {
   onOpenOfficial: (id: string) => void;
@@ -41,12 +42,12 @@ export function Discover({ modules, ...actions }: DiscoverActions & { modules: M
 
   const railItem = (value: Section, count?: number) => <TxButton key={value} variant="row" className="cm-rail-item"
     aria-current={section === value && !opened ? "page" : undefined} onClick={() => go(value)}>
-    <TxIcon name={ICONS[value]} /><span>{TITLES[value]}</span>{count !== undefined && <span className="cm-rail-count">{count}</span>}
+    <TxIcon name={ICONS[value]} /><span>{titles()[value]}</span>{count !== undefined && <span className="cm-rail-count">{count}</span>}
   </TxButton>;
   const item = opened ? official.find(entry => entry.id === opened) ?? null : null;
 
   return <div className="cm-discover">
-    <nav className="cm-rail" aria-label="Sections">
+    <nav className="cm-rail" aria-label={t("Sections")}>
       {railItem("all")}
       {railItem("module")}
       {railItem("official", official.length)}
@@ -56,11 +57,11 @@ export function Discover({ modules, ...actions }: DiscoverActions & { modules: M
 
     <div className="cm-main" ref={main}>
       {item
-        ? <ModulePage key={item.id} item={item} back={query.trim() ? `Results for “${query.trim()}”` : TITLES[section]} onBack={() => setOpened(null)} {...actions} />
+        ? <ModulePage key={item.id} item={item} back={query.trim() ? t("Results for “{query}”", { query: query.trim() }) : titles()[section]} onBack={() => setOpened(null)} {...actions} />
         : section === "all" && !query.trim()
           ? <Front official={official} query={query} onQuery={search} focus={typed.current} onOpen={setOpened} onSection={go} />
           : section === "all" || section === "official"
-            ? <ModuleGrid key={section} title={section === "all" ? `Results for “${query.trim()}”` : TITLES.official} official={official}
+            ? <ModuleGrid key={section} title={section === "all" ? t("Results for “{query}”", { query: query.trim() }) : titles().official} official={official}
               query={query} onQuery={search} focus={typed.current} onOpen={setOpened} />
             : <EmptySection section={section} />}
     </div>
@@ -80,7 +81,7 @@ function Head({ title, count, children }: { title: string; count?: number; child
 /** One official module in a grid: cover, name, publisher. */
 function Card({ item, onOpen }: { item: ModuleEntry; onOpen: (id: string) => void }) {
   return <button type="button" className="cm-card" onClick={() => onOpen(item.id)}>
-    <Cover seed={item.id} module={item.id}><span className="cm-cover-label">Official</span></Cover>
+    <Cover seed={item.id} module={item.id}><span className="cm-cover-label">{t("Official")}</span></Cover>
     <span className="cm-card-name" title={item.name}>{item.name}</span>
     <span className="cm-card-summary">{item.summary}</span>
     <span className="cm-card-foot"><Byline /></span>
@@ -101,16 +102,16 @@ function Front({ official, query, onQuery, focus, onOpen, onSection }: {
   const featured = [...official].sort((a, b) => Number(b.panels.length > 0) - Number(a.panels.length > 0)).slice(0, 3);
   const [main, ...picks] = featured;
   return <div className="cm-front">
-    <Head title="All">
-      <TxSearch value={query} onValueChange={onQuery} className="cm-search" aria-label="Search" placeholder="Search everything" autoFocus={focus} />
+    <Head title={t("All")}>
+      <TxSearch value={query} onValueChange={onQuery} className="cm-search" aria-label={t("Search")} placeholder={t("Search everything")} autoFocus={focus} />
     </Head>
 
     {main && <div className="cm-stage">
-      <section className="cm-featured" aria-label="Featured">
+      <section className="cm-featured" aria-label={t("Featured")}>
         <button type="button" className="cm-feature" onClick={() => onOpen(main.id)}>
           <Cover seed={main.id} module={main.id} size="feature" />
           <span className="cm-feature-text">
-            <span className="cm-kicker">Featured · Official</span>
+            <span className="cm-kicker">{t("Featured · Official")}</span>
             <span className="cm-feature-name">{main.name}</span>
             <span className="cm-feature-summary">{main.summary}</span>
             <span className="cm-feature-meta"><Byline size="sm" /></span>
@@ -121,7 +122,7 @@ function Front({ official, query, onQuery, focus, onOpen, onSection }: {
           {picks.map(item => <button key={item.id} type="button" className="cm-pick" onClick={() => onOpen(item.id)}>
             <Cover seed={item.id} module={item.id} size="thumb" />
             <span className="cm-pick-text">
-              <span className="cm-kicker">Official</span>
+              <span className="cm-kicker">{t("Official")}</span>
               <span className="cm-pick-name">{item.name}</span>
               <span className="cm-pick-meta"><Byline /></span>
             </span>
@@ -130,10 +131,10 @@ function Front({ official, query, onQuery, focus, onOpen, onSection }: {
       </section>
     </div>}
 
-    <section className="cm-shelf" aria-label="Official modules">
+    <section className="cm-shelf" aria-label={t("Official modules")}>
       <header className="cm-shelf-head">
-        <h2>Official modules</h2>
-        <TxButton size="sm" variant="quiet" className="cm-see-all" onClick={() => onSection("official")}>See all<TxIcon name="arrow-right" /></TxButton>
+        <h2>{t("Official modules")}</h2>
+        <TxButton size="sm" variant="quiet" className="cm-see-all" onClick={() => onSection("official")}>{t("See all")}<TxIcon name="arrow-right" /></TxButton>
       </header>
       <div className="cm-grid">{official.slice(0, 4).map(item => <Card key={item.id} item={item} onOpen={onOpen} />)}</div>
     </section>
@@ -153,10 +154,10 @@ function ModuleGrid({ title, official, query, onQuery, focus, onOpen }: {
   const shown = official.filter(item => matches(query, item.name, item.summary));
   return <div className="cm-list-page">
     <Head title={title} count={shown.length}>
-      <TxSearch value={query} onValueChange={onQuery} className="cm-search" aria-label="Search" placeholder="Search everything" autoFocus={focus} />
+      <TxSearch value={query} onValueChange={onQuery} className="cm-search" aria-label={t("Search")} placeholder={t("Search everything")} autoFocus={focus} />
     </Head>
     <div className="cm-grid" aria-label={title}>{shown.map(item => <Card key={item.id} item={item} onOpen={onOpen} />)}</div>
-    {!shown.length && <div className="cm-nothing">Nothing matches “{query.trim()}”</div>}
+    {!shown.length && <div className="cm-nothing">{t("Nothing matches “{query}”", { query: query.trim() })}</div>}
   </div>;
 }
 
@@ -164,10 +165,10 @@ function ModuleGrid({ title, official, query, onQuery, focus, onOpen }: {
 
 function EmptySection({ section }: { section: Shared }) {
   return <div className="cm-list-page">
-    <Head title={TITLES[section]} />
+    <Head title={titles()[section]} />
     <div className="cm-empty" role="status">
       <Cover seed={`empty-${section}`} icon={ICONS[section]} size="thumb" />
-      <span className="cm-empty-title">{EMPTY[section]}</span>
+      <span className="cm-empty-title">{empty()[section]}</span>
     </div>
   </div>;
 }
@@ -180,21 +181,21 @@ function ModulePage({ item, back, onBack, onOpenOfficial, onManage }: DiscoverAc
   onBack: () => void;
 }) {
   const facts: [string, ReactNode][] = [
-    ...(item.version ? [["Version", <span key="version" className="cm-mono">{item.version}</span>] as [string, ReactNode]] : []),
-    ["Panels", item.panels.length ? item.panels.join(", ") : "None"],
-    ["Works with", item.requires.length ? item.requires.join(", ") : "Nothing else"],
+    ...(item.version ? [[t("Version"), <span key="version" className="cm-mono">{item.version}</span>] as [string, ReactNode]] : []),
+    [t("Panels"), item.panels.length ? item.panels.join(", ") : t("None")],
+    [t("Works with"), item.requires.length ? item.requires.join(", ") : t("Nothing else")],
   ];
   return <div className="cm-item-page">
     <TxButton size="sm" variant="quiet" className="cm-back" onClick={onBack}><TxIcon name="arrow-left" />{back}</TxButton>
-    <Cover seed={item.id} module={item.id} size="banner"><span className="cm-cover-label">Official</span></Cover>
+    <Cover seed={item.id} module={item.id} size="banner"><span className="cm-cover-label">{t("Official")}</span></Cover>
     <header className="cm-item-head">
       <div className="cm-item-title">
         <h1>{item.name}</h1>
         <div className="cm-item-meta"><Byline size="sm" /></div>
       </div>
       <div className="cm-item-actions">
-        <TxButton onClick={() => onManage(item.id)}><TxIcon name="settings" />Manage</TxButton>
-        {item.panels.length > 0 && <TxButton variant="primary" onClick={() => onOpenOfficial(item.id)}><TxIcon name="external" />Open in a new workspace</TxButton>}
+        <TxButton onClick={() => onManage(item.id)}><TxIcon name="settings" />{t("Manage")}</TxButton>
+        {item.panels.length > 0 && <TxButton variant="primary" onClick={() => onOpenOfficial(item.id)}><TxIcon name="external" />{t("Open in a new workspace")}</TxButton>}
       </div>
     </header>
 
@@ -202,9 +203,9 @@ function ModulePage({ item, back, onBack, onOpenOfficial, onManage }: DiscoverAc
       <div className="cm-item-main">
         <div className="cm-doc"><p><Linked text={item.summary} /></p></div>
       </div>
-      <aside className="cm-item-side" aria-label="About">
+      <aside className="cm-item-side" aria-label={t("About")}>
         <dl className="cm-facts">
-          <div><dt>Publisher</dt><dd>TALYX</dd></div>
+          <div><dt>{t("Publisher")}</dt><dd>TALYX</dd></div>
           {facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
         </dl>
       </aside>

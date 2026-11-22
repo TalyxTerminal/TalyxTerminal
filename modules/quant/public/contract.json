@@ -1062,8 +1062,7 @@
    ],
    "errors": [
     "not_found",
-    "model_not_callable",
-    "input_retired"
+    "model_not_callable"
    ]
   },
   "read_library_values": {
@@ -1726,7 +1725,7 @@
    ]
   },
   "start_sweep": {
-   "description": "Run one ordinary run per combination of the axes' values, without changing the object. Returns one runId at\nonce; the result (each cell's state and numbers, the top 20 by the kind's main number, the best cell) comes when\nevery cell has ended. Axes are the declared params (read_object part options); a strategy also takes @costMultiple\n(0-10), @fill (nextOpen or nextClose), @capital and @period ({start, end}); a factor holding, groups, costBps and\ndelay. At most: strategy 200 combinations, factor 48, allocation 25 (1 or 2 axes of 2+ values), model 20.\nStrategy only: metric ranks the cells (sharpe default, cagr, totalReturn, maxDrawdown, trades, profitFactor,\nwinRate); of starts from a completed backtest's code and values. Keep a cell with apply_run.",
+   "description": "Run one ordinary run per combination of the axes' values, without changing the object. Returns one runId at\nonce; the result (each cell's state and numbers, the top 20 by the kind's main number, the best cell) comes when\nevery cell has ended. Axes are the declared params (read_object part options); a strategy also takes @costMultiple\n(0-10), @fill (nextOpen or nextClose), @capital and @period ({start, end}); a factor holding, groups, costBps and\ndelay; an allocation one or two axes of two or more values. Any number of combinations: estimate_sweep says how long a\nstrategy's take.\nStrategy only: metric ranks the cells (sharpe default, cagr, totalReturn, maxDrawdown, trades, profitFactor,\nwinRate); of starts from a completed backtest's code and values. Keep a cell with apply_run.",
    "effects": [
     "code",
     "write"
@@ -1787,15 +1786,13 @@
     }
    ],
    "errors": [
-    "case_over_budget",
     "invalid_input",
     "not_found",
-    "too_many_combinations",
     "value_outside_declared"
    ]
   },
   "start_walk_forward": {
-   "description": "Walk-forward validation of a strategy: each window picks the best combination of the axes over pickOn months\n(by pickBy, default sharpe) and trades it for the next trade months (defaults 12 and 3); at least 3 windows must\nfit before the held-out start. Axes as in start_sweep, at most 200 combinations. Returns runId at once; the\nresult (stitched out-of-sample numbers against fixed values, efficiency, the windows) comes when it ends.",
+   "description": "Walk-forward validation of a strategy: each window picks the best combination of the axes over pickOn months\n(by pickBy, default sharpe) and trades it for the next trade months (defaults 12 and 3); at least 3 windows must\nfit before the held-out start. Axes as in start_sweep. Returns runId at once; the\nresult (stitched out-of-sample numbers against fixed values, efficiency, the windows) comes when it ends.",
    "effects": [
     "code",
     "write"
@@ -1825,10 +1822,8 @@
     }
    ],
    "errors": [
-    "case_over_budget",
     "not_found",
     "too_few_windows",
-    "too_many_combinations",
     "value_outside_declared"
    ]
   },
@@ -7406,7 +7401,7 @@
      "title": "End"
     },
     "adjustment": {
-     "default": "split",
+     "default": "split_dividend",
      "enum": [
       "raw",
       "split",
@@ -8433,7 +8428,7 @@
      "type": "string"
     },
     "axes": {
-     "description": "The swept axes; the combinations are every mix of their values, at most 200.",
+     "description": "The swept axes; the combinations are every mix of their values.",
      "items": {
       "$ref": "#/$defs/Axe"
      },

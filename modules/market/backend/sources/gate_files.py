@@ -17,6 +17,7 @@ import io
 from datetime import UTC, datetime
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -103,7 +104,7 @@ class GateFiles:
         try:
             return await in_worker(_rows, body)
         except (OSError, EOFError, ValueError) as exc:
-            raise MarketError("source_unavailable", f"gate file {url.rsplit('/', 1)[-1]} is unreadable: {exc}",
+            raise MarketError("source_unavailable", t("gate file {value} is unreadable: {exc}", value=url.rsplit('/', 1)[-1], exc=exc),
                               source_id="gate") from exc
 
     def _url(self, market: str, kind: str, record: dict, month: int) -> str:

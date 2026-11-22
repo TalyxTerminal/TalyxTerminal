@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..projects.service import atomic_json, canonical_uri, file_path
 from .changes import DocumentChanges
@@ -54,7 +55,7 @@ def replace_lines(content, edits):
     for edit in sorted(edits, key=lambda item: item["startLine"]):
         start, end = edit["startLine"] - 1, edit["endLine"]
         if not consumed <= start < end <= len(lines):
-            raise ContractError("invalid_input", "Line edits must cover existing, non-overlapping lines")
+            raise ContractError("invalid_input", t("Line edits must cover existing, non-overlapping lines"))
         result.extend(lines[consumed:start])
         replacement = edit["text"]
         if first_ending:
@@ -84,7 +85,7 @@ class DocumentService:
 
     def record(self, document_id):
         if document_id not in self.records:
-            raise ContractError("not_found", "This shared document is unavailable.")
+            raise ContractError("not_found", t("This shared document is unavailable."))
         return self.records[document_id]
 
     @staticmethod
@@ -173,12 +174,12 @@ class DocumentService:
                 found = [item for item in self.developer.implementations("document_source")
                          if item["moduleId"] == module and item["id"] == provider]
                 if not found:
-                    raise ContractError("unavailable", "Choose an available document source provider.")
+                    raise ContractError("unavailable", t("Choose an available document source provider."))
                 read_only = bool(found[0]["descriptor"].get("readOnly"))
             loaded = await self.source_read(source)
             existing = self.existing(source)
             if not register and existing is None and not loaded.get("exists", True):
-                raise ContractError("not_found", "This source does not exist and has no shared buffer.")
+                raise ContractError("not_found", t("This source does not exist and has no shared buffer."))
             if source["kind"] == "contribution":
                 uri = loaded.get("canonicalUri") or "talyx-source:/" + source_identity(source)
                 context, name = loaded["context"], loaded["name"]
@@ -216,13 +217,13 @@ class DocumentService:
             project_id, relative, content = value["projectId"], value["relativePath"], value["content"]
             project = self.projects.get(project_id)
             if project.get("readOnly"):
-                raise ContractError("permission_denied", "This project is read-only")
+                raise ContractError("permission_denied", t("This project is read-only"))
             path = self.projects.path(project_id, relative)
             if path.exists():
-                raise ContractError("conflict", "This file already exists; open and edit its current document version")
+                raise ContractError("conflict", t("This file already exists; open and edit its current document version"))
             source = {"kind": "file", "uri": canonical_uri(path), "projectId": project_id}
             if self.existing(source) is not None:
-                raise ContractError("conflict", "This source already has a shared document; edit and save using its expectedVersion")
+                raise ContractError("conflict", t("This source already has a shared document; edit and save using its expectedVersion"))
             saved = self.projects.write(project_id, relative, content, None)
             if saved["status"] != "saved":
                 raise ContractError("conflict", saved["message"])
@@ -238,7 +239,7 @@ class DocumentService:
 
     def check_version(self, record, expected):
         if record["version"] != expected:
-            raise ContractError("conflict", "Read the current revision before submitting an edit.",
+            raise ContractError("conflict", t("Read the current revision before submitting an edit."),
                                 details={"documentId": record["documentId"], "version": record["version"]})
 
     def set_content(self, record, content, by):
@@ -251,7 +252,7 @@ class DocumentService:
             record = self.record(value["documentId"])
             self.check_version(record, value["expectedVersion"])
             if record["readOnly"]:
-                raise ContractError("permission_denied", "This source is read-only.")
+                raise ContractError("permission_denied", t("This source is read-only."))
             content = replace_lines(record["content"], value["edits"]) if "edits" in value else value["content"]
             result = self.set_content(record, content, origin(call))
             if result["version"] != record["version"]:
@@ -265,10 +266,10 @@ class DocumentService:
             if value.get("expectedVersion") is not None:
                 self.check_version(record, value["expectedVersion"])
             if record["readOnly"]:
-                raise ContractError("permission_denied", "This source is read-only.")
+                raise ContractError("permission_denied", t("This source is read-only."))
             result = {"documentId": record["documentId"], "version": record["version"], "message": None}
             if record["conflict"]:
-                return {**result, "status": "conflict", "message": "Compare the external source before saving."}
+                return {**result, "status": "conflict", "message": t("Compare the external source before saving.")}
             if record["content"] == record["baseContent"] and record["externalState"] == "present":
                 return {**result, "status": "clean"}
             source, content = record["source"], record["content"]
@@ -306,7 +307,7 @@ class DocumentService:
         async with self.lock:
             record = copy.deepcopy(self.record(opened["documentId"]))
             if record["readOnly"]:
-                raise ContractError("permission_denied", "This source is read-only.")
+                raise ContractError("permission_denied", t("This source is read-only."))
             if writes_source:
                 current = await self.source_read(source)
                 content = snapshot["baseContent"]
@@ -347,10 +348,10 @@ class DocumentService:
             record = copy.deepcopy(self.record(document_id))
             self.check_version(record, expected_version)
             if record["readOnly"]:
-                raise ContractError("permission_denied", "This source is read-only.")
+                raise ContractError("permission_denied", t("This source is read-only."))
             external = await self.source_read(record["source"])
             if external["version"] != expected_source_version:
-                raise ContractError("conflict", "The external version changed again. Compare it before resolving.")
+                raise ContractError("conflict", t("The external version changed again. Compare it before resolving."))
             record.update(baseContent=external["content"], baseVersion=external["version"], conflict=False, stat=external.get("stat"),
                           externalState="present" if external.get("exists", True) else "deleted")
             if mode == "external" and record["content"] != external["content"]:

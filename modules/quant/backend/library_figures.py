@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from talyx_sdk.i18n import t
+
 ROLES = {"main", "benchmark", "compare", "earlier", "group", "attention", "watch"}
 OVER = 0.10  # a risk share this far (10 points) from what was published is the allocation's to look at
 SHOWN = 10  # risk shares drawn for an allocation of many assets: the largest, and every one over 10 points besides
@@ -22,7 +24,7 @@ def day(label, timeframe="1d"):
 def figure(key, traces, **layout):
     for trace in traces:
         if (trace.get("meta") or {}).get("role") not in ROLES:
-            raise ValueError(f"{key}: every line needs a role ({trace.get('name')})")
+            raise ValueError(t("{key}: every line needs a role ({name})", key=key, name=trace.get('name')))
     base = {"meta": {"key": key}, "margin": {"l": 8, "r": 44, "t": 12, "b": 24}, "showlegend": False}
     return {"data": traces, "layout": {**base, **layout}}
 
@@ -112,14 +114,14 @@ def cumulative(version, points, metric, span):
         traces.append(line(xs, [level_value] * len(since), "at the published level", "compare", f"At the published level %{{y:{level_format}}} {unit}", yaxis="y2", opacity=0, line={"width": 1, "dash": "dash"}))
     shapes = [{"type": "line", "xref": "x", "yref": "paper", "x0": day(through, timeframe), "x1": day(through, timeframe), "y0": 0, "y1": 1, "meta": {"role": "benchmark"},
                "line": {"width": 1, "dash": "dot"}}]
-    annotations = [{"x": day(through, timeframe), "y": 1, "xref": "x", "yref": "paper", "text": f"v{version.get('version')} published", "showarrow": False,
+    annotations = [{"x": day(through, timeframe), "y": 1, "xref": "x", "yref": "paper", "text": t("v{version} published", version=version.get('version')), "showarrow": False,
                     # library.js writes it up the publication line, on its left
                     "textangle": -90, "xanchor": "right", "yanchor": "top"}]
     if pending:
         first, last = pending[0]["date"], pending[-1]["date"]
         shapes.append({"type": "rect", "xref": "x", "yref": "paper", "x0": day(first - 43_200_000, "1h" if timeframe[-1] != "d" else "1d"), "x1": day(last + 43_200_000, "1h" if timeframe[-1] != "d" else "1d"),
                        "y0": 0, "y1": 1, "layer": "below", "line": {"width": 0}, "meta": {"role": "group"}})
-        annotations.append({"x": day(first, timeframe), "y": 1, "xref": "x", "yref": "paper", "text": f"{len(pending)} pending", "showarrow": False, "xanchor": "left"})
+        annotations.append({"x": day(first, timeframe), "y": 1, "xref": "x", "yref": "paper", "text": t("{pending} pending", pending=len(pending)), "showarrow": False, "xanchor": "left"})
         # The section's key names the shaded stretch too (library.js: settled, at the published level, pending): an empty box trace in its colour.
         traces.append({"type": "bar", "x": [], "y": [], "name": "pending", "meta": {"role": "group"}, "hoverinfo": "none"})
     return figure("library.cumulative", traces, hovermode="x unified", shapes=shapes, annotations=annotations,

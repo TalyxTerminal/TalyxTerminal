@@ -77,7 +77,7 @@ def capture_content(file: dict, data_dir: Path) -> str:
     folder = (data_dir / "platform" / "captures").resolve()
     path = Path(file["path"]).resolve()
     if path.parent != folder or path.suffix != ".png":
-        raise ContractError("invalid_output", "The window returned an invalid capture reference")
+        raise ContractError("invalid_output", "The window returned an invalid capture reference")  # i18n: ignore (AI contract)
     return base64.b64encode(path.read_bytes()).decode("ascii")
 
 
@@ -152,7 +152,7 @@ class AI:
                                          for topic, doc in (item.docs if item else {}).items()]})
             names = [tool_name(tool["name"]) for tool in tools]
             if len(names) != len(set(names)):
-                raise ContractError("internal", "Two actions map to the same AI tool name")
+                raise ContractError("internal", "Two actions map to the same AI tool name")  # i18n: ignore (AI contract)
             self._catalog = (version, {"tools": tools, "modules": modules, "hidden": hidden})
         return self._catalog[1]
 
@@ -169,7 +169,7 @@ class AI:
             length = len(json.dumps(items[index], ensure_ascii=False, separators=(",", ":"))) + 1
             if size + length > ANSWER_LIMIT:
                 if not page[key]:
-                    raise ContractError("too_large", "A single declaration exceeds the AI catalog page size")
+                    raise ContractError("too_large", "A single declaration exceeds the AI catalog page size")  # i18n: ignore (AI contract)
                 page["nextCursor"] = index
                 break
             page[key].append(items[index])
@@ -186,13 +186,13 @@ class AI:
         """The module's guide, or with ``topic`` one of its authoring docs."""
         item = self.host.catalog.get(module)
         if not item.enabled or not item.guide:
-            raise ContractError("unavailable", f"{module} has no enabled AI guide; read the module catalog")
+            raise ContractError("unavailable", f"{module} has no enabled AI guide; read the module catalog")  # i18n: ignore (AI contract)
         if topic is None:
             text = item.guide["text"]
         elif topic in item.docs:
             text = item.docs[topic]["text"]
         else:
-            raise ContractError("not_found", f"{module} has no doc {topic}; its docs are "
+            raise ContractError("not_found", f"{module} has no doc {topic}; its docs are "  # i18n: ignore (AI contract)
                                              f"{', '.join(item.docs) or 'none'}")
         stop = min(len(text), cursor + ANSWER_LIMIT - 256)
         while len(json.dumps(text[cursor:stop], ensure_ascii=False)) > ANSWER_LIMIT - 256:
@@ -202,16 +202,16 @@ class AI:
     def find(self, name: str) -> dict:
         entries = self._entries()
         if name in entries["hidden"]:
-            raise ContractError("permission_denied", f"{name} does not accept AI calls")
+            raise ContractError("permission_denied", f"{name} does not accept AI calls")  # i18n: ignore (AI contract)
         for tool in entries["tools"]:
             if tool["name"] == name or tool_name(tool["name"]) == name:
                 return tool
-        raise ContractError("unknown_capability", f"No action {name}; read the catalog again")
+        raise ContractError("unknown_capability", f"No action {name}; read the catalog again")  # i18n: ignore (AI contract)
 
     async def call(self, caller: dict, value: dict) -> object:
         """An AI client inside TALYX calls an action as AI in one workspace."""
         if caller["origin"] != "module":
-            raise ContractError("permission_denied", "ai.call is for an AI client module")
+            raise ContractError("permission_denied", "ai.call is for an AI client module")  # i18n: ignore (AI contract)
         ai_caller = {"origin": "ai", "module": caller["module"], "workspaceId": value["workspaceId"],
                      "ai": {"client": value["client"], "conversation": value.get("conversation")}}
         call_id = self.host.router.next_id()
@@ -230,9 +230,9 @@ class AI:
         if size > ANSWER_LIMIT:
             message = f"The answer has {size} characters; AI reads at most {ANSWER_LIMIT} at a time."
             if tool["effects"] != ["read"]:
-                raise ContractError("too_large", f"The action executed, but its answer was too large to deliver. Read the result before retrying. {message}",
+                raise ContractError("too_large", f"The action executed, but its answer was too large to deliver. Read the result before retrying. {message}",  # i18n: ignore (AI contract)
                                     {"limit": ANSWER_LIMIT}, execution="unknown", effects="may_have_occurred")
-            raise ContractError("too_large", f"{message} Ask for a smaller page.", {"limit": ANSWER_LIMIT}, execution="failed")
+            raise ContractError("too_large", f"{message} Ask for a smaller page.", {"limit": ANSWER_LIMIT}, execution="failed")  # i18n: ignore (AI contract)
         return json.loads(body)
 
 
@@ -287,12 +287,12 @@ class MCP:
 
         request = Request(scope, receive)
         if not ip_address(request.client.host).is_loopback:
-            error = ContractError("permission_denied", "MCP only accepts this machine")
+            error = ContractError("permission_denied", "MCP only accepts this machine")  # i18n: ignore (AI contract)
             await JSONResponse({"error": error.to_dict()}, status_code=403)(scope, receive, send)
             return
         workspace = scope["path_params"]["workspace_id"]
         if not self.ai.host.workspaces.is_open(workspace):
-            error = ContractError("target_gone", f"Workspace {workspace} is not open")
+            error = ContractError("target_gone", f"Workspace {workspace} is not open")  # i18n: ignore (AI contract)
             await JSONResponse({"error": error.to_dict()}, status_code=404)(scope, receive, send)
             return
         # A client is known by its MCP session for as long as the session lasts; a request outside one is its own.

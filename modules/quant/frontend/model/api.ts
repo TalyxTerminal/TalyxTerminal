@@ -17,7 +17,7 @@ export interface Running {concurrency: number; cpus: number; memoryUsed: number;
 export interface ModelPrep {
   objectId: string; name: string; mode: "standard" | "code"; ownCode: boolean; groups: {name: string; settings: Parameter[]}[]; values: Record<string, ParamValue>;
   errors: {message: string; line: number | null}[]; algorithms: Algorithm[]; offers: Offer[]; run: RunSettings; data: DataSettings & {heldOutFrom?: string | null};
-  batchLimit: number; running: Running; version: number; concepts?: {id: string; label: string; kind: "market" | "library"}[]; baseRuns?: {id: string; number: number; label: string; algorithm: string; inputs?: unknown; lookback: number; width: number; layers: number}[];
+  running: Running; version: number; concepts?: {id: string; label: string; kind: "market" | "library"}[]; baseRuns?: {id: string; number: number; label: string; algorithm: string; inputs?: unknown; lookback: number; width: number; layers: number}[];
 }
 export interface DeepDevice {id: string; kind: "cpu" | "cuda" | "xpu"; label: string; memoryTotal?: number; memoryFree?: number}
 export interface DeepEnvironment {
@@ -36,7 +36,7 @@ export interface CheckAnswer {
   ok: boolean; blocked: boolean; checks: Check[]; axis?: Axis; inputs?: {id: string; name: string; source: string; features: number; coverage: number; start: number | null; flag?: string; note?: string}[];
   seconds: number; windows?: number; names?: number; features?: number; failure?: {title: string; message: string}; engineParams?: {ok: boolean; errors: {key: string; message: string}[]} | null;
   label?: {reach: {ahead: number; back: number; start: {bar: number; at: string}} | null; error: FormulaError | null};
-  batch?: {groups: {group: number; values: Record<string, ParamValue>; time: number | null; memory: number | null; blocked: boolean}[]; total: number; peak: number; free: number; concurrency: number; threads?: number; limit: number};
+  batch?: {groups: {group: number; values: Record<string, ParamValue>; time: number | null; memory: number | null}[]; total: number; peak: number; free: number; concurrency: number; threads?: number};
 }
 export interface WindowRow {k: number; trainIc: number | null; validIc: number | null; testIc: number | null; rows?: number; secs?: number; test?: {from: number; to: number}}
 export interface ModelRun {
@@ -47,7 +47,7 @@ export interface ModelRun {
   queue: {position?: number} | number | null; failure: {window?: number; title: string; detail?: string; message?: string; resumeFrom?: number | null; epoch?: number; kind?: "memory" | "gpu-memory"; saved?: number; batch?: number; tryBatch?: number; windowsTotal?: number | null; checkpoint?: number | null; file?: string; line?: number; need?: number; free?: number} | null;
   stopped: {window: number; auto: boolean} | null; windowsTotal: number | null; windowsDone: number; windows: WindowRow[]; perWindow: boolean;
   metrics: Record<string, number | null> | null; baselines: {bestInput: {name: string; ic: number | null}; equalWeight: {mean: number | null}; ridge: number | null} | null;
-  portfolio?: string | null; checks: Check[] | null; review: number; passed: number; combinedFrom: string[] | null; of: string | null; ofNumber: number | null; dataTo: number | null; dataFrom: number | null;
+  portfolio?: string | null; checks: Check[] | null; review: number; passed: number; combinedFrom: string[] | null; of: string | null; ofNumber: number | null; dataTo: number | null; dataFrom: number | null; dataNotes: string[];
   starred: boolean; note: string; published: {version: number; name?: string} | null; heldOut: {runId: string; number: number; state: string; numbers?: Record<string, number | null>} | null;
   message: string | null; updatedAt?: number; overrides: Record<string, ParamValue>; overrideFrom?: number | null; resumedAfterClose?: boolean; pipeline: {version: string; digest: string} | null; horizon: number | null;
   reach: {ahead: number; back: number; start: {bar: number; at: string}} | null; heldOutFrom: string | null; estimate: {memory?: number; seconds?: number} | null; memory?: number | null;

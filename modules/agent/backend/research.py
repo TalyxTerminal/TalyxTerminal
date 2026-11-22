@@ -9,6 +9,7 @@ from pathlib import Path
 from langchain_core.tools import StructuredTool
 from pypdf import PdfReader
 from talyx_sdk import ContractError, talyx_call
+from talyx_sdk.i18n import t
 from talyx_sdk.jobs import spawn
 
 from .tools import TOOL_CALL
@@ -33,7 +34,7 @@ def research_tools(service, turn, filesystem):
         script = None
         if path is None:
             if code is None:
-                raise ContractError("invalid_input", "Supply code or the path of an existing script")
+                raise ContractError("invalid_input", t("Supply code or the path of an existing script"))
             # Keep user code off the Windows command line (length-limited and visible to process viewers).
             # One JSON line carries the code; the remaining bytes are the script's stdin.
             argv = [sys.executable, "-B", "-c", "import json, sys; exec(compile(json.loads(sys.stdin.buffer.readline()), '<calculation>', 'exec'))"]
@@ -42,18 +43,18 @@ def research_tools(service, turn, filesystem):
                 relative = Path(path.removeprefix("/workspace/"))
                 script = (root / relative).resolve()
                 if relative.anchor or not script.is_relative_to(root):
-                    raise ContractError("invalid_input", "Choose a Python script inside the workspace folder")
+                    raise ContractError("invalid_input", t("Choose a Python script inside the workspace folder"))
                 workspace_skills = filesystem.mounts["/skills/workspace/"].cwd
                 if script.is_relative_to(workspace_skills):
                     path = "/skills/workspace/" + script.relative_to(workspace_skills).as_posix()
             if path.startswith("/skills/"):
                 if code is not None:
-                    raise ContractError("invalid_input", "Run a skill script by path alone, without code")
+                    raise ContractError("invalid_input", t("Run a skill script by path alone, without code"))
                 script = filesystem.skill_path(path)
             if script.suffix.lower() != ".py":
-                raise ContractError("invalid_input", "Choose a .py script")
+                raise ContractError("invalid_input", t("Choose a .py script"))
             if code is None and not script.is_file():
-                raise ContractError("not_found", f"No script at {path}")
+                raise ContractError("not_found", t("No script at {path}", path=path))
             argv = [sys.executable, "-B", str(script)]
         stdin = None
         if stdin_source is not None:
@@ -63,15 +64,15 @@ def research_tools(service, turn, filesystem):
                     "SELECT json_extract(value,'$.text') FROM cards WHERE id=? AND conversation=? "
                     "AND json_extract(value,'$.role')='user'", (identity, turn["conversationId"])).fetchone()
                 if row is None:
-                    raise ContractError("not_found", "Choose a user message from this conversation")
+                    raise ContractError("not_found", t("Choose a user message from this conversation"))
                 stdin = row[0].encode("utf-8")
             elif kind == "attachment":
                 attachment = service.attachment(identity, turn["conversationId"])
                 if not attachment["mime"].startswith("text/") and attachment["mime"] != "application/json":
-                    raise ContractError("invalid_input", "Choose a text attachment for Python input")
+                    raise ContractError("invalid_input", t("Choose a text attachment for Python input"))
                 stdin = await asyncio.to_thread(service.attachment_bytes, attachment)
             else:
-                raise ContractError("invalid_input", "Use the message: or attachment: source supplied with the input")
+                raise ContractError("invalid_input", t("Use the message: or attachment: source supplied with the input"))
         if script is None:
             stdin = (json.dumps(code, ensure_ascii=False) + "\n").encode() + (stdin or b"")
         token = await service.ctx.run_token(workspace, conversation=turn["conversationId"])
@@ -112,18 +113,18 @@ def research_tools(service, turn, filesystem):
         report = {"exitCode": status, "stdout": preview("stdout.txt"), "stderr": preview("stderr.txt"),
                   "outputFolder": "/.agent/runs/" + token["runId"]}
         if status:
-            raise ContractError("execution_failed", f"The research script exited with status {status}", report)
+            raise ContractError("execution_failed", t("The research script exited with status {status}", status=status), report)
         return json.dumps(report, ensure_ascii=False)
 
     async def read_pdf(attachment_id: str, page: int) -> str:
         """Read one numbered text page of a PDF attached to this conversation, starting at page 1."""
         selected = service.attachment(attachment_id, turn["conversationId"])
         if selected["mime"] != "application/pdf":
-            raise ContractError("invalid_input", "Choose an attached PDF")
+            raise ContractError("invalid_input", t("Choose an attached PDF"))
         def read():
             reader = PdfReader(service.root / "attachments" / attachment_id)
             if not 1 <= page <= len(reader.pages):
-                raise ContractError("invalid_input", f"Choose a page from 1 to {len(reader.pages)}")
+                raise ContractError("invalid_input", t("Choose a page from 1 to {value}", value=len(reader.pages)))
             return json.dumps({"page": page, "pages": len(reader.pages), "text": reader.pages[page-1].extract_text()},
                               ensure_ascii=False)
         return await asyncio.to_thread(read)

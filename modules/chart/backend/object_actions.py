@@ -10,6 +10,7 @@ import asyncio
 
 from pydantic import ValidationError
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .actions import (
     decode_cursor,
@@ -50,7 +51,7 @@ def operand_in(app, operand: dict | None, chart_id: str | None) -> dict | None:
     if kind == "drawing":
         chart = operand.get("chartId") or chart_id
         if chart is None:
-            raise ContractError("invalid_input", "A drawing operand names its chartId")
+            raise ContractError("invalid_input", t("A drawing operand names its chartId"))
         return {"kind": "drawing", "chartId": chart, "drawingId": operand["drawingId"]}
     ref = indicator_ref(operand, app.catalog)
     if kind == "alertcondition":
@@ -173,9 +174,9 @@ async def write_alert(app, value: dict, call_ctx) -> dict:
                     if value.get("symbol"):
                         target.pop("watchlistId", None)
                 else:
-                    raise ContractError("invalid_input", "The alert target needs a chart, watchlist or symbol")
+                    raise ContractError("invalid_input", t("The alert target needs a chart, watchlist or symbol"))
                 if not target.get("chartId") and not (target.get("timeframe") and (target.get("symbol") or target.get("watchlistId"))):
-                    raise ContractError("invalid_input", "The alert target needs a symbol or watchlist and timeframe")
+                    raise ContractError("invalid_input", t("The alert target needs a symbol or watchlist and timeframe"))
                 spec[key] = await target_in(app, workspace, target)
             elif key == "conditions":
                 spec[key] = conditions_in(app, value, (spec.get("target") or {}).get("chartId"))
@@ -264,7 +265,7 @@ async def write_watchlist(app, value: dict, call_ctx) -> dict:
         sections = [{**section, "members": list(section["members"])} for section in (sections or current["sections"])]
         for text in operation.get("remove", []):
             if not any(matches(member["instrument"], text) for section in sections for member in section["members"]):
-                raise ContractError("not_found", f"{text} is not in this watchlist")
+                raise ContractError("not_found", t("{text} is not in this watchlist", text=text))
             for section in sections:
                 section["members"] = [member for member in section["members"] if not matches(member["instrument"], text)]
         additions = operation.get("add", [])

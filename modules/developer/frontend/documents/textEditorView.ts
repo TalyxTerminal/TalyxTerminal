@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { Json, ModuleContext } from "@talyx/sdk";
 import type { ContractTypes } from "../../public/ts/types";
 
@@ -125,7 +126,7 @@ export function mountTextEditor(node: HTMLElement, ctx: ModuleContext) {
       const line = model.getLineContent(event.position.lineNumber).slice(0, event.position.column - 1);
       completes.set(Boolean(props.assist) && /[\w.]$/.test(line));
     }));
-    created.addAction({ id: "talyx.text.complete", label: "Complete", keybindings: [loaded.KeyCode.Tab], precondition: "talyxTextCompletes && !suggestWidgetVisible && !inSnippetMode",
+    created.addAction({ id: "talyx.text.complete", label: t("Complete"), keybindings: [loaded.KeyCode.Tab], precondition: "talyxTextCompletes && !suggestWidgetVisible && !inSnippetMode",
       run: () => { created.trigger("keyboard", "editor.action.triggerSuggest", {}); } });
     const codes: Record<Key, number> = { "Shift+Enter": loaded.KeyMod.Shift | loaded.KeyCode.Enter, "Ctrl+Enter": loaded.KeyMod.CtrlCmd | loaded.KeyCode.Enter,
       "Alt+Enter": loaded.KeyMod.Alt | loaded.KeyCode.Enter, "Ctrl+S": loaded.KeyMod.CtrlCmd | loaded.KeyCode.KeyS, "Escape": loaded.KeyCode.Escape };

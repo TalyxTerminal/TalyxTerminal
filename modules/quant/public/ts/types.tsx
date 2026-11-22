@@ -1737,7 +1737,7 @@ export interface StartStrategyWalkForwardInput {
  */
 objectId: string
 /**
- * The swept axes; the combinations are every mix of their values, at most 200.
+ * The swept axes; the combinations are every mix of their values.
  * 
  * @minItems 1
  * @maxItems 8

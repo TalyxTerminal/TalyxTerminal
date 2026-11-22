@@ -12,14 +12,45 @@ from __future__ import annotations
 import csv
 import io
 
+import numpy as np
+from talyx_sdk.i18n import mark, t
+
+from .. import calendars
 from ..common import MarketError, ns_of_date
 from .base import Source, Target, coverage, row
 
 URL = "https://raw.githubusercontent.com/fja05680/sp500/master/sp500_ticker_start_end.csv"
 INDEX = "^GSPC"
-NOTE = ("S&P 500 members by effective date from fja05680's public compilation of S&P announcements; "
+NOTE = mark("S&P 500 members by effective date from fja05680's public compilation of S&P announcements; "
         "it includes companies that later left the index (no survivorship bias), but the announcement "
         "dates are not recorded, so knownAt is the effective date.")
+
+
+CN_INDICES = {"000300.SH": ("query_hs300_stocks", "399300.SZ"),
+              "000905.SH": ("query_zz500_stocks", "000905.SH"),
+              "000016.SH": ("query_sz50_stocks", "000016.SH")}
+
+
+def cn_indices(identity):
+    result = []
+    for code in CN_INDICES:
+        listing = identity.find_code("CN", code)
+        if listing:
+            result.append({"index": identity.record(listing), "start": None, "end": None,
+                           "pointInTime": True, "survivorshipBias": False, "note": None})
+    return result
+
+
+def localize_sp500_dates(rows):
+    """The CSV dates and the original cached rows encode New York effective dates at UTC midnight."""
+    dates = sorted({int(row[field]) for row in rows for field in ("from", "until", "knownAt")
+                    if row[field] is not None})
+    days = np.asarray(dates, dtype="datetime64[ns]").astype("datetime64[D]")
+    midnights = dict(zip(map(str, dates), map(str, calendars.local_midnight("XNYS", days)), strict=True))
+    for member in rows:
+        for field in ("from", "until", "knownAt"):
+            if member[field] is not None:
+                member[field] = midnights[member[field]]
 
 
 class Sp500History(Source):
@@ -33,7 +64,7 @@ class Sp500History(Source):
 
     async def research(self, source_id: str, target: Target, kind: str) -> list[dict]:
         if kind != "members" or target.instrument["symbol"] != INDEX:
-            raise MarketError("unsupported", f"{source_id} gives S&P 500 ({INDEX}) members only", source_id=source_id)
+            raise MarketError("unsupported", t("{source_id} gives S&P 500 ({INDEX}) members only", source_id=source_id, INDEX=INDEX), source_id=source_id)
         text = (await self.egress.bytes(self.id, URL, timeout=60)).decode("utf-8", "replace")
         rows = []
         for item in csv.DictReader(io.StringIO(text)):
@@ -45,16 +76,18 @@ class Sp500History(Source):
             rows.append({"code": code, "from": str(begin), "until": str(ns_of_date(end)) if end else None,
                          "knownAt": str(begin)})
         if not rows:
-            raise MarketError("source_unavailable", f"{source_id} returned no members", source_id=source_id)
+            raise MarketError("source_unavailable", t("{source_id} returned no members", source_id=source_id), source_id=source_id)
+        localize_sp500_dates(rows)
         return rows
 
     def note(self, source_id: str, kind: str) -> str | None:
-        return NOTE if kind == "members" else None
+        return t(NOTE) if kind == "members" else None
 
     def indices(self, source_id: str) -> list[dict]:
         found = self.market.identity.find_code("US", INDEX, None)
         if found is None:
             return []
         record = self.market.identity.record(self.market.identity.survivor(found) or found)
-        return [{"index": record, "start": str(ns_of_date("1996-01-02")), "end": None, "pointInTime": True,
-                 "survivorshipBias": False, "note": NOTE}]
+        start = calendars.local_midnight(record["calendarId"], np.array(["1996-01-02"], dtype="datetime64[D]"))[0]
+        return [{"index": record, "start": str(start), "end": None, "pointInTime": True,
+                 "survivorshipBias": False, "note": t(NOTE)}]

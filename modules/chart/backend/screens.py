@@ -15,6 +15,7 @@ from collections.abc import Callable
 from contextlib import nullcontext
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import bars as wire_bars
 from . import changes
@@ -37,15 +38,15 @@ def check_screen(spec: dict) -> None:
     for condition in spec["conditions"]:
         kinds = [item["kind"] for item in operands(condition)]
         if "drawing" in kinds or "alertcondition" in kinds or condition["op"] == "triggered":
-            raise ContractError("invalid_input", "Screens compare prices, indicator outputs and values")
+            raise ContractError("invalid_input", t("Screens compare prices, indicator outputs and values"))
         if condition["op"] in MOVING_OPS:
             if condition.get("amount") is None or condition.get("bars") is None:
-                raise ContractError("invalid_input", "Moving conditions take an amount and bars")
+                raise ContractError("invalid_input", t("Moving conditions take an amount and bars"))
         elif condition["op"].endswith("_channel"):
             if not (condition.get("right") and condition.get("right2")):
-                raise ContractError("invalid_input", "Channel conditions take the two bounds")
+                raise ContractError("invalid_input", t("Channel conditions take the two bounds"))
         elif not condition.get("right"):
-            raise ContractError("invalid_input", "This condition takes two operands")
+            raise ContractError("invalid_input", t("This condition takes two operands"))
 
 
 def legend_name(described: dict, params: dict) -> str:
@@ -71,7 +72,7 @@ class Screens:
         for value in self.all(workspace):
             if value["id"] == screen_id:
                 return value
-        raise ContractError("not_found", f"No screen {screen_id} in this workspace")
+        raise ContractError("not_found", t("No screen {screen_id} in this workspace", screen_id=screen_id))
 
     def put(self, workspace: str, screen: dict) -> dict:
         self.store.put_object("screen", {"id": screen["id"], "value": screen}, workspace)
@@ -89,7 +90,7 @@ class Screens:
         else:
             current = self.get(workspace, screen_id)
             if revision != current["revision"]:
-                raise ContractError("conflict", "The screen changed meanwhile", {"revision": current["revision"]})
+                raise ContractError("conflict", t("The screen changed meanwhile"), {"revision": current["revision"]})
             screen = {**current, **spec, "revision": revision + 1}
         self.store.put_object("screen_pins", {"id": screen["id"], "pins": pins}, workspace)
         return self.put(workspace, screen)
@@ -175,7 +176,7 @@ class Screens:
         closed = sum(1 for close in columns["closeTime"] if close <= now_ms())  # the latest closed bar is the last
         columns = {name: values[:closed] for name, values in columns.items()}
         if closed < 2:
-            raise ContractError("unavailable", "Not enough closed bars")
+            raise ContractError("unavailable", t("Not enough closed bars"))
         outputs = await self.indicators(screen, instrument, series, columns, decimals, pins)
         rule = Rule([{key: item.get(key) for key in ("op", "amount", "bars")} for item in screen["conditions"]],
                     "once_per_bar_close")

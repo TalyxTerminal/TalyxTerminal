@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from . import i18n
 from . import metrics as M
 from . import styles as S
 
@@ -49,11 +50,13 @@ class Panel:
         self.fields = fields  # name -> float array (T, N): open, high, low, close, volume
         self.member = member
         self.info = info
-        self.industry = industry  # list of labels per column (None where unknown), or None
         self.shares = shares
         self.library = library or {}  # name -> {"version", "values": array (T, N)}
         self.notes = list(notes or [])
         self.dates = pd.to_datetime(self.labels, unit="ms", utc=True)
+        # Each name's industry on each bar (dates × names, None where unknown), or None: Market's industry as known on that date
+        # where it keeps dated answers, else its current one on every date. One label per name is the same on every date.
+        self.industry = industry_frame(industry, self.dates, self.columns)
         self._derived = {}
         self._cache = {}
 
@@ -115,7 +118,7 @@ class Panel:
 
     def _truncated(self, cut):
         panel = Panel(self.labels[:cut], self.columns, {k: v[:cut] for k, v in self.fields.items()}, self.member[:cut], self.info,
-                      industry=self.industry, shares=None if self.shares is None else self.shares[:cut],
+                      industry=None if self.industry is None else self.industry.iloc[:cut], shares=None if self.shares is None else self.shares[:cut],
                       library={k: {**v, "values": v["values"][:cut]} for k, v in self.library.items()}, notes=self.notes)
         return panel
 
@@ -137,7 +140,8 @@ class Panel:
             value = self.shares if self.shares is not None else np.full(self.shape, np.nan)
         elif name == "returns":
             # A halted name holds its last price until it trades again, so its first bar back carries the whole move over the halt; after
-            # its last price (delisted) it has no return.
+            # its last price (delisted) it has no return: a book holding it is out at its last close and earns nothing after (returns_of
+            # counts the missing return as 0, as forward returns hold the last close, M.held).
             frame = pd.DataFrame(f["close"])
             close = frame.ffill().where(frame.bfill().notna()).to_numpy()
             with np.errstate(invalid="ignore", divide="ignore"):
@@ -162,10 +166,61 @@ class Panel:
             out[f"$lib.{name}"] = self.frame(item["values"])
         return out
 
-    def industry_series(self):
+    def industry_codes(self, unknown=None):
+        """Each cell's industry as an integer (T, N) and the names: a cell without one is -1, or the code of `unknown` when given."""
         if self.industry is None:
             return None
-        return pd.Series(self.industry, index=self.columns, dtype=object)
+        return self.cached(("industry-codes", unknown), lambda: label_codes(self.industry, unknown))
+
+
+def industry_frame(industry, dates, columns):
+    """An industry as a table of dates × names: a table as it is, one label per name on every date, None stays None."""
+    if industry is None:
+        return None
+    if isinstance(industry, pd.DataFrame):
+        return pd.DataFrame(industry.to_numpy(dtype=object), index=dates, columns=columns)
+    array = np.asarray(industry, dtype=object)
+    if array.ndim == 1:
+        array = np.broadcast_to(array, (len(dates), len(columns)))
+    return pd.DataFrame(np.array(array, dtype=object), index=dates, columns=columns)
+
+
+def label_codes(industry, unknown=None):
+    """(codes (T, N) int, names) of a table of labels: None is -1, or the code of `unknown` when given."""
+    cells = industry.to_numpy(dtype=object) if isinstance(industry, pd.DataFrame) else np.asarray(industry, dtype=object)
+    if unknown is not None:
+        cells = np.where(pd.isna(cells), unknown, cells)
+    codes, names = pd.factorize(cells.ravel())
+    return codes.reshape(cells.shape).astype(np.int32), list(names)
+
+
+def industry_segments(codes):
+    """Runs of bars on which every name keeps its industry: [(first bar, end bar, the codes on them)]; industries change on few dates, so
+    work by industry runs over a few column sets."""
+    change = np.flatnonzero((codes[1:] != codes[:-1]).any(axis=1)) + 1 if len(codes) > 1 else np.asarray([], dtype=int)
+    bounds = [0, *change.tolist(), len(codes)]
+    return [(first, end, codes[first]) for first, end in zip(bounds[:-1], bounds[1:], strict=True) if end > first]
+
+
+def industry_table(labels, columns, histories):
+    """Each name's industry on each bar from its history (`histories`: {column: [[from ms | None, until ms | None, name], ...]}, oldest
+    first): a bar takes the row whose span holds its label; None where no row does (before the first known one, or after the last
+    ended). A name given as one label (data frozen by TALYX 0.1, which kept only the current classification) has it on every bar."""
+    labels = np.asarray(labels, dtype="int64")
+    table = np.full((len(labels), len(columns)), None, dtype=object)
+    for index, column in enumerate(columns):
+        history = histories.get(column)
+        if isinstance(history, str):
+            table[:, index] = history
+            continue
+        for start, end, name in history or ():
+            inside = np.ones(len(labels), dtype=bool)
+            if start is not None:
+                inside &= labels >= start
+            if end is not None:
+                inside &= labels < end
+            table[inside, index] = name
+    return table
 
 
 def library_table(labels, columns, rows, clocks):
@@ -213,7 +268,7 @@ def members_a_day(labels, index):
         return None
     intervals = sorted(index["intervals"], key=lambda item: item["since"])
     starts = np.asarray([item["since"] for item in intervals], dtype="int64")
-    counts = np.asarray([len({member["assetId"] for member in item["members"]}) for item in intervals] + [0])
+    counts = np.asarray([len({index["members"][position]["assetId"] for position in item["members"]}) for item in intervals] + [0])
     ends = np.asarray([item["until"] for item in intervals], dtype="int64")
     at = np.searchsorted(starts, labels, side="right") - 1
     inside = (at >= 0) & (labels <= ends[np.clip(at, 0, None)])
@@ -330,7 +385,7 @@ def preprocess(raw, panel, settings, reason):
     neutral = settings["neutralize"]
     if neutral != "none":
         from .formula import neutralize
-        industry = panel.industry_series()
+        industry = panel.industry
         if industry is None:
             label = "Industry + size" if neutral == "industry+size" else "Industry"
             raise ValueError(f"Neutralize {label} needs an industry for each name, and Market gives none for these names")
@@ -376,11 +431,16 @@ def group_of(values, settings, industry=None):
     if grouping.get("withinIndustry"):
         if industry is None:
             raise ValueError("Grouping inside each industry needs an industry for each name, and Market gives none for these names")
-        labels = pd.Series(industry).fillna("__none__")
-        for _, members in labels.groupby(labels).groups.items():
-            index = np.asarray(list(members))
-            out[:, index] = equal(values[:, index], count)
-        return out
+        # Each day inside each industry of that day (names without one together).
+        codes = label_codes(industry, "__none__")[0]
+        rows = values.shape[0]
+        key = (codes + np.arange(rows)[:, None] * (int(codes.max()) + 1)).ravel()
+        flat = pd.Series(values.ravel())
+        ranks = flat.groupby(key).rank(method="average").to_numpy().reshape(values.shape)
+        size = flat.notna().groupby(key).transform("sum").to_numpy(dtype=float).reshape(values.shape)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            g = np.floor((ranks - 1) * count / size) + 1
+        return np.where(np.isnan(values), 0, g).astype(np.int16)
     return equal(values, count)
 
 
@@ -416,14 +476,15 @@ def returns_of(panel, groups, count, settings, values, codes=None):
     returns = np.nan_to_num(panel.derived("returns"))
     universe = _held_fast(equal_weights(~np.isnan(values)), holding, delay)
     if codes is not None and settings.get("groupAdjust"):
-        # Each name against the held names of its own industry that day.
+        # Each name against the held names of its own industry that day (`codes`: each name's industry each day, or one per name).
+        codes = np.broadcast_to(codes, returns.shape)
         base = np.zeros_like(returns)
         for code in np.unique(codes):
             inside = codes == code
-            weight = universe[:, inside].sum(axis=1)
+            weight = (universe * inside).sum(axis=1)
             with np.errstate(invalid="ignore", divide="ignore"):
-                mean = np.where(weight > 0, (universe[:, inside] * returns[:, inside]).sum(axis=1) / weight, 0.0)
-            base[:, inside] = mean[:, None]
+                mean = np.where(weight > 0, (universe * returns * inside).sum(axis=1) / weight, 0.0)
+            base = np.where(inside, mean[:, None], base)
     elif settings.get("demeaned", True):
         base = (universe * returns).sum(axis=1)[:, None]
     else:
@@ -451,12 +512,13 @@ def returns_of(panel, groups, count, settings, values, codes=None):
 def group_demeaned(forward, values, codes):
     """Each day's forward returns less the mean of the names in the same group that day (Alphalens' group_adjust): the names with a value and a return count."""
     out = np.array(forward, dtype=float, copy=True)
+    codes = np.broadcast_to(codes, out.shape)
     counted = np.where(np.isfinite(values) & np.isfinite(forward), forward, np.nan)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         for code in np.unique(codes):
             inside = codes == code
-            out[:, inside] = forward[:, inside] - np.nanmean(counted[:, inside], axis=1, keepdims=True)
+            out = np.where(inside, forward - np.nanmean(np.where(inside, counted, np.nan), axis=1, keepdims=True), out)
     return out
 
 
@@ -557,56 +619,56 @@ def checks_of(numbers, details, settings, *, formula, future=None, library=None)
     out = []
 
     def add(identity, name, value, need, passed, title, go):
-        out.append({"id": identity, "name": name, "value": value, "need": need,
+        out.append({"id": identity, "name": i18n.t(name), "value": value, "need": need,
                     "state": "notrun" if passed is None else "ok" if passed else "watch", "title": title, "go": go})
 
     t = numbers["t"]
     add("significance", T["significance"]["name"], _fmt(t), T["significance"]["need"], None if t is None else M.passes("significance", t),
-        f"t, Newey–West, for overlapping {settings['holding']}-day returns", {"to": "results", "id": "ic"})
+        i18n.t("t, Newey–West, for overlapping {days}-day returns", days=settings["holding"]), {"to": "results", "id": "ic"})
     like = numbers.get("mostLikeLibrary")
     if library:
         rho = abs(like["rho"]) if like else None
         add("library", T["library"]["name"], _fmt(rho), T["library"]["need"], None if rho is None else M.passes("library", rho),
-            f"Closest: {like['name']}" if like else "No library factor shares days and names with this run", {"to": "tab", "id": "similar"})
+            i18n.t("Closest: {name}", name=like["name"]) if like else i18n.t("No library factor shares days and names with this run"), {"to": "tab", "id": "similar"})
     else:
         # with nothing published there is nothing for the factor to repeat: the check passes and says why, not "Not run"
-        add("library", T["library"]["name"], "Library empty", T["library"]["need"], True, "Nothing is published in the library yet", {"to": "tab", "id": "similar"})
+        add("library", T["library"]["name"], i18n.t("Library empty"), T["library"]["need"], True, i18n.t("Nothing is published in the library yet"), {"to": "tab", "id": "similar"})
     size = numbers.get("groupSize")
     add("group_size", T["group_size"]["name"], _fmt(size, 0), T["group_size"]["need"], None if size is None else M.passes("group_size", size),
-        "Names in the smallest group, median day", {"to": "setting", "id": "groups"})
+        i18n.t("Names in the smallest group, median day"), {"to": "setting", "id": "groups"})
     years = [item for item in details["years"] if item["whole"]]
     sign = math.copysign(1, numbers["rankIc"]) if numbers["rankIc"] else 0
     same = sum(1 for item in years if sign and math.copysign(1, item["rankIc"]) == sign)
     share = same / len(years) if years else None
-    add("every_year", T["every_year"]["name"], f"{same} of {len(years)}" if years else "no whole year", T["every_year"]["need"],
-        None if share is None else M.passes("every_year", share), "Whole years whose rank IC has the sign of the whole period; each year: rank IC above, long–short net of cost below", {"to": "results", "id": "ic"})
+    add("every_year", T["every_year"]["name"], i18n.t("{same} of {years}", same=same, years=len(years)) if years else i18n.t("no whole year"), T["every_year"]["need"],
+        None if share is None else M.passes("every_year", share), i18n.t("Whole years whose rank IC has the sign of the whole period; each year: rank IC above, long–short net of cost below"), {"to": "results", "id": "ic"})
     # Each whole year's IC and long–short net beside the count: whether the years that held also made money after cost.
     out[-1]["years"] = [{"year": item["year"], "rankIc": item["rankIc"], "longShortNet": item["longShortNet"]} for item in years]
     breakeven = numbers.get("breakEven")
     cost = settings["costBps"]
-    add("cost_room", T["cost_room"]["name"], "—" if breakeven is None else "loses before costs" if breakeven < 0 else f"{breakeven:,.1f} bps", f"≥ {2 * cost:g} bps",
-        None if breakeven is None else M.passes("cost_room", breakeven, cost), f"Break-even cost a trade, against twice the {cost:g} bps assumed",
+    add("cost_room", T["cost_room"]["name"], "—" if breakeven is None else i18n.t("loses before costs") if breakeven < 0 else i18n.t("{value} bps", value=f"{breakeven:,.1f}"), i18n.t("≥ {value} bps", value=f"{2 * cost:g}"),
+        None if breakeven is None else M.passes("cost_room", breakeven, cost), i18n.t("Break-even cost a trade, against twice the {cost} bps assumed", cost=f"{cost:g}"),
         {"to": "results", "id": "costs"})
     means = details["groupMeans"]
     direction = 1 if numbers["rankIc"] is None or numbers["rankIc"] >= 0 else -1
     broken = next((k for k in range(1, len(means)) if means[k] is not None and means[k - 1] is not None and (means[k] - means[k - 1]) * direction < 0), None)
-    add("group_order", "Group order", "in order" if broken is None else f"Q{broken} {'>' if direction > 0 else '<'} Q{broken + 1}", "in order",
-        broken is None, "Mean return " + ("rises" if direction > 0 else "falls") + " from Q1 to the top group", {"to": "results", "id": "returns"})
+    add("group_order", i18n.mark("Group order"), i18n.t("in order") if broken is None else f"Q{broken} {'>' if direction > 0 else '<'} Q{broken + 1}", i18n.t("in order"),
+        broken is None, i18n.t("Mean return rises from Q1 to the top group") if direction > 0 else i18n.t("Mean return falls from Q1 to the top group"), {"to": "results", "id": "returns"})
     if formula:
-        add("future_data", "Future data", "none", "none", True, "A formula reads only earlier days: shifts into later days are refused", None)
+        add("future_data", i18n.mark("Future data"), "none", "none", True, i18n.t("A formula reads only earlier days: shifts into later days are refused"), None)
     elif future is None:
-        add("future_data", "Future data", "", "none", None, "Recomputed at 3 dates without later prices after the numbers", None)
+        add("future_data", i18n.mark("Future data"), "", "none", None, i18n.t("Recomputed at 3 dates without later prices after the numbers"), None)
     else:
-        add("future_data", "Future data", future["value"], "none", future["passed"], future["title"],
+        add("future_data", i18n.mark("Future data"), future["value"], "none", future["passed"], future["title"],
             {"to": "code", "line": future["line"]} if future.get("line") else None)
     drop = details["coverage"]
-    add("coverage_drop", "Coverage drop", "—" if drop["drop"] is None else f"{drop['drop'] * 100:.0f}%", "under 20%",
+    add("coverage_drop", i18n.mark("Coverage drop"), "—" if drop["drop"] is None else f"{drop['drop'] * 100:.0f}%", i18n.t("under 20%"),
         None if drop["drop"] is None else drop["drop"] < 0.2,
-        f"Worst day against the usual count of names: {drop['day']}" if drop["day"] else "Names with a value each day after the warm-up",
+        i18n.t("Worst day against the usual count of names: {day}", day=drop["day"]) if drop["day"] else i18n.t("Names with a value each day after the warm-up"),
         {"to": "tab", "id": "values", "order": "missing", **({"date": drop["label"]} if drop.get("label") else {})})
     flags = details["flags"]
-    add("suspicious_prices", "Suspicious prices", str(len(flags)), "none", not flags,
-        flags[0]["text"] if flags else "No daily move of -50% or +100% on normal dollar volume", {"to": "flag"} if flags else None)
+    add("suspicious_prices", i18n.mark("Suspicious prices"), str(len(flags)), "none", not flags,
+        flags[0]["text"] if flags else i18n.t("No daily move of -50% or +100% on normal dollar volume"), {"to": "flag"} if flags else None)
     return out
 
 
@@ -642,8 +704,11 @@ def suspicious(panel, limit=50):
     for t, i in hits[:limit]:
         move = returns[t, i]
         day = panel.dates[t]
+        wording = (i18n.mark("{symbol} fell {change}% on {month} {day}, {year} on normal dollar volume") if move < 0
+                   else i18n.mark("{symbol} rose {change}% on {month} {day}, {year} on normal dollar volume"))
         out.append({"t": int(t), "i": int(i), "label": int(panel.labels[t]),
-                    "text": f"{panel.columns[i]} {'fell' if move < 0 else 'rose'} {abs(move) * 100:.0f}% on {day.strftime('%b')} {day.day}, {day.year} on normal dollar volume"})
+                    "text": i18n.t(wording, symbol=panel.columns[i], change=f"{abs(move) * 100:.0f}",
+                                   month=day.strftime(i18n.t("%b")), day=day.day, year=day.year)})
     return out
 
 
@@ -721,7 +786,7 @@ class Evaluation:
         if settings.get("groupAdjust"):
             if panel.industry is None:
                 raise ValueError("Group neutral needs an industry for each name, and Market gives none for these names")
-            codes = pd.factorize(np.asarray([item or "Unknown" for item in panel.industry], dtype=object))[0]
+            codes = panel.industry_codes("Unknown")[0]
         # The values sorted once, for the rank IC of every holding and the comparison with the library and the styles.
         self.basis = M.RankBasis(self.after)
         found = rank_ics(self.after, close, holdings, d, codes, basis=self.basis, panel=panel)
@@ -738,7 +803,7 @@ class Evaluation:
         # The long-short book (top minus bottom) pays for itself: its return is already a return over cash, so its Sharpe takes no rate
         # off (design.md, risk-free rate; over the T-bill it took the rate off twice, 0.3 where 0.8 was right). Every number of a
         # factor is of that book or of no money at all, so a factor has no risk-free setting; the record says what Sharpe is over.
-        risk_measure = {"basis": "zero", "label": "none: a long–short book that pays for itself is already a return over cash"}
+        risk_measure = {"basis": "zero", "label": i18n.t("none: a long–short book that pays for itself is already a return over cash")}
         self.similar = similar(self.after, self.groups, self.count, panel, holding=h, delay=d, close=close, basis=self.basis) if with_similar else []
         like = self.similar[0] if self.similar else None
         like_library = next((item for item in self.similar if not item.get("style")), None)
@@ -815,7 +880,11 @@ class Evaluation:
             np.save(directory / f"input-{index}.npy", np.asarray(table, dtype=np.float32))
             names.append(name)
         flags = [{"t": item["t"], "i": item["i"], "text": item["text"]} for item in self.details["flags"]]
-        meta = {"labels": self.panel.labels.tolist(), "columns": self.panel.columns, "industry": self.panel.industry,
+        industries = None
+        if self.panel.industry is not None:
+            codes, industries = self.panel.industry_codes()
+            np.save(directory / "industry.npy", codes.astype(np.int16))
+        meta = {"labels": self.panel.labels.tolist(), "columns": self.panel.columns, "industries": industries,
                 "inputs": names, "holding": self.settings["holding"], "delay": self.settings["delay"], "groups": self.count, "flags": flags,
                 "names": [int(item) for item in self.details["names"]]}
         (directory / "meta.json").write_text(json.dumps(meta), encoding="utf-8")

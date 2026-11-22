@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.jobs import spawn
 
 IDLE_SECONDS = 3.0
@@ -135,7 +136,7 @@ class LanguageServer:
     # ---- process ----
     async def start(self) -> None:
         if self.state == "stopped":
-            raise ContractError("unavailable", "The Python language service stopped.")
+            raise ContractError("unavailable", t("The Python language service stopped."))
         if self.starting is None:
             self.starting = asyncio.create_task(self._launch())
         await asyncio.shield(self.starting)
@@ -166,7 +167,7 @@ class LanguageServer:
             await self.stop()
             if isinstance(error, (asyncio.CancelledError, ContractError)):
                 raise
-            raise ContractError("unavailable", "The Python language service could not start.", {"reason": str(error)}) from error
+            raise ContractError("unavailable", t("The Python language service could not start."), {"reason": str(error)}) from error
 
     async def stop(self) -> None:
         if self.state == "stopped":
@@ -184,7 +185,7 @@ class LanguageServer:
             self.job.close()
         for waiting in self.pending.values():
             if isinstance(waiting, asyncio.Future) and not waiting.done():
-                waiting.set_exception(ContractError("unavailable", "The Python language service stopped."))
+                waiting.set_exception(ContractError("unavailable", t("The Python language service stopped.")))
         self.pending.clear()
         connection, self.connection = self.connection, None
         if connection is not None:
@@ -211,7 +212,7 @@ class LanguageServer:
                 self.process.stdin.write(b"Content-Length: %d\r\n\r\n" % len(body) + body)
                 await self.process.stdin.drain()
             except (ConnectionError, OSError) as error:
-                raise ContractError("unavailable", "The Python language service stopped.") from error
+                raise ContractError("unavailable", t("The Python language service stopped.")) from error
 
     async def notify(self, method: str, params) -> None:
         await self._write({"method": method, "params": params})
@@ -254,7 +255,7 @@ class LanguageServer:
         if method in {"client/registerCapability", "client/unregisterCapability", "window/workDoneProgress/create", "window/showMessageRequest",
                       "workspace/diagnostic/refresh", "workspace/semanticTokens/refresh", "workspace/inlayHint/refresh", "workspace/codeLens/refresh"}:
             return {"result": None}
-        return {"error": {"code": -32601, "message": f"{method} is not supported"}}
+        return {"error": {"code": -32601, "message": t("{method} is not supported", method=method)}}
 
     # ---- editor window ----
     async def attach(self, connection: Connection) -> None:
@@ -295,7 +296,7 @@ class LanguageServer:
         """Wait until the server is ready; a server that stopped meanwhile is an error, not a wait."""
         await self.ready.wait()
         if self.state != "ready":
-            raise ContractError("unavailable", "The Python language service stopped.")
+            raise ContractError("unavailable", t("The Python language service stopped."))
 
     async def from_client(self, connection: Connection, message: dict) -> None:
         method, ident = message.get("method"), message.get("id")
@@ -310,7 +311,7 @@ class LanguageServer:
             return
         elif method not in CLIENT_MESSAGES:
             if ident is not None:
-                await connection.send({"jsonrpc": "2.0", "id": ident, "error": {"code": -32601, "message": f"{method} is not supported"}})
+                await connection.send({"jsonrpc": "2.0", "id": ident, "error": {"code": -32601, "message": t("{method} is not supported", method=method)}})
         else:
             await self._settled()
             await self._forward(connection, message)

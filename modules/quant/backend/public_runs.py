@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import ai_views, chart_layers, market_inputs, public_settings, strategy_ai
 from .public_pages import complete_json, offset, table
@@ -283,7 +284,7 @@ async def compare(services, record, other_id):
     other = services.runs.read(other_id)
     if record["objectKind"] != other["objectKind"]:
         raise ContractError(
-            "invalid_input", "compareTo must reference another run of the same kind."
+            "invalid_input", t("compareTo must reference another run of the same kind.")
         )
     left, right = await summary(services, record), await summary(services, other)
     a, b = left["numbers"], right["numbers"]
@@ -311,14 +312,14 @@ async def read(services, args):
     parts, _ = parts_and_tables(record)
     if part not in parts or args.get("cursor") and part != "code":
         raise ContractError(
-            "invalid_input", f"Available parts: {', '.join(parts)}. cursor applies to code."
+            "invalid_input", t("Available parts: {parts}. cursor applies to code.", parts=', '.join(parts))
         )
     if part == "chartLayer":
         return {"runId": identity, "part": part, "data": await chart_layers.read(services, record, args)}
     if isinstance(args.get("compareTo"), list):
-        raise ContractError("invalid_input", "Multiple comparison runs apply only to chartLayer.")
+        raise ContractError("invalid_input", t("Multiple comparison runs apply only to chartLayer."))
     if args.get("instrumentId") or args.get("around") or args.get("includeInstruments"):
-        raise ContractError("invalid_input", "instrumentId, around and includeInstruments apply to chartLayer.")
+        raise ContractError("invalid_input", t("instrumentId, around and includeInstruments apply to chartLayer."))
     if part == "summary":
         result = await summary(services, record)
     else:
@@ -487,13 +488,13 @@ async def rows(services, ctx, args):
     if name not in tables or filters.keys() - FILTERS.get(name, set()):
         raise ContractError(
             "invalid_input",
-            f"Tables: {', '.join(tables)}. Filters for {name}: {', '.join(sorted(FILTERS.get(name, ())))}.",
+            t("Tables: {tables}. Filters for {name}: {name2}.", tables=', '.join(tables), name=name, name2=', '.join(sorted(FILTERS.get(name, ())))),
         )
     start = public_settings.milliseconds(args["start"]) if args.get("start") else None
     end = public_settings.milliseconds(args["end"], end=True) if args.get("end") else None
     at = public_settings.milliseconds(args["date"]) if args.get("date") else None
     if at is not None and name not in {"crossSection", "values", "rebalances"}:
-        raise ContractError("invalid_input", f"date does not select rows of {name}.")
+        raise ContractError("invalid_input", t("date does not select rows of {name}.", name=name))
     if (start is not None or end is not None) and name not in {
         "daily",
         "trades",
@@ -501,7 +502,7 @@ async def rows(services, ctx, args):
         "rebalances",
         "periods",
     }:
-        raise ContractError("invalid_input", f"start and end do not select rows of {name}.")
+        raise ContractError("invalid_input", t("start and end do not select rows of {name}.", name=name))
     base_offset, total = offset(args), None
     page_args = args
     if name in {"trades", "orders", "rebalances"}:
@@ -557,7 +558,7 @@ async def rows(services, ctx, args):
     elif name == "log":
         stream = filters.get("stream", "stderr")
         if stream not in {"stdout", "stderr", "environment_stdout", "environment_stderr"}:
-            raise ContractError("invalid_input", "Unknown log stream.")
+            raise ContractError("invalid_input", t("Unknown log stream."))
         if stream.startswith("environment_"):
             saved = (record.get("environment") or {}).get(
                 "stdoutPath" if stream == "environment_stdout" else "stderrPath"

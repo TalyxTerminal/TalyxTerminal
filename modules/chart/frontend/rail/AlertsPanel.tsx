@@ -1,18 +1,19 @@
+import { t } from "../i18n";
 /* The alerts panel (TradingView): Alerts lists every alert of the workspace with its state, and on hover pause or
    resume, edit and delete; Log lists what fired, newest first. */
 import { useEffect, useState } from "react";
-import { TxEmpty, TxIconButton, TxTabs, TxTag, type ModuleContext } from "@talyx/sdk";
+import { intlLocale, TxEmpty, TxIconButton, TxTabs, TxTag, type ModuleContext } from "@talyx/sdk";
 import { post } from "../api";
 import { message, openOverlay, useStore } from "../store";
 import type { Alert, Fired } from "../wire";
 import { timeframeLabel } from "../chart/timeframes";
 
-const STATES: Record<Alert["state"], string> = { active: "Active", paused: "Paused", triggered: "Triggered", expired: "Expired" };
+const STATES: Record<Alert["state"], string> = { active: t("Active"), paused: t("Paused"), triggered: t("Triggered"), expired: t("Expired") };
 
 export function AlertsPanel({ ctx, panelId }: { ctx: ModuleContext; panelId: string }) {
   const [tab, setTab] = useState<"alerts" | "log">("alerts");
   return <div className="chart-rail-panel">
-    <div className="chart-rail-head"><TxTabs value={tab} onChange={setTab} label="Alerts" options={[{ value: "alerts", label: "Alerts" }, { value: "log", label: "Log" }]} /></div>
+    <div className="chart-rail-head"><TxTabs value={tab} onChange={setTab} label={t("Alerts")} options={[{ value: "alerts", label: t("Alerts") }, { value: "log", label: t.c("alerts", "Log") }]} /></div>
     {tab === "alerts" ? <AlertList ctx={ctx} panelId={panelId} /> : <AlertLog ctx={ctx} />}
   </div>;
 }
@@ -24,14 +25,14 @@ function AlertList({ ctx, panelId }: { ctx: ModuleContext; panelId: string }) {
   const [error, setError] = useState<string | null>(null);
   const list = Object.values(alerts).sort((a, b) => b.createdAt - a.createdAt);
   const fail = (failed: unknown) => setError(message(failed));
-  if (!list.length) return <TxEmpty title="No alerts" />;
+  if (!list.length) return <TxEmpty title={t("No alerts")} />;
   return <>
     {error && <p className="chart-alert-error chart-rail-note" role="alert">{error}</p>}
     <div className="chart-rail-list" role="list">
       {list.map(alert => {
         const target = alert.target.kind === "series"
           ? `${alert.target.instrument.displaySymbol}, ${timeframeLabel(alert.target.series.timeframe!)}`
-          : `${watchlists[alert.target.watchlistId]?.name ?? "Watchlist"}, ${timeframeLabel(alert.target.timeframe)}`;
+          : `${watchlists[alert.target.watchlistId]?.name ?? t("Watchlist")}, ${timeframeLabel(alert.target.timeframe)}`;
         const running = alert.state === "active";
         // A source that failed pauses the alert with its reason; Retry starts it again.
         const failed = alert.state === "paused" && alert.reason;
@@ -43,14 +44,14 @@ function AlertList({ ctx, panelId }: { ctx: ModuleContext; panelId: string }) {
             {running && alert.source && <span className="chart-muted">{alert.source.message}</span>}
           </div>
           <span className="chart-alert-tags">
-            {alert.outdated && <TxTag tone="watch">Uses an older version</TxTag>}
+            {alert.outdated && <TxTag tone="watch">{t("Uses an older version")}</TxTag>}
             <TxTag tone={running ? undefined : alert.state === "triggered" ? "watch" : "muted"}>{STATES[alert.state]}</TxTag>
           </span>
           <span className="chart-alert-actions">
-            {(alert.state === "active" || alert.state === "paused") && <TxIconButton size="sm" icon={running ? "pause" : failed ? "refresh" : "play"} label={running ? "Pause" : failed ? "Retry" : "Resume"}
+            {(alert.state === "active" || alert.state === "paused") && <TxIconButton size="sm" icon={running ? "pause" : failed ? "refresh" : "play"} label={running ? t("Pause") : failed ? t("Retry") : t("Resume")}
               onClick={() => post(ctx, "/alerts/state", { alertId: alert.id, revision: alert.revision, state: running ? "paused" : "active" }).catch(fail)} />}
-            <TxIconButton size="sm" icon="edit" label="Edit" onClick={() => openOverlay(panelId, { kind: "alert", chartId: active!, alertId: alert.id })} />
-            <TxIconButton size="sm" icon="trash" label="Delete" onClick={() => post(ctx, "/alerts/delete", { alertId: alert.id }).catch(fail)} />
+            <TxIconButton size="sm" icon="edit" label={t("Edit")} onClick={() => openOverlay(panelId, { kind: "alert", chartId: active!, alertId: alert.id })} />
+            <TxIconButton size="sm" icon="trash" label={t("Delete")} onClick={() => post(ctx, "/alerts/delete", { alertId: alert.id }).catch(fail)} />
           </span>
         </div>;
       })}
@@ -67,15 +68,15 @@ function AlertLog({ ctx }: { ctx: ModuleContext }) {
   if (error) return <p className="chart-alert-error chart-rail-note" role="alert">{error}</p>;
   const seen = new Set(live.map(event => event.id));
   const events = [...live, ...(earlier ?? []).filter(event => !seen.has(event.id))].sort((a, b) => b.at - a.at);
-  if (!earlier) return <p className="chart-muted chart-rail-note">Loading…</p>;
-  if (!events.length) return <TxEmpty title="Nothing fired yet" />;
+  if (!earlier) return <p className="chart-muted chart-rail-note">{t("Loading…")}</p>;
+  if (!events.length) return <TxEmpty title={t("Nothing fired yet")} />;
   return <div className="chart-rail-list" role="list">
     {events.map(event => <div key={event.id} className="chart-alert-item" role="listitem">
       <div className="chart-alert-text">
         <span className="chart-alert-title">{event.symbol}</span>
         <span className="chart-muted">{event.message}</span>
       </div>
-      <time className="chart-muted chart-alert-time" dateTime={new Date(event.at).toISOString()}>{new Date(event.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+      <time className="chart-muted chart-alert-time" dateTime={new Date(event.at).toISOString()}>{new Date(event.at).toLocaleString(intlLocale(), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
     </div>)}
   </div>;
 }

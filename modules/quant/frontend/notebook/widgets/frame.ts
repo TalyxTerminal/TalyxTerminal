@@ -52,7 +52,7 @@ const open = async (commId: string, target: string, data: {state?: Record<string
     const module = (data.state?._model_module as string | undefined) ?? "this";
     console.error("widget", reason);
     post({type: "failed", message: String((reason as Error)?.stack ?? reason).slice(0, 400)});
-    root.textContent = module.includes("plotly") ? "plotly widgets don't run here; use fig.show()" : `${module} widgets don't run here`;
+    post({type: "unsupported", plotly: module.includes("plotly"), library: module});
   }
 };
 
@@ -64,14 +64,15 @@ const show = async (modelId: string) => {
     await manager.display_view(manager.create_view(model), root);
   } catch (reason) {
     const module = String((reason as Error).message ?? reason);
-    root.textContent = /plotly/i.test(module) ? "plotly widgets don't run here; use fig.show()" : "This widget library doesn't run here";
+    post({type: "unsupported", plotly: /plotly/i.test(module)});
   }
   post({type: "height", height: document.documentElement.scrollHeight});
 };
 
 window.addEventListener("message", event => {
-  const message = event.data as {type: string; commId?: string; target?: string; data?: any; modelId?: string};
-  if (message.type === "comm_open") void open(message.commId!, message.target ?? "jupyter.widget", message.data ?? {}).then(() => {if (message.commId === pending) void show(pending!);});
+  const message = event.data as {type: string; commId?: string; target?: string; data?: any; modelId?: string; text?: string};
+  if (message.type === "notice") root.textContent = message.text ?? "";
+  else if (message.type === "comm_open") void open(message.commId!, message.target ?? "jupyter.widget", message.data ?? {}).then(() => {if (message.commId === pending) void show(pending!);});
   else if (message.type === "comm_msg") comms.get(message.commId!)?.hear(message.data);
   else if (message.type === "comm_close") {comms.get(message.commId!)?.gone(); comms.delete(message.commId!);}
   else if (message.type === "view") {pending = message.modelId!; if (comms.has(pending)) void show(pending);}

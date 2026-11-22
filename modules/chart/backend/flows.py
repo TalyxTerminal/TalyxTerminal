@@ -14,6 +14,7 @@ import logging
 from bisect import bisect_right
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .charts import Charts, Entry
 from .document import BRICK_TYPES, ChartDocument, drawing_group
@@ -322,13 +323,13 @@ class ChartFlow:
     async def start_replay(self, at: int) -> None:
         async with self.lock:
             if not self.current:
-                raise ContractError("unavailable", "The chart has no current feed")
+                raise ContractError("unavailable", t("The chart has no current feed"))
             base = self.feed.raw
             await base.wait_whole(latest_rows=1)
             if not base.columns["time"]:
-                raise ContractError("unavailable", "There are no closed bars to replay")
+                raise ContractError("unavailable", t("There are no closed bars to replay"))
             if at < base.columns["time"][0]:
-                raise ContractError("invalid_input", "Backfill the chart to the replay date first")
+                raise ContractError("invalid_input", t("Backfill the chart to the replay date first"))
             self.end_replay()
             document = self.document
             replay = Replay(base, at, document.chartType,
@@ -345,7 +346,7 @@ class ChartFlow:
     async def step_replay(self, count: int) -> None:
         async with self.lock:
             if self.replay is None:
-                raise ContractError("conflict", "The chart is not replaying")
+                raise ContractError("conflict", t("The chart is not replaying"))
             self.replay.raw.step(count)
             self.out.put(self.replay_item())
 
@@ -399,7 +400,7 @@ class ChartFlow:
     async def backfill(self, to: int | None, bars: int | None) -> dict:
         async with self.lock:
             if not self.current:
-                raise ContractError("unavailable", "The chart has no current feed")
+                raise ContractError("unavailable", t("The chart has no current feed"))
             base = self.feed.raw
             await base.wait_whole(latest_rows=1)
             if not base.has_more_before or base.limit_reached:  # nothing older: no window of its own, no resend

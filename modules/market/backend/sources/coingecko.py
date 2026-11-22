@@ -11,6 +11,8 @@ Data shown from it must credit "Data provided by CoinGecko".
 
 from __future__ import annotations
 
+from talyx_sdk.i18n import mark, t
+
 from ..common import DAY_NS, MarketError, now_ns
 from .base import Source, Target, coverage, row
 
@@ -24,7 +26,7 @@ class CoinGecko(Source):
     descriptor = {"name": "CoinGecko", "sourceIds": ["coingecko"], "kinds": ["listings", "market_cap", "categories"],
                   "assetClasses": ["crypto"], "credentials": "optional", "paid": False,
                   "supports": ["catalog", "research"], "attribution": ATTRIBUTION,
-                  "settings": [{"name": "apiKey", "label": "Demo API key (optional)", "type": "string",
+                  "settings": [{"name": "apiKey", "label": mark("Demo API key (optional)"), "type": "string",
                                 "secret": True, "required": False}]}
     secret_settings = ("apiKey",)
 
@@ -56,7 +58,7 @@ class CoinGecko(Source):
 
     def _coin(self, target: Target) -> str:
         if target.instrument["venueId"] != "COIN":
-            raise MarketError("unsupported", "CoinGecko answers for coins (market COIN) only", source_id=self.id)
+            raise MarketError("unsupported", t("CoinGecko answers for coins (market COIN) only"), source_id=self.id)
         return target.source_key or target.instrument["symbol"]
 
     async def research(self, source_id: str, target: Target, kind: str) -> list[dict]:
@@ -81,7 +83,7 @@ class CoinGecko(Source):
             known = str(now_ns())
             return [{"category": _slug(name), "name": name, "knownAt": known} for name in data.get("categories") or []
                     if name]
-        raise MarketError("unsupported", f"CoinGecko gives market_cap and categories, not {kind}", source_id=self.id)
+        raise MarketError("unsupported", t("CoinGecko gives market_cap and categories, not {kind}", kind=kind), source_id=self.id)
 
     def note(self, source_id: str, kind: str) -> str | None:
         return ATTRIBUTION

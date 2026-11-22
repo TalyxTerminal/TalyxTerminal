@@ -45,7 +45,7 @@ it.each(["failure", "timeout", "quota", "success"])("reload follows only confirm
   try {
     let commit: (() => void) | undefined;
     if (outcome === "success") stash.mockReturnValueOnce(new Promise<void>(resolve => { commit = resolve; }));
-    const restarted = controller.hostRestarted();
+    const restarted = controller.reloadKeepingUnsaved();
     await vi.runAllTimersAsync();
     if (commit) {
       expect(stash).toHaveBeenCalledWith([{ workspaceId: "w" }]);

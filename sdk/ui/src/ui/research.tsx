@@ -1,9 +1,12 @@
+import { translator } from "../i18n";
 /* Research workbench pieces: one row on top (name, data, what runs, one run button, views, code, menu), the run strip,
    key numbers, checks, the two-layer parameter column with linked inputs, the runs table, tags, state words,
    per-period strips, the heatmap and in-place failures. Generic: nothing here knows a module. Styles: research.css.ts. */
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { TxButton, TxCheckbox, TxMenu, TxPopover, type TxMenuItem } from "./components";
 import { TxIcon, type IconName } from "./icons";
+
+const t = translator("platform");
 
 const on = (value: boolean | undefined) => (value ? "" : undefined);
 
@@ -31,8 +34,8 @@ export function TxRunButton({ label, kinds, onRun, onKind, locked, disabled, tit
     separated: kind.separated, checked: kind.current, onSelect: () => onKind(kind.id),
   }));
   return <span className="tx-runbutton" data-locked={on(locked)} data-disabled={on(disabled)}>
-    <button type="button" onClick={onRun} title={title ?? `${label} (Ctrl+Enter)`}>{locked ? <TxIcon name="lock" /> : <TxIcon name="play" data-fill="" />}{label}</button>
-    <TxMenu label="Kind of run" align="end" items={items} trigger={<button type="button" aria-label="Kind of run"><TxIcon name="chevron" /></button>} />
+    <button type="button" onClick={onRun} title={title ?? t("{label} (Ctrl+Enter)", { label })}>{locked ? <TxIcon name="lock" /> : <TxIcon name="play" data-fill="" />}{label}</button>
+    <TxMenu label={t("Kind of run")} align="end" items={items} trigger={<button type="button" aria-label={t("Kind of run")}><TxIcon name="chevron" /></button>} />
   </span>;
 }
 
@@ -48,10 +51,10 @@ export function TxRunProgress({ run, stage, count, value, elapsed, steps, onStop
     {value != null && <span className="tx-runbar"><i style={{ width: `${Math.round(value * 100)}%` }} /></span>}
     {elapsed && <span className="tx-runtime">{elapsed}</span>}
     {onStop && <span role="button" tabIndex={0} className="tx-runstop" onClick={event => { event.stopPropagation(); onStop(); }}
-      onKeyDown={event => { if (event.key === "Enter") { event.stopPropagation(); onStop(); } }}><TxIcon name="stop" />Stop</span>}
+      onKeyDown={event => { if (event.key === "Enter") { event.stopPropagation(); onStop(); } }}><TxIcon name="stop" />{t("Stop")}</span>}
   </button>;
   if (!steps) return pill;
-  return <TxPopover open={open} onOpenChange={setOpen} trigger={pill} label="Steps">
+  return <TxPopover open={open} onOpenChange={setOpen} trigger={pill} label={t("Steps")}>
     <div className="tx-runsteps">{steps.map((step, index) => <div key={index} data-state={step.state}>
       {step.state === "done" ? <TxIcon name="check" /> : step.state === "now" ? <span className="tx-spin" /> : <TxIcon name="circle" />}
       <span>{step.label}</span><span className="tx-steptime">{step.time ?? ""}</span>
@@ -66,13 +69,13 @@ export function TxLive({ label, value }: { label: string; value?: number | null 
 // ---------------------------------------------------------------- run strip: which run is shown, compared with what
 /** The shown run as a menu of runs. */
 export function TxRunPicker({ run, items }: { run: string; items: TxMenuItem[] }) {
-  return <TxMenu label="Show another run" items={items} trigger={<button type="button" className="tx-runpick">{run}<TxIcon name="chevron" /></button>} />;
+  return <TxMenu label={t("Show another run")} items={items} trigger={<button type="button" className="tx-runpick">{run}<TxIcon name="chevron" /></button>} />;
 }
 
 /** The compared run as a menu; `run` null offers Compare. Its line's look is in the chart, by its name at the line's end. */
 export function TxCompare({ run, items }: { run: string | null; items: TxMenuItem[] }) {
-  return <TxMenu label="Compare with another run" items={items} trigger={<button type="button" className="tx-compare">
-    {run ? <>vs <b>{run}</b></> : "Compare"}<TxIcon name="chevron" />
+  return <TxMenu label={t("Compare with another run")} items={items} trigger={<button type="button" className="tx-compare">
+    {run ? <>{t("vs")} <b>{run}</b></> : t("Compare")}<TxIcon name="chevron" />
   </button>} />;
 }
 
@@ -82,7 +85,7 @@ export function TxRunStrip({ picker, when, meta, tags, notes, onNotes, compare, 
   return <div className="tx-runstrip">{picker}<span className="tx-runwhen">{when}</span>
     {meta && <span className="tx-runmeta" title={meta.join(", ")}>{meta.map((item, index) => <span key={index}>{item}</span>)}</span>}{tags}
     <span className="tx-spacer" />
-    {notes ? <button type="button" className="tx-notes" onClick={onNotes}>Notes {notes}</button> : null}
+    {notes ? <button type="button" className="tx-notes" onClick={onNotes}>{t("Notes")} {notes}</button> : null}
     {compare}{actions}
   </div>;
 }
@@ -93,7 +96,7 @@ export interface TxKeyNumber { label: string; value?: ReactNode; unit?: string; 
 
 /** A delta against a compared run: the change carries its own sign and the value's decimals. */
 export function txDelta(change: string, run: string): ReactNode {
-  return <>{change} <em>vs {run}</em></>;
+  return <>{change} <em>{t("vs")} {run}</em></>;
 }
 
 export function TxKeyNumbers({ items, columns }: { items: TxKeyNumber[]; columns?: number }) {
@@ -102,7 +105,7 @@ export function TxKeyNumbers({ items, columns }: { items: TxKeyNumber[]; columns
       const pending = item.pending !== undefined;
       const body = <><div className="tx-knl">{item.label}</div>
         <div className="tx-knv">{pending ? "—" : <><span className={item.tone === "up" ? "tx-up" : item.tone === "down" ? "tx-down" : undefined}>{item.value}</span>{item.unit && <small>{item.unit}</small>}</>}</div>
-        <div className="tx-knd">{pending ? (item.pending === true ? "when done" : item.pending) : item.delta}</div></>;
+        <div className="tx-knd">{pending ? (item.pending === true ? t("when done") : item.pending) : item.delta}</div></>;
       return item.onClick && !pending
         ? <button key={index} type="button" title={item.title} onClick={item.onClick}>{body}</button>
         : <div key={index} title={item.title} data-pending={on(pending)}>{body}</div>;
@@ -118,18 +121,18 @@ export interface TxCheck { name: string; value?: ReactNode; need?: string; state
  * The checks of a run. `layout="table"` is the dense form: each group a table with Check, Value, Needs and Result, 23 px rows,
  * the groups stacked; where the region around it is narrow (a container under 1000 px) the groups sit side by side under the charts.
  */
-export function TxChecks({ title = "Checks", scope, groups, layout = "rows" }: { title?: string; scope?: string; groups: { title?: string; items: TxCheck[] }[]; layout?: "rows" | "table" }) {
+export function TxChecks({ title = t("Checks"), scope, groups, layout = "rows" }: { title?: string; scope?: string; groups: { title?: string; items: TxCheck[] }[]; layout?: "rows" | "table" }) {
   const all = groups.flatMap(group => group.items);
   const fix = all.filter(item => item.state === "fix").length, watch = all.filter(item => item.state === "watch").length, notrun = all.filter(item => item.state === "notrun").length;
-  const head = <header><h3>{title}</h3>{fix > 0 && <span className="tx-ckfix">{fix} to fix</span>}{watch > 0 && <span className="tx-ckwatch">{watch} to review</span>}
-    {!fix && !watch && <span className="tx-ckscope" style={{ marginLeft: 0 }}>{notrun === all.length ? "not run yet" : notrun ? `${all.length - notrun} passed, ${notrun} not run` : layout === "table" ? "all pass" : "all passed"}</span>}{scope && <span className="tx-ckscope">{scope}</span>}</header>;
+  const head = <header><h3>{title}</h3>{fix > 0 && <span className="tx-ckfix">{t("{count} to fix", { count: fix })}</span>}{watch > 0 && <span className="tx-ckwatch">{t("{count} to review", { count: watch })}</span>}
+    {!fix && !watch && <span className="tx-ckscope" style={{ marginLeft: 0 }}>{notrun === all.length ? t("not run yet") : notrun ? t("{value} passed, {notrun} not run", { value: all.length - notrun, notrun }) : layout === "table" ? t("all pass") : t("all passed")}</span>}{scope && <span className="tx-ckscope">{scope}</span>}</header>;
   if (layout === "table") return <section className="tx-checklist" data-layout="table">{head}
     <div className="tx-cktables">{groups.map((group, index) => <table key={index} className="tx-cktable">
       <colgroup><col style={{ width: "31%" }} /><col style={{ width: "24%" }} /><col style={{ width: "22%" }} /><col style={{ width: "23%" }} /></colgroup>
-      <thead><tr><th data-align="left">Check</th><th>Value</th><th>Needs</th><th data-align="left">Result</th></tr></thead>
+      <thead><tr><th data-align="left">{t("Check")}</th><th>{t("Value")}</th><th>{t("Needs")}</th><th data-align="left">{t("Result")}</th></tr></thead>
       <tbody>{group.items.map(item => <tr key={item.name} data-state={item.state} data-go={on(Boolean(item.onClick))} title={item.title} onClick={item.onClick}>
         <td data-align="left" className="tx-ckname">{item.name}</td><td className="tx-ckvalue">{item.state === "notrun" ? "" : item.value}</td><td className="tx-ckneed">{item.need ?? ""}</td>
-        <td data-align="left" className="tx-ckresult">{item.state === "ok" ? <span><TxIcon name="check" />Pass</span> : item.state === "notrun" ? <span>Not run</span> : <span><i />Not passed</span>}</td>
+        <td data-align="left" className="tx-ckresult">{item.state === "ok" ? <span><TxIcon name="check" />{t("Pass")}</span> : item.state === "notrun" ? <span>{t("Not run")}</span> : <span><i />{t("Not passed")}</span>}</td>
       </tr>)}</tbody></table>)}</div>
   </section>;
   return <section className="tx-checklist">
@@ -138,7 +141,7 @@ export function TxChecks({ title = "Checks", scope, groups, layout = "rows" }: {
       {group.items.map(item => <button key={item.name} type="button" className="tx-check-row" data-state={item.state} title={item.title} onClick={item.onClick}>
         <span>{item.state === "ok" ? <TxIcon name="check" /> : <i />}</span>
         <span className="tx-ckname">{item.name}</span>
-        <span className="tx-ckvalue">{item.state === "notrun" ? <span>{item.runLabel ?? "Run"}</span> : item.value}</span>
+        <span className="tx-ckvalue">{item.state === "notrun" ? <span>{item.runLabel ?? t("Run")}</span> : item.value}</span>
         <span className="tx-ckneed">{item.need ?? ""}</span>
         <span><TxIcon name="chevron" /></span>
       </button>)}
@@ -153,7 +156,7 @@ export function TxParams({ children, footer }: { children: ReactNode; footer?: R
 /** One layer of settings: declared in the code, or given by the platform for every run. Counts values changed since the shown run. */
 export function TxParamLayer({ title, source, note, changed, onReset }: { title: string; source?: string; note?: string; changed?: number; onReset?: () => void }) {
   return <div className="tx-params-layer"><h3>{title}</h3>{source && <span className="tx-layersource">{source}</span>}{note && <span className="tx-layernote">{note}</span>}
-    {changed ? <span className="tx-layerstate"><span className="tx-layerchanged">{changed} changed</span><button type="button" className="tx-layerreset" onClick={onReset}>Reset</button></span> : null}</div>;
+    {changed ? <span className="tx-layerstate"><span className="tx-layerchanged">{changed} {t("changed")}</span><button type="button" className="tx-layerreset" onClick={onReset}>{t("Reset")}</button></span> : null}</div>;
 }
 
 /** A folding group of settings; folded, it shows a one-line summary. */
@@ -169,7 +172,7 @@ export function TxParamGroup({ title, summary, changed, defaultOpen = true, chil
 export function TxParamRow({ label, hint, changed, wide, onRevert, children }: { label?: string; hint?: string; changed?: boolean; wide?: boolean; onRevert?: () => void; children: ReactNode }) {
   return <div className="tx-params-row" data-changed={on(changed)} data-wide={on(wide)} data-revert={on(changed && !!onRevert)}>
     {!wide && <span className="tx-paramlabel" title={hint}>{label}</span>}{children}
-    {changed && onRevert && <TxButton size="sm" variant="quiet" title="Restore last run value" aria-label={`Restore ${label ?? "row"} to last run value`} onClick={onRevert}><TxIcon name="undo" /></TxButton>}
+    {changed && onRevert && <TxButton size="sm" variant="quiet" title={t("Restore last run value")} aria-label={t("Restore {value} to last run value", { value: label ?? t("row") })} onClick={onRevert}><TxIcon name="undo" /></TxButton>}
   </div>;
 }
 
@@ -181,11 +184,11 @@ export function TxParamValue({ children, icon, text }: { children: ReactNode; ic
 /** What the object reads from elsewhere (a published version or a research run), with a newer version and the switch. */
 export interface TxLinkedInput { name: string; kind: string; version: string; pinned?: string; warn?: string; newer?: string; where?: string; onOpen?: () => void; onSwitch?: () => void }
 
-export function TxLinkedInputs({ title = "Inputs used", note, items }: { title?: string; note?: string; items: TxLinkedInput[] }) {
+export function TxLinkedInputs({ title = t("Inputs used"), note, items }: { title?: string; note?: string; items: TxLinkedInput[] }) {
   return <><TxParamLayer title={title} note={note} /><div className="tx-linked">{items.map(item => <div key={item.name} className="tx-linked-item">
-    <span className="tx-linkedname"><button type="button" title="Open where it came from" onClick={item.onOpen}>{item.name}</button><TxTag tone="version">{item.version}</TxTag></span>
-    <span className="tx-linkedsource" title={item.where}>{item.kind}{item.pinned ? `, pinned ${item.pinned}` : ""}</span>{item.warn && <span className="tx-linkedwarn" role="alert">{item.warn}</span>}
-    <span className="tx-linkedaction">{item.newer && <TxButton size="sm" onClick={item.onSwitch}>Switch to {item.newer}</TxButton>}</span>
+    <span className="tx-linkedname"><button type="button" title={t("Open where it came from")} onClick={item.onOpen}>{item.name}</button><TxTag tone="version">{item.version}</TxTag></span>
+    <span className="tx-linkedsource" title={item.where}>{item.kind}{item.pinned ? t(", pinned {pinned}", { pinned: item.pinned }) : ""}</span>{item.warn && <span className="tx-linkedwarn" role="alert">{item.warn}</span>}
+    <span className="tx-linkedaction">{item.newer && <TxButton size="sm" onClick={item.onSwitch}>{t("Switch to")} {item.newer}</TxButton>}</span>
   </div>)}</div></>;
 }
 // ---------------------------------------------------------------- runs table
@@ -275,7 +278,7 @@ export function TxHeatmap({ title, axes, metric, x, y, cells, selected, best, sc
         const cell = cells[r]?.[c];
         return <td key={c} data-state={cell?.state} data-selected={on(same(selected, r, c))} data-best={on(same(best, r, c))} title={cell?.title}
           style={cell && cell.value !== undefined && !cell.state ? { background: fill(cell.value) } : undefined} onClick={() => onCell?.(r, c)}>
-          {cell?.state === "failed" ? "failed" : cell?.state === "notrun" || !cell || cell.value === undefined ? "—" : format(cell.value)}</td>;
+          {cell?.state === "failed" ? t("failed") : cell?.state === "notrun" || !cell || cell.value === undefined ? "—" : format(cell.value)}</td>;
       })}</tr>)}</tbody></table>
   </div>;
 }
@@ -289,8 +292,8 @@ export function TxFailure({ title, message, code, location, context, tone = "fix
   // The title and the message share a line and the buttons sit at its right end; the line the failure is at and where it stopped come under them.
   return <div className="tx-failure" data-tone={tone === "watch" ? "watch" : undefined}>
     <div><TxIcon name="alert" /><div style={{ flex: 1, minWidth: 0 }}><h3 style={{ display: "inline" }}>{title}</h3>{message && <span className="tx-failmessage" data-code={on(code)} style={{ marginLeft: 10, marginTop: 0 }}>{message}</span>}
-      {(location || context) && <div className="tx-failcontext">{location && <button type="button" onClick={location.onOpen} title="Open in the code">{location.label}</button>}{context}</div>}</div>
-      {(actions || trace) && <div className="tx-failactions" style={{ padding: 0, flex: "none" }}>{actions}{trace && <TxButton variant="quiet" size="sm" onClick={() => setShowTrace(!showTrace)}>Traceback</TxButton>}</div>}</div>
+      {(location || context) && <div className="tx-failcontext">{location && <button type="button" onClick={location.onOpen} title={t("Open in the code")}>{location.label}</button>}{context}</div>}</div>
+      {(actions || trace) && <div className="tx-failactions" style={{ padding: 0, flex: "none" }}>{actions}{trace && <TxButton variant="quiet" size="sm" onClick={() => setShowTrace(!showTrace)}>{t("Traceback")}</TxButton>}</div>}</div>
     {trace && showTrace && <pre>{trace.map((line, index) => <span key={index}>{line.mine ? <b>{line.text}</b> : line.text}{"\n"}</span>)}</pre>}
   </div>;
 }

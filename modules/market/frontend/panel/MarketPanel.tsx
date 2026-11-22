@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import {
   ModuleContextProvider, TxButton, TxDialog, TxEmpty, TxIcon, TxIconButton, TxMenu, TxProgress, TxSearch, TxSegmented, TxSplit, TxStatus, TxTable, TxTabs, TxTag, TxTd, TxTh,
@@ -80,9 +81,9 @@ export function MarketPanel() {
   const attention = data.sources.filter(source => source.enabled && (source.status === "unreachable" || source.status === "key-rejected")).length;
   return <div className="market-panel">
     <div className="market-tabs">
-      <TxTabs value={tab} onChange={setTab} label="Market" options={[
-        { value: "library", label: "Library" },
-        { value: "sources", label: "Sources", marked: attention ? `${attention} need attention` : undefined },
+      <TxTabs value={tab} onChange={setTab} label={t.c("module", "Market")} options={[
+        { value: "library", label: t("Library") },
+        { value: "sources", label: t("Sources"), marked: attention ? t("{count} need attention", { count: attention }) : undefined },
       ]} />
     </div>
     {tab === "library" ? <Library data={data} /> : <Sources sources={data.sources} selection={data.selection} library={data.library} onChanged={data.reload} />}
@@ -92,21 +93,21 @@ export function MarketPanel() {
 /* ── Status: said only when something is not normal ──────────────────────── */
 
 export const statusTone = { current: "done", behind: "review", updating: "busy", failed: "failed", delisted: "off", ended: "off" } as const;
-const statusLabel = { current: "", behind: "Behind", updating: "Updating", failed: "Failed", delisted: "Delisted", ended: "Source ended" } as const;
+const statusLabel = { current: "", behind: t("Behind"), updating: t("Updating"), failed: t("Failed"), delisted: t("Delisted"), ended: t("Source ended") } as const;
 
 export function SeriesStatus({ series }: { series: Series }) {
   if (series.status === "current") return null;
-  const status = <TxStatus tone={statusTone[series.status]} label={series.status === "delisted" ? `Delisted ${series.to}` : statusLabel[series.status]} />;
+  const status = <TxStatus tone={statusTone[series.status]} label={series.status === "delisted" ? t("Delisted {to}", { to: series.to }) : statusLabel[series.status]} />;
   return series.statusText ? <TxTooltip label={series.statusText}>{status}</TxTooltip> : status;
 }
 
 /** A dataset says the worst thing in it, counted; nothing when all is well. */
 function DatasetStatus({ set }: { set: Dataset }) {
   const { failed, behind, updating, ended } = set.count;
-  if (failed) return <TxStatus tone="failed" label={`${failed} failed`} />;
-  if (behind) return <TxStatus tone="review" label={`${behind} behind`} />;
-  if (updating) return <TxStatus tone="busy" label={`${updating} updating`} />;
-  if (ended === set.series.length) return <TxStatus tone="off" label="Source ended" />;
+  if (failed) return <TxStatus tone="failed" label={t("{failed} failed", { failed })} />;
+  if (behind) return <TxStatus tone="review" label={t("{behind} behind", { behind })} />;
+  if (updating) return <TxStatus tone="busy" label={t("{updating} updating", { updating })} />;
+  if (ended === set.series.length) return <TxStatus tone="off" label={t("Source ended")} />;
   return null;
 }
 
@@ -115,7 +116,7 @@ const matches = (series: Series, words: string[]) => {
   const text = `${series.code} ${series.name} ${series.kind} ${series.source} ${series.identity?.map(item => item.code).join(" ") ?? ""}`.toLowerCase();
   return words.every(word => text.includes(word));
 };
-const formerCodes = (series: Series) => series.identity?.filter(item => item.code !== series.code).map(item => item.to ? `${item.code} until ${item.to.slice(0, 4)}` : item.code).join(", ");
+const formerCodes = (series: Series) => series.identity?.filter(item => item.code !== series.code).map(item => item.to ? t("{code} until {end}", { code: item.code, end: item.to.slice(0, 4) }) : item.code).join(", ");
 export const isStock = (series: Series) => ["us", "cn", "hk"].includes(series.group) && series.capability === "ohlcv";
 export const chartable = (series: Series) => series.capability === "ohlcv";
 
@@ -228,7 +229,7 @@ function Library({ data }: { data: ReturnType<typeof usePanelData> }) {
     onCancel={() => run(panelCall(ctx, "cancel", { jobId: task.id }))} onResume={() => run(panelCall(ctx, "resume", { jobId: task.id }))} />)}</div>;
   const problemLine = (problem ?? data.problem) && <div className="market-problem" role="alert"><TxStatus tone="failed" label={problem ?? data.problem ?? ""} /></div>;
 
-  if (data.library === null) return <div className="market-library">{problemLine || <TxEmpty title="Reading the local library" />}</div>;
+  if (data.library === null) return <div className="market-library">{problemLine || <TxEmpty title={t("Reading the local library")} />}</div>;
 
   if (all.length === 0) return <div className="market-library">
     {problemLine}
@@ -239,37 +240,37 @@ function Library({ data }: { data: ReturnType<typeof usePanelData> }) {
   </div>;
 
   const body = !listing ? <div className="market-list" ref={list}><Overview datasets={datasets} onOpen={goTo} /></div>
-    : <div className="market-list" ref={list} tabIndex={0} onKeyDown={keys} aria-label="Series">
+    : <div className="market-list" ref={list} tabIndex={0} onKeyDown={keys} aria-label={t("Series")}>
       {set && <DatasetHead set={set} />}
       {(set && (counts.attention || counts.delisted)) ? <div className="market-show">
-        <TxSegmented size="sm" value={show} onChange={setShow} label="Show" options={[
-          { value: "all", label: `All ${set.series.length.toLocaleString("en-US")}` },
-          ...(counts.attention ? [{ value: "attention" as const, label: `Needs attention ${counts.attention}` }] : []),
-          ...(counts.delisted ? [{ value: "delisted" as const, label: `Delisted ${counts.delisted}` }] : []),
+        <TxSegmented size="sm" value={show} onChange={setShow} label={t("Show")} options={[
+          { value: "all", label: t("All {seriesCount}", { seriesCount: set.series.length.toLocaleString("en-US") }) },
+          ...(counts.attention ? [{ value: "attention" as const, label: t("Needs attention {attention}", { attention: counts.attention }) }] : []),
+          ...(counts.delisted ? [{ value: "delisted" as const, label: t("Delisted {delisted}", { delisted: counts.delisted }) }] : []),
         ]} />
       </div> : null}
       <SeriesTable rows={filtered} set={set} narrow={!!detail} selected={selected} onPick={pick} onChart={series => openInChart(ctx, series)} />
-      {filtered.length === 0 && <TxEmpty title={words.length ? `Nothing matches “${query.trim()}”` : "Nothing here"} />}
+      {filtered.length === 0 && <TxEmpty title={words.length ? t("Nothing matches “{query}”", { query: query.trim() }) : t("Nothing here")} />}
     </div>;
 
   return <div className="market-library">
-    <TxToolbar label="Library" density="compact">
-      <nav className="market-crumbs" aria-label="Path">
+    <TxToolbar label={t("Library")} density="compact">
+      <nav className="market-crumbs" aria-label={t("Path")}>
         {set ? <>
-          <TxButton variant="tool" onClick={() => goTo("all")}>All data</TxButton>
+          <TxButton variant="tool" onClick={() => goTo("all")}>{t("All data")}</TxButton>
           <span className="market-crumb-sep" aria-hidden="true">/</span>
-          <TxMenu label="Switch dataset" items={switcher} trigger={<TxButton variant="tool" className="market-crumb-current">{set.market} · {set.kind}<TxIcon name="chevron-down" /></TxButton>} />
-        </> : <TxMenu label="Open dataset" items={switcher} trigger={<TxButton variant="tool" className="market-crumb-current">All data<TxIcon name="chevron-down" /></TxButton>} />}
+          <TxMenu label={t("Switch dataset")} items={switcher} trigger={<TxButton variant="tool" className="market-crumb-current">{set.market} · {set.kind}<TxIcon name="chevron-down" /></TxButton>} />
+        </> : <TxMenu label={t("Open dataset")} items={switcher} trigger={<TxButton variant="tool" className="market-crumb-current">{t("All data")}<TxIcon name="chevron-down" /></TxButton>} />}
       </nav>
       <TxToolbarDivider />
-      <TxButton variant="tool-primary" onClick={() => setGetting(true)}><TxIcon name="plus" />Get data</TxButton>
-      <TxButton variant="tool" disabled={!updateScope.some(row => !row.importId)} onClick={() => update(updateScope)}><TxIcon name="refresh" />{chosen.length > 1 ? `Update ${chosen.length.toLocaleString("en-US")}` : set ? "Update" : "Update all"}</TxButton>
-      <TxButton variant="tool" onClick={() => setImporting(true)}><TxIcon name="download" />Import</TxButton>
-      <TxButton variant="tool" disabled={exportScope.length === 0} onClick={() => setExporting(true)}><TxIcon name="arrow-up-right" />Export</TxButton>
-      <TxButton variant="tool" disabled={chosen.length === 0} onClick={() => setDeleting(true)}><TxIcon name="trash" />Delete</TxButton>
+      <TxButton variant="tool-primary" onClick={() => setGetting(true)}><TxIcon name="plus" />{t("Get data")}</TxButton>
+      <TxButton variant="tool" disabled={!updateScope.some(row => !row.importId)} onClick={() => update(updateScope)}><TxIcon name="refresh" />{chosen.length > 1 ? t("Update {chosenCount}", { chosenCount: chosen.length.toLocaleString("en-US") }) : set ? t("Update") : t("Update all")}</TxButton>
+      <TxButton variant="tool" onClick={() => setImporting(true)}><TxIcon name="download" />{t("Import")}</TxButton>
+      <TxButton variant="tool" disabled={exportScope.length === 0} onClick={() => setExporting(true)}><TxIcon name="arrow-up-right" />{t("Export")}</TxButton>
+      <TxButton variant="tool" disabled={chosen.length === 0} onClick={() => setDeleting(true)}><TxIcon name="trash" />{t("Delete")}</TxButton>
       <span className="tx-spacer" />
       <TxSearch className="market-filter" value={query} onValueChange={value => { setQuery(value); setOpen(null); }}
-        placeholder={set ? `Filter ${set.market} · ${set.kind}` : "Code, former code or name"} aria-label="Filter local data" />
+        placeholder={set ? t("Filter {market} · {kind}", { market: set.market, kind: set.kind }) : t("Code, former code or name")} aria-label={t("Filter local data")} />
     </TxToolbar>
     {problemLine}
     {taskList}
@@ -279,16 +280,20 @@ function Library({ data }: { data: ReturnType<typeof usePanelData> }) {
       {body}
     </TxSplit>
     {importing && <ImportDialog onClose={() => setImporting(false)} onImported={() => void data.reload()} />}
-    {exporting && <ExportDialog title={chosen.length > 1 || !set ? `${exportScope.length.toLocaleString("en-US")} series` : `${set.market} · ${set.kind}`}
+    {exporting && <ExportDialog title={chosen.length > 1 || !set ? t("{exportScopeCount} series", { exportScopeCount: exportScope.length.toLocaleString("en-US") }) : `${set.market} · ${set.kind}`}
       series={exportScope} adjustable={exportScope.some(isStock)} onClose={() => setExporting(false)} />}
     {getting && <GetDataDialog initial={getting === true ? undefined : getting} alpaca={alpaca} onClose={() => setGetting(null)} onGet={work => run(work)} />}
-    <TxDialog open={deleting} onOpenChange={setDeleting} title={`Delete ${chosen.length.toLocaleString("en-US")} series?`} footer={<>
-      <TxButton size="sm" variant="quiet" onClick={() => setDeleting(false)}>Cancel</TxButton>
-      <TxButton size="sm" variant="primary" onClick={() => { setDeleting(false); setSelected(new Set()); setOpen(null); run(remove(chosen)); }}>Delete {formatBytes(chosen.reduce((sum, row) => sum + row.bytes, 0))}</TxButton>
+    <TxDialog open={deleting} onOpenChange={setDeleting} title={t("Delete {chosenCount} series?", { chosenCount: chosen.length.toLocaleString("en-US") })} footer={<>
+      <TxButton size="sm" variant="quiet" onClick={() => setDeleting(false)}>{t("Cancel")}</TxButton>
+      <TxButton size="sm" variant="primary" onClick={() => { setDeleting(false); setSelected(new Set()); setOpen(null); run(remove(chosen)); }}>{t("Delete {bytes}", { bytes: formatBytes(chosen.reduce((sum, row) => sum + row.bytes, 0)) })}</TxButton>
     </>}>
       {chosen.slice(0, 6).map(row => <div key={row.id}>{row.code} · {row.kind}</div>)}
-      {chosen.length > 6 && <div className="tx-muted">and {chosen.length - 6} more</div>}
-      <div className="tx-secondary">The instruments stay{chosen.some(row => !row.importId) ? "; downloaded rows are fetched again when needed" : ""}{chosen.some(row => row.importId) ? "; imported rows come back only by importing the files again" : ""}.</div>
+      {chosen.length > 6 && <div className="tx-muted">{t("and {chosenCount} more", { chosenCount: chosen.length - 6 })}</div>}
+      <div className="tx-secondary">{chosen.every(row => row.importId)
+        ? t("The instruments stay; imported rows come back only by importing the files again.")
+        : chosen.some(row => row.importId)
+          ? t("The instruments stay; downloaded rows are fetched again when needed; imported rows come back only by importing the files again.")
+          : t("The instruments stay; downloaded rows are fetched again when needed.")}</div>
     </TxDialog>
   </div>;
 }
@@ -309,7 +314,7 @@ function Overview({ datasets, onOpen }: { datasets: Dataset[]; onOpen: (id: stri
   return <TxTable className="market-sets" stickyHead density="compact">
     <colgroup><col className="market-col-set" /><col className="market-col-count" /><col /><col className="market-col-date" /><col className="market-col-gaps" />
       <col className="market-col-source" /><col className="market-col-size" /><col className="market-col-status" /></colgroup>
-    <thead><tr><TxTh>Data</TxTh><TxTh numeric>Instruments</TxTh><TxTh aria-label="Coverage"><AxisTicks axis={axis} /></TxTh><TxTh>Latest</TxTh><TxTh numeric>Gaps</TxTh><TxTh>Source</TxTh><TxTh numeric>Size</TxTh><TxTh /></tr></thead>
+    <thead><tr><TxTh>{t("Data")}</TxTh><TxTh numeric>{t("Instruments")}</TxTh><TxTh aria-label={t("Coverage")}><AxisTicks axis={axis} /></TxTh><TxTh>{t("Latest")}</TxTh><TxTh numeric>{t("Gaps")}</TxTh><TxTh>{t("Source")}</TxTh><TxTh numeric>{t("Size")}</TxTh><TxTh /></tr></thead>
     <tbody>{groupsOf(datasets).map(([market, items]) => <Fragment key={market}>
       <tr className="market-group"><TxTd colSpan={8}><span className="market-group-label">{market}</span><span className="tx-num market-group-count">{formatBytes(items.reduce((sum, item) => sum + item.bytes, 0))}</span></TxTd></tr>
       {items.map(set => <tr key={set.id} onClick={() => onOpen(set.id)} className="market-set-row">
@@ -318,7 +323,7 @@ function Overview({ datasets, onOpen }: { datasets: Dataset[]; onOpen: (id: stri
         <TxTd title={`${set.from.slice(0, 10)} → ${set.to.slice(0, 10)}`}><CoverageDensity series={set.series} axis={axis} /></TxTd>
         <TxTd className="tx-num tx-secondary">{set.to.slice(0, 10)}</TxTd>
         <TxTd numeric>{set.gaps ? <span className="market-gaps">{set.gaps}</span> : <span className="market-faint">—</span>}</TxTd>
-        <TxTd className="market-clip tx-muted" title={set.sources.join(", ")}>{set.group === "imported" ? "Imported" : set.sources.join(", ")}</TxTd>
+        <TxTd className="market-clip tx-muted" title={set.sources.join(", ")}>{set.group === "imported" ? t("Imported") : set.sources.join(", ")}</TxTd>
         <TxTd numeric className="tx-secondary">{formatBytes(set.bytes)}</TxTd>
         <TxTd><DatasetStatus set={set} /></TxTd>
       </tr>)}
@@ -332,17 +337,17 @@ function DatasetHead({ set }: { set: Dataset }) {
   const facts = datasetFacts(set);
   return <div className="market-head">
     <div className="market-stats">
-      <Stat value={set.series.length.toLocaleString("en-US")} label={set.count.delisted ? `instruments · ${set.count.delisted} delisted` : "instruments"} />
+      <Stat value={set.series.length.toLocaleString("en-US")} label={set.count.delisted ? t("instruments · {delisted} delisted", { delisted: set.count.delisted }) : t("instruments")} />
       <Stat value={`${set.from.slice(0, 10)} → ${set.to.slice(0, 10)}`} />
-      <Stat value={formatCount(set.rows)} label="rows" />
+      <Stat value={formatCount(set.rows)} label={t("rows")} />
       <Stat value={formatBytes(set.bytes)} />
-      {set.gaps > 0 && <Stat value={set.gaps.toLocaleString("en-US")} label={set.gaps === 1 ? "gap" : "gaps"} tone="fix" />}
+      {set.gaps > 0 && <Stat value={set.gaps.toLocaleString("en-US")} label={set.gaps === 1 ? t("gap") : t("gaps")} tone="fix" />}
       <DatasetStatus set={set} />
     </div>
     <dl className="market-facts">
-      <Fact label="Source">{set.group === "imported" ? <span className="tx-num">{set.sources[0]}</span> : set.sources.join(", ")}</Fact>
-      {facts.adjustment && <Fact label="Adjustment">{facts.adjustment}</Fact>}
-      {facts.bias && <Fact label="Survivorship">{facts.bias}</Fact>}
+      <Fact label={t("Source")}>{set.group === "imported" ? <span className="tx-num">{set.sources[0]}</span> : set.sources.join(", ")}</Fact>
+      {facts.adjustment && <Fact label={t("Adjustment")}>{facts.adjustment}</Fact>}
+      {facts.bias && <Fact label={t("Survivorship")}>{facts.bias}</Fact>}
     </dl>
   </div>;
 }
@@ -363,20 +368,20 @@ function SeriesTable({ rows, set, narrow, selected, onPick, onChart }: { rows: S
     <colgroup><col className="market-col-instrument" />{kind && <col className="market-col-kind" />}<col />
       {!narrow && <><col className="market-col-date" /><col className="market-col-rows" /></>}<col className="market-col-gaps" />{!narrow && <col className="market-col-size" />}
       <col className="market-col-status" /><col className="market-col-open" /></colgroup>
-    <thead><tr><TxTh>Instrument</TxTh>{kind && <TxTh>Data</TxTh>}<TxTh aria-label="Coverage"><AxisTicks axis={axis} /></TxTh>
-      {!narrow && <><TxTh>To</TxTh><TxTh numeric>Rows</TxTh></>}<TxTh numeric>Gaps</TxTh>{!narrow && <TxTh numeric>Size</TxTh>}<TxTh /><TxTh /></tr></thead>
+    <thead><tr><TxTh>{t("Instrument")}</TxTh>{kind && <TxTh>{t("Data")}</TxTh>}<TxTh aria-label={t("Coverage")}><AxisTicks axis={axis} /></TxTh>
+      {!narrow && <><TxTh>{t("To")}</TxTh><TxTh numeric>{t("Rows")}</TxTh></>}<TxTh numeric>{t("Gaps")}</TxTh>{!narrow && <TxTh numeric>{t("Size")}</TxTh>}<TxTh /><TxTh /></tr></thead>
     <tbody>{rows.map(series => {
       const former = formerCodes(series);
       return <tr key={series.id} data-id={series.id} data-selected={selected.has(series.id)} onClick={event => onPick(series.id, event)}>
         <TxTd><span className="market-instrument" title={series.name}><span className="tx-cell-name">{series.code}</span>{former && <TxTag tone="muted">{former}</TxTag>}<span className="market-name">{series.name}</span></span></TxTd>
-        {kind && <TxTd className="market-clip tx-secondary">{series.group === "imported" ? "Imported" : `${series.market}`} · {series.kind}</TxTd>}
+        {kind && <TxTd className="market-clip tx-secondary">{series.group === "imported" ? t("Imported") : `${series.market}`} · {series.kind}</TxTd>}
         <TxTd><CoverageBar series={series} axis={axis} /></TxTd>
         {!narrow && <><TxTd className="tx-num tx-secondary">{series.to}</TxTd><TxTd numeric className="tx-muted">{formatCount(series.rows)}</TxTd></>}
         <TxTd numeric>{series.gapCount ? <span className="market-gaps">{series.gapCount}</span> : <span className="market-faint">—</span>}</TxTd>
         {!narrow && <TxTd numeric className="tx-muted">{formatBytes(series.bytes)}</TxTd>}
         <TxTd><SeriesStatus series={series} /></TxTd>
         <TxTd className="market-open" onClick={event => event.stopPropagation()}>
-          {chartable(series) && <TxIconButton variant="tool" size="sm" icon="chart" label={`Open ${series.code} in Chart`} onClick={() => onChart(series)} />}
+          {chartable(series) && <TxIconButton variant="tool" size="sm" icon="chart" label={t("Open {code} in Chart", { code: series.code })} onClick={() => onChart(series)} />}
         </TxTd>
       </tr>;
     })}</tbody>
@@ -387,14 +392,14 @@ function SeriesTable({ rows, set, narrow, selected, onPick, onChart }: { rows: S
 
 function Start({ onPick, onImport }: { onPick: (item?: Pickable) => void; onImport: () => void }) {
   return <div className="market-start">
-    <div className="market-start-title">No market data on this computer</div>
+    <div className="market-start-title">{t("No market data on this computer")}</div>
     <div className="market-start-list">{starters.map(item => <TxButton key={item.id} variant="row" onClick={() => onPick(item)}>
       <span className="market-pick"><span className="tx-cell-name">{item.label}</span><span className="tx-muted market-clip">{item.detail}</span>
         <span className="tx-num tx-secondary">{item.count > 1 ? item.count.toLocaleString("en-US") : ""}</span><TxIcon name="chevron" /></span>
     </TxButton>)}</div>
     <div className="market-start-more">
-      <TxButton variant="primary" onClick={() => onPick()}><TxIcon name="plus" />Other instruments</TxButton>
-      <TxButton onClick={onImport}><TxIcon name="download" />Import a folder</TxButton>
+      <TxButton variant="primary" onClick={() => onPick()}><TxIcon name="plus" />{t("Other instruments")}</TxButton>
+      <TxButton onClick={onImport}><TxIcon name="download" />{t("Import a folder")}</TxButton>
     </div>
   </div>;
 }
@@ -407,12 +412,12 @@ function TaskRow({ task, onCancel, onResume }: { task: Task; onCancel: () => voi
     <span className="tx-cell-name market-clip" title={task.title}>{task.title}</span>
     <TxProgress value={task.done / task.total * 100} />
     <span className="tx-num tx-secondary market-task-count">{task.done.toLocaleString("en-US")} / {task.total.toLocaleString("en-US")}</span>
-    <span className="tx-num tx-muted market-task-size">{task.rows !== undefined ? `${formatCount(task.rows)} rows · ${formatBytes(task.bytes ?? 0)}` : ""}</span>
+    <span className="tx-num tx-muted market-task-size">{task.rows !== undefined ? t("{rows} rows · {bytes}", { rows: formatCount(task.rows), bytes: formatBytes(task.bytes ?? 0) }) : ""}</span>
     <TxTooltip label={task.detail}><TxStatus tone={failed ? "failed" : paused ? "off" : task.state === "waiting" ? "review" : "busy"} label={task.text} /></TxTooltip>
     <span className="market-task-actions">
-      {failed ? <TxIconButton size="sm" icon="close" label="Dismiss" onClick={onCancel} />
-        : paused ? <><TxButton size="sm" onClick={onResume}>Resume</TxButton><TxIconButton size="sm" icon="close" label="Cancel" onClick={onCancel} /></>
-        : <TxButton size="sm" variant="quiet" onClick={onCancel}>Cancel</TxButton>}
+      {failed ? <TxIconButton size="sm" icon="close" label={t("Dismiss")} onClick={onCancel} />
+        : paused ? <><TxButton size="sm" onClick={onResume}>{t("Resume")}</TxButton><TxIconButton size="sm" icon="close" label={t("Cancel")} onClick={onCancel} /></>
+        : <TxButton size="sm" variant="quiet" onClick={onCancel}>{t("Cancel")}</TxButton>}
     </span>
   </div>;
 }

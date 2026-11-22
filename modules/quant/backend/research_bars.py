@@ -7,6 +7,7 @@ import shutil
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import research_data
 from .research_lists import LIST
@@ -24,15 +25,15 @@ class ResearchBars:
     def list_named(self, name):
         found = [item for item in self.records.list(LIST) if not item.get("deleted") and item["name"].strip().casefold() == name.strip().casefold()]
         if not found:
-            raise ContractError("not_found", f"There is no research list named {name}.")
+            raise ContractError("not_found", t("There is no research list named {name}.", name=name))
         return [{"instrument": member} for member in found[0]["members"]]
 
     async def export(self, args, progress=None):
         from .public_settings import store_data
         given = [key for key in ("symbols", "index", "list") if args.get(key)]
         if len(given) != 1:
-            raise ContractError("invalid_input", "Choose one of symbols, index or list.")
-        data = await store_data(self.ctx, {**args,"adjustment":args.get("adjustment","split")}, {})
+            raise ContractError("invalid_input", t("Choose one of symbols, index or list."))
+        data = await store_data(self.ctx, {**args,"adjustment":args.get("adjustment","split_dividend")}, {})
         if "list" in data:
             data["symbols"] = self.list_named(data.pop("list"))
         if data.get("until") == "latest":

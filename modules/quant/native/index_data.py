@@ -10,9 +10,10 @@ def _table(index):
         for row in index['exclusions']:
             exclusions.setdefault(row['instrumentId'], []).append((row['since'], row['until']))
         for interval in index['intervals']:
-            for member in interval['members']:
-                if member['instrument'] is not None:
-                    members.setdefault(member['instrument']['instrumentId'], []).append((interval['since'], interval['until']))
+            for position in interval['members']:
+                member = index['members'][position]
+                if member['instrumentId'] is not None:
+                    members.setdefault(member['instrumentId'], []).append((interval['since'], interval['until']))
         found = _tables[id(index)] = (index, exclusions, members)
     return found
 

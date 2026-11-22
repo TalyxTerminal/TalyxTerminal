@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from langchain_core.callbacks import AsyncCallbackHandler
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .context import CURRENT_USAGE
 
@@ -106,11 +107,11 @@ class UsageLedger:
             if amount is not None and (not amount.is_finite() or amount < 0):
                 raise ValueError("Invalid group limit")
         except (ValueError, TypeError, ArithmeticError) as error:
-            raise ContractError("invalid_input", "Group limit must be a finite non-negative amount") from error
+            raise ContractError("invalid_input", t("Group limit must be a finite non-negative amount")) from error
         with self.lock, self.db:
             row = self.db.execute("SELECT * FROM group_budgets WHERE id=?", (group_id,)).fetchone()
             if expected_version != (row["version"] if row else 0) or row and row["workspace_id"] != workspace_id:
-                raise ContractError("conflict", "Group budget version or workspace changed")
+                raise ContractError("conflict", t("Group budget version or workspace changed"))
             unit = row["currency"] if row else currency or self.settings()["currency"]
             self.db.execute("INSERT OR REPLACE INTO group_budgets VALUES (?,?,?,?,?,NULL,NULL)",
                 (group_id, workspace_id, str(amount) if amount is not None else UNLIMITED, unit, expected_version + 1))
@@ -165,7 +166,7 @@ class UsageLedger:
         with self.lock:
             row = self.db.execute("SELECT * FROM group_budgets WHERE id=?", (group_id,)).fetchone()
             if row is None:
-                raise ContractError("target_gone", "Group budget is not configured")
+                raise ContractError("target_gone", t("Group budget is not configured"))
             month = self._month(time.time())
             spent = self._totals(month, row["currency"], group_id=group_id)
             return {"groupId": group_id, "workspaceId": row["workspace_id"], "version": row["version"],
@@ -196,12 +197,12 @@ class UsageLedger:
         try:
             ZoneInfo(timezone_name)
         except (TypeError, ZoneInfoNotFoundError) as error:
-            raise ContractError("invalid_input", "Invalid usage timezone", {"field": "timezone"}) from error
+            raise ContractError("invalid_input", t("Invalid usage timezone"), {"field": "timezone"}) from error
         try:
             if monthly_limit is not None and (not Decimal(str(monthly_limit)).is_finite() or Decimal(str(monthly_limit)) < 0):
                 raise ValueError("Monthly limit must be a finite non-negative amount")
         except (ValueError, TypeError, ArithmeticError) as error:
-            raise ContractError("invalid_input", "Invalid usage settings", {"field": "monthlyLimit"}) from error
+            raise ContractError("invalid_input", t("Invalid usage settings"), {"field": "monthlyLimit"}) from error
         with self.lock, self.db:
             self.db.execute("UPDATE settings SET value=? WHERE id=1", (json.dumps({
                 "timezone": timezone_name, "monthlyLimit": str(monthly_limit) if monthly_limit is not None else None,
@@ -218,7 +219,7 @@ class UsageLedger:
             existing = self.db.execute("SELECT connection_id,model_id FROM requests WHERE id=?", (request_id,)).fetchone()
             if existing is not None:
                 if (existing["connection_id"], existing["model_id"]) != (connection_id, model_id):
-                    raise ContractError("conflict", "Request identity belongs to another model")
+                    raise ContractError("conflict", t("Request identity belongs to another model"))
                 return False
             settings = self.settings()
             month = self._month(now)
@@ -227,16 +228,16 @@ class UsageLedger:
             if context.group_id is not None:
                 group = self.db.execute("SELECT * FROM group_budgets WHERE id=?", (context.group_id,)).fetchone()
                 if group is None or group["workspace_id"] != context.workspace_id:
-                    raise ContractError("permission_denied", "Group usage requires its configured workspace budget")
+                    raise ContractError("permission_denied", t("Group usage requires its configured workspace budget"))
             if priced and group is not None and group["paused_month"] == month:
-                failure = ContractError("budget_exceeded", "This group's monthly budget is paused", self.group_status(context.group_id))
+                failure = ContractError("budget_exceeded", t("This group's monthly budget is paused"), self.group_status(context.group_id))
             limits = [(None, settings["monthlyLimit"])] if settings["monthlyLimit"] is not None else []
             if group is not None and group["monthly_limit"] != UNLIMITED:
                 limits.append((context.group_id, group["monthly_limit"]))
             for group_id, limit in limits if priced else ():
                 spent = self._totals(month, settings["currency"], group_id=group_id)
                 if spent >= Decimal(limit):
-                    failure = ContractError("budget_exceeded", "Monthly budget cannot admit the next request",
+                    failure = ContractError("budget_exceeded", t("Monthly budget cannot admit the next request"),
                         {"groupId": group_id, "month": month, "spent": str(spent), "monthlyLimit": limit})
                     break
             if failure is not None and failure.code == "budget_exceeded" and group is not None and group["paused_month"] != month:
@@ -256,7 +257,7 @@ class UsageLedger:
         with self.lock, self.db:
             row = self.db.execute("SELECT * FROM requests WHERE id=?", (request_id,)).fetchone()
             if row is None:
-                raise ContractError("target_gone", "Provider request has not been started")
+                raise ContractError("target_gone", t("Provider request has not been started"))
             if row["state"] in {"final", "rejected"}:
                 return False
             units = search_units if search_units is not None else json.loads(row["search_units"])
@@ -290,7 +291,7 @@ class UsageLedger:
 
     def summary(self, *, group_by="day", month=None, group_id=None, workspace_id=None, child_run_id=None):
         if group_by not in {"day", "model", "workspace", "owner"}:
-            raise ContractError("invalid_input", "Choose a known usage grouping")
+            raise ContractError("invalid_input", t("Choose a known usage grouping"))
         with self.lock:
             settings = self.settings()
             zone = ZoneInfo(settings["timezone"])

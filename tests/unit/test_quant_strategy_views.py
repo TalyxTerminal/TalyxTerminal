@@ -75,10 +75,12 @@ def test_a_run_stopped_before_its_data_was_read_is_not_said_to_change_currency_a
     from modules.quant.backend import strategy_settings
     async def body(ctx, shell):
         obj = await strategy(shell)
-        stocks = {"runSettings": strategy_settings.effective("stock", None, {}), "tradedKind": "stock", "sources": [], "library": [], "models": []}
-        insert_run(shell, obj, "single", created=1_000, data=stocks)
-        stopped = insert_run(shell, obj, "single", created=2_000, state="cancelled", data={})
-        third = insert_run(shell, obj, "single", created=3_000, data=stocks)
+        stocks = {"runSettings": strategy_settings.effective("stock", None, {}, market="US"), "tradedKind": "stock", "sources": [], "library": [], "models": []}
+        saved = shell.store.read(obj)["settings"]
+        settings = {**saved, "data": {**saved["data"], "symbols": [{"instrument": {"instrumentId": "aapl", "venueId": "US", "assetClass": "equity"}}]}}
+        insert_run(shell, obj, "single", created=1_000, data=stocks, settings=settings)
+        stopped = insert_run(shell, obj, "single", created=2_000, state="cancelled", data={}, settings=settings)
+        third = insert_run(shell, obj, "single", created=3_000, data=stocks, settings=settings)
         assert shell.strategy.run(stopped["id"])["run"]["changes"] == [] and shell.strategy.run(third["id"])["run"]["changes"] == []
     scenario(tmp_path, body)
 

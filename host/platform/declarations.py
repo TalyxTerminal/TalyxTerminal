@@ -570,6 +570,12 @@ class SettingsChange(Model):
 
 
 # The platform's own settings: General in the settings window.
+module.setting("language", Literal["en", "zh-CN"], "en", title="Language", global_only=True, group="Appearance",
+               options={"en": "English", "zh-CN": "简体中文"},
+               description="The language of TALYX's words. Windows reload to change it; unsaved work is kept.")
+module.setting("checkForUpdates", bool, True, title="Tell me when a new version is out", global_only=True, group="Updates",
+               description="The desktop app asks GitHub for the latest release when it starts and once a day. Nothing "
+               "about you is sent.")
 module.setting("upColor", Literal["green-up", "red-up"], "green-up", title="Up color", group="Appearance",
                description="Which color means up for prices, P&L, buy and sell, everywhere in TALYX.")
 module.setting("launchOnLogin", bool, False, title="Start TALYX when you sign in", global_only=True, group="Desktop",
@@ -597,6 +603,78 @@ async def settings_write(input: SettingsWrite, call) -> SettingsValues:
 async def settings_reset(input: SettingsReset, call) -> SettingsValues:
     """Make a workspace follow the global value again for these settings."""
     return await s.HOST.settings.reset(input.module, input.workspaceId, input.keys)
+
+
+# ── updates ──────────────────────────────────────────────────────────────────
+
+class Release(Model):
+    version: str
+    url: str = Field(description="The release page, with the installer")
+    notes: str = Field(description="What changed, as the release says (Markdown)")
+    publishedAt: str | None
+    installer: bool = Field(description="Whether the release has a Windows installer with a published SHA-256, so TALYX can download and install it itself")
+
+
+class UpdateDownload(Model):
+    version: str
+    state: Literal["downloading", "ready", "failed"] = Field(description="ready: downloaded and its SHA-256 matches the release's")
+    received: int = Field(description="Bytes downloaded so far")
+    total: int | None = Field(description="The installer's size in bytes, or null when unknown")
+    problem: str | None = Field(description="Why it failed (a checksum that does not match deletes the download), or null")
+    path: str | None = Field(description="The checked installer on this machine, once ready")
+
+
+class ReleaseNotes(Model):
+    version: str = Field(description="This installation's version")
+    notes: str = Field(description="What changed in it, as its release says (Markdown)")
+
+
+class UpdateState(Model):
+    current: str = Field(description="This installation's version")
+    latest: Release | None = Field(description="A newer published version, or null when none is known")
+    checkedAt: int | None = Field(description="When GitHub was last asked (ms), or null")
+    problem: str | None = Field(description="Why the last check (or the last update's installer) failed, or null")
+    download: UpdateDownload | None = Field(description="The newer version's installer being downloaded, or null")
+    notes: ReleaseNotes | None = Field(description="This version's notes, until they have been seen once after it was installed; null otherwise")
+
+
+@module.action("updates.read", effects=["read"], examples=[{}])
+async def updates_read(input: Empty, call) -> UpdateState:
+    """This installation's version and the newer published one, if the last check found one."""
+    return s.HOST.updates.state
+
+
+@module.action("updates.check", effects=["external"], examples=[{}])
+async def updates_check(input: Empty, call) -> UpdateState:
+    """Ask GitHub for the latest published version now."""
+    return await s.HOST.updates.check()
+
+
+@module.action("updates.open", effects=["external"], examples=[{}])
+async def updates_open(input: Empty, call) -> Empty:
+    """Open the newer version's release page (with its installer) in the default browser."""
+    s.HOST.updates.open_download()
+    return {}
+
+
+@module.action("updates.download", effects=["external", "write"], examples=[{}])
+async def updates_download(input: Empty, call) -> UpdateState:
+    """Download the newer version's installer and check its SHA-256 against the release's; returns at once, the progress
+    follows on updates.changes. The desktop installs it when the user asks (it quits, installs and opens again)."""
+    return await s.HOST.updates.download()
+
+
+@module.action("updates.notes_seen", effects=["write"], examples=[{}])
+async def updates_notes_seen(input: Empty, call) -> UpdateState:
+    """This version's notes have been read: they are not shown again."""
+    return s.HOST.updates.notes_seen()
+
+
+@module.stream("updates.changes")
+async def updates_changes(params: Empty, call) -> AsyncIterator[UpdateState]:
+    """The update state now, then after each check, download step and change."""
+    async for state in s.HOST.updates.changes():
+        yield state
 
 
 @module.stream("settings.changes")
@@ -732,7 +810,7 @@ async def notifications_test(input: ChannelId, call) -> Delivery:
     return await s.HOST.notifications.test(input.channelId)
 
 
-@module.action("notifications.send", effects=["external"], examples=[{"notificationId": "daily-report", "channelIds": ["my-channel"], "title": "Daily report", "body": "Your report is ready."}])
+@module.action("notifications.send", effects=["external"], examples=[{"notificationId": "daily-report", "channelIds": ["my-channel"], "title": "Daily report", "body": "Your report is ready."}])  # i18n: ignore (AI contract)
 async def notifications_send(input: NotificationSend, call) -> Delivery:
     """Send a notification on configured channels. Delivery is durable and retried; read_delivery reports it."""
     return await s.HOST.send_notification(call.caller, input.model_dump(exclude_none=True))
@@ -744,7 +822,7 @@ async def notifications_read_delivery(input: NotificationId, call) -> Delivery:
     return await s.HOST.notifications.read_delivery(s.HOST.calling_module(call.caller), input.notificationId)
 
 
-@module.action("notifications.toast", effects=["write"], examples=[{"title": "Daily report", "message": "Your report is ready."}])
+@module.action("notifications.toast", effects=["write"], examples=[{"title": "Daily report", "message": "Your report is ready."}])  # i18n: ignore (AI contract)
 async def notifications_toast(input: Toast, call) -> Empty:
     """Show a Windows toast (unavailable where Windows cannot show one)."""
     await s.HOST.toast(call.caller, input.model_dump(exclude_none=True))

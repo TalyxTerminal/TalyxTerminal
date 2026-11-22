@@ -23,10 +23,11 @@ def axes_of(**values):
 
 
 # ---------------------------------------------------------------------------------------------------------------- the combinations
-def test_sweep_over_200_refused():
-    with pytest.raises(ContractError) as error:
-        S.expand(axes_of(lookback=list(range(12, 32)), stop=[round(0.5 + step * 0.5, 1) for step in range(12)]), DEFINITIONS)
-    assert error.value.code == "too_many_combinations" and error.value.message == "These ranges make 240 combinations; a sweep runs at most 200"
+def test_a_sweep_of_500_combinations_is_not_refused():
+    """Three parameters, 10 × 10 × 5: a sweep runs every combination; only one expected to take more than ten minutes asks first (on the page)."""
+    definitions = [*DEFINITIONS, {"name": "fast", "type": "int", "label": "Fast", "min": 1, "max": 50}]
+    found, combinations = S.expand(axes_of(lookback=list(range(12, 22)), stop=[round(0.5 + step * 0.5, 1) for step in range(10)], fast=[2, 4, 6, 8, 10]), definitions)
+    assert len(combinations) == 500 and len({tuple(sorted(item.items())) for item in combinations}) == 500
     found, combinations = S.expand(axes_of(lookback=list(range(12, 32)), stop=[1.0] * 1 + [2.0] * 0), DEFINITIONS)
     assert len(combinations) == 20
 
@@ -70,9 +71,9 @@ def test_sweep_run_settings_axes():
     assert run["costs"]["feePct"] == 0.05  # the sweep's own settings are not touched
     assert S.case_settings(run, {"capital": 50_000})["capital"] == 50_000
     prepared = {"runSettings": run, "venues": [{"name": "OKX", "balances": ["10000 USDT"], "fees": {"type": "maker_taker", "maker": 0.0002, "taker": 0.0005}}],
-                "instruments": [{"id": "A", "takerFee": "0.0005"}]}
+                "instruments": [{"id": "A", "makerFee": "0.0002", "takerFee": "0.0005"}]}
     zero = S.case_prepared(prepared, {"costMultiple": 0})
-    assert float(zero["venues"][0]["fees"]["taker"]) == 0 and float(zero["instruments"][0]["takerFee"]) == 0
+    assert float(zero["venues"][0]["fees"]["taker"]) == 0 and float(zero["instruments"][0]["takerFee"]) == 0 and float(zero["instruments"][0]["makerFee"]) == 0
     twice = S.case_prepared(prepared, {"costMultiple": 2})
     assert float(twice["venues"][0]["fees"]["taker"]) == pytest.approx(0.001) and float(twice["venues"][0]["fees"]["maker"]) == pytest.approx(0.0004)
     bigger = S.case_prepared(prepared, {"capital": 100_000})
@@ -202,15 +203,18 @@ def test_sweep_concurrency_changes_with_the_machine_not_a_constant(tmp_path):
     assert {S.concurrency(RunQueue(memory=64 * GB, cpus=8), GB)["atOnce"], S.concurrency(RunQueue(memory=8 * GB, cpus=2), GB)["atOnce"]} == {8, 2}
 
 
-def test_case_over_budget_refused(tmp_path):
+def test_case_over_budget_runs_one_at_a_time(tmp_path):
     async def body(ctx, shell):
         Runner(shell)
-        before = shell.runs.records.db.execute("SELECT count(*) FROM records WHERE kind='qrun'").fetchone()[0]
-        with pytest.raises(ContractError) as error:
-            await started(shell, AXES, queue=RunQueue(memory=16 * GB, cpus=4), memory=9 * GB)
-        assert error.value.code == "case_over_budget"
-        assert error.value.message.startswith("One combination needs about 9.0 GB; this machine gives runs 8.0 GB (half of 16.0 GB)")
-        assert shell.runs.records.db.execute("SELECT count(*) FROM records WHERE kind='qrun'").fetchone()[0] == before
+        shell.sweeps.queue = shell.runs.queue = RunQueue(memory=16 * GB, cpus=4)
+
+        async def per_case(obj, settings, newest):
+            return 9 * GB
+        shell.sweeps.case_memory = per_case
+        shell.sweeps.seconds_of = lambda run: 60
+        obj = await strategy(shell, STARTER)
+        found = await shell.sweeps.estimate(obj, {"axes": AXES})
+        assert found["atOnce"] == 1 and found["limit"] == "memory"
     scenario(tmp_path, body)
 
 

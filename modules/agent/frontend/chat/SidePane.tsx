@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useRef, type ReactNode } from "react";
 import { TxButton, TxIcon } from "@talyx/sdk";
 import type { ItemActions, PaneSection } from "./Items";
@@ -28,7 +29,7 @@ export function SidePane({ chat, focus, actions, agent, onAgent }: {
   // Running first, then the rest in the order they started tasks.
   const work: Work[] = [
     ...chat.items.flatMap(item => item.kind === "agents" ? item.agents : []).map(agent => ({ id: agent.id, title: agent.title, state: agent.state, now: agent.state === "done" ? agent.cost : agent.now,
-      kind: "Subagent", open: () => onAgent(agent.id) })),
+      kind: t("Subagent"), open: () => onAgent(agent.id) })),
     ...(chat.tasks ?? []).map(task => ({ id: task.id, title: task.title, state: task.state, now: task.now, kind: task.module,
       open: () => actions.open({ id: task.id, label: task.title, where: task.module, target:task.target }) })),
   ];
@@ -39,10 +40,10 @@ export function SidePane({ chat, focus, actions, agent, onAgent }: {
   const changes = last?.kind === "changes" && !last.undone ? last.changes : [];
   const files = chat.items.flatMap(item => item.kind === "user" ? item.files ?? [] : []);
 
-  return <aside className="chat-rail" aria-label="Chat summary" style={drag.style("--chat-rail-width")}>
-    <DragEdge side="left" label="Resize the summary" drag={drag} />
+  return <aside className="chat-rail" aria-label={t("Chat summary")} style={drag.style("--chat-rail-width")}>
+    <DragEdge side="left" label={t("Resize the summary")} drag={drag} />
     <div className="chat-rail-body">
-      {work.length > 0 && <Section title="Tasks" figure={running.length ? `${running.length} running` : undefined} refTo={element => { sections.current.agents = element; }}>
+      {work.length > 0 && <Section title={t("Tasks")} figure={running.length ? `${running.length} running` : undefined} refTo={element => { sections.current.agents = element; }}>
         {running.map(item => <TxButton key={item.id} variant="row" className="chat-rail-row chat-rail-live" aria-current={item.id === agent || undefined} onClick={item.open}>
           <TxIcon name="loader" className="chat-rail-icon chat-spin" />
           <span className="chat-rail-copy"><span className="chat-rail-title">{item.title}</span><span className="chat-rail-now">{item.now}</span></span>
@@ -52,22 +53,22 @@ export function SidePane({ chat, focus, actions, agent, onAgent }: {
           title={item.state === "failed" || item.state === "queued" ? item.now : undefined}>
           <TxIcon name={DONE_ICONS[item.state]} className="chat-rail-icon" />
           <span className="chat-rail-title">{item.title}</span>
-          <span className="chat-rail-meta">{item.state === "failed" ? "Failed" : item.state === "queued" ? "Waiting" : item.now}</span>
+          <span className="chat-rail-meta">{item.state === "failed" ? t("Failed") : item.state === "queued" ? t("Waiting") : item.now}</span>
         </TxButton>)}
       </Section>}
-      {changes.length > 0 && <Section title="Changes" refTo={element => { sections.current.changes = element; }}>
+      {changes.length > 0 && <Section title={t("Changes")} refTo={element => { sections.current.changes = element; }}>
         {changes.map(change => <TxButton key={change.id} variant="row" className="chat-rail-row" onClick={() => actions.open(change)}>
           <TxIcon name={change.path ? "file" : "box"} className="chat-rail-icon" />
           <span className="chat-rail-title chat-rail-name">{change.label}</span>
           <span className="chat-rail-what">{change.what}</span>
         </TxButton>)}
       </Section>}
-      {files.length > 0 && <Section title="Attached">
+      {files.length > 0 && <Section title={t("Attached")}>
         {files.map(file => <TxButton key={file.id} variant="row" className="chat-rail-row" onClick={() => actions.open({ id: file.id, label: file.name, path:"/attachments/"+file.id })}>
           <TxIcon name="paperclip" className="chat-rail-icon" /><span className="chat-rail-title">{file.name}</span>
         </TxButton>)}
       </Section>}
-      {!work.length && !changes.length && !files.length && <p className="chat-rail-none">Nothing running, changed or attached</p>}
+      {!work.length && !changes.length && !files.length && <p className="chat-rail-none">{t("Nothing running, changed or attached")}</p>}
     </div>
   </aside>;
 }

@@ -2,6 +2,7 @@
    Everything here comes from the private route `market.panel` (same numbers as read_data view=local) and the public
    actions fetch, export, write_data, read_source and write_source. */
 
+import { t } from "../i18n";
 import { failure, Platform, type Json, type ModuleContext, type TaskRef } from "@talyx/sdk";
 import { createClient, type ContractTypes } from "../../public/ts/types";
 
@@ -40,7 +41,7 @@ export interface Series {
 export interface Group { id: string; label: string }
 export interface Task { id: string; title: string; done: number; total: number; rows?: number; bytes?: number; state: "running" | "waiting" | "failed" | "interrupted"; text: string; detail: string }
 
-const MARKETS: Record<string, string> = { US: "US stocks", CN: "China A shares", HK: "Hong Kong" };
+const MARKETS: Record<string, string> = { US: t("US stocks"), CN: t("China A shares"), HK: t("Hong Kong") };
 const VENUES: Record<string, string> = {
   binance: "Binance", bitfinex: "Bitfinex", bitget: "Bitget", bybit: "Bybit", coinbase: "Coinbase", cryptocom: "Crypto.com",
   deribit: "Deribit", gate: "Gate", htx: "HTX", hyperliquid: "Hyperliquid", kraken: "Kraken", kucoin: "KuCoin", mexc: "MEXC", okx: "OKX",
@@ -48,22 +49,26 @@ const VENUES: Record<string, string> = {
 const ORDER = ["us", "cn", "hk", ...Object.keys(VENUES), "imported"];
 
 export function groupOf(venue: string, importId: string | null): Group {
-  if (importId) return { id: "imported", label: "Imported" };
+  if (importId) return { id: "imported", label: t("Imported") };
   const id = MARKETS[venue] ? venue.toLowerCase() : venue;
   return { id, label: MARKETS[venue] ?? VENUES[venue] ?? venue };
 }
 
-const UNITS: Record<string, [string, string]> = { m: ["minute", "minutes"], h: ["hour", "hours"], d: ["day", "days"], w: ["week", "weeks"] };
-const CAPABILITIES: Record<string, string> = { funding_rate: "Funding", open_interest: "Open interest", long_short_account_ratio: "Long/short ratio",
-  taker_volume: "Taker volume", option_metrics: "Option metrics" };
+const CAPABILITIES: Record<string, string> = { funding_rate: t("Funding"), open_interest: t("Open interest"), long_short_account_ratio: t("Long/short ratio"),
+  taker_volume: t("Taker volume"), option_metrics: t("Option metrics") };
 
 export function kindLabel(capability: string, timeframe: string | null): string {
   if (capability !== "ohlcv") return CAPABILITIES[capability] ?? capability;
-  if (timeframe === "1d") return "Daily";
+  if (timeframe === "1d") return t("Daily");
   const match = /^(\d+)([mhdw])$/.exec(timeframe ?? "");
-  if (!match) return timeframe ?? "Bars";
-  const [single, plural] = UNITS[match[2]!]!;
-  return match[1] === "1" ? `1 ${single}` : `${match[1]} ${plural}`;
+  if (!match) return timeframe ?? t("Bars");
+  const count = match[1]!;
+  switch (match[2]) {
+    case "m": return count === "1" ? t("1 minute") : t("{count} minutes", { count });
+    case "h": return count === "1" ? t("1 hour") : t("{count} hours", { count });
+    case "d": return count === "1" ? t("1 day") : t("{count} days", { count });
+    default: return count === "1" ? t("1 week") : t("{count} weeks", { count });
+  }
 }
 
 /* ── backend rows → panel rows ───────────────────────────────────────────── */
@@ -96,7 +101,7 @@ export function seriesOf(library: Library, sourceNames: Record<string, string>, 
       id, group: group.id, code: row.symbol, name: row.name ?? "", kind: kindLabel(capability, row.timeframe), from: day(row.first), to: day(row.last),
       rows: row.rows, gapCount: row.gaps, gaps: [], bytes: row.bytes, status,
       source: row.importId ? imports.get(row.importId)?.name ?? row.importId : sourceNames[row.source ?? ""] ?? row.source ?? "",
-      statusText: row.status === "delisted" && row.delistedAt ? `Last traded ${dateOfNs(row.delistedAt)}` : row.status === "behind" ? "Newer rows are at the source" : undefined,
+      statusText: row.status === "delisted" && row.delistedAt ? t("Last traded {date}", { date: dateOfNs(row.delistedAt) }) : row.status === "behind" ? t("Newer rows are at the source") : undefined,
       identity: row.former ? row.former.map(item => ({ from: "", to: dateOfNs(item.until), code: item.code, name: "" })) : undefined,
       instrumentId: row.instrumentId, storedKind: row.kind, capability, timeframe: row.timeframe, importId: row.importId, market: row.venue,
     };
@@ -111,7 +116,7 @@ export interface JobRow {
 const targetText = (target: Json) => {
   const value = target as Record<string, unknown>;
   if (typeof value.symbol === "string") return value.symbol;
-  if (value.index) return typeof value.index === "string" ? `${value.index} members` : `${(value.index as { symbol?: string }).symbol} members`;
+  if (value.index) return t("{index} members", { index: typeof value.index === "string" ? value.index : String((value.index as { symbol?: string }).symbol) });
   return (value.instrument as { symbol?: string } | undefined)?.symbol ?? "?";
 };
 
@@ -122,16 +127,16 @@ export function tasksOf(jobs: JobRow[]): Task[] {
     const names = count > 1 ? `${first} +${count - 1}` : first;
     const kinds = job.request.kinds.map(kind => kind.kind === "bars" ? kindLabel("ohlcv", kind.timeframe ?? "1d") : kind.kind).join(", ");
     const state: Task["state"] = job.state === "waiting" ? "waiting" : job.state === "interrupted" ? "interrupted" : job.state === "failed" ? "failed" : "running";
-    const text = state === "waiting" ? `Waiting for ${job.waitingFor ?? "the source"}` : state === "interrupted"
-      ? (job.interruption === "workspace_closed" ? "Paused when the workspace closed" : "Paused") : state === "failed" ? `${job.failed} failed` : "Fetching";
-    return { id: job.jobId, title: `${names} · ${kinds}${job.request.start ? ` · from ${day(job.request.start)}` : ""}`, done: job.done, total: Math.max(1, job.total),
-      rows: job.rows, bytes: job.bytes, state, text, detail: `${job.done} of ${job.total} done${job.failed ? `, ${job.failed} failed` : ""}` };
+    const text = state === "waiting" ? job.waitingFor ? t("Waiting for {source}", { source: job.waitingFor }) : t("Waiting for the source") : state === "interrupted"
+      ? (job.interruption === "workspace_closed" ? t("Paused when the workspace closed") : t("Paused")) : state === "failed" ? t("{failed} failed", { failed: job.failed }) : t("Fetching");
+    return { id: job.jobId, title: `${names} · ${kinds}${job.request.start ? t(" · from {date}", { date: day(job.request.start) }) : ""}`, done: job.done, total: Math.max(1, job.total),
+      rows: job.rows, bytes: job.bytes, state, text, detail: (job.failed ? t("{done} of {total} done, {failed} failed", { done: job.done, total: job.total, failed: job.failed }) : t("{done} of {total} done", { done: job.done, total: job.total })) };
   });
 }
 
 /* ── datasets: one market (or venue, or import) × one kind of data ───────── */
 
-const KIND_ORDER = ["Daily", "1 hour", "1 minute", "Funding", "Open interest"];
+const KIND_ORDER = [t("Daily"), t("1 hour"), t("1 minute"), t("Funding"), t("Open interest")];
 
 export interface Dataset {
   id: string; group: string; market: string; kind: string; series: Series[]; from: string; to: string; bytes: number; rows: number; gaps: number;
@@ -148,7 +153,7 @@ export function datasetsFor(all: Series[]): Dataset[] {
     const id = datasetKey(series);
     let set = map.get(id);
     if (!set) {
-      const market = series.group === "imported" ? "Imported" : groupOf(series.market, null).label;
+      const market = series.group === "imported" ? t("Imported") : groupOf(series.market, null).label;
       const kind = series.group === "imported" ? series.source : series.kind;
       set = { id, group: series.group, market, kind, series: [], from: series.from, to: series.to, bytes: 0, rows: 0, gaps: 0, sources: [],
         count: { current: 0, behind: 0, updating: 0, failed: 0, delisted: 0, ended: 0 } };
@@ -172,8 +177,8 @@ export function datasetsFor(all: Series[]): Dataset[] {
 
 /** What Market says about a dataset: stored raw, adjusted when read. */
 export function datasetFacts(set: Dataset): { adjustment?: string; bias?: string } {
-  if (["us", "cn", "hk"].includes(set.group) && set.kind === "Daily") return { adjustment: "Unadjusted, applied on read" };
-  if (set.group === "imported") return { adjustment: "As imported" };
+  if (["us", "cn", "hk"].includes(set.group) && set.kind === t("Daily")) return { adjustment: t("Unadjusted, applied on read") };
+  if (set.group === "imported") return { adjustment: t("As imported") };
   return {};
 }
 
@@ -206,9 +211,9 @@ export function sourceOf(row: SourceRow): Source {
   const status: SourceStatus = row.state === "working" || row.state === "off" ? "ok" : row.state === "rate_limited" ? "cooling"
     : row.state === "not_configured" ? "needs-key" : row.state === "unsubscribed" ? "ended" : row.problem?.code === "unauthorized" ? "key-rejected"
     : local ? "app-off" : "unreachable";
-  const statusText = status === "ok" ? "Connected" : status === "needs-key" ? "Needs key" : status === "ended" ? "Plan does not cover this"
-    : row.problem?.message ?? (status === "app-off" ? "Program not running" : "Not reachable");
-  return { id: row.source.sourceId, name: row.source.name, status, statusText, key, keySet: row.keyConfigured ?? undefined, enabled: row.enabled,
+  const statusText = status === "ok" ? t("Connected") : status === "needs-key" ? t("Needs key") : status === "ended" ? t("Plan does not cover this")
+    : row.problem?.message ?? (status === "app-off" ? t("Program not running") : t("Not reachable"));
+  return { id: row.source.sourceId, name: t(row.source.name), status, statusText, key, keySet: row.keyConfigured ?? undefined, enabled: row.enabled,
     paid: row.paid, coverage: row.coverage, settings: row.settings, lastTest: row.lastTest?.tests[0] ?? null };
 }
 
@@ -219,17 +224,17 @@ export interface SourceTest { source: string; latencyMs: number | null; unreacha
 
 export function testResultOf(test: SourceTest): TestResult {
   if (test.latencyMs !== null && !test.unreachable) {
-    return test.failed.length ? { ms: test.latencyMs, fail: `${test.failed.length} checks failed`, detail: test.failed.map(item => `${item.check}: ${item.detail}`).join("\n") } : { ms: test.latencyMs };
+    return test.failed.length ? { ms: test.latencyMs, fail: t("{count} checks failed", { count: test.failed.length }), detail: test.failed.map(item => `${item.check}: ${item.detail}`).join("\n") } : { ms: test.latencyMs };
   }
   switch (test.unreachable) {
-    case "timeout": return { fail: "Timeout", detail: "No answer within 10 s" };
-    case "http_error": return { fail: `HTTP ${test.httpStatus}`, detail: test.httpStatus === 451 || test.httpStatus === 403 ? "Blocked from your region; change your proxy node" : undefined };
-    case "key_missing": return { fail: "Needs key", tone: "off" };
-    case "key_rejected": return { fail: "Key rejected" };
-    case "local_program_off": return { fail: "Program not running", tone: "off" };
-    case "rate_limited": return { fail: "Rate limited", tone: "watch" };
-    case "network_unreachable": return { fail: "No network" };
-    default: return { fail: "Failed", detail: test.failed.map(item => item.detail).join("\n") || undefined };
+    case "timeout": return { fail: t("Timeout"), detail: t("No answer within 10 s") };
+    case "http_error": return { fail: `HTTP ${test.httpStatus}`, detail: test.httpStatus === 451 || test.httpStatus === 403 ? t("Blocked from your region; change your proxy node") : undefined };
+    case "key_missing": return { fail: t("Needs key"), tone: "off" };
+    case "key_rejected": return { fail: t("Key rejected") };
+    case "local_program_off": return { fail: t("Program not running"), tone: "off" };
+    case "rate_limited": return { fail: t("Rate limited"), tone: "watch" };
+    case "network_unreachable": return { fail: t("No network") };
+    default: return { fail: t("Failed"), detail: test.failed.map(item => item.detail).join("\n") || undefined };
   }
 }
 
@@ -239,7 +244,7 @@ export function testResultOf(test: SourceTest): TestResult {
 export async function panelCall<T>(ctx: ModuleContext, op: string, value: Record<string, unknown> = {}): Promise<T> {
   const response = await ctx.routes.fetch("panel", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op, ...value }) });
   const answer = await response.json();
-  if (!response.ok) throw failure(answer.code ?? "handler_error", answer.message ?? answer.detail ?? `Market answered ${response.status}`, undefined, answer.execution ?? "failed", answer.effects ?? "none");
+  if (!response.ok) throw failure(answer.code ?? "handler_error", answer.message ?? answer.detail ?? t("Market answered {status}", { status: response.status }), undefined, answer.execution ?? "failed", answer.effects ?? "none");
   return answer as T;
 }
 
@@ -255,7 +260,7 @@ export type SeriesRef = NonNullable<ExportInput["series"]>[number]["series"];
 /** A list as the contract bounds it (minItems, maxItems): TypeScript sees an array, the generated type a tuple, so the
  *  bounds are checked here. */
 export function listOf<L extends readonly unknown[]>(items: L[number][], min: number, max: number): L {
-  if (items.length < min || items.length > max) throw new Error(items.length < min ? "Nothing is chosen" : `At most ${max} at a time`);
+  if (items.length < min || items.length > max) throw new Error(items.length < min ? t("Nothing is chosen") : t("At most {max} at a time", { max }));
   return items as unknown as L;
 }
 /** The instrument records and series ids of chosen rows, as fetch and export take them. */
@@ -273,7 +278,7 @@ export async function marketCall<K extends TaskAction>(ctx: ModuleContext, name:
   for (;;) {
     const task = await Platform.createClient(ctx)["tasks.get"]({ taskId: reference.taskId });
     if (task.state === "completed") return task.result as ContractTypes[K]["output"];
-    if (task.state !== "running") throw task.error ?? { code: task.state, message: `The ${name} task was ${task.state}` };
+    if (task.state !== "running") throw task.error ?? { code: task.state, message: t("The {name} task was {state}", { name, state: task.state }) };
     await new Promise<void>(resolve => setTimeout(resolve, 250));
   }
 }
@@ -286,7 +291,7 @@ export function errorText(error: unknown): string {
 /* ── formatting ──────────────────────────────────────────────────────────── */
 
 export const today = () => new Date().toISOString().slice(0, 10);
-export const spans = [{ value: "1y", label: "1 year" }, { value: "5y", label: "5 years" }, { value: "10y", label: "10 years" }, { value: "max", label: "All" }] as const;
+export const spans = [{ value: "1y", label: t("1 year") }, { value: "5y", label: t("5 years") }, { value: "10y", label: t("10 years") }, { value: "max", label: t("All") }] as const;
 
 export function formatCount(value: number): string {
   if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
@@ -296,7 +301,7 @@ export function formatCount(value: number): string {
 }
 
 export function formatBytes(bytes: number): string {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1e3))} KB`;
+  if (bytes >= 1e9) return t("{value} GB", { value: (bytes / 1e9).toFixed(2) });
+  if (bytes >= 1e6) return t("{value} MB", { value: (bytes / 1e6).toFixed(1) });
+  return t("{value} KB", { value: Math.max(1, Math.round(bytes / 1e3)) });
 }

@@ -31,7 +31,7 @@ def engine_writing(rank_ics):
     return run_open
 
 
-async def prepared(settings, report=None):
+async def prepared(settings, report=None, facts=True):
     return {"key": "k", "barsPath": "bars.parquet", "extrasPath": "extras.json", "info": {"annualization": 252}, "dataFrom": 0, "dataTo": DAY,
             "names": 1, "requested": 1, "notes": [], "frozenAt": 0}
 
@@ -48,7 +48,7 @@ def services(tmp_path, monkeypatch, rank_ics):
     shell = Services(ctx, WorkRecords(tmp_path / "records"))
     factors = shell.factors
     monkeypatch.setattr(factors.data, "prepare", prepared)
-    monkeypatch.setattr(factors.data, "key", lambda data: "k")
+    monkeypatch.setattr(factors.data, "key", lambda data, facts=True: "k")
     monkeypatch.setattr(factors.data, "library_values", lambda *args, **kwargs: asyncio.sleep(0, None))
     monkeypatch.setattr(factors.engine, "run_open", engine_writing(rank_ics))
     monkeypatch.setattr(factors.data, "calendar_items", lambda data: asyncio.sleep(0, None))  # an index's members are Market's to say; the stand-in has none
@@ -87,7 +87,7 @@ def test_fetching_facts_marks_the_prices_done_once_not_with_every_facts_update(t
         ctx, shell, factors = services(tmp_path, monkeypatch, [.012])
         rows = [{"result": "fetched"}] * 4
 
-        async def fetching(settings, report=None):
+        async def fetching(settings, report=None, facts=True):
             report(rows, "prices")
             for done in range(1, 11):
                 clock[0] += .6
@@ -214,15 +214,17 @@ def test_a_strategy_or_model_started_from_a_run_reads_that_run_with_its_dates_ho
 
 
 STOCK = {**INSTRUMENT_FIXTURE, "instrumentId": "vi1_" + "e" * 64, "assetClass": "equity", "marketType": "spot", "symbol": "AAPL", "displaySymbol": "AAPL"}
+FUND = {**INSTRUMENT_FIXTURE, "instrumentId": "vi1_" + "f" * 64, "assetClass": "fund", "marketType": "spot", "symbol": "SPY", "displaySymbol": "SPY"}
 
 
 @pytest.mark.parametrize("universe, members, industries", [
     ("crypto symbols", ["crypto"], False), ("stock symbols", ["stock"], True), ("a mix", ["crypto", "stock"], True),
-    ("crypto research list", ["crypto"], False), ("stock research list", ["stock"], True)])
+    ("crypto research list", ["crypto"], False), ("stock research list", ["stock"], True),
+    ("ETFs only: Market has no industry for them, so nothing is neutralized by default", ["fund"], False)])
 def test_the_default_neutralize_the_settings_show_is_the_one_the_run_records(tmp_path, monkeypatch, universe, members, industries):
     async def scenario():
         ctx, shell, factors = services(tmp_path, monkeypatch, [.01])
-        chosen = [{"instrument": INSTRUMENT_FIXTURE if kind == "crypto" else STOCK} for kind in members]
+        chosen = [{"instrument": {"crypto": INSTRUMENT_FIXTURE, "stock": STOCK, "fund": FUND}[kind]} for kind in members]
         base = {key: DATA[key] for key in ("timeframe", "since", "until")}
         if universe.endswith("research list"):
             monkeypatch.setattr(factors.data.lists, "members", lambda name: chosen)
@@ -413,7 +415,7 @@ def test_the_data_step_says_how_the_data_came(tmp_path, monkeypatch):
         await shell.store.update_settings(created["id"], {"data": DATA})
         details = []
         for how, extra in (("unchanged", {}), ("full", {})):
-            async def ready(settings, report=None, how=how, extra=extra):
+            async def ready(settings, report=None, how=how, extra=extra, facts=True):
                 return {**(await prepared(settings)), "how": how, **extra}
             monkeypatch.setattr(factors.data, "prepare", ready)
             run = await settled(factors, (await factors.start(created["id"], {"formula": "-($close / Ref($close, 5) - 1)"}))["id"])
@@ -493,3 +495,15 @@ def test_every_member_of_a_day_is_one_row_and_the_count_plus_the_missing_rows_is
         assert sorted(rows) == sorted(set(rows)) and set(rows) == tickers and cross["members"] == len(tickers), (at, rows)
         assert cross["count"] == valued and cross["count"] + sum(1 for row in cross["rows"] if row.get("missing")) == cross["members"]
         assert "C" not in rows  # the only non-member
+
+
+def test_a_run_reads_industry_and_shares_only_when_its_settings_or_formula_use_them():
+    from modules.quant.backend.factor_runs import reads_facts
+    from modules.quant.native.factor_work import DEFAULT_SETTINGS
+
+    def record(formula="Rank($close)", mode="formula", **run):
+        return {"mode": mode, "formula": formula, "settings": {"run": {**DEFAULT_SETTINGS, "neutralize": "none", **run}}}
+    assert not reads_facts(record())
+    assert reads_facts(record(neutralize="industry+size")) and reads_facts(record(groupAdjust=True))
+    assert reads_facts(record(grouping={**DEFAULT_SETTINGS["grouping"], "withinIndustry": True}))
+    assert reads_facts(record(formula="Rank($size)")) and reads_facts(record(mode="code", formula=None))

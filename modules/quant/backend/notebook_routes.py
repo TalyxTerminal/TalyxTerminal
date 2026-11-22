@@ -25,6 +25,7 @@ import re
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .kernels import Kernels
 from .notebook_activation import CellActivation, identity
@@ -86,7 +87,7 @@ class NotebookServices:
     def notebook(self, object_id):
         record = self.store.read(object_id)
         if record["kind"] != "notebook":
-            raise ContractError("invalid_input", "This Quant object is not a notebook.")
+            raise ContractError("invalid_input", t("This Quant object is not a notebook."))
         return record
 
     def activities(self, workspace_id):
@@ -109,18 +110,13 @@ class NotebookServices:
             wanted = args["signal"].get("param")
             if wanted is None:
                 if len(library_params) != 1:
-                    raise ContractError("invalid_input", f"{strategy['name']} reads {len(library_params)} library items ({', '.join(library_params)}); pass signal=\"{library_params[0] if library_params else 'signal'}\" to say which one data replaces.",
+                    raise ContractError("invalid_input", t("{name} reads {library_params} library items ({library_params2}); pass signal=\"{value}\" to say which one data replaces.", name=strategy['name'], library_params=len(library_params), library_params2=', '.join(library_params), value=library_params[0] if library_params else 'signal'),
                                         {"parameters": library_params})
                 wanted = library_params[0]
             elif wanted not in library_params:
-                raise ContractError("invalid_input", f"{strategy['name']} has no library input named {wanted}.", {"parameters": library_params})
+                raise ContractError("invalid_input", t("{name} has no library input named {wanted}.", name=strategy['name'], wanted=wanted), {"parameters": library_params})
             override = {"param": wanted, "path": args["signal"]["path"]}
-        try:
-            started = await self.runs.start(strategy["id"], {**({"params": args["params"]} if args.get("params") else {}), "tags": ["notebook"], **({"signalOverride": override} if override else {})})
-        except ContractError as error:
-            if error.code == "over_machine_budget":
-                raise ContractError(error.code, error.message.replace("This run needs", "This backtest needs", 1), error.details) from None
-            raise
+        started = await self.runs.start(strategy["id"], {**({"params": args["params"]} if args.get("params") else {}), "tags": ["notebook"], **({"signalOverride": override} if override else {})})
         return {"runId": started["id"], "number": started.get("number")}
 
     # a run, opened here with the first cell loaded
@@ -168,10 +164,10 @@ class NotebookServices:
         record = self.notebook(object_id)
         wanted = next((item for item in self.packages.kernel_environments() if item["id"] == environment), None)
         if wanted is None:
-            raise ContractError("invalid_input", f"There is no kernel environment named {environment}.", {"environments": [item["id"] for item in self.packages.kernel_environments()]})
+            raise ContractError("invalid_input", t("There is no kernel environment named {environment}.", environment=environment), {"environments": [item["id"] for item in self.packages.kernel_environments()]})
         if not wanted["installed"]:
             offer = self.packages.deep_status().get("offer") if getattr(self.packages, "deep_status", None) else None
-            raise ContractError("deep_not_installed", "The deep-learning environment is not installed.", {"offer": offer})
+            raise ContractError("deep_not_installed", t("The deep-learning environment is not installed."), {"offer": offer})
         session = self.kernels.find(object_id)
         if session is not None:
             session.check_restart()
@@ -184,11 +180,11 @@ class NotebookServices:
     # extracting cells into a new object
     async def extract_view(self, args):
         if args["kind"] not in KINDS:
-            raise ContractError("invalid_input", "Choose one of: " + ", ".join(KINDS) + ".")
+            raise ContractError("invalid_input", t("Choose one of: {kinds}.", kinds=', '.join(KINDS)))
         cells = (await self.files.read(args["notebookId"]))["notebook"]["cells"]
         known = {cell["id"] for cell in cells}
         if not args["cells"] or any(item not in known for item in args["cells"]):
-            raise ContractError("invalid_input", "Select cells of this notebook to take.", {"cells": args["cells"]})
+            raise ContractError("invalid_input", t("Select cells of this notebook to take."), {"cells": args["cells"]})
         settings = self.notebook(args["notebookId"])["settings"]
         held = settings["data"].get("heldOutFrom") or day_of(settings.get("openedFrom", {}).get("heldOutFrom"))
         shown = preview(args["cells"], cells, args["kind"], held)
@@ -218,7 +214,7 @@ class NotebookServices:
             name = found["list"]
             choice = next((row for row in self.store.lists.list()["items"] if row["name"].casefold() == name.casefold()), None)
             if choice is None:
-                raise ContractError("not_found", f"There is no research list named {name}.")
+                raise ContractError("not_found", t("There is no research list named {name}.", name=name))
             data["list"] = choice["id"]
         if found["libraryInputs"]:
             data["libraryInputs"] = found["libraryInputs"]
@@ -246,7 +242,7 @@ class NotebookServices:
         ids = [cell["id"] for cell in cells]
         for key in ("cellId", "after"):
             if key in args and args[key] not in ids:
-                raise ContractError("not_found", f"This notebook has no cell {args[key]}.", {"cells": ids})
+                raise ContractError("not_found", t("This notebook has no cell {args}.", args=args[key]), {"cells": ids})
         if args["op"] == "add":
             cell = new_cell(args.get("type", "code"), args["source"])
             cells.insert(ids.index(args["after"]) + 1 if "after" in args else len(cells), cell)
@@ -279,7 +275,7 @@ class NotebookServices:
             async with asyncio.timeout(args["timeoutSeconds"] if "timeoutSeconds" in args else RUN_WAIT_SECONDS):
                 result = await asyncio.shield(completion)
         except TimeoutError as error:
-            raise ContractError("unavailable", "The cell is still running; use control_notebook_kernel to read its state or interrupt it.", {"cellId": args["cellId"]}) from error
+            raise ContractError("unavailable", t("The cell is still running; use control_notebook_kernel to read its state or interrupt it."), {"cellId": args["cellId"]}) from error
         return {"objectId": args["objectId"], "cellId": args["cellId"], "codeIdentity": identity(code), "status": result["status"],
                 "executionCount": result["executionCount"], "outputs": [text_of(output) for output in result["outputs"]]}
 
@@ -384,7 +380,7 @@ def mount_notebooks(router: APIRouter, services: NotebookServices):
             elif kind in {"complete", "inspect"}:
                 await session.ask(panel, kind, op["id"], op["code"], op["cursor"])
             else:
-                raise ContractError("invalid_input", f"Unknown operation {kind}.")
+                raise ContractError("invalid_input", t("Unknown operation {kind}.", kind=kind))
 
         async def run(op):
             try:
@@ -400,7 +396,7 @@ def mount_notebooks(router: APIRouter, services: NotebookServices):
                     if not isinstance(op["op"], str):
                         raise TypeError
                 except (ValueError, KeyError, TypeError):
-                    session.send(panel, {"type": "error", "op": "message", "code": "invalid_input", "message": "A message is a JSON object with an op."})
+                    session.send(panel, {"type": "error", "op": "message", "code": "invalid_input", "message": t("A message is a JSON object with an op.")})
                     continue
                 task = asyncio.create_task(run(op))
                 work.add(task)

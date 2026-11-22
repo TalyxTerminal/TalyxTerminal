@@ -5,7 +5,6 @@ import asyncio
 import pytest
 from talyx_sdk import ContractError
 
-from modules.quant.backend.run_queue import RunQueue
 from tests.fixtures.strategy import fakes
 from tests.fixtures.strategy.fakes import services, strategy
 from tests.unit.test_quant_object_runs import DATA, INSTRUMENT
@@ -85,14 +84,17 @@ def test_model_values_backtest_before_cutoff(tmp_path, monkeypatch):
     scenario(tmp_path, body)
 
 
-def test_retired_input_refused(tmp_path):
+def test_stopped_input_runs(tmp_path):
+    """A strategy pinned to a stopped version runs: the start check does not refuse it (its values end where it stopped)."""
     async def body(ctx, shell):
-        shell.runs.library = fakes.library({"v3": {**VERSIONS["v2"], "version": 3, "retired": True}})
+        shell.runs.library = fakes.library({"v3": {**VERSIONS["v2"], "version": 3, "state": "delisted"}})
         obj = await strategy(shell, code_with('self.model = q.model("Alpha")'))
         record = shell.store.read(obj)
         shell.store.save(record, settings={**record["settings"], "inputs": {"library": {}, "models": {"Alpha": {"name": "Alpha", "versionId": "v3"}}}})
-        error = await refused(shell, obj, "input_retired")
-        assert "v3 is retired; switch to a live version" in error.message
+        try:
+            await shell.runs.start(obj, {})
+        except ContractError as error:
+            assert error.code != "input_retired"
     scenario(tmp_path, body)
 
 
@@ -145,23 +147,6 @@ def test_unresolvable_account_conversion_preserves_market_refusal(tmp_path):
         error = await refused(shell, obj, "not_found")
         assert error.message == "Market cannot identify USDT/USD."
     scenario(tmp_path, body, routes=[fakes.ROUTE])
-
-
-def test_over_machine_budget_refused_with_both_numbers(tmp_path):
-    async def body(ctx, shell):
-        shell.runs.queue = RunQueue(memory=8 * GIB, cpus=4)
-        names = [{"instrument": {**INSTRUMENT, "instrumentId": f"vi1_{index:064x}", "symbol": f"S{index}", "displaySymbol": f"S{index}"}} for index in range(500)]
-        obj = await strategy(shell, data={**DATA, "symbols": names, "since": "2014-01-01", "timeframe": "1m"})
-        error = await refused(shell, obj, "over_machine_budget")
-        assert error.details["needGb"] > error.details["canGiveGb"] == 4.0
-        assert "this machine gives runs 4.0 GB (half of 8.0 GB)" in error.message and "needs about" in error.message
-        # more free memory on a bigger machine lets the same run through this check
-        shell.runs.queue = RunQueue(memory=64_000 * GIB, cpus=4)
-        try:
-            await shell.runs.start(obj, {})
-        except ContractError as other:
-            assert other.code != "over_machine_budget"
-    scenario(tmp_path, body)
 
 
 def test_ranked_without_signal_refused_before_run(tmp_path):

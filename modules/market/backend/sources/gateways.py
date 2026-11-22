@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import numpy as np
+from talyx_sdk.i18n import mark, t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -30,7 +31,7 @@ LOCAL_OFF = {"reason": "local_program_off"}
 
 
 def local_off(source_id: str, program: str, exc: BaseException) -> MarketError:
-    return MarketError("source_unavailable", f"{program} is not running on this computer ({exc})",
+    return MarketError("source_unavailable", t("{program} is not running on this computer ({exc})", program=program, exc=exc),
                        source_id=source_id, details=LOCAL_OFF)
 
 
@@ -70,9 +71,9 @@ class IbSource(Source):
     descriptor = {"name": "Interactive Brokers (IB Gateway)", "sourceIds": ["ib"], "kinds": ["bars"],
                   "assetClasses": ["equity", "fund", "index"], "credentials": "none", "paid": False,
                   "supports": ["history", "configure"], "localGateway": True,
-                  "settings": [{"name": "port", "label": "IB Gateway or TWS API port", "type": "integer",
+                  "settings": [{"name": "port", "label": mark("IB Gateway or TWS API port"), "type": "integer",
                                 "secret": False, "required": True},
-                               {"name": "clientId", "label": "API client id", "type": "integer", "secret": False,
+                               {"name": "clientId", "label": mark("API client id"), "type": "integer", "secret": False,
                                 "required": False}]}
 
     def __init__(self, market):
@@ -155,7 +156,7 @@ class FutuSource(Source):
     descriptor = {"name": "Futu (OpenD)", "sourceIds": ["futu"], "kinds": ["bars"],
                   "assetClasses": ["equity", "fund", "index"], "credentials": "none", "paid": False,
                   "supports": ["history", "configure"], "localGateway": True,
-                  "settings": [{"name": "port", "label": "OpenD port", "type": "integer", "secret": False,
+                  "settings": [{"name": "port", "label": mark("OpenD port"), "type": "integer", "secret": False,
                                 "required": True}]}
 
     async def describe(self, source_id: str) -> dict:
@@ -195,7 +196,7 @@ class FutuSource(Source):
                                                                     ktype=_FUTU_K[timeframe], autype="NONE",
                                                                     max_count=1000, page_req_key=key)
                     if ret != 0:
-                        raise MarketError("source_unavailable", f"Futu: {frame}", source_id=self.id)
+                        raise MarketError("source_unavailable", t("Futu: {frame}", frame=frame), source_id=self.id)
                     frames.append(frame)
                     if key is None:
                         return frames

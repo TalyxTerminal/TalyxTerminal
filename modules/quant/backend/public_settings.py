@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .allocation_prep import NUMBER_TEXT
 
@@ -37,7 +38,7 @@ def milliseconds(value, end=False):
             raise ValueError
     except (ValueError, TypeError) as error:
         raise ContractError(
-            "invalid_input", f"Expected a date or an ISO time with timezone, got {value!r}."
+            "invalid_input", t("Expected a date or an ISO time with timezone, got {value}.", value=repr(value))
         ) from error
     return int(moment.timestamp() * 1000) + (86_399_999 if end and len(value) == 10 else 0)
 
@@ -72,10 +73,10 @@ def edit_list(original, edit, path):
     if isinstance(edit, list):
         return list(edit)
     if not isinstance(edit, dict) or not edit or edit.keys() - {"add", "remove"}:
-        raise ContractError("invalid_input", f"{path} takes a list, or add/remove lists.")
+        raise ContractError("invalid_input", t("{path} takes a list, or add/remove lists.", path=path))
     for key, values in edit.items():
         if not isinstance(values, list):
-            raise ContractError("invalid_input", f"{path}.{key} takes a list.")
+            raise ContractError("invalid_input", t("{path}.{key} takes a list.", path=path, key=key))
     result = [value for value in original if value not in edit.get("remove", [])]
     for value in edit.get("add", []):
         if value not in result:
@@ -94,7 +95,7 @@ def run_in(record, run):
     if record["kind"] != "model":
         return run
     if "cost" in run:
-        raise ContractError("invalid_input", "A model's trade cost is run.costBps, in basis points.")
+        raise ContractError("invalid_input", t("A model's trade cost is run.costBps, in basis points."))
     return {("cost" if key == "costBps" else key): value for key, value in run.items()}
 
 
@@ -114,11 +115,11 @@ def params_in(record, values):
     result = {}
     for name, value in values.items():
         if name in PERCENT:
-            raise ContractError("invalid_input", f"Use {PERCENT[name]} for a percentage.")
+            raise ContractError("invalid_input", t("Use {PERCENT} for a percentage.", PERCENT=PERCENT[name]))
         if name in inverse:
             name = inverse[name]
             if type(value) not in (float, int) and value != "":
-                raise ContractError("invalid_input", f"{PERCENT[name]} takes a percentage.")
+                raise ContractError("invalid_input", t("{PERCENT} takes a percentage.", PERCENT=PERCENT[name]))
             if name in NUMBER_TEXT:
                 value = str(value)
         result[name] = value
@@ -188,10 +189,10 @@ async def store_data(ctx, data, labels):
         or index.keys() - {"symbol", "at"}
         or not isinstance(index.get("symbol"), str)
     ):
-        raise ContractError("invalid_input", "data.index holds symbol and optionally at.")
+        raise ContractError("invalid_input", t("data.index holds symbol and optionally at."))
     names = raw.get("symbols", [])
     if not isinstance(names, list) or any(not isinstance(s, str) or not s for s in names):
-        raise ContractError("invalid_input", "data.symbols must contain nonempty symbol strings.")
+        raise ContractError("invalid_input", t("data.symbols must contain nonempty symbol strings."))
     missing = list(
         dict.fromkeys(s for s in [*names, *([index["symbol"]] if index else [])] if s not in labels)
     )
@@ -207,7 +208,7 @@ async def store_data(ctx, data, labels):
         if "indexAsOf" in raw:
             raw["index"]["asOf"] = milliseconds(raw.pop("indexAsOf"))
     if raw.get("adjustment") not in {None, "raw", "split", "split_dividend"}:
-        raise ContractError("invalid_input", "data.adjustment is raw, split or split_dividend.")
+        raise ContractError("invalid_input", t("data.adjustment is raw, split or split_dividend."))
     if "start" in raw:
         raw["since"] = raw.pop("start")
     raw["until"] = raw.pop("end", "latest")
@@ -219,7 +220,7 @@ async def prepare_update(store, record, args):
         invalid = set(args) & {"params", "run", "libraryInputs", "formula"}
         if invalid:
             raise ContractError(
-                "invalid_input", f"A notebook cannot set {', '.join(sorted(invalid))}."
+                "invalid_input", t("A notebook cannot set {invalid}.", invalid=', '.join(sorted(invalid)))
             )
     previous, labels = await settings(store.ctx, record)
     patch = {key: args[key] for key in ("data", "params", "run") if key in args}
@@ -233,11 +234,11 @@ async def prepare_update(store, record, args):
             }
     if isinstance(patch.get("data"), dict):
         if "heldOutFrom" in patch["data"]:
-            raise ContractError("invalid_input", "Set the held-out date in run.heldOutFrom.")
+            raise ContractError("invalid_input", t("Set the held-out date in run.heldOutFrom."))
         keys = [s for s in SELECTIONS if patch["data"].get(s) is not None]
         if len(keys) > 1:
             raise ContractError(
-                "invalid_input", "Choose one of data.symbols, index, list or universe."
+                "invalid_input", t("Choose one of data.symbols, index, list or universe.")
             )
         if keys:
             patch["data"] = {**{s: None for s in SELECTIONS if s != keys[0]}, **patch["data"]}
@@ -246,7 +247,7 @@ async def prepare_update(store, record, args):
         old_names = {"since", "until"} & patch["data"].keys()
         if old_names:
             raise ContractError(
-                "invalid_input", "Use data.start and data.end for the requested dates."
+                "invalid_input", t("Use data.start and data.end for the requested dates.")
             )
     target = {
         k: merge(previous[k], patch[k]) or {} if k in patch else previous[k] for k in previous
@@ -265,7 +266,7 @@ async def prepare_update(store, record, args):
         updates["params"] = params_in(record, target["params"])
     if "formula" in args:
         if record["kind"] != "factor" or store.source_path(record).is_file():
-            raise ContractError("invalid_input", "formula applies to a formula factor.")
+            raise ContractError("invalid_input", t("formula applies to a formula factor."))
         updates["formula"] = args["formula"] or ""
     if "run" in patch:
         run = run_in(record, dict(target["run"]))

@@ -320,7 +320,7 @@ class ResearchBars(Model):
     """YYYY-MM-DD, inclusive."""
     end: str | None = None
     """YYYY-MM-DD, inclusive; default the latest close."""
-    adjustment: Adjustment = "split"
+    adjustment: Adjustment = "split_dividend"
 
 
 class Axis(Model):

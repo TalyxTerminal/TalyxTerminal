@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { TxIcon } from "@talyx/sdk";
 import type { Wake } from "./model";
 
@@ -11,12 +12,12 @@ const ICON: Record<Wake["kind"], Parameters<typeof TxIcon>[0]["name"]> = {
 
 export function wakeText(wake: Wake): string {
   switch (wake.kind) {
-    case "you": return "You";
-    case "mention": return `Mentioned by ${wake.name}`;
+    case "you": return t("You");
+    case "mention": return t("Mentioned by {name}", { name: wake.name });
     case "schedule": return wake.routine;
     case "event": return `${wake.event} · ${wake.routine}`;
-    case "catchup": return `Catch-up: ${wake.routine}, due ${wake.due}`;
-    case "resumed": return `Resumed: stopped at ${wake.stopped}`;
+    case "catchup": return t("Catch-up: {routine}, due {due}", { routine: wake.routine, due: wake.due });
+    case "resumed": return t("Resumed: stopped at {time}", { time: wake.stopped });
   }
 }
 

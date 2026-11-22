@@ -1,3 +1,4 @@
+import { translator } from "../i18n";
 /* TALYX platform components.
    Modules get these from `@talyx/sdk`; they must not hand-roll buttons, inputs,
    popups or tables. Behaviour: settings
@@ -25,6 +26,8 @@ import { findOverlayRoot, TxOverlayProvider, useOverlayContainer, useModalContai
 import { useDialogFocus } from "./focus";
 import { tokenValue } from "./theme";
 import { hexOpacity, withHexOpacity } from "./colorValue";
+
+const t = translator("platform");
 
 type Tone = "off" | "busy" | "done" | "review" | "failed";
 
@@ -130,11 +133,11 @@ export function TxColorInput({ value, onValueChange, "aria-label": label, disabl
     </TxButton></PopoverPrimitive.Trigger>
     <PopoverPrimitive.Portal container={container}><PopoverPrimitive.Content ref={content} className="tx-root tx-color-picker tx-glass" align="start" sideOffset={4} aria-label={label}
       onOpenAutoFocus={event => { event.preventDefault(); content.current?.querySelector<HTMLButtonElement>("button[aria-pressed='true'],button")?.focus(); }}>
-      <div className="tx-color-palette" role="group" aria-label={`${label} palette`}>{colorPalette.map(color => <TxButton key={color} aria-label={`Choose ${color}`} aria-pressed={value.toUpperCase() === color} className="tx-color-choice" title={color}
+      <div className="tx-color-palette" role="group" aria-label={t("{label} palette", { label })}>{colorPalette.map(color => <TxButton key={color} aria-label={t("Choose {color}", { color })} aria-pressed={value.toUpperCase() === color} className="tx-color-choice" title={color}
         onClick={() => { onValueChange(color); setDraft(color); }}><span className="tx-color-swatch" style={{ "--tx-user-color": color } as CSSProperties} /></TxButton>)}</div>
-      <TxField label="Hex color" error={valid ? undefined : "Enter a valid hex color."}><TxInput aria-label={`${label} hex color`} value={draft} spellCheck={false}
+      <TxField label={t("Hex color")} error={valid ? undefined : t("Enter a valid hex color.")}><TxInput aria-label={t("{label} hex color", { label })} value={draft} spellCheck={false}
         onChange={event => { const next = event.target.value; setDraft(next); if (/^#(?:[a-fA-F\d]{3}|[a-fA-F\d]{4}|[a-fA-F\d]{6}|[a-fA-F\d]{8})$/.test(next)) onValueChange(next); }} /></TxField>
-      <TxField label="Opacity"><TxInput numeric type="number" min={0} max={100} step={1} suffix="%" aria-label={`${label} opacity`} value={hexOpacity(value)}
+      <TxField label={t("Opacity")}><TxInput numeric type="number" min={0} max={100} step={1} suffix="%" aria-label={t("{label} opacity", { label })} value={hexOpacity(value)}
         onChange={event => { if (event.target.value === "") return; const next = withHexOpacity(value, Number(event.target.value)); onValueChange(next); setDraft(next); }} /></TxField>
     </PopoverPrimitive.Content></PopoverPrimitive.Portal>
   </PopoverPrimitive.Root>;
@@ -217,14 +220,14 @@ export interface TxSearchProps extends Omit<InputHTMLAttributes<HTMLInputElement
   onValueChange: (value: string) => void;
 }
 
-export function TxSearch({ value, onValueChange, placeholder = "Search", className, ...rest }: TxSearchProps) {
+export function TxSearch({ value, onValueChange, placeholder = t("Search"), className, ...rest }: TxSearchProps) {
   return <div className={join("tx-search", className)}>
     <TxIcon name="search" />
     <input
       className="tx-input" type="search" value={value} placeholder={placeholder}
       onChange={event => onValueChange(event.target.value)} {...rest}
     />
-    {value && <TxIconButton className="tx-search-clear" label="Clear search" icon="close" size="sm" onClick={() => onValueChange("")} />}
+    {value && <TxIconButton className="tx-search-clear" label={t("Clear search")} icon="close" size="sm" onClick={() => onValueChange("")} />}
   </div>;
 }
 
@@ -293,7 +296,7 @@ export function TxSegmented<T extends string>({ value, options, onChange, label,
 
 /** The small orange dot of a tab's `marked`. A string names it for screen readers ("Has marks"); `true` reads as "New". */
 function TxMark({ marked }: { marked?: boolean | string }) {
-  return marked ? <span className="tx-tab-mark" role="img" aria-label={typeof marked === "string" ? marked : "New"} /> : null;
+  return marked ? <span className="tx-tab-mark" role="img" aria-label={typeof marked === "string" ? marked : t("New")} /> : null;
 }
 
 export interface TxTabsProps<T extends string> {
@@ -313,15 +316,15 @@ export function TxTabs<T extends string>({ value, options, onChange, closable = 
   const trigger = (option: TxTabsProps<T>["options"][number]) => <TabsPrimitive.Trigger key={option.value} value={option.value} data-value={option.value}
     disabled={option.disabled} title={option.title}>
     {option.label}{option.count !== undefined && <span className="tx-tab-count">{option.count}</span>}<TxMark marked={option.marked} />
-    {!closable && option.dirty && <span className="tx-tab-dirty" role="img" aria-label="Unsaved changes" />}
+    {!closable && option.dirty && <span className="tx-tab-dirty" role="img" aria-label={t("Unsaved changes")} />}
   </TabsPrimitive.Trigger>;
   return <TabsPrimitive.Root value={value} onValueChange={next => onChange(next as T)}>
     <TabsPrimitive.List className="tx-tabs" aria-label={label} data-closable={closable ? "" : undefined}>
       {closable ? options.map(option => <span key={option.value} className="tx-tab" data-state={option.value === value ? "active" : "inactive"} data-dirty={option.dirty ? "" : undefined}>
         {trigger(option)}
         <span className="tx-tab-end">
-          {option.dirty && <span className="tx-tab-dirty" role="img" aria-label="Unsaved changes" />}
-          <TxIconButton className="tx-tab-close" size="sm" icon="close" label={`Close ${option.label}`} onClick={() => onClose?.(option.value)} />
+          {option.dirty && <span className="tx-tab-dirty" role="img" aria-label={t("Unsaved changes")} />}
+          <TxIconButton className="tx-tab-close" size="sm" icon="close" label={t("Close {label}", { label: option.label })} onClick={() => onClose?.(option.value)} />
         </span>
       </span>) : options.map(trigger)}
     </TabsPrimitive.List>
@@ -330,13 +333,13 @@ export function TxTabs<T extends string>({ value, options, onChange, closable = 
 
 /* ── Status ─────────────────────────────────────────────────── */
 
-const toneLabels: Record<Tone, string> = {
-  off: "Off", busy: "Running", done: "Done", review: "Needs review", failed: "Failed",
-};
+const toneLabels = (): Record<Tone, string> => ({
+  off: t("Off"), busy: t("Running"), done: t("Done"), review: t("Needs review"), failed: t("Failed"),
+});
 
 /** Status never uses red or green; shape and words carry the meaning. */
 export const TxStatus = forwardRef<HTMLSpanElement, HTMLAttributes<HTMLSpanElement> & { tone: Tone; label?: string }>(function TxStatus({ tone, label, className, ...props }, ref) {
-  const text = label ?? toneLabels[tone];
+  const text = label ?? toneLabels()[tone];
   return <span {...props} ref={ref} className={join("tx-status", className)} data-tone={tone} role="status">{text}</span>;
 });
 
@@ -355,7 +358,7 @@ export function TxProgress({ value, label, className }: {
     </div>}
     <div
       className="tx-progress" role="progressbar"
-      aria-valuemin={0} aria-valuemax={100} aria-label={label ?? "Progress"}
+      aria-valuemin={0} aria-valuemax={100} aria-label={label ?? t("Progress")}
       data-indeterminate={known ? undefined : ""}
       {...(known ? { "aria-valuenow": percent, "aria-valuetext": `${percent}%` } : {})}
     >
@@ -736,7 +739,7 @@ export function TxDialog({ open, onOpenChange, title, children, footer, label, c
       <DialogPrimitive.Content {...focus} className={join("tx-root tx-dialog tx-glass", className)} style={style} data-size={size} aria-label={title || label} aria-describedby={undefined}>
         <TxOverlayProvider container={container ?? null}>
           <TxDialogSurface title={<DialogPrimitive.Title>{title}</DialogPrimitive.Title>}
-            footer={footer ?? <DialogPrimitive.Close asChild><TxButton variant="primary" size="sm">Close</TxButton></DialogPrimitive.Close>}
+            footer={footer ?? <DialogPrimitive.Close asChild><TxButton variant="primary" size="sm">{t("Close")}</TxButton></DialogPrimitive.Close>}
           >{children}</TxDialogSurface>
         </TxOverlayProvider>
       </DialogPrimitive.Content>
@@ -744,7 +747,7 @@ export function TxDialog({ open, onOpenChange, title, children, footer, label, c
   </DialogPrimitive.Root>;
 }
 
-export function TxSheet({ open, onOpenChange, title, actions, tabs, footer, children, label = "Sheet", preview = false }: {
+export function TxSheet({ open, onOpenChange, title, actions, tabs, footer, children, label = t("Sheet"), preview = false }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -762,7 +765,7 @@ export function TxSheet({ open, onOpenChange, title, actions, tabs, footer, chil
   if (preview) return open ? <>
     <div className="tx-sheet-overlay" data-preview="" />
     <aside className="tx-root tx-sheet tx-glass" data-preview="" aria-label={title}>
-      <TxSheetSurface title={title} actions={actions} close={<TxIconButton label={`Close ${label}`} icon="close" onClick={() => onOpenChange(false)} />}
+      <TxSheetSurface title={title} actions={actions} close={<TxIconButton label={t("Close {label}", { label })} icon="close" onClick={() => onOpenChange(false)} />}
         tabs={tabs} footer={footer}>{children}</TxSheetSurface>
     </aside>
   </> : null;
@@ -773,7 +776,7 @@ export function TxSheet({ open, onOpenChange, title, actions, tabs, footer, chil
       <DialogPrimitive.Content {...focus} className="tx-root tx-sheet tx-glass" aria-label={title || label} aria-describedby={undefined}>
         <TxOverlayProvider container={container ?? null}>
           <TxSheetSurface title={<DialogPrimitive.Title>{title}</DialogPrimitive.Title>} actions={actions}
-            close={<DialogPrimitive.Close asChild><TxIconButton label={`Close ${label}`} icon="close" /></DialogPrimitive.Close>}
+            close={<DialogPrimitive.Close asChild><TxIconButton label={t("Close {label}", { label })} icon="close" /></DialogPrimitive.Close>}
             tabs={tabs} footer={footer}>{children}</TxSheetSurface>
         </TxOverlayProvider>
       </DialogPrimitive.Content>
@@ -813,7 +816,7 @@ export function TxToastProvider({ children }: { children: ReactNode }) {
     },
   }), []);
   return <ToastContext.Provider value={api}>
-    <ToastPrimitive.Provider swipeDirection="right" duration={6000} label="Notifications">
+    <ToastPrimitive.Provider swipeDirection="right" duration={6000} label={t("Notifications")}>
       {children}
       {records.map(record => <ToastPrimitive.Root
         key={record.key} className="tx-root tx-toast tx-glass" duration={record.duration ?? 6000}
@@ -831,7 +834,7 @@ export function TxToastProvider({ children }: { children: ReactNode }) {
           </div>
         </ToastPrimitive.Description>
       </ToastPrimitive.Root>)}
-      {typeof document !== "undefined" && createPortal(<ToastPrimitive.Viewport className="tx-root tx-toast-viewport" />, container ?? document.body)}
+      {typeof document !== "undefined" && createPortal(<ToastPrimitive.Viewport label={t("Notifications ({hotkey})")} className="tx-root tx-toast-viewport" />, container ?? document.body)}
     </ToastPrimitive.Provider>
   </ToastContext.Provider>;
 }
@@ -928,7 +931,7 @@ export function TxDisclosure({ label, children, open, defaultOpen = false, onOpe
 }
 
 /** Collapsed raw detail. The only place error text, ids or paths may appear. */
-export function TxDetails({ label = "Technical details", children }: { label?: string; children: ReactNode }) {
+export function TxDetails({ label = t("Technical details"), children }: { label?: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return <div className="tx-details">
@@ -937,7 +940,7 @@ export function TxDetails({ label = "Technical details", children }: { label?: s
     ><TxIcon name="chevron" />{label}</button>
     {open && <div id={id} className="tx-trace">
       <code>{children}</code>
-      {typeof children === "string" && <TxIconButton size="sm" label="Copy technical details" icon="copy" onClick={() => void navigator.clipboard?.writeText(children)} />}
+      {typeof children === "string" && <TxIconButton size="sm" label={t("Copy technical details")} icon="copy" onClick={() => void navigator.clipboard?.writeText(children)} />}
     </div>}
   </div>;
 }

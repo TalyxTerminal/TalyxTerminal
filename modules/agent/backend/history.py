@@ -6,6 +6,7 @@ import shutil
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import checkpoints
 from .store import encode
@@ -29,13 +30,13 @@ class History:
     def boundary(self, cid, workspace, item, role):
         conversation = self.store.conversation(cid, workspace)
         if conversation.get("kind", "chat") != "chat" or self.store.active(cid):
-            raise ContractError("conflict", "Choose a finished chat before changing its history")
+            raise ContractError("conflict", t("Choose a finished chat before changing its history"))
         row = self.db.execute("SELECT turn_id,value FROM cards WHERE id=? AND conversation=?", (item, cid)).fetchone()
         if row is None:
-            raise ContractError("not_found", "This message is unavailable")
+            raise ContractError("not_found", t("This message is unavailable"))
         card = json.loads(row["value"])
         if card.get("role") != role or "checkpointId" not in card:
-            raise ContractError("invalid_input", "This message has no saved boundary for this operation")
+            raise ContractError("invalid_input", t("This message has no saved boundary for this operation"))
         event = self.db.execute("SELECT MIN(seq) FROM events WHERE conversation=? AND json_extract(value,'$.type')='card' "
                                 "AND json_extract(value,'$.payload.id')=?", (cid, item)).fetchone()[0]
         return conversation, row["turn_id"], card, event
@@ -136,7 +137,7 @@ class History:
 
     async def rewrite(self, cid, workspace, item, text, undo):
         if not isinstance(text, str) or not text.strip() or len(text) > 100000 or type(undo) is not bool:
-            raise ContractError("invalid_input", "Enter an edited message and choose whether to undo changes")
+            raise ContractError("invalid_input", t("Enter an edited message and choose whether to undo changes"))
         original, _, card, seq = self.boundary(cid, workspace, item, "user")
         dest = uuid4().hex
         saver = self.service.engine.checkpointer

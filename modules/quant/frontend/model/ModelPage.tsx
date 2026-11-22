@@ -1,5 +1,6 @@
 /* A model's page: the preparation on the left, the experiments and the selected run on the right (Work), or one run's Results. The preparation is the
    standard pipeline's settings; changing one saves it and, 400 ms after the last change, asks for the check before training (stale answers are dropped). */
+import { t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TxButton, TxDialog, TxEmpty, TxSkeleton, TxIcon, TxIconButton, TxMenu, TxRunButton, TxRunProgress, TxSegmented, TxSheet, useTxToast, type Json, type ModuleContext, type TxMenuItem, type TxRunKind } from "@talyx/sdk";
 import { DataInline, DataSettingsChip, useIndexMaterials, useResearchLists } from "../DataSettings";
@@ -7,6 +8,7 @@ import { restoreNotice } from "../shared/restored";
 import { CodeArea, fileUri, type CodeMark } from "../shared/CodeArea";
 import { dataReady, universeText, useEvent, useThrottled, type Api, type ObjectDetail, type ParamValue } from "../objects";
 import type { ShellState } from "../QuantShell";
+import { LongRunConfirm, isLong } from "../shared/LongRun";
 import { modelApi, type CheckAnswer, type DeepEnvironment, type HeldOutPlan, type ModelPrep, type ModelRun, type RunList, type Vary } from "./api";
 import type { FactorFields } from "../factor/api";
 import { ComparePane } from "./ComparePane";
@@ -183,7 +185,7 @@ export function ModelPage({ctx, api, detail, onDetail, state, update, title, men
 
   // ---------------------------------------------------------------- running
   const total = vary.reduce((count, item) => count * Math.max(1, item.values.length), 1);
-  const blocked = check?.blocked ? (check.checks.find(item => item.state === "block")?.name ?? check.label?.error?.message ?? "the check blocks sending") : !prep || !draft.algorithm ? "choose an algorithm first" : null;
+  const blocked = check?.blocked ? (check.checks.find(item => item.state === "block")?.name ?? check.label?.error?.message ?? t("the check blocks sending")) : !prep || !draft.algorithm ? t("choose an algorithm first") : null;
   const [chosenKind, setKind] = useState<"train" | "batch" | "heldout" | "check">("train");
   const heldTarget = selected && selected.status === "completed" && !selected.heldOut ? selected : null;
   // Validate on held-out is offered only with a finished run not yet scored and a held-out period set; otherwise the button trains.
@@ -194,14 +196,13 @@ export function ModelPage({ctx, api, detail, onDetail, state, update, title, men
   const prepFlex = mode === "narrow" ? {flex: `0 0 ${prepPx}px`} : mode === "wide" ? {flex: "0 0 58%"} : {flex: "1 1 auto"};
   const runKinds: TxRunKind[] = [
     // With several values only a batch can be sent, so the single run is not offered (8293ca6f's greyed item).
-    ...(total > 1 ? [] : [{id: "train", label: "Train", hint: "One run", current: shownKind === "train"}]),
-    {id: "batch", label: `Train a batch${total > 1 ? ` · ${total} groups` : ""}`, current: shownKind === "batch"},
-    ...(heldRun !== null ? [{id: "heldout", label: `Validate #${heldRun.number} on held-out`, current: kind === "heldout"}] : []),
-    {id: "check", label: "Check only", separated: true, current: kind === "check"},
+    ...(total > 1 ? [] : [{id: "train", label: t("Train"), hint: t("One run"), current: shownKind === "train"}]),
+    {id: "batch", label: (total > 1 ? t("Train a batch · {total} groups", { total }) : t("Train a batch")), current: shownKind === "batch"},
+    ...(heldRun !== null ? [{id: "heldout", label: t("Validate #{number} on held-out", { number: heldRun.number }), current: kind === "heldout"}] : []),
+    {id: "check", label: t("Check only"), separated: true, current: kind === "check"},
   ];
   const [confirm, setConfirm] = useState<{run: ModelRun; plan: HeldOutPlan} | null>(null);
   const [long, setLong] = useState<{groups: number; seconds: number} | null>(null);
-  const days = (seconds: number) => seconds >= 86400 ? `${(seconds / 86400).toFixed(seconds >= 864000 ? 0 : 1)} days` : `${Math.round(seconds / 3600)} hours`;
   // The run is made the moment Train is pressed and checks as its first step; until the answer comes the button takes no second press.
   const [sending, setSending] = useState(false);
   const send = () => {
@@ -216,23 +217,24 @@ export function ModelPage({ctx, api, detail, onDetail, state, update, title, men
   const go = () => {
     if (sending) return;
     if (kind === "check") {checkNow(draft, vary, true); return;}
-    if (blocked !== null) {toast({title: `Blocked: ${blocked}`}); return;}   // Train is never greyed: pressed while blocked, it says by what
+    if (blocked !== null) {toast({title: t("Blocked: {blocked}", { blocked })}); return;}   // Train is never greyed: pressed while blocked, it says by what
     if (kind === "heldout" && heldTarget) {void mapi.heldOutPlan(heldTarget.id).then(plan => setConfirm({run: heldTarget, plan}), fail); return;}
-    if (kind === "batch" && total < 2) {toast({title: "Give any setting several values"}); document.getElementById("mx-row-batch")?.scrollIntoView(); return;}
-    const longest = Math.max(0, ...(check?.batch?.groups ?? []).map(group => group.time ?? 0)), whole = check?.batch?.total ?? 0;
-    if (chosen?.deep && (longest >= 86400 || whole >= 86400)) {setLong({groups: check?.batch?.groups.length ?? 1, seconds: Math.max(longest, whole)}); return;}
+    if (kind === "batch" && total < 2) {toast({title: t("Give any setting several values")}); document.getElementById("mx-row-batch")?.scrollIntoView(); return;}
+    // Expected to take more than ten minutes (the check's estimate for the whole batch, or its longest run): it waits for the user's word.
+    const longest = Math.max(0, ...(check?.batch?.groups ?? []).map(group => group.time ?? 0)), whole = Math.max(longest, check?.batch?.total ?? 0);
+    if (isLong(whole)) {setLong({groups: check?.batch?.groups.length ?? 1, seconds: whole}); return;}
     send();
   };
   const stop = (run: ModelRun) => void mapi.stop(run.id).then(() => loadRuns(), fail);
   const batchOf = (run: ModelRun | null) => run?.batch ? runs.filter(item => item.batch === run.batch && isActive(item)) : [];
   const stopBatch = (run: ModelRun) => void mapi.stopBatch(run.batch!).then(() => loadRuns(), fail);
   const resume = (run: ModelRun, alone?: boolean, override?: Record<string, ParamValue>) => void mapi.resume(run.id, {alone, ...(override ? {override} : {})}).then(() => {
-    if (override?.nn_batch) toast({title: `Window ${run.failure?.window ?? ""} starts over with batch size ${override.nn_batch}${run.failure?.window && run.failure.window > 1 ? `; windows 1–${run.failure.window - 1} are kept` : ""}`});
-    if (override?.nn_device === "cpu") toast({title: `Window ${run.failure?.window ?? ""} starts over on the CPU${run.failure?.window && run.failure.window > 1 ? `; windows 1–${run.failure.window - 1} are kept` : ""}`});
+    if (override?.nn_batch) toast({title: (run.failure?.window && run.failure.window > 1 ? t("Window {window} starts over with batch size {nn_batch}; windows 1–{window2} are kept", { window: run.failure?.window ?? "", nn_batch: String(override.nn_batch), window2: run.failure.window - 1 }) : t("Window {window} starts over with batch size {nn_batch}", { window: run.failure?.window ?? "", nn_batch: String(override.nn_batch) }))});
+    if (override?.nn_device === "cpu") toast({title: (run.failure?.window && run.failure.window > 1 ? t("Window {window} starts over on the CPU; windows 1–{window2} are kept", { window: run.failure?.window ?? "", window2: run.failure.window - 1 }) : t("Window {window} starts over on the CPU", { window: run.failure?.window ?? "" }))});
     void loadRuns();
   }, fail);
-  const progress = active ? {stage: active.status === "queued" ? "Waiting in the queue" : `${active.progress?.window ? `Window ${active.progress.window}${active.windowsTotal ? ` of ${active.windowsTotal}` : ""}` : "Preparing"}${active.progress?.round ? ` · round ${active.progress.round}` : ""}`,
-    count: active.progress?.left ? `about ${minutes(active.progress.left)} left` : undefined, value: active.progress?.fraction ?? null} : null;
+  const progress = active ? {stage: active.status === "queued" ? t("Waiting in the queue") : `${active.progress?.window ? (active.windowsTotal ? t("Window {window} of {total}", { window: active.progress.window, total: active.windowsTotal }) : t("Window {window}", { window: active.progress.window })) : t("Preparing")}${active.progress?.round ? t(" · round {round}", { round: active.progress.round }) : ""}`,
+    count: active.progress?.left ? t("about {time} left", { time: minutes(active.progress.left) }) : undefined, value: active.progress?.fraction ?? null} : null;
     // ---------------------------------------------------------------- the code area: only a model written as code has a file
   const ownCode = detail.hasCode === true && prep?.mode === "code";
   // The code of a run that is not the newest (own code), or of any run (the standard pipeline's file as that run ran it): read-only, with its own head.
@@ -250,7 +252,7 @@ export function ModelPage({ctx, api, detail, onDetail, state, update, title, men
   const [sidePx, setSidePx] = useState<number | null>(null);
   const root = detail.entryUri.slice(0, detail.entryUri.lastIndexOf("/"));
   const failure = selected?.status === "failed" ? selected.failure : null;
-  const marks: CodeMark[] = ownCode && failure?.file && failure.line ? [{uri: fileUri(root, failure.file), line: failure.line, message: (failure.message ?? failure.detail ?? "").split("\n")[0], title: `Run #${selected!.number}`}] : [];
+  const marks: CodeMark[] = ownCode && failure?.file && failure.line ? [{uri: fileUri(root, failure.file), line: failure.line, message: (failure.message ?? failure.detail ?? "").split("\n")[0], title: t("Run #{number}", { number: selected!.number })}] : [];
   const goLine = (line: number) => {update({side: "code"}); setCodeLine({line, request: `${Date.now()}`});};
   const dragSide = (event: React.PointerEvent<HTMLDivElement>) => {
     const box = (event.currentTarget.parentElement as HTMLElement).getBoundingClientRect(), target = event.currentTarget; target.setPointerCapture(event.pointerId);
@@ -269,76 +271,76 @@ export function ModelPage({ctx, api, detail, onDetail, state, update, title, men
   const universe = universeText(data, lists, indexes.items);
   const span = headSpan(data);
   const dataTo = selected?.dataTo ?? null;
-  const chip = <button type="button" className="tx-datachip" title="Data settings" data-need={universe === null}>
-    <TxIcon name="list" />{universe === null ? <b data-priority={1}>No universe</b> : <b data-priority={1}>{universe}{span.often ? ` ${span.often}` : ""}</b>}
+  const chip = <button type="button" className="tx-datachip" title={t("Data settings")} data-need={universe === null}>
+    <TxIcon name="list" />{universe === null ? <b data-priority={1}>{t("No universe")}</b> : <b data-priority={1}>{universe}{span.often ? ` ${span.often}` : ""}</b>}
     {universe !== null && span.years && <><span className="tx-sep" /><span data-priority={2}>{span.years}</span></>}
     {universe !== null && span.held && <><span className="tx-sep" /><span data-priority={3} className="mx-held" title={span.held.title}><TxIcon name="lock" />{span.held.text}</span></>}
     <TxIcon name="chevron" style={{transform: "rotate(90deg)"}} />
   </button>;
   const pageMenu: TxMenuItem[] = [...menu];
   const firstLines: FirstLine[] = [
-    {label: "Names", value: universe === null ? "Set data" : `${universe}${span.often ? `, ${span.often}` : ""}`, missing: universe === null, onClick: () => setDataOpen(true)},
-    {label: "Years", value: span.years ? <>{span.years}{span.held && <span className="mx-t3">, then held out</span>}</> : "Set data", missing: !span.years, onClick: () => setDataOpen(true)},
-    {label: "Inputs", value: Array.isArray(draft.inputs) && draft.inputs.length ? `${draft.inputs.length} ${draft.inputs.length === 1 ? "input" : "inputs"}` : "none yet", missing: !(Array.isArray(draft.inputs) && draft.inputs.length)},
-    {label: "Algorithm", value: chosen?.label ?? "not chosen", missing: !chosen},
-    ...(blocked !== null && chosen ? [{label: "Check", value: blocked, missing: true}] : []),
+    {label: t("Names"), value: universe === null ? t("Set data") : `${universe}${span.often ? `, ${span.often}` : ""}`, missing: universe === null, onClick: () => setDataOpen(true)},
+    {label: t("Years"), value: span.years ? <>{span.years}{span.held && <span className="mx-t3">{t(", then held out")}</span>}</> : t("Set data"), missing: !span.years, onClick: () => setDataOpen(true)},
+    {label: t("Inputs"), value: Array.isArray(draft.inputs) && draft.inputs.length ? draft.inputs.length === 1 ? t("1 input") : t("{count} inputs", { count: draft.inputs.length }) : t("none yet"), missing: !(Array.isArray(draft.inputs) && draft.inputs.length)},
+    {label: t("Algorithm"), value: chosen?.label ?? t("not chosen"), missing: !chosen},
+    ...(blocked !== null && chosen ? [{label: t("Check"), value: blocked, missing: true}] : []),
   ];
   return <div className="qx-page mx-page" onKeyDownCapture={event => {if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {event.preventDefault(); event.stopPropagation(); go();}}}>
-    <div className="tx-panelhead mx-head">{title}<span className="mx-kind">Model</span>
+    <div className="tx-panelhead mx-head">{title}<span className="mx-kind">{t("Model")}</span>
       <DataSettingsChip ctx={ctx} api={api} kind="model" data={detail.settings.data} defaults={null} defaultsError={null} boundary={null} open={dataOpen} onOpenChange={setDataOpen}
         onSave={async next => {onDetail(await api.settings(detail.id, {data: next})); void loadPrep(); checkNow(draft, vary, false, next);}} trigger={chip}>
         <div className="mx-dpop">
-          <div className="mx-dr"><span>Held out</span><span>{span.held ? <><TxIcon name="lock" />from {span.held.title.replace("Held out from ", "")}</> : "none"}</span></div>
-          {dataTo !== null && <div className="mx-dr"><span>Data to</span><span>{dayYear(dataTo)}</span></div>}
+          <div className="mx-dr"><span>{t("Held out")}</span><span>{span.held ? <><TxIcon name="lock" />{t("from {title}", { title: dayYear(Date.parse(data.heldOutFrom!)) })}</> : t("none")}</span></div>
+          {dataTo !== null && <div className="mx-dr"><span>{t("Data to")}</span><span>{dayYear(dataTo)}</span></div>}
         </div>
       </DataSettingsChip>
       <span className="tx-spacer" />
-      {active && progress ? <>{batchOf(active).length > 1 && <TxMenu label="Stop" align="end" trigger={<TxButton size="sm" variant="quiet">Stop batch…</TxButton>}
-          items={[{id: "run", label: `Stop #${active.number}`, onSelect: () => stop(active)},
-            {id: "batch", label: `Stop batch ${active.batch ? (list?.batches.find(item => item.id === active.batch)?.title || "") : ""} · ${batchOf(active).filter(item => item.status === "running").length} running, ${batchOf(active).filter(item => item.status === "queued").length} queued`.replace("batch  ·", "batch ·"), onSelect: () => stopBatch(active)}]} />}
+      {active && progress ? <>{batchOf(active).length > 1 && <TxMenu label={t.c("action", "Stop")} align="end" trigger={<TxButton size="sm" variant="quiet">{t("Stop batch…")}</TxButton>}
+          items={[{id: "run", label: t("Stop #{number}", { number: active.number }), onSelect: () => stop(active)},
+            {id: "batch", label: t("Stop batch {batch} · {running} running, {queued} queued", { batch: active.batch ? (list?.batches.find(item => item.id === active.batch)?.title || "") : "", running: batchOf(active).filter(item => item.status === "running").length, queued: batchOf(active).filter(item => item.status === "queued").length }).replace(t("batch  ·"), t("batch ·")), onSelect: () => stopBatch(active)}]} />}
           <TxRunProgress run={`#${active.number}`} stage={progress.stage} count={progress.count} value={progress.value} onStop={() => stop(active)} /></>
         : <TxRunButton label={runLabel(shownKind, total, heldTarget?.number ?? null)}
           kinds={runKinds} onRun={go} onKind={id => setKind(id as typeof kind)} locked={kind === "heldout"} disabled={sending}
-          title={blocked !== null ? `Blocked: ${blocked}` : "Ctrl+Enter"} />}
-      {(ownCode || snapRun !== null) && <button type="button" className="tx-codetoggle" aria-pressed={codeShown} onClick={() => update({side: codeShown ? undefined : "code"})}><TxIcon name="code" /><span>{codeShown ? "Hide code" : "Show code"}</span></button>}
-      <TxSegmented label="Work or Results" value={pageView} options={[{value: "work", label: "Work"}, {value: "results", label: "Results"}]} onChange={next => update({modelView: next === "results" ? "results" : undefined} as Partial<ShellState>)} />
-      <TxMenu label="Actions" align="end" items={pageMenu} trigger={<TxIconButton label="Actions" icon="more" />} />
+          title={blocked !== null ? t("Blocked: {blocked}", { blocked }) : t("Ctrl+Enter")} />}
+      {(ownCode || snapRun !== null) && <button type="button" className="tx-codetoggle" aria-pressed={codeShown} onClick={() => update({side: codeShown ? undefined : "code"})}><TxIcon name="code" /><span>{codeShown ? t("Hide code") : t("Show code")}</span></button>}
+      <TxSegmented label={t("Work or Results")} value={pageView} options={[{value: "work", label: t("Work")}, {value: "results", label: t("Results")}]} onChange={next => update({modelView: next === "results" ? "results" : undefined} as Partial<ShellState>)} />
+      <TxMenu label={t("Actions")} align="end" items={pageMenu} trigger={<TxIconButton label={t("Actions")} icon="more" />} />
     </div>
     {restored?.note && restored.id === selected?.id && <div className="qx-note" role="status">{restored.note}</div>}
-    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>Dismiss</TxButton></div>}
-    {blocked !== null && check?.blocked && kind !== "check" && <div className="mx-blocked" role="status">Blocked by {blocked}</div>}
+    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>{t("Dismiss")}</TxButton></div>}
+    {blocked !== null && check?.blocked && kind !== "check" && <div className="mx-blocked" role="status">{t("Blocked by {blocked}", { blocked })}</div>}
     {/* The preparation's place, the same while it loads (seconds when it waits on Market) as when it is there. */}
     <div className="mx-body"><div className="mx-desk" ref={desk} data-width={mode}>
       {pageView === "results" ? (selected ? <Results mapi={mapi} run={selected} runs={runs} tab={((state as {modelResults?: string}).modelResults as ResultsTab) ?? "windows"} vs={compareId === selected.id ? null : compareId}
         onTab={next => update({modelResults: next} as Partial<ShellState>)} onVs={setCompareId} onPublish={run => update({runId: run.id, modelPublish: true} as Partial<ShellState>)}
-        onSelect={id => update({runId: id})} onStar={run => void mapi.annotate(run.id, {starred: !run.starred}).then(() => loadRuns(), fail)} error={fail} onHeldOut={() => void mapi.heldOutPlan(selected.id).then(plan => setConfirm({run: selected, plan}), fail)} onUseSettings={() => void useRun(selected.id).catch(fail)} /> : list !== null && runs.length === 0 ? <NoResultsYet lines={firstLines} toWork={() => update({modelView: undefined} as Partial<ShellState>)} /> : <TxEmpty title="No runs yet" />) : <>
+        onSelect={id => update({runId: id})} onStar={run => void mapi.annotate(run.id, {starred: !run.starred}).then(() => loadRuns(), fail)} error={fail} onHeldOut={() => void mapi.heldOutPlan(selected.id).then(plan => setConfirm({run: selected, plan}), fail)} onUseSettings={() => void useRun(selected.id).catch(fail)} /> : list !== null && runs.length === 0 ? <NoResultsYet lines={firstLines} toWork={() => update({modelView: undefined} as Partial<ShellState>)} /> : <TxEmpty title={t("No runs yet")} />) : <>
         {prep === null && <div className="mx-prepbox" style={prepFlex}><div className="mx-none"><TxSkeleton width="60%" /></div></div>}
         {prep && <div className="mx-prepbox" style={prepFlex}>
           <Prep dataBasics={<DataInline ctx={ctx} api={api} data={detail.settings.data} onSave={async next => {onDetail(await api.settings(detail.id, {data: next})); void loadPrep(); checkNow(draft, vary, false, next);}} />} deep={deep} onInstallDeep={installDeep} onCancelDeep={cancelDeep} fields={fields} inspect={(input, feature) => mapi.inspect(detail.id, {input, ...(feature ? {feature} : {})})} prep={prep} values={draft} base={baseRun ? baseRun.params : null} baseNumber={baseRun?.number ?? null} width={mode} check={check} checking={checking} vary={vary} onVary={changeVary}
             baseRun={baseRun?.run ?? null} onRevert={(name, value) => {const next = {...draft, [name]: value}; setDraft(next); checkNow(next, vary, true);}}
             onChange={change} onRun={saveRun} onHeldOut={saveHeldOut} onReset={() => baseRun && (setDraft(baseRun.params), checkNow(baseRun.params, vary, true))} onWidth={setWidth}
             onWriteCode={() => void mapi.writeCode(detail.id).then(() => api.read(detail.id).then(next => {onDetail(next); update({side: "code"}); void loadPrep();}), fail)} onGo={group => document.querySelector(`[data-group="${group}"]`)?.scrollIntoView()} /></div>}
-        {mode === "narrow" && <div className="mx-vgut" role="separator" aria-label="Resize" onPointerDown={dragPrep} />}
+        {mode === "narrow" && <div className="mx-vgut" role="separator" aria-label={t("Resize")} onPointerDown={dragPrep} />}
         {mode !== "full" && <div className="mx-main" ref={main}>
           {list !== null && runs.length === 0 && (comparing ?? []).length === 0 ? <FirstRun lines={firstLines} /> : <Experiments running={list?.running ?? null} perRun={check?.batch?.peak || Math.max(0, ...runs.map(item => item.memory ?? 0))} onConcurrency={count => void mapi.concurrency(count).then(() => loadRuns(true), fail)} view={view} onView={setView} list={list} runs={runs} selectedId={selected?.id ?? null} compareId={compareId} ticked={ticked} filter={filter} query={query} sort={sort} byBatch={byBatch}
             onFilter={setFilter} onQuery={setQuery} onSort={setSort} onByBatch={setByBatch} onSelect={id => update({runId: id})} onOpen={id => {update({runId: id}); showResults("windows");}}
             onTick={(id, on) => setTicked(current => {const next = new Set(current); if (on) next.add(id); else next.delete(id); return next;})}
             onStar={run => void mapi.annotate(run.id, {starred: !run.starred}).then(() => loadRuns(), fail)} onNext={run => void mapi.next(run.id).then(() => loadRuns(), fail)}
             onRemove={run => void mapi.remove(run.id).then(() => loadRuns(), fail)} onResume={resume} onCompare={() => setComparing([...ticked].slice(0, 4))}
-            onCombine={() => void mapi.combine([...ticked]).then(created => {toast({title: `Combining ${[...ticked].map(id => `#${runs.find(run => run.id === id)?.number}`).join(", ")}`, detail: "mean of their daily ranks"}); setTicked(new Set()); update({runId: created.id}); void loadRuns();}, fail)} />}
-          {(runs.length > 0 || (comparing !== null && comparing.length > 0)) && <><div className="mx-hgut" role="separator" aria-label="Resize" onPointerDown={dragSel} />
+            onCombine={() => void mapi.combine([...ticked]).then(created => {toast({title: t("Combining {value}", { value: [...ticked].map(id => `#${runs.find(run => run.id === id)?.number}`).join(", ") }), detail: t("mean of their daily ranks")}); setTicked(new Set()); update({runId: created.id}); void loadRuns();}, fail)} />}
+          {(runs.length > 0 || (comparing !== null && comparing.length > 0)) && <><div className="mx-hgut" role="separator" aria-label={t("Resize")} onPointerDown={dragSel} />
           <div className="mx-selbox" style={selPx ? {flex: `0 0 ${selPx}px`} : undefined}>{comparing !== null && comparing.length > 0 ? <ComparePane mapi={mapi} runs={comparing.map(id => runs.find(run => run.id === id)).filter((run): run is ModelRun => run !== undefined)} onClose={() => setComparing(null)} error={fail} /> : selected ? <Selected runs={runs} onCompare={setCompareId} onEdit={run => void useRun(run.id).catch(fail)} mapi={mapi} run={selected} onLine={ownCode ? goLine : undefined} compare={baseRun && baseRun.id !== selected.id ? baseRun : null} onStop={stop} onResume={resume}
             onLog={run => void mapi.log(run.id).then(log => setLogOf({run, text: `${log.stdout}\n${log.stderr}`.trim()}), fail)} onGo={showResults}
             onNotebook={run => void route<{notebookId: string}>(ctx, "POST", at`/runs/${run.id}/notebook`).then(opened => update({objectId: opened.notebookId, runId: undefined}), fail)}
-            onStrategy={run => void mapi.strategy(run.id).then(created => {toast({title: `New strategy with ${detail.name} #${run.number}`}); update({objectId: created.id, runId: undefined});}, fail)}
+            onStrategy={run => void mapi.strategy(run.id).then(created => {toast({title: t("New strategy with {name} #{number}", { name: detail.name, number: run.number })}); update({objectId: created.id, runId: undefined});}, fail)}
             onPublish={run => update({runId: run.id, modelPublish: true} as Partial<ShellState>)} onHeldOut={run => void mapi.heldOutPlan(run.id).then(plan => setConfirm({run, plan}), fail)} error={fail} /> : null}</div></>}
         </div>}</>}
     </div>
-    {codeShown && <div className="mx-vsplit" role="separator" aria-label="Resize the code" onPointerDown={dragSide} />}
-    {codeShown && <section className="mx-code" aria-label="Code" style={{width: (sidePx ?? 520) + (!snapRun && state.modelTree ? 150 : 0)}}>
-      {snapRun ? <><div className="mx-snaphead"><span>{snap?.pipeline ? `Standard pipeline ${snap.pipeline.version} as #${snapRun.number} ran it, read-only` : `Code of #${snapRun.number}, read-only`}</span><span className="tx-spacer" />
-          {ownCode && <TxButton size="sm" onClick={() => void useRun(snapRun.id).catch(fail)}>Restore this code</TxButton>}
-          <TxIconButton size="sm" label="Hide code" icon="close" onClick={() => update({side: undefined})} /></div>
+    {codeShown && <div className="mx-vsplit" role="separator" aria-label={t("Resize the code")} onPointerDown={dragSide} />}
+    {codeShown && <section className="mx-code" aria-label={t("Code")} style={{width: (sidePx ?? 520) + (!snapRun && state.modelTree ? 150 : 0)}}>
+      {snapRun ? <><div className="mx-snaphead"><span>{snap?.pipeline ? t("Standard pipeline {version} as #{number} ran it, read-only", { version: snap.pipeline.version, number: snapRun.number }) : t("Code of #{number}, read-only", { number: snapRun.number })}</span><span className="tx-spacer" />
+          {ownCode && <TxButton size="sm" onClick={() => void useRun(snapRun.id).catch(fail)}>{t("Restore this code")}</TxButton>}
+          <TxIconButton size="sm" label={t("Hide code")} icon="close" onClick={() => update({side: undefined})} /></div>
         <pre className="mx-snap">{snap && snap.id === snapRun.id ? snap.files.map(item => item.text).join("\n\n") : ""}</pre></>
       : <CodeArea ctx={ctx} projectId={detail.developer?.projectId ?? null} rootUri={root} treeTitle={detail.name} entryUri={detail.entryUri} marks={marks} line={codeLine?.line} request={codeLine?.request}
         tree={state.modelTree === true} onTree={open => update({modelTree: open})} onHide={() => update({side: undefined})}
@@ -346,15 +348,14 @@ export function ModelPage({ctx, api, detail, onDetail, state, update, title, men
     </section>}
     </div>
     {(state as {modelPublish?: boolean}).modelPublish && selected && selected.status === "completed" && <PublishSheet mapi={mapi} run={selected} published={(selected.published ?? runs.find(item => item.published?.name)?.published)?.name ?? null} open onClose={() => update({modelPublish: undefined} as Partial<ShellState>)} onPublished={() => void loadRuns()} />}
-    {long && <TxDialog open onOpenChange={() => setLong(null)} title={`Train ${long.groups} run${long.groups > 1 ? "s" : ""}, about ${days(long.seconds)} on this machine?`}
-      footer={<><TxButton size="sm" onClick={() => setLong(null)}>Cancel</TxButton><TxButton size="sm" variant="primary" data-autofocus="" onClick={() => {setLong(null); send();}}>{runLabel(shownKind, total, null)}</TxButton></>}>
-      <div className="mx-cfm"><p>{check?.batch ? `${check.batch.concurrency} at a time, ${check.batch.threads} threads each.` : ""}</p></div></TxDialog>}
-    {confirm && <TxDialog open onOpenChange={() => setConfirm(null)} title={`Validate #${confirm.run.number} on held-out?`}
-      footer={<><TxButton size="sm" onClick={() => setConfirm(null)}>Cancel</TxButton><TxButton size="sm" variant="primary" data-autofocus="" onClick={() => void mapi.heldOut(confirm.run.id).then(() => {setConfirm(null); void loadRuns();}, fail)}>Validate on held-out</TxButton></>}>
-      <div className="mx-cfm"><p>Scores · {dayYear(confirm.plan.from)} – {dayYear(confirm.plan.to)}, once</p><p>Retrains · {confirm.plan.windows} {confirm.plan.windows === 1 ? "window" : "windows"} on the same schedule{confirm.plan.minutes ? confirm.plan.minutes < 1 ? ", under a minute" : `, about ${Math.round(confirm.plan.minutes)} min` : ""}</p>
-        <p>Held out so far · {heldOutUses(confirm.plan.uses)}</p>
-        <p>Afterwards #{confirm.run.number} is tagged Held-out. Picking between runs by their held-out score makes that score no longer clean.</p></div></TxDialog>}
-    {logOf && <TxSheet open onOpenChange={() => setLogOf(null)} title={`Log of #${logOf.run.number}`} label="Log" footer={<><TxButton size="sm" onClick={() => {void navigator.clipboard?.writeText(logOf.text); toast({title: "Copied the log"});}}>Copy</TxButton><TxButton size="sm" variant="quiet" onClick={() => setLogOf(null)}>Close</TxButton></>}><pre className="mx-log">{logOf.text}</pre></TxSheet>}
+    {long && <LongRunConfirm title={(long.groups > 1 ? t("Train {groups} runs?", { groups: long.groups }) : t("Train {groups} run?", { groups: long.groups }))} seconds={long.seconds} label={runLabel(shownKind, total, null)}
+      onCancel={() => setLong(null)} onConfirm={() => {setLong(null); send();}} />}
+    {confirm && <TxDialog open onOpenChange={() => setConfirm(null)} title={t("Validate #{number} on held-out?", { number: confirm.run.number })}
+      footer={<><TxButton size="sm" onClick={() => setConfirm(null)}>{t("Cancel")}</TxButton><TxButton size="sm" variant="primary" data-autofocus="" onClick={() => void mapi.heldOut(confirm.run.id).then(() => {setConfirm(null); void loadRuns();}, fail)}>{t("Validate on held-out")}</TxButton></>}>
+      <div className="mx-cfm"><p>{t("Scores · {from} – {to}, once", { from: dayYear(confirm.plan.from), to: dayYear(confirm.plan.to) })}</p><p>{(confirm.plan.windows === 1 ? t("Retrains · {windows} window on the same schedule", { windows: confirm.plan.windows }) : t("Retrains · {windows} windows on the same schedule", { windows: confirm.plan.windows }))}{confirm.plan.minutes ? confirm.plan.minutes < 1 ? t(", under a minute") : t(", about {minutes} min", { minutes: Math.round(confirm.plan.minutes) }) : ""}</p>
+        <p>{t("Held out so far · {uses}", { uses: heldOutUses(confirm.plan.uses) })}</p>
+        <p>{t("Afterwards #{number} is tagged Held-out. Picking between runs by their held-out score makes that score no longer clean.", { number: confirm.run.number })}</p></div></TxDialog>}
+    {logOf && <TxSheet open onOpenChange={() => setLogOf(null)} title={t("Log of #{number}", { number: logOf.run.number })} label={t("Log")} footer={<><TxButton size="sm" onClick={() => {void navigator.clipboard?.writeText(logOf.text); toast({title: t("Copied the log")});}}>{t("Copy")}</TxButton><TxButton size="sm" variant="quiet" onClick={() => setLogOf(null)}>{t.c("action", "Close")}</TxButton></>}><pre className="mx-log">{logOf.text}</pre></TxSheet>}
   </div>;
 }
 void ({} as Json);

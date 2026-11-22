@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from langchain_core.messages import ToolMessage
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 def config(thread, namespace="", checkpoint=None):
@@ -29,10 +30,10 @@ async def copy_thread(saver, source, destination, checkpoint=None):
     head = await saver.aget_tuple(config(source, checkpoint=checkpoint))
     if head is None:
         if checkpoint is not None:
-            raise ContractError("not_found", "This conversation checkpoint no longer exists")
+            raise ContractError("not_found", t("This conversation checkpoint no longer exists"))
         return
     if await saver.aget_tuple(config(destination)) is not None:
-        raise ContractError("conflict", "The destination conversation already has a history")
+        raise ContractError("conflict", t("The destination conversation already has a history"))
     pending = {"": head}
     copied = set()
     try:
@@ -58,7 +59,7 @@ async def copy_thread(saver, source, destination, checkpoint=None):
                 # Each completed subagent task has its own namespace.
                 child_head = await saver.aget_tuple(config(source, child))
                 if child_head is None:
-                    raise ContractError("not_found", "A completed subagent's checkpoint is missing")
+                    raise ContractError("not_found", t("A completed subagent's checkpoint is missing"))
                 pending[child] = child_head
     except BaseException:
         await saver.adelete_thread(destination)

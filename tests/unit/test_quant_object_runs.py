@@ -9,7 +9,6 @@ from types import SimpleNamespace
 import pytest
 from talyx_sdk import ContractError
 
-from modules.quant.backend.object_data import check_coverage
 from modules.quant.backend.object_history import RunHistory, describe_failure, metrics_of
 from modules.quant.backend.object_routes import Services
 from modules.quant.backend.work_records import WorkRecords
@@ -243,36 +242,6 @@ def test_source_limit_or_refusal_is_the_runs_failure_reason_and_is_not_retried(t
     asyncio.run(scenario())
 
 
-def test_missing_data_names_the_symbol_and_keeps_markets_gap_details():
-    since, until, now = 1_704_067_200_000, 1_719_705_599_999, 1_800_000_000_000
-    gaps = [{"start": str(since * 1_000_000), "end": str((since + 3_600_000) * 1_000_000), "reason": "source_gap"}]
-    selection = {"instrument": INSTRUMENT, "coverage": {"exportedRows": 100, "missingBars": 3, "gaps": gaps}}
-    with pytest.raises(ContractError, match=r"BTC/USDT:USDT: 3 missing 1h bars") as error:
-        check_coverage(selection, since, until, "1h", now)
-    assert error.value.details == {"instrumentId": INSTRUMENT["instrumentId"], "missingBars": 3, "gaps": gaps}
-    selection["coverage"]["exportedRows"] = 0
-    with pytest.raises(ContractError, match="BTC/USDT:USDT: no 1h bars"):
-        check_coverage(selection, since, until, "1h", now)
-    selection["coverage"].update(exportedRows=10, missingBars=0, gaps=[])
-    check_coverage(selection, since, until, "1h", now)
-
-
-def test_sparse_export_range_uses_the_calendars_closed_bar_count():
-    hour = 3_600_000
-    now = 1_793_500_000_000 + 30 * 60_000
-    last_closed_open = now // hour * hour - hour
-    end_of_today = (now // 86_400_000 + 1) * 86_400_000 - 1
-    selection = {"instrument": INSTRUMENT, "coverage": {"exportedRows": 10, "exportedRange": {"start": 1_790_000_000_000, "end": last_closed_open}, "missingBars": 0}}
-    check_coverage(selection, 1_790_000_000_000, end_of_today, "1h", now)
-    # Only bars counted missing against Market's closed calendar are gaps; forming bars and closed sessions do not become holes.
-    selection["coverage"]["missingBars"] = 5
-    with pytest.raises(ContractError, match="5 missing 1h bars"):
-        check_coverage(selection, 1_790_000_000_000, end_of_today, "1h", now)
-    selection["instrument"] = {**INSTRUMENT, "calendarId": "XNYS"}
-    selection["coverage"].update(missingBars=0, exportedRange={"start": 1_790_000_000_000, "end": last_closed_open - 3 * 86_400_000})
-    check_coverage(selection, 1_790_000_000_000, end_of_today, "1h", now)
-
-
 def test_an_error_in_the_authors_code_is_reported_at_the_authors_file_and_line(tmp_path):
     def frame(root, file, line, function, text, path=None):
         return {"root": root, "file": file, "path": path or "C:/run/" + file, "line": line, "function": function, "text": text}
@@ -479,7 +448,7 @@ def pipeline(runs, monkeypatch, tmp_path):
         return {"digest": "d" * 64, "files": [], "snapshotPath": str(source)}
 
     async def prepare_data(identity, obj, directory):
-        return {"summary": {}}
+        return {"summary": {"traded": 1, "rows": 1000}}
 
     async def launch(identity, obj, directory, prepared, state):
         return {"leaseId": "lease"}

@@ -9,6 +9,7 @@ from decimal import ROUND_FLOOR, Decimal
 import numpy as np
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -26,7 +27,7 @@ def read_json(path):
 
 def window(opens, end, around):
     if not len(opens):
-        raise ContractError("not_found", "This instrument has no bars in the run.")
+        raise ContractError("not_found", t("This instrument has no bars in the run."))
     last_start = max(0, len(opens) - BAR_LIMIT)
     start = (
         last_start
@@ -67,13 +68,13 @@ def pane(key, title, position="below"):
 
 def selected(items, requested):
     if not items:
-        raise ContractError("not_found", "This run has no instruments with values.")
+        raise ContractError("not_found", t("This run has no instruments with values."))
     if requested is None:
         return items[0]
     for item in items:
         if requested in (item["instrumentId"], item["key"]):
             return item
-    raise ContractError("invalid_input", f"{requested} is not an instrument in this run.")
+    raise ContractError("invalid_input", t("{requested} is not an instrument in this run.", requested=requested))
 
 
 def contribution_amounts(items, net):
@@ -241,7 +242,7 @@ def research(services, record, requested, around):
     factor = record["objectKind"] == "factor"
     meta_path = folder / ("cross/meta.json" if factor else "pred.json")
     if not meta_path.exists():
-        raise ContractError("not_found", "This run's values were not retained.")
+        raise ContractError("not_found", t("This run's values were not retained."))
     meta = read_json(meta_path)
     if factor:
         path = folder / "values.npy"
@@ -251,7 +252,7 @@ def research(services, record, requested, around):
         values = np.load(folder / "pred.npy", mmap_mode="r")
     valid_days = np.flatnonzero(np.isfinite(values).any(axis=1))
     if not len(valid_days):
-        raise ContractError("not_found", "This run has no scored values.")
+        raise ContractError("not_found", t("This run has no scored values."))
     latest = values[valid_days[-1]]
     by_column = {i["column"]: i for i in info["instruments"]}
     items = [
@@ -275,7 +276,7 @@ def research(services, record, requested, around):
     # A model scores only its test windows: the price window starts at the first scored day.
     bars = bars[bars.label.isin(labels[valid_days[0]:])].sort_values("time")
     if bars.empty:
-        raise ContractError("not_found", "This instrument has no prices in the run.")
+        raise ContractError("not_found", t("This instrument has no prices in the run."))
     count = len(bars)
     duration = timeframe_nanoseconds(info["timeframe"]) // 1_000_000
     # A value is known at its bar's close. On a continuous market or an intraday bar that is the next bar's open,
@@ -315,7 +316,7 @@ def result(record, item, items, timeframe, adjustment, limits, count, panes, lin
     if len(markers) > 20_000:
         raise ContractError(
             "too_large",
-            f"{len(markers):,} markers, {len(markers) - 20_000:,} over the limit of 20,000.",
+            t("{markers} markers, {markers2} over the limit of 20,000.", markers=f'{len(markers):,}', markers2=f'{len(markers) - 20000:,}'),
         )
     interval = {"from": timestamp(limits[0]), "to": timestamp(limits[1])}
     layer = {
@@ -340,7 +341,7 @@ def result(record, item, items, timeframe, adjustment, limits, count, panes, lin
 
 async def read(services, record, args):
     if record["state"] != "completed":
-        raise ContractError("invalid_input", "Choose a completed run.")
+        raise ContractError("invalid_input", t("Choose a completed run."))
     inputs = (services, record, args.get("instrumentId"), args.get("around"))
     if record["objectKind"] == "strategy":
         compare = args.get("compareTo") or []
@@ -348,16 +349,16 @@ async def read(services, record, args):
         for identity in ([compare] if isinstance(compare, str) else compare):
             other = services.runs.read(identity)
             if other["objectKind"] != "strategy":
-                raise ContractError("invalid_input", "The comparison must be a strategy run.")
+                raise ContractError("invalid_input", t("The comparison must be a strategy run."))
             comparisons.append((other, services.strategy.shown(other)))
         found = await asyncio.to_thread(strategy, *inputs, comparisons)
     elif record["objectKind"] in {"factor", "model"}:
         if args.get("compareTo"):
-            raise ContractError("invalid_input", "Comparison lines apply only to a strategy chartLayer.")
+            raise ContractError("invalid_input", t("Comparison lines apply only to a strategy chartLayer."))
         found = await asyncio.to_thread(research, *inputs)
     else:
         raise ContractError(
-            "invalid_input", "Price layers are available for strategy, factor and model runs."
+            "invalid_input", t("Price layers are available for strategy, factor and model runs.")
         )
     payload = await complete_json(services.store.ctx, found["layer"], "research-layer.json")
     layer = payload["file"] if "file" in payload else payload

@@ -45,15 +45,19 @@ def library_value(name, instrument_id, field, value, version, observed_ns, avail
                         version_id=version_id, batch_end=batch_end)
 
 
-def events(invocation):
-    """The library values a backtest hands its strategy, from the file the backend wrote: each arrives at the moment it became available."""
+def values(invocation):
+    """The library values a backtest hands its strategy, as the table the backend wrote (None when it reads none)."""
     import pandas as pd
     reading = invocation["libraryValues"]
     if reading["path"] is None:
-        return []
+        return None
     register()
-    frame = pd.read_parquet(reading["path"])
-    versions = {(item['name'], item['version']): item['versionId'] for item in reading['items']}
+    return pd.read_parquet(reading["path"])
+
+
+def events(invocation, frame):
+    """Those of `values` in `frame` as engine data: each arrives at the moment it became available."""
+    versions = {(item['name'], item['version']): item['versionId'] for item in invocation["libraryValues"]['items']}
     result = []
     for _, section in frame.groupby(['name', 'ts_init', 'field'], sort=False):
         for index, row in enumerate(section.itertuples()):

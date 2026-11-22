@@ -245,7 +245,7 @@ for case, extra in (("raw", {"demeaned": False}), ("neutral", {"groupAdjust": Tr
     prices = pd.DataFrame(close, index=panel.dates, columns=columns)
     factor = pd.DataFrame(raw, index=panel.dates, columns=columns).stack()
     factor.index.names = ["date", "asset"]
-    five_days = alutils.get_clean_factor_and_forward_returns(factor, prices, periods=(5,), groupby=dict(zip(columns, panel.industry)),
+    five_days = alutils.get_clean_factor_and_forward_returns(factor, prices, periods=(5,), groupby=dict(zip(columns, panel.industry.iloc[0])),
                                                              quantiles=5, max_loss=1.0, filter_zscore=None)
     ic = perf.factor_information_coefficient(five_days, group_adjust=adjust)["5D"].mean()
     information = next(row for row in built.build("ic")["information"] if row["period"] == 5)["mean"]

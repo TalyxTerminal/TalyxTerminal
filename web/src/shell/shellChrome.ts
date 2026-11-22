@@ -1,3 +1,5 @@
+import { translator } from "@talyx/sdk";
+import { t } from "./i18n";
 import { useEffect, useMemo, useState } from "react";
 import { failure } from "@talyx/sdk";
 import { platformRuntime } from "../kernel/runtime";
@@ -27,7 +29,7 @@ export function useWorkspaceTabs(open: readonly { id: string; name: string | nul
   const activity = useWorkspaceActivities();
   return useMemo(() => open.map(record => {
     const activities = activity.find(entry => entry.workspace.workspaceId === record.id)?.activities ?? [];
-    return { id: record.id, name: record.name ?? "Untitled", running: activities.length > 0, aiWork: aiWorkCount(activities) };
+    return { id: record.id, name: record.name ?? t("Untitled"), running: activities.length > 0, aiWork: aiWorkCount(activities) };
   }), [open, activity]);
 }
 
@@ -48,9 +50,9 @@ export function shellAlerts(modules: readonly ShellModuleState[], status: readon
 export function readShellAlerts() {
   const runtime = platformRuntime(), kernel = runtime.kernel;
   const modules = [...kernel.definitions.values()].filter(item => item.id !== "platform").map(item => ({
-    id: item.id, name: item.name, failed: item.enabled && (item.state === "failed" || runtime.faults.has(item.id) && !kernel.modules.get(item.id)?.ready),
+    id: item.id, name: translator(item.id)(item.name), failed: item.enabled && (item.state === "failed" || runtime.faults.has(item.id) && !kernel.modules.get(item.id)?.ready),
   }));
-  modules.push(...runtime.unreadable.map(item => ({ id: item.id, name: item.name, failed: true })));
+  modules.push(...runtime.unreadable.map(item => ({ id: item.id, name: translator(item.id)(item.name), failed: true })));
   const status = kernel.contributions("platform.status_item").flatMap(item => {
     const value = kernel.statusValues.get(`${item.moduleId}.${item.id}`);
     return value ? [value] : [];
@@ -69,7 +71,7 @@ export function useShellAlerts() {
 export function shellModuleChoices(faults: readonly ShellAttention[]): ShellModuleChoice[] {
   return [...platformRuntime().kernel.definitions.values()]
     .filter(item => item.id !== "platform" && item.enabled && Object.values(item.manifest.panels ?? {}).some(panel => panel.launcher))
-    .map(item => ({ kind: `module:${item.id}`, name: item.name, failed: faults.some(entry => entry.id === item.id) }))
+    .map(item => ({ kind: `module:${item.id}`, name: translator(item.id)(item.name), failed: faults.some(entry => entry.id === item.id) }))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
@@ -103,7 +105,7 @@ export function useWindowMaximized(desktop: TalyxDesktop | undefined): boolean {
 /** Opens an open workspace's folder in File Explorer (the desktop app only). */
 export async function openWorkspaceFolder(workspaceId: string): Promise<void> {
   const desktop = window.top!.talyxDesktop;
-  if (!desktop) throw failure("unavailable", "Opening folders needs the TALYX desktop app");
+  if (!desktop) throw failure("unavailable", t("Opening folders needs the TALYX desktop app"));
   const { path } = await platformRuntime().platform["workspace.folder"]({ workspaceId });
   await desktop.openFolder(path);
 }

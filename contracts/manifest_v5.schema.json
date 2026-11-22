@@ -29,6 +29,12 @@
         }
       }
     },
+    "locales": {
+      "type": "object",
+      "description": "The module's dictionaries by language: JSON files inside the module, English text to translation, shared by its frontend and backend. English needs none.",
+      "propertyNames": {"enum": ["zh-CN"]},
+      "additionalProperties": {"type": "string", "pattern": "\\.json$"}
+    },
     "entries": {
       "type": "object", "additionalProperties": false,
       "properties": {

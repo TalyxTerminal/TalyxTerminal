@@ -97,9 +97,7 @@ class NoIndustry:
         self.dates = np.arange(bars)
         self.columns = [f"S{i}" for i in range(names)]
         self.shape = (bars, names)
-
-    def industry_series(self):
-        return None
+        self.industry = None
 
     def derived(self, name):
         assert name == "size"
@@ -191,7 +189,8 @@ def panel(days, names):
 
 def test_a_name_halted_past_five_bars_carries_the_move_over_the_halt_into_its_first_open_back():
     """on the model side: the label and the long–short read opens carried over a halt until the name trades again, as the factor's returns now
-    do, so a held name earns the move over a long halt on its first bar back; after its last price (delisted) it has no return."""
+    do, so a held name earns the move over a long halt on its first bar back; after its last price (delisted) it is out at its last close: the move from
+    its last open to that close counts, and nothing after."""
     p = panel(40, 5)
     opens = p.fields["open"]
     opens[:, 3] = 10.0
@@ -200,7 +199,9 @@ def test_a_name_halted_past_five_bars_carries_the_move_over_the_halt_into_its_fi
     label = D.label_of(p, 1)  # bar t: open t+2 over open t+1
     assert label[7, 3] == pytest.approx(12.1 / 11 - 1)  # open 8 is the price held over the halt, 11; open 9 is 12.1
     assert label[1, 3] == pytest.approx(0.0)  # within the halt the held price does not move
-    assert np.isnan(label[28:, 4]).all() and not np.isnan(label[27, 4])
+    last = p.fields["close"][29, 4]
+    assert label[28, 4] == pytest.approx(last / opens[29, 4] - 1)  # bought at the last open, out at the last close
+    assert np.all(label[29:38, 4] == 0) and np.isnan(label[38:, 4]).all()  # nothing after; the last two bars have no later open at all
     returns = R.OpenToOpen(p).derived("returns")
     assert returns[9, 3] == pytest.approx(12.1 / 11 - 1) and returns[5, 3] == pytest.approx(0.0)
-    assert np.isnan(returns[30:, 4]).all()
+    assert returns[30, 4] == pytest.approx(last / opens[29, 4] - 1) and np.all(returns[31:, 4] == 0)

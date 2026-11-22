@@ -16,6 +16,8 @@ from datetime import time as clock_time
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
+from talyx_sdk.i18n import mark, t
+
 from ..common import NS, MarketError
 from .base import Source, Target, coverage, row
 
@@ -29,7 +31,7 @@ class SecFilings(Source):
     id = "sec"
     descriptor = {"name": "SEC EDGAR company facts", "sourceIds": ["sec"], "kinds": ["financials"],
                   "assetClasses": ["equity"], "credentials": "none", "paid": False, "supports": ["research"],
-                  "settings": [{"name": "contactEmail", "label": "Contact e-mail (sent to the SEC with each request)",
+                  "settings": [{"name": "contactEmail", "label": mark("Contact e-mail (sent to the SEC with each request)"),
                                 "type": "string", "secret": False, "required": True}]}
 
     def __init__(self, market):
@@ -43,7 +45,7 @@ class SecFilings(Source):
     def _agent(self, source_id: str) -> dict:
         email = (self.settings.get("contactEmail") or "").strip()
         if "@" not in email:
-            raise MarketError("unsupported", "SEC filings need a contact e-mail in the SEC source's settings",
+            raise MarketError("unsupported", t("SEC filings need a contact e-mail in the SEC source's settings"),
                               source_id=source_id)
         return {"User-Agent": f"TALYX research {email}", "Accept-Encoding": "gzip, deflate"}
 
@@ -57,11 +59,11 @@ class SecFilings(Source):
 
     async def research(self, source_id: str, target: Target, kind: str) -> list[dict]:
         if kind != "financials":
-            raise MarketError("unsupported", f"{source_id} gives financials only", source_id=source_id)
+            raise MarketError("unsupported", t("{source_id} gives financials only", source_id=source_id), source_id=source_id)
         headers = self._agent(source_id)
         cik = await self._cik(source_id, target.code_at(), headers)
         if cik is None:
-            raise MarketError("no_data", f"The SEC has no filer for {target.code_at()}", source_id=source_id)
+            raise MarketError("no_data", t("The SEC has no filer for {code_at}", code_at=target.code_at()), source_id=source_id)
         data = await self.egress.json(self.id, FACTS.format(cik=cik), headers=headers, timeout=60)
         return facts_rows(data)
 

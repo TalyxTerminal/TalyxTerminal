@@ -1,5 +1,6 @@
 /* A sweep: the key numbers, the heat map (or the bars of each year) with the table beside it, one line when the best combination sits on the edge of the grid,
    and under them the combination looked at. Nothing here picks a combination for the strategy: it only describes the best one. */
+import { t } from "../../i18n";
 import {useEffect, useMemo, useState} from "react";
 import { TxButton, TxHeatmap, TxIcon, TxKeyNumbers, TxRegionHead, TxSegmented, TxSelect, type TxHeatCell } from "@talyx/sdk";
 import {Fig} from "./Fig";
@@ -60,11 +61,11 @@ export function edgeNote(detail: SweepDetail): string | null {
   const best = detail.cases.find(item => item.index === detail.bestIndex);
   const edge = best?.edge?.[0];
   if (!edge) return null;
-  return `${edge.label ?? edge.name} ${valueText(edge.value)} is the ${edge.end} value tried (${valueText(edge.low)}–${valueText(edge.high)}); the best may lie beyond`;
+  return t("{setting} {value} is the {end} value tried ({low}–{high}); the best may lie beyond", { setting: edge.label ?? edge.name, value: valueText(edge.value), end: edge.end, low: valueText(edge.low), high: valueText(edge.high) });
 }
 
 export function SweepView({detail, onCell, onUse, onRunCell, onResume, onWiden}: SweepViewProps) {
-  if (detail.old) return <p className="sv-why" role="status">Sweep #{detail.number} was made by an earlier TALYX; run it again to see it here</p>;
+  if (detail.old) return <p className="sv-why" role="status">{t("Sweep #{number} was made by an earlier TALYX; run it again to see it here", { number: detail.number ?? "" })}</p>;
   const {axes, cases} = detail;
   const years = axes.some(axis => axis.name === "@period");
   const [pick, setPick] = useState<{x?: string; y?: string; metric?: Metric}>({});
@@ -80,20 +81,20 @@ export function SweepView({detail, onCell, onUse, onRunCell, onResume, onWiden}:
   const viewed = cases.find(item => item.index === (detail.selected ?? detail.viewed)) ?? null;
   const stopped = ["cancelled", "interrupted"].includes(detail.state);
   const left = cases.filter(item => item.state !== "completed" && item.state !== "failed").length;
-  const ranText = stopped ? `Stopped, ${detail.done - left < 0 ? 0 : cases.length - left} of ${detail.total}` : detail.state === "completed" ? `${detail.total}` : `${detail.done} of ${detail.total}`;
+  const ranText = stopped ? t("Stopped, {done} of {total}", { done: detail.done - left < 0 ? 0 : cases.length - left, total: detail.total }) : detail.state === "completed" ? `${detail.total}` : t("{done} of {total}", { done: detail.done, total: detail.total });
   const atOnce = detail.concurrency.atOnce;
-  const atText = atOnce ? `${atOnce} at a time${detail.concurrency.limit === "memory" ? " (memory)" : ""}` : undefined;
+  const atText = atOnce ? (detail.concurrency.limit === "memory" ? t("{count} at a time (memory)", { count: atOnce }) : t("{count} at a time", { count: atOnce })) : undefined;
   const numbers = useMemo(() => years ? [
-    {label: "Years", value: String(detail.total)},
-    {label: "Best year", value: best ? metricText("totalReturn", best.metrics?.totalReturn) : "", delta: best ? valueText(best.params[axes[0].name]) : undefined},
-    {label: "Worst year", value: worst ? metricText("totalReturn", worst.metrics?.totalReturn) : "", delta: worst ? valueText(worst.params[axes[0].name]) : undefined},
-    {label: "Ran", value: ranText, delta: atText},
+    {label: t("Years"), value: String(detail.total)},
+    {label: t("Best year"), value: best ? metricText("totalReturn", best.metrics?.totalReturn) : "", delta: best ? valueText(best.params[axes[0].name]) : undefined},
+    {label: t("Worst year"), value: worst ? metricText("totalReturn", worst.metrics?.totalReturn) : "", delta: worst ? valueText(worst.params[axes[0].name]) : undefined},
+    {label: t("Ran"), value: ranText, delta: atText},
   ] : [
-    {label: "Combinations", value: String(detail.total), delta: axes.map(axis => axis.values.length).join(" × ") + ", in-sample"},
-    {label: `Best ${METRIC_LABEL[detail.metric]}`, value: best ? metricText(detail.metric, best.metrics?.[detail.metric]) : "", delta: best ? axes.map(axis => valueText(best.params[axis.name])).join(", ") : undefined},
-    {label: "Best neighbourhood", value: best?.neighbours != null ? nf(best.neighbours, 2) : "", delta: best ? `${best.neighbourCount} neighbour${best.neighbourCount === 1 ? "" : "s"}` : undefined},
-    {label: `Worst ${METRIC_LABEL.sharpe}`, value: worst ? nf(worst.metrics?.sharpe, 2) : ""},
-    {label: "Ran", value: ranText, delta: atText},
+    {label: t("Combinations"), value: String(detail.total), delta: axes.map(axis => axis.values.length).join(" × ") + t(", in-sample")},
+    {label: t("Best {metric}", { metric: METRIC_LABEL[detail.metric] }), value: best ? metricText(detail.metric, best.metrics?.[detail.metric]) : "", delta: best ? axes.map(axis => valueText(best.params[axis.name])).join(", ") : undefined},
+    {label: t("Best neighbourhood"), value: best?.neighbours != null ? nf(best.neighbours, 2) : "", delta: best ? (best.neighbourCount === 1 ? t("{count} neighbour", { count: best.neighbourCount }) : t("{count} neighbours", { count: best.neighbourCount })) : undefined},
+    {label: t("Worst {sharpe}", { sharpe: METRIC_LABEL.sharpe }), value: worst ? nf(worst.metrics?.sharpe, 2) : ""},
+    {label: t("Ran"), value: ranText, delta: atText},
   ], [detail, best, worst, ranText, atText, axes, years]);
   const ordered = useMemo(() => years ? cases : [...cases].sort((a, b) => (b.metrics?.[metric] ?? -Infinity) - (a.metrics?.[metric] ?? -Infinity)), [cases, metric, years]);
   const note = edgeNote(detail);
@@ -101,26 +102,26 @@ export function SweepView({detail, onCell, onUse, onRunCell, onResume, onWiden}:
   useEffect(() => { if (!years && !viewed && best && best.state === "completed") onCell(best.index); }, [detail.number, years, viewed === null, best?.index]);
   const showState = cases.some(item => item.state !== "completed");
   if (detail.failed === detail.total) {
-    return <p className="sv-why" role="status">All {detail.total} combinations failed; the first one: {stateText(cases[0]).replace(/^Failed: /, "")}</p>;
+    return <p className="sv-why" role="status">{t("All {total} combinations failed; the first one: {cases}", { total: detail.total, cases: stateText(cases[0]).replace(/^Failed: /, "") })}</p>;
   }
   return <div className="sv-sweep">
     <TxKeyNumbers items={numbers} />
-    {stopped && left > 0 && <div className="sv-resume"><TxButton size="sm" onClick={onResume}><TxIcon name="play" />Resume the other {left}</TxButton></div>}
+    {stopped && left > 0 && <div className="sv-resume"><TxButton size="sm" onClick={onResume}><TxIcon name="play" />{t("Resume the other {left}", { left })}</TxButton></div>}
     <div className="sv-split">
       <div className="sv-heatbox">
         {!years && axes.length > 2 && heat && <div className="sv-axes">
           <label>x <TxSelect value={heat.x} onChange={event => setPick({x: event.target.value, y: heat.y === event.target.value ? undefined : heat.y ?? undefined, metric})}>{axes.map(axis => <option key={axis.name} value={axis.name}>{axisLabel(axis)}</option>)}</TxSelect></label>
           <label>y <TxSelect value={heat.y ?? ""} onChange={event => setPick({x: heat.x, y: event.target.value, metric})}>{axes.filter(axis => axis.name !== heat.x).map(axis => <option key={axis.name} value={axis.name}>{axisLabel(axis)}</option>)}</TxSelect></label>
-          <span className="sv-held">Others held at: {Object.entries(heat.held).map(([name, value]) => `${axisLabel(axes.find(axis => axis.name === name)!).replace(/^./, first => first.toLowerCase())} ${value}`).join(", ")}</span></div>}
-        {years ? <><TxRegionHead title="Each year" /><Fig fig={detail.figures.years} label="Each year" /></>
+          <span className="sv-held">{t("Others held at: {settings}", { settings: Object.entries(heat.held).map(([name, value]) => `${axisLabel(axes.find(axis => axis.name === name)!).replace(/^./, first => first.toLowerCase())} ${value}`).join(", ") })}</span></div>}
+        {years ? <><TxRegionHead title={t("Each year")} /><Fig fig={detail.figures.years} label={t("Each year")} /></>
           : <TxHeatmap title={yName ? `${axisLabel(axes.find(axis => axis.name === xName)!)} × ${axisLabel(axes.find(axis => axis.name === yName)!).replace(/^./, first => first.toLowerCase())}` : axisLabel(axes[0])}
-            metric={<TxSegmented label="Measure" value={metric} onChange={next => setPick({...pick, metric: next})} options={MEASURES.map(value => ({value, label: METRIC_LABEL[value]}))} />}
+            metric={<TxSegmented label={t("Measure")} value={metric} onChange={next => setPick({...pick, metric: next})} options={MEASURES.map(value => ({value, label: METRIC_LABEL[value]}))} />}
             x={grid.x} y={grid.y} cells={grid.cells} selected={grid.selected} best={grid.best} scale="neutral" format={value => metricText(metric, value)}
             onCell={(row, column) => { const found = grid.index[row]?.[column]; if (found !== null && found !== undefined && cases[found]?.state === "completed") onCell(found); }} />}
-        {note && <p className="sv-edge">{note}{onWiden && best?.edge?.[0] && <> <TxButton size="sm" variant="quiet" onClick={() => onWiden(axes.find(axis => axis.name === best.edge[0].name)!, best.edge[0].end)}>Widen the range</TxButton></>}</p>}
+        {note && <p className="sv-edge">{note}{onWiden && best?.edge?.[0] && <> <TxButton size="sm" variant="quiet" onClick={() => onWiden(axes.find(axis => axis.name === best.edge[0].name)!, best.edge[0].end)}>{t("Widen the range")}</TxButton></>}</p>}
       </div>
-      <div className="sv-tablebox"><div className="sv-tablehead"><b>Results</b> <span className="dim">{cases.length}</span></div><table className="sv-table"><thead><tr>
-        {axes.map(axis => <th key={axis.name} className="l">{axisLabel(axis)}</th>)}<th>Return</th><th>{METRIC_LABEL.sharpe}{years ? "" : " ↓"}</th>{!years && <th>Neighbours</th>}<th>Max DD</th>{showState && <th className="l">State</th>}</tr></thead>
+      <div className="sv-tablebox"><div className="sv-tablehead"><b>{t("Results")}</b> <span className="dim">{cases.length}</span></div><table className="sv-table"><thead><tr>
+        {axes.map(axis => <th key={axis.name} className="l">{axisLabel(axis)}</th>)}<th>{t.c("performance", "Return")}</th><th>{METRIC_LABEL.sharpe}{years ? "" : " ↓"}</th>{!years && <th>{t("Neighbours")}</th>}<th>{t("Max DD")}</th>{showState && <th className="l">{t("State")}</th>}</tr></thead>
         <tbody>{ordered.map(item => <tr key={key(item)} data-click="" data-on={item.index === viewed?.index ? "" : undefined} onClick={() => item.state === "completed" && onCell(item.index)}>
           {axes.map(axis => <td key={axis.name} className="l">{valueText(item.params[axis.name])}</td>)}
           <td className={cls(item.metrics?.totalReturn)}>{metricText("totalReturn", item.metrics?.totalReturn)}</td><td>{metricText("sharpe", item.metrics?.sharpe)}</td>
@@ -128,9 +129,9 @@ export function SweepView({detail, onCell, onUse, onRunCell, onResume, onWiden}:
           {showState && <td className="l dim">{stateText(item)}</td>}</tr>)}</tbody></table></div>
     </div>
     {!years && viewed && <><div className="sv-sub"><b>{caseTitle(axes, viewed.params).toLowerCase()}</b>
-      <span className="dim">Sharpe {nf(viewed.metrics?.sharpe, 2)}{viewed.neighbours != null ? `, neighbours ${nf(viewed.neighbours, 2)}` : ""}, max DD {metricText("maxDrawdown", viewed.metrics?.maxDrawdown)}</span><span className="sv-grow" />
-      <TxButton size="sm" onClick={() => onUse(viewed.index)}>Use these values</TxButton><TxButton variant="quiet" size="sm" onClick={() => onRunCell(viewed.index)}><TxIcon name="play" />Run</TxButton></div>
-      <Fig fig={detail.figures.preview} label="Equity of the combination" /></>}
+      <span className="dim">{(viewed.neighbours != null ? t("Sharpe {sharpe}, neighbours {neighbours}, max DD {value}", { sharpe: nf(viewed.metrics?.sharpe, 2), neighbours: nf(viewed.neighbours, 2), value: metricText("maxDrawdown", viewed.metrics?.maxDrawdown) }) : t("Sharpe {sharpe}, max DD {value}", { sharpe: nf(viewed.metrics?.sharpe, 2), value: metricText("maxDrawdown", viewed.metrics?.maxDrawdown) }))}</span><span className="sv-grow" />
+      <TxButton size="sm" onClick={() => onUse(viewed.index)}>{t("Use these values")}</TxButton><TxButton variant="quiet" size="sm" onClick={() => onRunCell(viewed.index)}><TxIcon name="play" />{t.c("action", "Run")}</TxButton></div>
+      <Fig fig={detail.figures.preview} label={t("Equity of the combination")} /></>}
   </div>;
 }
 export const sweepSeconds = (detail: SweepDetail) => detail.estimate ? span(detail.estimate.seconds) : "";

@@ -1,6 +1,7 @@
 {
   "manifestVersion": 5,
   "id": "chart",
+  "locales": {"zh-CN": "locales/zh-CN.json"},
   "name": "Chart",
   "version": "0.3.0",
   "ai": {"guide": "GUIDE.md", "docs": [

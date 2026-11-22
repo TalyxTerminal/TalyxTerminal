@@ -14,11 +14,11 @@ from talyx_sdk import ContractError
 
 from . import research_data, research_inputs
 from .materials import release, run_task
-from .object_data import required_settings, resolve_until
+from .object_data import left_out_text, required_settings, resolve_until
 from .work_records import digest
 
 DAY = 86_400_000
-INDUSTRY_CLASSES = {"equity", "fund", "etf"}  # the asset classes Market keeps an industry for
+INDUSTRY_CLASSES = {"equity"}  # the asset class Market keeps an industry and shares for (not funds: an ETF has neither)
 FETCHING = 4
 
 
@@ -33,6 +33,17 @@ def _write_json(path, value):
 def _bar_range(path):
     labels = pd.read_parquet(path, columns=["label"])["label"]
     return int(labels.min()), int(labels.max()), len(labels.unique())
+
+
+def ended_names(path, shown=5):
+    """The note for names whose prices stop before the data's do (delisted, or the source has none after), or None."""
+    bars = pd.read_parquet(path, columns=["label", "column"])
+    last = bars.groupby("column")["label"].max()
+    names = sorted(last[last < bars["label"].max()].index)
+    if not names:
+        return None
+    listed = ", ".join(names[:shown]) + (f" and {len(names) - shown} more" if len(names) > shown else "")
+    return f"Prices of {listed} end before the period does (delisted, or the source has none after): each is out at its last close and earns nothing after"
 
 
 def _library_frame(rows, columns, item):
@@ -64,7 +75,7 @@ class FactorData:
     def selection(self, data):
         required_settings({**data, "symbols": data.get("symbols") or data.get("list")})
         chosen = {key: data[key] for key in ("timeframe", "since", "until") if key in data}
-        chosen["adjustment"] = data.get("adjustment", "split")
+        chosen["adjustment"] = data.get("adjustment", "split_dividend")
         if data.get("index"):
             chosen["index"] = data["index"]
         else:
@@ -72,8 +83,10 @@ class FactorData:
             chosen["instruments"] = [item["instrument"] for item in symbols]
         return chosen
 
-    def key(self, data, calendars="one"):
-        return digest({"selection": self.selection(data), "calendars": calendars})[:24]
+    def key(self, data, calendars="one", facts=True):
+        """The freeze these settings share; one made without industry and shares (`facts=False`) is its own."""
+        # format 2: index members are kept once and named by place in each interval (freezes before it are made again)
+        return digest({"selection": self.selection(data), "calendars": calendars, "format": 2, **({} if facts else {"facts": False})})[:24]
 
     async def calendar_items(self, data):
         if data.get("until") != "latest":
@@ -101,19 +114,20 @@ class FactorData:
     def today(self):
         return freeze_day(self.clock())
 
-    async def prepare(self, data, *, report=None, retry=False, refresh_after=None, calendars="one"):
+    async def prepare(self, data, *, report=None, retry=False, refresh_after=None, calendars="one", facts=True):
         """The frozen data for these settings. When the same settings (the same range to its last closed bar) were frozen before and
         Market's revision of every series is the one frozen, that freeze is used as it is: nothing is fetched, exported or arranged.
-        Otherwise a candidate is frozen and kept only if its revisions or facts differ."""
+        Otherwise a candidate is frozen and kept only if its revisions or facts differ. `facts=False` (a factor run that reads no industry or
+        shares) freezes the prices alone."""
         resolved = await self.resolve(data)
-        key = self.key(resolved, calendars)
+        key = self.key(resolved, calendars, facts)
         async with self.locks.setdefault(key, asyncio.Lock()):
             previous = await asyncio.to_thread(self.ready, key)
             if previous is not None and await self.unchanged(previous):
                 return {**previous, "how": "unchanged"}
             staging = self.root / f".preparing-{key}-{uuid4().hex}"
             try:
-                candidate = await self._prepare(key, resolved, report or (lambda rows, stage, done=None, progress=None: None), staging, calendars)
+                candidate = await self._prepare(key, resolved, report or (lambda rows, stage, done=None, progress=None: None), staging, calendars, facts)
                 if previous is not None and previous["fingerprint"] == candidate["fingerprint"]:
                     return {**previous, "how": "unchanged"}
                 if previous is not None:
@@ -151,7 +165,7 @@ class FactorData:
         if self.renamed is not None:
             self.renamed(key, aside, ready["frozenAt"])
 
-    async def _prepare(self, key, resolved, report, directory, calendars="one"):
+    async def _prepare(self, key, resolved, report, directory, calendars="one", facts=True):
         directory.mkdir(parents=True)
         selection = self.selection(resolved)
         data = dict(resolved)
@@ -168,19 +182,26 @@ class FactorData:
             info = prepared["research"]["info"]
             rows = prepared["summary"]["fetchRows"]
             await asyncio.to_thread(self._write_rows, directory, rows)
-            report(rows, "facts", 0)
             instruments = [item["instrument"] for item in info["instruments"]]
-            priced = [next(row for row in rows if row["instrumentId"] == item["instrumentId"]) for item in instruments]
-            extras = await self._facts(instruments, priced, rows, directory, info["since"], info["until"],
-                                       info["adjusted"], info["timeframe"], report)
-            notes = [item["text"] for item in extras["describe"]["limits"]]
-            notes.extend(fact_notes(rows, extras["kinds"]))
+            if facts:
+                report(rows, "facts", 0)
+                priced = [next(row for row in rows if row["instrumentId"] == item["instrumentId"]) for item in instruments]
+                extras = await self._facts(instruments, priced, rows, directory, info["since"], info["until"],
+                                           info["adjusted"], info["timeframe"], report)
+            else:
+                extras = {"industry": None, "shares": None, "describe": await research_inputs.describe(self.ctx, instruments), "kinds": [], "notes": []}
+            notes = [*extras["notes"], *fact_notes(rows, extras["kinds"])]
+            stopped = await asyncio.to_thread(ended_names, prepared["research"]["barsPath"])
+            if stopped:
+                notes.append(stopped)
+            left = [row for row in rows if row["result"] not in {"fetched", "partial"}]
             if "index" in info:
                 from .index_universe import gap_text, gaps
-                without = sum(row["result"] not in {"fetched", "partial"} for row in rows)
-                lacking = gaps(info["index"], without)
+                lacking = gaps(info["index"], len(left))
                 if lacking:
                     notes.append(gap_text(lacking))
+            elif left:
+                notes.append(left_out_text(left, len(rows)))
             extras_value = {"industry": extras["industry"], "shares": extras["shares"], "notes": notes}
             await asyncio.to_thread(_write_json, directory / "extras.json", extras_value)
             first, last, bars = await asyncio.to_thread(_bar_range, prepared["research"]["barsPath"])
@@ -204,7 +225,7 @@ class FactorData:
         _write_json(directory / "fetch.json", rows)
 
     def industries(self, data):
-        """Whether these names are of an asset class Market gives an industry for (stocks and funds, not crypto); the settings that need
+        """Whether these names are of an asset class Market gives an industry for (stocks, not funds or crypto); the settings that need
         an industry (neutralizing by it, grouping inside it, Group neutral) exist only for such a pool, and take nothing out by default
         elsewhere."""
         if not data.get("symbols") and not data.get("list"):
@@ -216,48 +237,53 @@ class FactorData:
         return "industry+size" if self.industries(data) else "none"
 
     async def _facts(self, instruments, priced_rows, rows, directory, since, until, adjusted, timeframe, report):
+        """Industry and shares as Market knew them on each date: an industry history per name (`{ticker: [[from, until, name], ...]}`,
+        times in ms, None where open) and each name's share counts by announcement."""
         described = await research_inputs.describe(self.ctx, instruments)
         fields = {item["key"]: item for item in described["fields"]}
-        industry, shares = {}, {}
+        industry, shares, notes = {}, {}, []
         eligible = [(instrument, row) for instrument, row in zip(instruments, priced_rows, strict=True)
                     if instrument["assetClass"] in INDUSTRY_CLASSES]
         kinds = [kind for field, kind in (("industry", "classification"), ("shares", "shares")) if fields[field]["basis"] is not None] if eligible else []
-        if kinds and eligible:
+        ticker_of = {instrument["instrumentId"]: row for instrument, row in eligible}
+        if "classification" in kinds:
+            # Market reads A shares' industry on each quarter's date (one request a date for the whole market) and keeps what it read.
+            found, problems = await research_inputs.industries(self.ctx, [instrument for instrument, _ in eligible], since, until,
+                                                              progress=lambda value: report(rows, "facts", 0, value))
+            for identity, problem in problems.items():
+                if problem["code"] not in {"unsupported", "no_data", "not_found"}:
+                    raise ContractError(problem["code"], problem["message"], problem)
+                _fact_note(ticker_of[identity], problem["message"])
+            for identity, history in found.items():
+                row = ticker_of[identity]
+                industry[row["ticker"]] = [list(item) for item in history]
+                row["sector"] = history[-1][2]
+        if "shares" in kinds:
             # One Market fetch for every name: Market keeps what it has (fetches only facts it lacks up to this end) and
             # limits the requests to its sources itself.
             result = await run_task(self.ctx, "market.fetch", {"symbols": [instrument["instrumentId"] for instrument, _ in eligible],
-                "data": [{"kind": kind} for kind in kinds], "start": "1970-01-01", "end": research_inputs.timestamp(until)},
+                "data": [{"kind": "shares"}], "start": "1970-01-01", "end": research_inputs.timestamp(until)},
                 progress=lambda value: report(rows, "facts", 0, value))
             for failure in result["failures"]:
                 problem = failure["problem"]
                 if problem["code"] not in {"unsupported", "no_data", "not_found"}:
                     raise ContractError(problem["code"], problem["message"], problem)
-                row = next(row for instrument, row in eligible if instrument["instrumentId"] == failure["instrumentId"])
-                _fact_note(row, problem["message"])
+                _fact_note(ticker_of[failure["instrumentId"]], problem["message"])
         gate = asyncio.Semaphore(FETCHING)
         finished = 0
         async def one(instrument, row):
             nonlocal finished
             async with gate:
-                if "classification" in kinds:
-                    found = await research_inputs.read_pages(self.ctx, {"data": "classification", "symbols": [instrument["instrumentId"]],
-                        "asOf": research_inputs.timestamp(int(self.clock() * 1000)), "fill": "none"})
-                    self._fact_problem(found, row)
-                    candidates = sorted(found["rows"], key=lambda entry: (entry["level"] == "sector", research_inputs.milliseconds(entry["knownAt"])))
-                    if candidates:
-                        industry[row["ticker"]] = candidates[-1]["name"]
-                        row["sector"] = candidates[-1]["name"]
-                if "shares" in kinds:
-                    found = await research_inputs.read_pages(self.ctx, {"data": "shares", "symbols": [instrument["instrumentId"]],
-                        "end": research_inputs.timestamp(until), "asOf": research_inputs.timestamp(until), "fill": "none"})
-                    self._fact_problem(found, row)
-                    counts = [(research_inputs.milliseconds(entry["knownAt"]), float(entry["shares"]))
-                              for entry in found["rows"] if entry["kind"] == "outstanding"]
-                    if counts:
-                        shares[row["ticker"]] = sorted(set(counts))
+                found = await research_inputs.read_pages(self.ctx, {"data": "shares", "symbols": [instrument["instrumentId"]],
+                    "end": research_inputs.timestamp(until), "asOf": research_inputs.timestamp(until), "fill": "none"})
+                self._fact_problem(found, row)
+                counts = [(research_inputs.milliseconds(entry["knownAt"]), float(entry["shares"]))
+                          for entry in found["rows"] if entry["kind"] == "outstanding"]
+                if counts:
+                    shares[row["ticker"]] = sorted(set(counts))
                 finished += 1
                 report(rows, "facts", finished)
-        tasks = [asyncio.create_task(one(instrument, row)) for instrument, row in eligible]
+        tasks = [asyncio.create_task(one(instrument, row)) for instrument, row in eligible] if "shares" in kinds else []
         try:
             await asyncio.gather(*tasks)
         except BaseException:
@@ -265,7 +291,7 @@ class FactorData:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
-        return {"industry": industry or None, "shares": shares or None, "describe": described, "kinds": kinds}
+        return {"industry": industry or None, "shares": shares or None, "describe": described, "kinds": kinds, "notes": notes}
 
     @staticmethod
     def _fact_problem(found, row):

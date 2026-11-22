@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .market_inputs import ms, ns
 from .materials import plain
@@ -23,7 +24,7 @@ async def date_window(ctx, calendar_id, timeframe, start, end):
     page = plain(await ctx.call("market.calendar.sessions", {
         "calendarId": calendar_id, "startDate": first.isoformat(), "endDate": first.isoformat()}))
     if page["timezone"] is None:
-        raise ContractError("unavailable", f"Market has no timezone for {calendar_id}.")
+        raise ContractError("unavailable", t("Market has no timezone for {calendar_id}.", calendar_id=calendar_id))
     zone = ZoneInfo(page["timezone"])
     opened = datetime.combine(first, datetime.min.time(), zone)
     stopped = datetime.combine(last + timedelta(days=1), datetime.min.time(), zone)
@@ -55,7 +56,7 @@ async def boundaries(ctx, calendar_id, timeframe, scope, start, end):
                 "start": ns(window), "end": str(limit * 1_000_000 - 1), "limit": PAGE,
                 **({"after": after} if after is not None else {})}))
             if page["evidence"] != "verified":
-                raise ContractError("unavailable", f"Market has no verified trading calendar {calendar_id} for {timeframe} bars: {page['reason']}.",
+                raise ContractError("unavailable", t("Market has no verified trading calendar {calendar_id} for {timeframe} bars: {reason}.", calendar_id=calendar_id, timeframe=timeframe, reason=page['reason']),
                                     {"calendarId": calendar_id})
             zone = page["timezone"]
             found.update((ms(opened), ms(closed)) for opened, closed in zip(page["open"], page["close"], strict=True))
@@ -69,7 +70,7 @@ async def boundaries(ctx, calendar_id, timeframe, scope, start, end):
 def annualization(found, start, end):
     """Bars per year: the boundaries Market counts in the range, scaled to one year."""
     if not found:
-        raise ContractError("unavailable", "Market's calendar lists no bars in the selected range.")
+        raise ContractError("unavailable", t("Market's calendar lists no bars in the selected range."))
     return round(len(found) * YEAR_MS / (end - start))
 
 
@@ -86,5 +87,5 @@ def available_at(labels, timeframe, zone, found):
     closes = {label_of(opened, timeframe, zone): closed for opened, closed in found}
     missing = [label for label in labels if label not in closes]
     if missing:
-        raise ContractError("unavailable", f"Market's calendar has no bar at {len(missing)} of the values' times (the first is {missing[0]}).")
+        raise ContractError("unavailable", t("Market's calendar has no bar at {missing} of the values' times (the first is {missing2}).", missing=len(missing), missing2=missing[0]))
     return [closes[label] for label in labels]

@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import changes
 
@@ -168,7 +169,7 @@ class Store:
         if cursor is None:
             cursor = self.db.execute("SELECT COALESCE(MAX(seq),0) FROM fired").fetchone()[0]
         elif type(cursor) is not int or not 0 <= cursor < 2**63:
-            raise ContractError("invalid_input", "Invalid alert firing cursor")
+            raise ContractError("invalid_input", t("Invalid alert firing cursor"))
         while True:
             waiting = self.firing
             rows = self.db.execute("SELECT seq,condition,record FROM fired WHERE workspace=? AND seq>? "

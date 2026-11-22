@@ -5,6 +5,8 @@ places. The declarations are the code's own settings layer; the platform's run s
 """
 import ast
 
+from talyx_sdk.i18n import t
+
 LITERAL_TYPES = (int, float, bool, str)
 NAMES = {"param", "library_param", "choice", "pick", "table"}
 COMMON = {"label", "help", "group", "show_if"}
@@ -25,27 +27,27 @@ def _literal(node, line, what):
     try:
         return ast.literal_eval(node)
     except ValueError:
-        raise ValueError(f"line {line}: {what} must be a literal") from None
+        raise ValueError(t("line {line}: {what} must be a literal", line=line, what=what)) from None
 
 
 def _options(raw, line):
     """Choices as `[value, …]` or `[(value, label), …]`; each value a number or text."""
     if not isinstance(raw, (list, tuple)) or not raw:
-        raise ValueError(f"line {line}: options must be a list of values, or of (value, label) pairs")
+        raise ValueError(t("line {line}: options must be a list of values, or of (value, label) pairs", line=line))
     out = []
     for item in raw:
         value, label = (item[0], item[1]) if isinstance(item, (list, tuple)) and len(item) == 2 else (item, None)
         if type(value) not in (int, float, str) or label is not None and not isinstance(label, str):
-            raise ValueError(f"line {line}: each option is a number or text, with an optional label")
+            raise ValueError(t("line {line}: each option is a number or text, with an optional label", line=line))
         out.append({"value": value, "label": label if label is not None else str(value)})
     if len({repr(item["value"]) for item in out}) != len(out):
-        raise ValueError(f"line {line}: options repeat a value")
+        raise ValueError(t("line {line}: options repeat a value", line=line))
     return out
 
 
 def _columns(raw, line):
     if not isinstance(raw, (list, tuple)) or not raw or not all(isinstance(item, str) and item for item in raw):
-        raise ValueError(f"line {line}: columns must be a list of column names")
+        raise ValueError(t("line {line}: columns must be a list of column names", line=line))
     return list(raw)
 
 
@@ -57,26 +59,26 @@ def _declared(node, declared, file):
     if any(isinstance(arg, ast.Starred) for arg in node.args) or not 1 <= len(node.args) <= positional or declared != "pick" and len(node.args) < positional:
         shape = {"param": "a name and a default", "library_param": "a name and a default", "choice": "a name, a default and the options",
                  "table": "a name and the default rows", "pick": "a name"}[declared]
-        raise ValueError(f"line {line}: q.{declared} needs {shape} as its first arguments")
+        raise ValueError(t("line {line}: q.{declared} needs {shape} as its first arguments", line=line, declared=declared, shape=shape))
     name = _literal(node.args[0], line, "the setting's name")
     if not isinstance(name, str) or not name.isidentifier():
-        raise ValueError(f"line {line}: the setting's name must be an identifier string")
+        raise ValueError(t("line {line}: the setting's name must be an identifier string", line=line))
     options = {}
     for keyword in node.keywords:
         if keyword.arg not in KEYWORDS[declared]:
-            raise ValueError(f"line {line}: q.{declared} does not take {keyword.arg or '**'}")
+            raise ValueError(t("line {line}: q.{declared} does not take {arg}", line=line, declared=declared, arg=keyword.arg or '**'))
         options[keyword.arg] = _literal(keyword.value, line, keyword.arg)
     for key in ("label", "help", "group"):
         if key in options and not isinstance(options[key], str):
-            raise ValueError(f"line {line}: {key} must be text")
+            raise ValueError(t("line {line}: {key} must be text", line=line, key=key))
     show_if = options.get("show_if")
     if show_if is not None and (not isinstance(show_if, dict) or not show_if or not all(isinstance(key, str) for key in show_if)):
-        raise ValueError(f"line {line}: show_if must be a dict of other settings' names and the values that show this one")
+        raise ValueError(t("line {line}: show_if must be a dict of other settings' names and the values that show this one", line=line))
     item = {"name": name, "label": options.get("label") or name, "help": options.get("help"), "group": options.get("group"),
             "showIf": show_if, "file": file, "line": line, "min": None, "max": None}
     if "unit" in options:
         if not isinstance(options["unit"], str):
-            raise ValueError(f"line {line}: unit must be text")
+            raise ValueError(t("line {line}: unit must be text", line=line))
         item["unit"] = options["unit"]
     if declared in ("param", "library_param"):
         default = _literal(node.args[1], line, "the default")
@@ -84,41 +86,41 @@ def _declared(node, declared, file):
             raise ValueError(f"line {line}: the default must be " + ("the text of a library item's name" if declared == "library_param" else "a number, true/false or text"))
         for key in ("min", "max", "step"):
             if key in options and (type(options[key]) not in (int, float) or type(default) in (bool, str)):
-                raise ValueError(f"line {line}: {key} applies to number settings")
+                raise ValueError(t("line {line}: {key} applies to number settings", line=line, key=key))
         if "step" in options and options["step"] <= 0:
-            raise ValueError(f"line {line}: step must be more than 0")
+            raise ValueError(t("line {line}: step must be more than 0", line=line))
         kind = "library" if declared == "library_param" else {bool: "bool", int: "int", float: "float", str: "text"}[type(default)]
         item.update(type=kind, default=default, min=options.get("min"), max=options.get("max"), step=options.get("step"))
     elif declared == "choice":
         default = _literal(node.args[1], line, "the default")
         choices = _options(_literal(node.args[2], line, "the options"), line)
         if all(repr(default) != repr(entry["value"]) for entry in choices):
-            raise ValueError(f"line {line}: the default {default!r} is not one of the options")
+            raise ValueError(t("line {line}: the default {default} is not one of the options", line=line, default=repr(default)))
         item.update(type="choice", default=default, options=choices)
     elif declared == "pick":
         default = _literal(node.args[1], line, "the default") if len(node.args) > 1 else None
         kinds = options.get("kinds", ["factor"])
         kinds = [kinds] if isinstance(kinds, str) else list(kinds) if isinstance(kinds, (list, tuple)) else None
         if not kinds or any(entry not in PICK_KINDS for entry in kinds):
-            raise ValueError(f"line {line}: kinds must be among {', '.join(sorted(PICK_KINDS))}")
+            raise ValueError(t("line {line}: kinds must be among {PICK_KINDS}", line=line, PICK_KINDS=', '.join(sorted(PICK_KINDS))))
         pinned = options.get("pinned", "version")
         if pinned not in ("version", "run"):
-            raise ValueError(f"line {line}: pinned is \"version\" (a library version) or \"run\" (one run of an unpublished object)")
+            raise ValueError(t("line {line}: pinned is \"version\" (a library version) or \"run\" (one run of an unpublished object)", line=line))
         if not isinstance(options.get("multiple", False), bool):
-            raise ValueError(f"line {line}: multiple must be True or False")
+            raise ValueError(t("line {line}: multiple must be True or False", line=line))
         item.update(type="pick", default=default if default is not None else ([] if options.get("multiple") else None), kinds=kinds,
                     multiple=options.get("multiple", False), pinned=pinned)
     else:
         rows = _literal(node.args[1], line, "the default rows")
         columns = _columns(options.get("columns"), line) if "columns" in options else None
         if not isinstance(rows, (list, tuple)) or not all(isinstance(row, dict) for row in rows):
-            raise ValueError(f"line {line}: a table's default is a list of rows, each a dict of column to value")
+            raise ValueError(t("line {line}: a table's default is a list of rows, each a dict of column to value", line=line))
         columns = columns or (list(rows[0]) if rows else None)
         if not columns:
-            raise ValueError(f"line {line}: a table needs columns")
+            raise ValueError(t("line {line}: a table needs columns", line=line))
         for row in rows:
             if set(row) != set(columns) or any(type(value) not in LITERAL_TYPES for value in row.values()):
-                raise ValueError(f"line {line}: every row has exactly the columns {', '.join(columns)}, each a number, true/false or text")
+                raise ValueError(t("line {line}: every row has exactly the columns {columns}, each a number, true/false or text", line=line, columns=', '.join(columns)))
         item.update(type="table", default=[dict(row) for row in rows], columns=columns)
     return item
 
@@ -136,7 +138,7 @@ def read_project(files):
         try:
             tree = ast.parse(files[file])
         except SyntaxError as error:
-            errors.append({"file": file, "line": error.lineno or 1, "message": f"line {error.lineno}: {error.msg}"})
+            errors.append({"file": file, "line": error.lineno or 1, "message": t("line {lineno}: {msg}", lineno=error.lineno, msg=error.msg)})
             continue
         found = []
         for node in ast.walk(tree):
@@ -152,7 +154,7 @@ def read_project(files):
         for item in sorted(found, key=lambda entry: entry["line"]):
             if item["name"] in first:
                 where = first[item["name"]]
-                errors.append({"file": file, "line": item["line"], "message": f"{item['name']!r} is declared twice: {where['file']} line {where['line']} and {file} line {item['line']}",
+                errors.append({"file": file, "line": item["line"], "message": t("{name} is declared twice: {file} line {line} and {file2} line {line2}", name=repr(item['name']), file=where['file'], line=where['line'], file2=file, line2=item['line']),
                                "also": {"file": where["file"], "line": where["line"]}})
                 continue
             first[item["name"]] = item
@@ -161,7 +163,7 @@ def read_project(files):
     for item in parameters:
         for other in item["showIf"] or {}:
             if other not in names:
-                errors.append({"file": item["file"], "line": item["line"], "message": f"line {item['line']}: show_if names {other!r}, which is not declared"})
+                errors.append({"file": item["file"], "line": item["line"], "message": t("line {line}: show_if names {other}, which is not declared", line=item['line'], other=repr(other))})
     return {"parameters": parameters, "errors": errors}
 
 
@@ -185,7 +187,7 @@ def check_values(definitions, values):
     for name, value in values.items():
         item = known.get(name)
         if item is None:
-            raise ValueError(f"The code has no setting {name!r}")
+            raise ValueError(t("The code has no setting {name}", name=repr(name)))
         kind = item["type"]
         need = None
         if kind == "bool":
@@ -205,6 +207,6 @@ def check_values(definitions, values):
             ok = isinstance(value, list) and all(isinstance(row, dict) and set(row) == set(item["columns"]) and all(type(cell) in LITERAL_TYPES for cell in row.values()) for row in value)
             need = None if ok else f"rows with the columns {', '.join(item['columns'])}"
         if need:
-            raise ValueError(f"Setting {name!r} needs {need}")
+            raise ValueError(t("Setting {name} needs {need}", name=repr(name), need=need))
         if kind in ("int", "float") and (item["min"] is not None and value < item["min"] or item["max"] is not None and value > item["max"]):
-            raise ValueError(f"Setting {name!r} must be between {item['min']} and {item['max']}")
+            raise ValueError(t("Setting {name} must be between {min} and {max}", name=repr(name), min=item['min'], max=item['max']))

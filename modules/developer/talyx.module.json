@@ -3,6 +3,7 @@
   "id": "developer",
   "ai": {"guide": "GUIDE.md", "docs": [{"topic": "module", "title": "Write a TALYX module: template, declarations, the SDK references", "file": "docs/module.md"}]},
   "requires": {"agent": {"optional": true}},
+  "locales": {"zh-CN": "locales/zh-CN.json"},
   "name": "Developer",
   "version": "2.0.0",
   "description": "Source projects, shared documents and writing TALYX modules.",

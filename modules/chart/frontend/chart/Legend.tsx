@@ -1,3 +1,5 @@
+import { indicatorLabel } from "../indicatorText";
+import { t } from "../i18n";
 /* TradingView's status line: symbol, timeframe and exchange with the market state, OHLC and the change under the pointer;
    one row per indicator (name, inputs, values) with show/hide, settings, source code and remove on hover. Data state only when not live. */
 import { useState } from "react";
@@ -10,7 +12,7 @@ import { PRICE_PANE, type CatalogEntry, type Comparison, type Indicator } from "
 import { comparisonColor } from "../engine/theme";
 import { timeframeLabel } from "./timeframes";
 
-const STATE_TEXT: Record<string, string> = { connecting: "Connecting", delayed: "Delayed", history_only: "History only", market_closed: "Market closed", recovering: "Reconnecting", failed: "Disconnected" };
+const STATE_TEXT: Record<string, string> = { connecting: t("Connecting"), delayed: t("Delayed"), history_only: t("History only"), market_closed: t("Market closed"), recovering: t("Reconnecting"), failed: t("Disconnected") };
 
 export function Legend({ ctx, panelId, chartId, onIndicatorSettings, tops }: { ctx: ModuleContext; panelId: string; chartId: string; onIndicatorSettings(id: string): void; tops: Map<string, number> }) {
   const entry = useStore(state => state.charts[chartId]);
@@ -40,24 +42,24 @@ export function Legend({ ctx, panelId, chartId, onIndicatorSettings, tops }: { c
     <div className="chart-legend-row chart-legend-main chart-legend-fit">
       <span className="chart-legend-head">
         {shows.title && <span className="chart-legend-title">{(document.instrument.name ?? document.instrument.displaySymbol)} · {timeframeLabel(document.series.timeframe!)} · {(document.instrument.venueName ?? document.instrument.venueId)}</span>}
-        {status && status.state !== "connecting" && <span className="chart-state-dot" data-state={status.state} title={STATE_TEXT[status.state] ?? "Live"} />}
+        {status && status.state !== "connecting" && <span className="chart-state-dot" data-state={status.state} title={STATE_TEXT[status.state] ?? t("Live")} />}
       </span>
       {shows.ohlc && index >= 0 && <span className="chart-legend-values" data-direction={up ? "up" : "down"}>
-        {(["O", "H", "L", "C"] as const).map((key, at) => <span key={key}><span className="chart-legend-key">{key}</span>{formatPrice([bars.open, bars.high, bars.low, bars.close][at][index], precision)}</span>)}
+        {([t("O"), t("H"), t("L"), t("C")] as const).map((key, at) => <span key={key}><span className="chart-legend-key">{key}</span>{formatPrice([bars.open, bars.high, bars.low, bars.close][at][index], precision)}</span>)}
       </span>}
       {shows.change && index >= 0 && change !== null && <span className="chart-legend-values" data-direction={up ? "up" : "down"}>{change >= 0 ? "+" : ""}{formatPrice(change, precision)} ({change >= 0 ? "+" : ""}{(change / previous! * 100).toFixed(2)}%)</span>}
-      {shows.volume && index >= 0 && bars.volume[index] !== null && <span className="chart-legend-values"><span className="chart-legend-key">Vol</span>{formatCompact(bars.volume[index]!)}</span>}
+      {shows.volume && index >= 0 && bars.volume[index] !== null && <span className="chart-legend-values"><span className="chart-legend-key">{t("Vol")}</span>{formatCompact(bars.volume[index]!)}</span>}
     </div>
     {/* Connecting (before the first live) shows nothing unless an attempt failed. */}
     {status && status.state !== "live" && (status.state !== "connecting" || status.problem) && <div className="chart-legend-row chart-data-state" data-state={status.state}>
       <span>{STATE_TEXT[status.state]}{status.problem ? ` · ${status.problem.message}` : ""}</span>
-      {status.state === "failed" && <TxButton variant="quiet" size="sm" onClick={() => retryChart(ctx, chartId)}>Retry</TxButton>}
+      {status.state === "failed" && <TxButton variant="quiet" size="sm" onClick={() => retryChart(ctx, chartId)}>{t("Retry")}</TxButton>}
     </div>}
-    {entry.atStart && feed.limitReached && <div className="chart-legend-row chart-data-state" title="Use a longer timeframe to see further back">30,000 bar limit reached</div>}
+    {entry.atStart && feed.limitReached && <div className="chart-legend-row chart-data-state" title={t("Use a longer timeframe to see further back")}>{t("30,000 bar limit reached")}</div>}
     {entry.error && <div className="chart-legend-row chart-data-state" data-state="failed" role="alert">{entry.error}</div>}
     {document.comparisons.map((comparison, at) => <ComparisonRow key={comparison.id} ctx={ctx} chartId={chartId} entry={entry} comparison={comparison} color={comparison.color ?? comparisonColor(at)} index={index} />)}
     {!collapsed && document.indicators.filter(indicator => indicator.paneId === PRICE_PANE).map(row)}
-    {document.indicators.some(indicator => indicator.paneId === PRICE_PANE) && <TxIconButton size="sm" className="chart-legend-toggle" label={collapsed ? "Show indicator legend" : "Hide indicator legend"}
+    {document.indicators.some(indicator => indicator.paneId === PRICE_PANE) && <TxIconButton size="sm" className="chart-legend-toggle" label={collapsed ? t("Show indicator legend") : t("Hide indicator legend")}
       icon={collapsed ? "chevron-down" : "chevron"} onClick={() => setCollapsed(!collapsed)} />}
   </div></>;
 }
@@ -68,8 +70,8 @@ function ComparisonRow({ ctx, chartId, entry, comparison, color, index }: { ctx:
   return <div className="chart-legend-row chart-legend-indicator chart-legend-fit" data-hidden={!comparison.visible}>
     <span className="chart-legend-head"><span className="chart-legend-name" style={{ color }}>{comparison.instrument.displaySymbol}</span></span>
     <span className="chart-legend-actions">
-      <TxIconButton size="sm" icon={comparison.visible ? "eye" : "eye-off"} label={comparison.visible ? "Hide" : "Show"} onClick={() => void commit(ctx, chartId, [{ type: "comparison.update", id: comparison.id, visible: !comparison.visible }])} />
-      <TxIconButton size="sm" icon="close" label="Remove" onClick={() => void commit(ctx, chartId, [{ type: "comparison.delete", id: comparison.id }])} />
+      <TxIconButton size="sm" icon={comparison.visible ? "eye" : "eye-off"} label={comparison.visible ? t("Hide") : t("Show")} onClick={() => void commit(ctx, chartId, [{ type: "comparison.update", id: comparison.id, visible: !comparison.visible }])} />
+      <TxIconButton size="sm" icon="close" label={t("Remove")} onClick={() => void commit(ctx, chartId, [{ type: "comparison.delete", id: comparison.id }])} />
     </span>
     {comparison.visible && data && index >= 0 && <span className="chart-legend-values"><span style={{ color }}>{value === null || value === undefined ? "∅" : formatPrice(value, data.priceFormat.precision)}</span></span>}
   </div>;
@@ -85,19 +87,19 @@ function IndicatorRow({ ctx, panelId, chartId, entry, indicator, index, precisio
   const plots = (data?.meta ?? []).filter(meta => meta.kind === "plot" && meta.display !== "none" && indicator.styles[meta.id]?.visible !== false);
   const precision = definition?.overlay ? pricePrecision : 2;
   const actions = <span className="chart-legend-actions">
-    <TxIconButton size="sm" icon={indicator.visible ? "eye" : "eye-off"} label={indicator.visible ? "Hide" : "Show"} onClick={() => void commit(ctx, chartId, [{ type: "indicator.update", id: indicator.id, patch: { visible: !indicator.visible } }])} />
-    <TxIconButton size="sm" icon="settings" label="Settings" onClick={onSettings} />
-    <TxIconButton size="sm" icon="code" label="Source code" onClick={() => openSource(panelId, indicator.definition)} />
-    <TxIconButton size="sm" icon="close" label="Remove" onClick={() => void commit(ctx, chartId, [{ type: "indicator.delete", id: indicator.id }])} />
-    <TxMenu label="More" items={[
-      { id: "duplicate", label: "Duplicate", icon: "copy", onSelect: () => void commit(ctx, chartId, [{ type: "indicator.duplicate", id: indicator.id }]) },
-      { id: "up", label: "Move up", icon: "arrow-up", onSelect: () => void commit(ctx, chartId, [{ type: "indicator.reorder", id: indicator.id, direction: -1 }]) },
-      { id: "down", label: "Move down", icon: "arrow-down", onSelect: () => void commit(ctx, chartId, [{ type: "indicator.reorder", id: indicator.id, direction: 1 }]) },
-    ]} trigger={<TxIconButton size="sm" icon="more" label="More" />} />
+    <TxIconButton size="sm" icon={indicator.visible ? "eye" : "eye-off"} label={indicator.visible ? t("Hide") : t("Show")} onClick={() => void commit(ctx, chartId, [{ type: "indicator.update", id: indicator.id, patch: { visible: !indicator.visible } }])} />
+    <TxIconButton size="sm" icon="settings" label={t("Settings")} onClick={onSettings} />
+    <TxIconButton size="sm" icon="code" label={t("Source code")} onClick={() => openSource(panelId, indicator.definition)} />
+    <TxIconButton size="sm" icon="close" label={t("Remove")} onClick={() => void commit(ctx, chartId, [{ type: "indicator.delete", id: indicator.id }])} />
+    <TxMenu label={t("More")} items={[
+      { id: "duplicate", label: t("Duplicate"), icon: "copy", onSelect: () => void commit(ctx, chartId, [{ type: "indicator.duplicate", id: indicator.id }]) },
+      { id: "up", label: t("Move up"), icon: "arrow-up", onSelect: () => void commit(ctx, chartId, [{ type: "indicator.reorder", id: indicator.id, direction: -1 }]) },
+      { id: "down", label: t("Move down"), icon: "arrow-down", onSelect: () => void commit(ctx, chartId, [{ type: "indicator.reorder", id: indicator.id, direction: 1 }]) },
+    ]} trigger={<TxIconButton size="sm" icon="more" label={t("More")} />} />
   </span>;
   // TradingView: the actions appear after the name on hover; the values follow and drop first when the chart is narrow.
   return <div className="chart-legend-row chart-legend-indicator chart-legend-fit" data-hidden={!indicator.visible}>
-    <span className="chart-legend-head"><span className="chart-legend-name">{indicator.name ?? definition?.shortTitle ?? indicator.definition.id}{showArguments && inputs ? ` ${inputs}` : ""}</span></span>
+    <span className="chart-legend-head"><span className="chart-legend-name">{indicator.name ?? indicatorLabel(indicator.definition.source, definition?.shortTitle ?? indicator.definition.id)}{showArguments && inputs ? ` ${inputs}` : ""}</span></span>
     {actions}
     {error ? <span className="chart-legend-error" title={error.message}>{error.message}</span>
       : showValues && indicator.visible && index >= 0 && <span className="chart-legend-values">{plots.map(meta => {

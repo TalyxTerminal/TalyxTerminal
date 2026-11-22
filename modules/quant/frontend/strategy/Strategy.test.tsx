@@ -22,16 +22,16 @@ const titles = (markup: string) => [...markup.matchAll(/ title="([^"]*)"/g)].map
 /** What a hover may say on a strategy's page: a definition (how a number is worked out) or where the code declared a setting. Nothing that explains how to use the page. */
 const DEFINITIONS: RegExp[] = [
   /^Total [+−]?[\d.,]+%/, /^annualized over (365 days|252 trading days)$/, /^A year: CAGR minus .+ CAGR$/, /^(Fees|Spread|Impact|Funding|Borrow) \d+% of gross/,
-  /^Leveraged: margin = notional ÷ leverage\. Standard: margin = a fixed share of notional$/, /^Cash plus β times the S&P 500; β is measured over this run$/, /^The members of this run's universe, equally weighted each day$/,
+  /^Leveraged: margin = notional ÷ leverage\. Standard: margin = a fixed share of notional$/, /^The members of this run's universe, equally weighted each day$/, /^What this strategy trades, bought at the first open and held$/, /^Any Market symbol's daily closes, adjusted for splits and dividends$/,
   /^q\.param\(".+"\)/,
   // a group's one-line summary of its values, and the failure bar's button (the SDK's own words)
-  /^\d[\d,]* [A-Z]+$/, /^[\d.]+×, (leveraged|standard)$/, /^from Market/, /^next (open|close)$/, /^(BTC buy and hold|Buy and hold|Cash \+ β × S&P 500|S&P 500 equal weight|[Nn]one)$/, /^Reg T$/, /^Open in the code$/, /^(Sharpe|Held-out|Walk|Neighbouring|Costs|Shuffled|Best five|Deflated|Probability|The five|out-of-sample|mean Sharpe|95th|Sharpe on)/i,
+  /^\d[\d,]* [A-Z]+$/, /^[\d.]+×, (leveraged|standard)$/, /^from Market/, /^next (open|close)$/, /^(Buy and hold|Members, equal weight|[A-Z]+:[\w.^/:]+|[Nn]one)$/, /^Reg T$/, /^Open in the code$/, /^(Sharpe|Held-out|Walk|Neighbouring|Costs|Shuffled|Best five|Deflated|Probability|The five|out-of-sample|mean Sharpe|95th|Sharpe on)/i,
 ];
 const unlisted = (markup: string) => titles(markup).filter(title => title !== "" && !DEFINITIONS.some(rule => rule.test(title)));
 
 describe("The page's words", () => {
   it("no_title_outside_definitions: every hover on the settings column, the key numbers, the checks and a failure is a definition", () => {
-    const columns = ["perpetual", "stock"].map(kind => renderToStaticMarkup(createElement(SettingsColumn, {...base, view: view(kind as never, kind === "stock" ? {benchmark: {kind: "beta"}} : {})} as never))).join("");
+    const columns = ["perpetual", "stock"].map(kind => renderToStaticMarkup(createElement(SettingsColumn, {...base, view: view(kind as never, kind === "stock" ? {benchmark: {kind: "symbol", symbol: "US:SPY"}} : {})} as never))).join("");
     const keys = renderToStaticMarkup(createElement(KeyNumbersRow, {work: work(), go: vi.fn()}));
     const checks = renderToStaticMarkup(createElement(ChecksColumn, {work: work({checks: CHECKS}), go: vi.fn()}));
     const failure = renderToStaticMarkup(createElement(FailedBlock, {run: run({state: "failed", failure: {file: "strategy.py", line: 7, error: "boom", stage: "run", simulatedAt: 1, instrument: null, cause: "", tradesBefore: null, equityBefore: null, locals: [], withoutPrice: null, inEngine: false, partial: false}}), onLine: vi.fn()}));
@@ -62,6 +62,6 @@ describe("a rebalance", () => {
     const page = readFileSync(new URL("./Holdings.tsx", import.meta.url), "utf8");
     expect(page).toContain("names.sort((a, b) => weight(b) - weight(a) || (row?.ranks?.[a] ?? Infinity) - (row?.ranks?.[b] ?? Infinity))");
     expect(page).toContain('"Not held"');
-    expect(page).toContain('(target || held ? "Filled" : "")');
+    expect(page).toContain('(target || held ? t("Filled") : "")');
   });
 });

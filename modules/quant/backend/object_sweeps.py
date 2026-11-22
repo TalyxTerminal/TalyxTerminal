@@ -23,15 +23,15 @@ from uuid import uuid4
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..native import metrics as M
 from . import run_flow, strategy_checks, strategy_settings, sweep_figures
 from .object_data import day_ms
 from .object_params import check_values
-from .object_runs import GB, RUN, finish_copy, new_run_directory
+from .object_runs import RUN, finish_copy, new_run_directory
 from .run_queue import RunQueue
 
-MAX_CASES = 200
 MAX_AXES = 8
 FORMAT = 2
 # What a combination can be ranked by; all of them are "more is better" (a drawdown is stored as a negative number).
@@ -65,78 +65,75 @@ def months_later(ms, months):
 def axis_values(name, values, definition):
     """The values of one axis, checked: a code parameter's against what the code declares, a run setting's against what it accepts."""
     if not isinstance(values, list) or not values:
-        raise ContractError("invalid_input", f"{name} needs a list of values.", {"axis": name})
+        raise ContractError("invalid_input", t("{name} needs a list of values.", name=name), {"axis": name})
     if len(set(json.dumps(item, sort_keys=True) for item in values)) != len(values):
-        raise ContractError("invalid_input", f"{name} lists a value twice.", {"axis": name})
+        raise ContractError("invalid_input", t("{name} lists a value twice.", name=name), {"axis": name})
     if name.startswith("@"):
         return setting_values(name[1:], values)
     if definition is None:
-        raise ContractError("invalid_input", f"The code has no parameter {name!r}.", {"parameter": name})
+        raise ContractError("invalid_input", t("The code has no parameter {name}.", name=repr(name)), {"parameter": name})
     if definition["type"] == "bool":
         # a switch is swept over both of its sides.
         if any(not isinstance(item, bool) for item in values):
-            raise ContractError("invalid_input", f"{label_of(definition)} is swept over on and off (true, false).", {"parameter": name})
+            raise ContractError("invalid_input", t("{definition} is swept over on and off (true, false).", definition=label_of(definition)), {"parameter": name})
         return sorted(values)
     if definition["type"] == "choice":
         # a choice is swept over options the code declares, in the code's order.
         options = [option["value"] for option in definition["options"]]
         for item in values:
             if item not in options:
-                raise ContractError("value_outside_declared", f"{label_of(definition)} has no option {item!r}", {"parameter": name, "value": item})
+                raise ContractError("value_outside_declared", t("{definition} has no option {item}", definition=label_of(definition), item=repr(item)), {"parameter": name, "value": item})
         return [option for option in options if option in values]
     if definition["type"] not in ("int", "float"):
-        raise ContractError("invalid_input", f"{label_of(definition)} is a {definition['type']}; numbers, switches and choices can be swept.", {"parameter": name})
+        raise ContractError("invalid_input", t("{definition} is a {type}; numbers, switches and choices can be swept.", definition=label_of(definition), type=definition['type']), {"parameter": name})
     for item in values:
         if type(item) not in (int, float) or isinstance(item, bool) or not math.isfinite(item):
-            raise ContractError("invalid_input", f"{label_of(definition)} is swept over numbers.", {"parameter": name})
+            raise ContractError("invalid_input", t("{definition} is swept over numbers.", definition=label_of(definition)), {"parameter": name})
         if definition["type"] == "int" and item != int(item):
-            raise ContractError("value_outside_declared", f"{label_of(definition)} {item:g} is not a whole number", {"parameter": name, "value": item})
+            raise ContractError("value_outside_declared", t("{definition} {item} is not a whole number", definition=label_of(definition), item=f'{item:g}'), {"parameter": name, "value": item})
         low, high = definition.get("min"), definition.get("max")
         if low is not None and item < low or high is not None and item > high:
-            raise ContractError("value_outside_declared", f"{label_of(definition)} {item:g} is outside {low:g}–{high:g}" if low is not None and high is not None
-                                else f"{label_of(definition)} {item:g} is outside what the code allows", {"parameter": name, "value": item, "min": low, "max": high})
+            raise ContractError("value_outside_declared", t("{definition} {item} is outside {low}–{high}", definition=label_of(definition), item=f'{item:g}', low=f'{low:g}', high=f'{high:g}') if low is not None and high is not None
+                                else t("{definition} {item} is outside what the code allows", definition=label_of(definition), item=f'{item:g}'), {"parameter": name, "value": item, "min": low, "max": high})
     return sorted(int(item) if definition["type"] == "int" else float(item) for item in values)
 
 
 def setting_values(name, values):
     if name not in SETTINGS:
-        raise ContractError("invalid_input", "A sweep can vary these run settings: " + ", ".join("@" + key for key in SETTINGS) + ".", {"setting": name})
+        raise ContractError("invalid_input", t("A sweep can vary these run settings: {settings}.", settings=', '.join('@' + key for key in SETTINGS)), {"setting": name})
     if name == "costMultiple" and any(type(item) not in (int, float) or not 0 <= item <= 10 for item in values):
-        raise ContractError("invalid_input", "@costMultiple values are numbers from 0 to 10.")
+        raise ContractError("invalid_input", t("@costMultiple values are numbers from 0 to 10."))
     if name == "capital" and any(type(item) not in (int, float) or item <= 0 for item in values):
-        raise ContractError("invalid_input", "@capital values are numbers above zero.")
+        raise ContractError("invalid_input", t("@capital values are numbers above zero."))
     if name == "fill" and any(item not in ("nextOpen", "nextClose") for item in values):
-        raise ContractError("invalid_input", "@fill values are nextOpen and nextClose.")
+        raise ContractError("invalid_input", t("@fill values are nextOpen and nextClose."))
     if name == "period":
         for item in values:
             if not isinstance(item, dict) or set(item) != {"since", "until"}:
-                raise ContractError("invalid_input", "@period values are {start, end} days.")
+                raise ContractError("invalid_input", t("@period values are {start, end} days."))
             try:
                 if datetime.fromisoformat(item["until"]) < datetime.fromisoformat(item["since"]):
                     raise ValueError
             except (TypeError, ValueError):
-                raise ContractError("invalid_input", "@period values are {start, end} days, end not before start.") from None
+                raise ContractError("invalid_input", t("@period values are {start, end} days, end not before start.")) from None
     return list(values)
 
 
 def expand(axes, definitions):
     """The axes as stored (name, type, values, and a label for a run setting) and every combination, each a dict from axis name to value."""
     if not isinstance(axes, list) or not 1 <= len(axes) <= MAX_AXES:
-        raise ContractError("invalid_input", f"Choose 1 to {MAX_AXES} parameters to sweep.")
+        raise ContractError("invalid_input", t("Choose 1 to {MAX_AXES} parameters to sweep.", MAX_AXES=MAX_AXES))
     known = {item["name"]: item for item in definitions}
     found = []
     seen = set()
     for axis in axes:
         name = axis["name"]
         if name in seen:
-            raise ContractError("invalid_input", f"{name} is swept twice.", {"axis": name})
+            raise ContractError("invalid_input", t("{name} is swept twice.", name=name), {"axis": name})
         seen.add(name)
         values = axis_values(name, axis["values"], known.get(name))
         found.append({"name": name, "type": "setting" if name.startswith("@") else known[name]["type"], "values": values,
                       **({"label": SETTINGS[name[1:]]} if name.startswith("@") else {"label": label_of(known[name])})})
-    total = math.prod(len(axis["values"]) for axis in found)
-    if total > MAX_CASES:
-        raise ContractError("too_many_combinations", f"These ranges make {total} combinations; a sweep runs at most {MAX_CASES}", {"combinations": total, "max": MAX_CASES})
     names = [axis["name"] for axis in found]
     return found, [dict(zip(names, combination, strict=True)) for combination in itertools.product(*[axis["values"] for axis in found])]
 
@@ -190,8 +187,9 @@ def case_prepared(prepared, overrides, scale=None):
         item = dict(item)
         if factor is not None:
             multiple = Decimal(str(factor))
-            if "takerFee" in item:
-                item["takerFee"] = format(Decimal(str(item["takerFee"])) * multiple, "f")
+            for key in ("makerFee", "takerFee"):
+                if key in item:
+                    item[key] = format(Decimal(str(item[key])) * multiple, "f")
             if isinstance(item.get("stockCommission"), dict):
                 commission = dict(item["stockCommission"])
                 for key in ("rate", "perShare", "minimum"):
@@ -302,16 +300,16 @@ class Sweeps:
         """Everything a sweep needs checked before it exists: the axes, the values, the combinations, what one takes and how many run at once."""
         runs = self.runs
         if runs.closed:
-            raise ContractError("unavailable", "Quant is closing.")
+            raise ContractError("unavailable", t("Quant is closing."))
         obj = runs.store.read(object_id)
         if obj["kind"] != "strategy":
-            raise ContractError("invalid_input", "Only a strategy can be swept.")
+            raise ContractError("invalid_input", t("Only a strategy can be swept."))
         metric = args.get("metric") or ("sharpe" if kind == "walk" else "sharpe")
         if metric not in METRICS:
-            raise ContractError("invalid_input", "Rank the combinations by one of: " + ", ".join(METRICS) + ".", {"metrics": list(METRICS)})
+            raise ContractError("invalid_input", t("Rank the combinations by one of: {metrics}.", metrics=', '.join(METRICS)), {"metrics": list(METRICS)})
         source = runs.read(args["of"]) if args.get("of") else None
         if source is not None and (source["objectId"] != obj["id"] or source["state"] != "completed" or source["runKind"] not in ("run", "case", "heldout")):
-            raise ContractError("invalid_input", "Start from a completed backtest of this strategy.")
+            raise ContractError("invalid_input", t("Start from a completed backtest of this strategy."))
         if source:
             obj = runs.source_object(obj, source)
             saved = (Path(obj["directory"]) / obj["entry"]).read_text(encoding="utf-8")
@@ -339,10 +337,7 @@ class Sweeps:
             walk = await self.walk_plan(settings, args)
         newest = source or self.latest_run(obj["id"])
         per_case = await self.case_memory(obj, settings, newest)
-        machine = self.machine
-        if per_case > machine.budget:
-            raise ContractError("case_over_budget", f"One combination needs about {per_case / GB:.1f} GB; this machine gives runs {machine.budget / GB:.1f} GB "
-                                f"(half of {machine.total / GB:.1f} GB). Fewer names or a shorter period.", {"needGb": round(per_case / GB, 1), "canGiveGb": round(machine.budget / GB, 1)})
+        machine = self.machine  # a combination over the budget is not refused: it runs alone (run_queue)
         seconds = self.seconds_of(newest)
         total = len(combinations) + (len(walk["spans"]) if walk else 0)
         at_once = concurrency(machine, per_case)
@@ -354,18 +349,21 @@ class Sweeps:
     async def walk_plan(self, settings, args):
         pick, trade = args.get("pickOn", 12), args.get("trade", 3)
         if type(pick) is not int or type(trade) is not int or not 1 <= pick <= 120 or not 1 <= trade <= 60:
-            raise ContractError("invalid_input", "pickOn and trade are whole numbers of months (pick on 1 to 120, trade 1 to 60).")
+            raise ContractError("invalid_input", t("pickOn and trade are whole numbers of months (pick on 1 to 120, trade 1 to 60)."))
         pick_by = args.get("pickBy") or "sharpe"
         if pick_by not in PICK_BY:
-            raise ContractError("invalid_input", "Pick by one of: " + ", ".join(PICK_BY) + ".")
+            raise ContractError("invalid_input", t("Pick by one of: {criteria}.", criteria=', '.join(PICK_BY)))
         data = strategy_settings.cut_data(settings["data"], "walk")
         from .object_data import resolve_until
         resolved = await resolve_until(self.runs.ctx, data)
         if not resolved.get("since") or not resolved.get("until"):
-            raise ContractError("invalid_input", "Walk-forward needs a start and an end of the data.")
+            raise ContractError("invalid_input", t("Walk-forward needs a start and an end of the data."))
         spans = window_spans(day_ms(resolved["since"], False), day_ms(resolved["until"], True), pick, trade)
         if len(spans) < 3:
-            raise ContractError("too_few_windows", f"Pick on {pick} months, trade {trade}: {len(spans)} window{'s' if len(spans) != 1 else ''} fit in the period before the held-out part; at least 3 needed.",
+            raise ContractError("too_few_windows", t("Pick on {pick} months, trade {trade}: {spans} window fit in the period before the held-out part; at least 3 needed.",
+                                                     pick=pick, trade=trade, spans=len(spans))
+                                                   if len(spans) == 1 else t("Pick on {pick} months, trade {trade}: {spans} windows fit in the period before the held-out part; at least 3 needed.",
+                                                     pick=pick, trade=trade, spans=len(spans)),
                                 {"windows": len(spans), "pickOn": pick, "trade": trade})
         return {"pickOn": pick, "trade": trade, "pickBy": pick_by, "spans": spans}
 
@@ -375,11 +373,14 @@ class Sweeps:
         return json.loads(row[0]) if row else None
 
     async def case_memory(self, obj, settings, newest):
-        """What one combination is expected to need: the peak a run of this strategy measured (a little over), else the estimate from names and bars."""
+        """What one combination is expected to need: the peak a run of this strategy measured (a little over), else the estimate from the bars it
+        prepared, else from names and bars of the settings."""
         if newest and newest.get("peakMemory"):
             return int(newest["peakMemory"] * 1.15)
+        if newest and (newest.get("data") or {}).get("rows"):
+            return strategy_settings.memory_estimate(newest["data"]["traded"], newest["data"]["rows"])
         found = await self.runs.memory_need(settings)
-        return int(found) if found else int(strategy_settings.memory_estimate(1, 1000))
+        return found or strategy_settings.memory_estimate(1, 1000)
 
     @staticmethod
     def seconds_of(run):
@@ -457,9 +458,9 @@ class Sweeps:
                 await self.walk(identity, obj, directory, prepared, state)
             ending = self.conclude(identity)
         except asyncio.CancelledError:
-            ending = {"state": "interrupted" if runs.closed else "cancelled", "message": "Stopped before every combination had run."}
+            ending = {"state": "interrupted" if runs.closed else "cancelled", "message": t("Stopped before every combination had run.")}
         except ContractError as error:
-            ending = {"state": "interrupted" if runs.closed else "cancelled", "message": "Stopped before every combination had run."} if error.code == "cancelled" else {
+            ending = {"state": "interrupted" if runs.closed else "cancelled", "message": t("Stopped before every combination had run.")} if error.code == "cancelled" else {
                 "state": "failed", "message": error.message, "error": runs.failure(identity, error)}
         except Exception as error:  # a sweep must reach an end state whatever breaks
             failure = ContractError("internal_error", f"{type(error).__name__}: {error}", {"exceptionType": type(error).__name__})
@@ -557,7 +558,7 @@ class Sweeps:
             await runs.finish(identity, process, case_directory)
             ending = runs.ending(identity, case_directory)
         except asyncio.CancelledError:
-            ending = {"state": "interrupted" if runs.closed else "cancelled", "message": "Stopped before the run finished."}
+            ending = {"state": "interrupted" if runs.closed else "cancelled", "message": t("Stopped before the run finished.")}
             raise
         except ContractError as error:
             ending = {"state": "failed", "message": error.message, "error": {"stage": "backtest", **error.to_dict()}}
@@ -590,9 +591,9 @@ class Sweeps:
         if not any(case["state"] == "completed" for case in cases):
             failed = next((case for case in cases if case["state"] == "failed"), None)
             if failed is None:
-                return {"state": "cancelled", "message": "Stopped before any combination ran."}
-            return {"state": "failed", "message": f"All {len(cases)} combinations failed; the first one: {failed['message']}",
-                    "error": {"stage": "sweep", "code": "no_result", "message": "No combination completed.", "file": None, "line": None, "details": {"cases": len(cases), "first": failed["index"]}}}
+                return {"state": "cancelled", "message": t("Stopped before any combination ran.")}
+            return {"state": "failed", "message": t("All {cases} combinations failed; the first one: {message}", cases=len(cases), message=failed['message']),
+                    "error": {"stage": "sweep", "code": "no_result", "message": t("No combination completed."), "file": None, "line": None, "details": {"cases": len(cases), "first": failed["index"]}}}
         best = self.best(record)
         self.runs.update(identity, sweep={**record["sweep"], "bestIndex": best["index"] if best else None})
         return {"state": "completed", "message": None}
@@ -661,7 +662,7 @@ class Sweeps:
                 row.update(failed=finished["message"])
                 runs.update(identity, walk={**walk, "windows": windows})
                 when = "–".join(datetime.fromtimestamp(at / 1000, UTC).date().isoformat() for at in (picked_end, traded_end))
-                raise ContractError("failed", f"Window {number} ({when}) did not run: {finished['message']}", {"window": number})
+                raise ContractError("failed", t("Window {number} ({when}) did not run: {message}", number=number, when=when, message=finished['message']), {"window": number})
             work = self.work_of(window_id)
             points = work["equity"]
             stats = await asyncio.to_thread(window_stats, points, 0, 10 ** 18, work["annualization"], work["dailyRiskFree"])
@@ -682,12 +683,12 @@ class Sweeps:
         runs = self.runs
         record = self.read(identity)
         if runs.closed:
-            raise ContractError("unavailable", "Quant is closing.")
+            raise ContractError("unavailable", t("Quant is closing."))
         window = record["runKind"] == "walk" and record["state"] == "failed" and ((record.get("error") or {}).get("details") or {}).get("window")
         if identity in runs.tasks or (record["state"] not in ("cancelled", "interrupted") and not window):
-            raise ContractError("conflict", "Only a stopped sweep, or a walk-forward a window of which failed, can be resumed.", {"state": record["state"]})
+            raise ContractError("conflict", t("Only a stopped sweep, or a walk-forward a window of which failed, can be resumed."), {"state": record["state"]})
         if record["runKind"] != "walk" and not any(case["state"] in ("cancelled", "interrupted", "queued", "running", "failed") for case in record["sweep"]["cases"]):
-            raise ContractError("conflict", "Every combination of this sweep already ran.")
+            raise ContractError("conflict", t("Every combination of this sweep already ran."))
         obj = {**runs.store.read(record["objectId"]), "settings": record["settings"], "entry": record["code"]["entry"]}
         from .runtime import call_attribution
         sweep = record["sweep"]
@@ -703,7 +704,7 @@ class Sweeps:
     def read(self, identity):
         record = self.runs.read(identity)
         if record["runKind"] not in ("sweep", "walk"):
-            raise ContractError("invalid_input", "This run is not a parameter sweep.")
+            raise ContractError("invalid_input", t("This run is not a parameter sweep."))
         return record
 
     def is_old(self, record):
@@ -768,9 +769,9 @@ class Sweeps:
         record = self.read(identity)
         case = next((item for item in record["sweep"]["cases"] if item["index"] == index), None)
         if case is None:
-            raise ContractError("not_found", "This sweep has no such combination.", {"index": index})
+            raise ContractError("not_found", t("This sweep has no such combination."), {"index": index})
         if case["state"] != "completed":
-            raise ContractError("conflict", f"This combination did not complete ({case['state']}); there is no result to show.", {"index": index, "state": case["state"]})
+            raise ContractError("conflict", t("This combination did not complete ({state}); there is no result to show.", state=case['state']), {"index": index, "state": case["state"]})
         self.runs.save(record, sweep={**record["sweep"], "selected": index})
         return self.detail(identity)
 
@@ -779,14 +780,14 @@ class Sweeps:
         record = self.read(identity)
         case = next((item for item in record["sweep"]["cases"] if item["index"] == index), None)
         if case is None:
-            raise ContractError("not_found", "This sweep has no such combination.", {"index": index})
+            raise ContractError("not_found", t("This sweep has no such combination."), {"index": index})
         obj = self.runs.store.read(record["objectId"])
         saved = await self.runs.saved_source(obj)
         declared = {item["name"] for item in self.runs.store.parameters(saved)["parameters"]}
         code, overrides = split(case["params"])
         gone = [name for name in code if name not in declared]
         if gone:
-            raise ContractError("conflict", f"The code no longer declares {', '.join(gone)}; the values cannot be written back.", {"parameters": gone})
+            raise ContractError("conflict", t("The code no longer declares {gone}; the values cannot be written back.", gone=', '.join(gone)), {"parameters": gone})
         args = {"params": {**obj["settings"]["params"], **code}}
         run = {key: overrides[key] for key in ("fill", "capital") if key in overrides}
         if run:

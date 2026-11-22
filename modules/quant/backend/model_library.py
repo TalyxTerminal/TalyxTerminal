@@ -20,6 +20,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..native import metrics as M
 from . import library_after, library_checks, research_calendar
@@ -47,7 +48,7 @@ class ModelLibrary:
         """The window the future-data check retrains, and the bar it cuts the data at (inside that window's test period)."""
         windows = [item for item in record.get("windows") or [] if item.get("test")]
         if not windows:
-            raise ContractError("invalid_input", "This run has no windows to check; publish a run trained window by window.")
+            raise ContractError("invalid_input", t("This run has no windows to check; publish a run trained window by window."))
         first, last = windows[0]["test"]["from"], windows[-1]["test"]["to"]
         point = first + (last - first) * CHECK_AT
         window = next((item for item in windows if item["test"]["from"] <= point <= item["test"]["to"]), windows[-1])
@@ -71,13 +72,13 @@ class ModelLibrary:
         publishing without new values still goes out, with what the model has until today)."""
         other = [item for item in found if item["kind"] != "model"]
         if other:
-            return {"reason": f"{name} is already a {other[0]['kind']} in the library; choose another name.", "field": "name"}
+            return {"reason": t("{name} is already a {kind} in the library; choose another name.", name=name, kind=other[0]['kind']), "field": "name"}
         for pin in pinned:
             if pin["state"] in ("stopped", "archived"):
                 item = self.store.version(pin["versionId"])["item_id"]
                 newer = [entry for entry in self.store.item_versions(item) if entry["version"] > pin["version"] and entry["state"] == "updating" and entry["archivedAt"] is None]
                 action = f"retrain on v{newer[0]['version']}" if newer else "retrain on a producing version"
-                return {"reason": f"{pin['name']} v{pin['version']} is {pin['state']}; {action}, or publish without new values.", "field": "inputs"}
+                return {"reason": t("{name} v{version} is {state}; {action}, or publish without new values.", name=pin['name'], version=pin['version'], state=pin['state'], action=action), "field": "inputs"}
         return None
 
     def compare_rows(self, record, previous):
@@ -107,7 +108,7 @@ class ModelLibrary:
         pins, the checks to look at, who uses the item now, and the future-data check."""
         record = self.models.read(run_id)
         if record["state"] != "completed" or record["runKind"] not in ("train", "combine"):
-            raise ContractError("invalid_input", "Publish a completed training run.")
+            raise ContractError("invalid_input", t("Publish a completed training run."))
         name = (name or record["name"]).strip()
         found = self.store.find_item(name)
         existing = [item for item in found if item["kind"] == "model"]
@@ -135,15 +136,14 @@ class ModelLibrary:
                 "blocked": self.blocked_reason(name, found, pinned),
                 "futureDataCheck": ([{"runId": source, "window": found_window["k"], "cutoff": point} for source, (found_window, point) in zip(record["combinedFrom"], checks, strict=True)]
                                     if record["runKind"] == "combine" else
-                                    {"window": window["k"], "cutoff": cut, "text": f"Retrains window {window['k']} on the data cut at {day_of(cut)} and compares its predictions"}),
-                "schedule": {"every": record["settings"]["params"].get("every_months"), "text": f"Retrains a new window every {record['settings']['params'].get('every_months')} months; "
-                             "other days the newest window predicts"}}
+                                    {"window": window["k"], "cutoff": cut, "text": t("Retrains window {k} on the data cut at {cut} and compares its predictions", k=window['k'], cut=day_of(cut))}),
+                "schedule": {"every": record["settings"]["params"].get("every_months"), "text": t("Retrains a new window every {every_months} months; other days the newest window predicts", every_months=record['settings']['params'].get('every_months'))}}
 
     # ------------------------------------------------------------------------------------------------------------ publishing
     async def publish(self, run_id, args):
         name = (args.get("name") or "").strip()
         if not name or len(name) > 120:
-            raise ContractError("invalid_input", "Choose a name of 1 to 120 characters.")
+            raise ContractError("invalid_input", t("Choose a name of 1 to 120 characters."))
         plan = self.plan(run_id, name)
         if plan["blocked"]:
             # An input version that is stopped lets the model go out when it does not produce new values (it keeps only what it has until today).
@@ -171,7 +171,7 @@ class ModelLibrary:
     def read(self, identity):
         record = self.records.find(RUN, identity)
         if record is None or not record.get("modelPublish"):
-            raise ContractError("not_found", "This model publication does not exist.")
+            raise ContractError("not_found", t("This model publication does not exist."))
         return self.view(record)
 
     def owns(self, identity):
@@ -217,13 +217,13 @@ class ModelLibrary:
             created, folders = await self.commit(identity, source, ready, publish)
             ending = {"state": "completed", "message": None}
         except asyncio.CancelledError:
-            ending = {"state": "cancelled", "message": "Stopped before anything was added to the library."}
+            ending = {"state": "cancelled", "message": t("Stopped before anything was added to the library.")}
         except ContractError as error:
             ending = {"state": "failed", "message": error.message, "error": error.to_dict()}
         except Exception as error:  # noqa: BLE001 - the publication ends and says what broke
             import logging
             logging.getLogger(__name__).exception("Model publication failed (%s)", identity)
-            ending = {"state": "failed", "message": f"Quant hit an internal error ({type(error).__name__}) while publishing; nothing was added."}
+            ending = {"state": "failed", "message": t("Quant hit an internal error ({name}) while publishing; nothing was added.", name=type(error).__name__)}
         finally:
             self.tasks.pop(identity, None)
             if ending.get("state") != "completed":
@@ -243,7 +243,7 @@ class ModelLibrary:
                    output=str(written / "output"), cache=str(written / "windows"), keepDone=False)
         answer = await self.models.engine.run_model(job, directory / "future" / "engine", context={"objectId": source["objectId"], "runId": source["id"]})
         if not answer.get("ok"):
-            raise ContractError("unavailable", "The future-data check could not run: " + answer["failure"]["message"], {"failure": answer["failure"]})
+            raise ContractError("unavailable", t("The future-data check could not run: {message}", message=answer['failure']['message']), {"failure": answer["failure"]})
         future = {"passed": answer["passed"], "value": "unchanged" if answer["passed"] else "changed", "title": answer["title"], "window": answer["window"], "cutoff": int(spec["cutoff"])}
         checks = [item if item["id"] != "future_data" else {**item, "value": future["value"], "state": "ok" if future["passed"] else "watch", "title": future["title"]}
                   for item in source.get("checks") or []]
@@ -261,7 +261,7 @@ class ModelLibrary:
             return await asyncio.to_thread(pd.read_parquet, answer["path"])
         cross = self.models.factors.directory(factor["id"]) / "output" / "cross"
         if not (cross / "raw.npy").is_file():
-            raise ContractError("invalid_input", f"{factor['name']} #{factor['number']}: this run's values were not kept; run the factor again before publishing.")
+            raise ContractError("invalid_input", t("{name} #{number}: this run's values were not kept; run the factor again before publishing.", name=factor['name'], number=factor['number']))
         return await asyncio.to_thread(self.code_factor_values, cross)
 
     @staticmethod
@@ -441,7 +441,7 @@ class ModelLibrary:
     async def factor_update(self, pipeline, ready, directory, after):
         """A pipeline factor's values later than `after` (label, column, value); a factor published from code has no formula and is not updated."""
         if not pipeline.get("formula"):
-            raise ContractError("invalid_input", "This factor was published from code and does not update.")
+            raise ContractError("invalid_input", t("This factor was published from code and does not update."))
         job = {"data": {key: ready[key] for key in ("key", "barsPath", "info", "extrasPath")}, "formula": pipeline["formula"], "after": after or 0, "output": str(directory)}
         answer = await self.models.engine.call("formula_values", job)
         if not answer.get("ok"):
@@ -480,7 +480,7 @@ class ModelLibrary:
                 job["code"]["roots"].append(str(folder / "common"))
         answer = await self.models.engine.run_model(job, Path(directory) / "engine", context={"objectId": meta["origin"]["objectId"], "versionId": version["id"]})
         if not answer.get("ok"):
-            raise ContractError("code_failed", "The update failed: " + answer["failure"]["message"], {"failure": answer["failure"]})
+            raise ContractError("code_failed", t("The update failed: {message}", message=answer['failure']['message']), {"failure": answer["failure"]})
         if answer.get("trainedWindows"):
             self.store.merge_meta(version["id"], lastTrained={"windows": answer["trainedWindows"], "at": int(time.time() * 1000)})
         values = await asyncio.to_thread(pd.read_parquet, Path(job["output"]) / "values.parquet")

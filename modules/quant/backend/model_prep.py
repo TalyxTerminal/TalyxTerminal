@@ -19,22 +19,177 @@ from types import SimpleNamespace
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t
 
 from ..native import model_algorithms as A
 from .object_params import check_values, read_parameters
 from .project_paths import MODULE
 
 STANDARD = MODULE / "native" / "model_standard.py"
-BATCH_LIMIT = 20
-BUILTIN = [{"source": "builtin", "ref": "alpha158", "name": "Alpha158", "features": 157, "note": "Qlib's 158 price features less VWAP0, which needs a VWAP the source does not give"},
-           {"source": "builtin", "ref": "alpha360", "name": "Alpha360", "features": 300, "note": "Qlib's 360 price features less the 60 VWAP ones"},
-           {"source": "builtin", "ref": "styles", "name": "Styles", "features": 7, "note": "Momentum, reversal, volatility, residual volatility, beta, liquidity and size"}]
+BUILTIN = [{"source": "builtin", "ref": "alpha158", "name": "Alpha158", "features": 157, "note": mark("Qlib's 158 price features less VWAP0, which needs a VWAP the source does not give")},
+           {"source": "builtin", "ref": "alpha360", "name": "Alpha360", "features": 300, "note": mark("Qlib's 360 price features less the 60 VWAP ones")},
+           {"source": "builtin", "ref": "styles", "name": "Styles", "features": 7, "note": mark("Momentum, reversal, volatility, residual volatility, beta, liquidity and size")}]
 SOURCES = ("library", "value", "run", "builtin", "market", "code")
 ALGORITHM_KEYS = {"lightgbm": "lgb", "xgboost": "xgb", "catboost": "cat", "ridge": "ridge", "lasso": "lasso", "double_ensemble": "dens", **{key: "nn" for key in A.NEURAL_IDS}}
 
 
+# Labels and help from the built-in executable pipeline and its native algorithm catalog.
+# Custom model declarations keep the words from their own source.
+STANDARD_WORDS = {
+    mark("1 month"),
+    mark("1 year"),
+    mark("12 months"),
+    mark("2 years"),
+    mark("3 months"),
+    mark("3 years"),
+    mark("5 years"),
+    mark("6 months"),
+    mark("A finished LSTM or GRU run of this model whose weights the network starts from"),
+    mark("A finished LSTM or GRU run whose weights GATs starts from"),
+    mark("A finished LSTM or GRU run whose weights the network starts from"),
+    mark("Adam"),
+    mark("Algorithm"),
+    mark("Alpha"),
+    mark("Also the length of each test period"),
+    mark("Auxiliary labels"),
+    mark("Batch size"),
+    mark("Built-in columns"),
+    mark("CatBoost"),
+    mark("Choose"),
+    mark("Classification · Binary"),
+    mark("Classification · Groups"),
+    mark("Clip at 3 MAD"),
+    mark("Clip at 5 MAD"),
+    mark("Column sample"),
+    mark("Concepts"),
+    mark("Day's mean"),
+    mark("Day's median"),
+    mark("Days of history each sample sees; memory grows with it"),
+    mark("Days without a price or volume"),
+    mark("Depth"),
+    mark("Device"),
+    mark("Dollar volume a day, in the quote currency"),
+    mark("Domains"),
+    mark("DoubleEnsemble"),
+    mark("Drop the row"),
+    mark("Dropout"),
+    mark("Early stop"),
+    mark("Early stop on"),
+    mark("Empty: the first test starts after the first training and validation"),
+    mark("Engine parameters"),
+    mark("Epochs, up to"),
+    mark("Equal"),
+    mark("Expanding"),
+    mark("Extremes"),
+    mark("Feature fraction"),
+    mark("First test"),
+    mark("Fitted on each window's training segment"),
+    mark("Formula"),
+    mark("Heads"),
+    mark("Hidden units in each layer"),
+    mark("Industry median"),
+    mark("Inputs"),
+    mark("L1 regularization"),
+    mark("L2 leaf"),
+    mark("L2 regularization"),
+    mark("Label"),
+    mark("Label extremes"),
+    mark("Label missing"),
+    mark("Label scale"),
+    mark("Lambda"),
+    mark("Lasso"),
+    mark("Layers"),
+    mark("Learning rate"),
+    mark("Least squares"),
+    mark("Leave out halted days"),
+    mark("Leave out names listed under 1 year"),
+    mark("Leave out names under the minimum a day"),
+    mark("Leave to the model"),
+    mark("Leaves"),
+    mark("Library factors at a version, factor runs not yet published, built-in sets, Market series and features written in code"),
+    mark("LightGBM"),
+    mark("Localformer"),
+    mark("Look back"),
+    mark("Market value"),
+    mark("Market-state weight"),
+    mark("Max depth"),
+    mark("Min child weight"),
+    mark("Min data in leaf"),
+    mark("Minimum a day"),
+    mark("Min–max, training segment"),
+    mark("Missing"),
+    mark("Names listed under a year"),
+    mark("Names trading under the minimum a day, 20-day average"),
+    mark("Non-negative least squares"),
+    mark("None"),
+    mark("Objective"),
+    mark("One formula in each line; none means the label's own return one and two bars further out"),
+    mark("Only these columns of the built-in sets, such as KMID, ROC5 (Qlib's FilterCol); empty keeps them all"),
+    mark("Optimizer"),
+    mark("Pretrain epochs"),
+    mark("Rank each day"),
+    mark("Ranking · LambdaRank"),
+    mark("Ranking · Pairwise"),
+    mark("Ranking · XE-NDCG"),
+    mark("Regression · Huber"),
+    mark("Regression · L1"),
+    mark("Regression · L2"),
+    mark("Regression · Quantile"),
+    mark("Regularization strength"),
+    mark("Reproducible"),
+    mark("Retrain every"),
+    mark("Ridge"),
+    mark("Robust z-score, training segment"),
+    mark("Rolling"),
+    mark("Rounds each"),
+    mark("Rounds, up to"),
+    mark("Row fraction"),
+    mark("Row sample"),
+    mark("Same inputs give the same model on any number of threads; a little slower"),
+    mark("Sample weight"),
+    mark("Sandwich"),
+    mark("Scale"),
+    mark("Seed"),
+    mark("Start from"),
+    mark("States"),
+    mark("Stops when the validation loss has not improved for this many epochs"),
+    mark("Stops when the validation loss has not improved for this many rounds; 0 turns it off"),
+    mark("Sub-models"),
+    mark("TabNet"),
+    mark("Take out industry"),
+    mark("Take out size"),
+    mark("Tanh"),
+    mark("The concept-sector table HIST reads"),
+    mark("The concept-sector table HIST reads: which names belong to which concepts"),
+    mark("Training"),
+    mark("Training median"),
+    mark("Training median is fitted on each window's training segment"),
+    mark("Transformer"),
+    mark("Validation"),
+    mark("Validation IC"),
+    mark("Validation loss"),
+    mark("Validation rank IC"),
+    mark("Weight formula"),
+    mark("Weight steps"),
+    mark("Width"),
+    mark("Window"),
+    mark("XGBoost"),
+    mark("Z-score each day"),
+    mark("Z-score, training segment"),
+    mark("Zero"),
+}
+
+
 def standard_declarations():
-    return read_parameters(STANDARD.read_text(encoding="utf-8"), "model_standard.py")
+    declared = read_parameters(STANDARD.read_text(encoding="utf-8"), "model_standard.py")
+    for setting in declared["parameters"]:
+        for field in ("label", "help"):
+            if setting[field] in STANDARD_WORDS:
+                setting[field] = t(setting[field])
+        for option in setting.get("options", []):
+            if option["label"] in STANDARD_WORDS:
+                option["label"] = t(option["label"])
+    return declared
 
 
 def pipeline_of(path=None):
@@ -102,13 +257,20 @@ def algorithms():
     """The algorithm table, grouped, with each one's own parameters and what cannot run here; each parameter names the standard
     setting that holds it (`setting`), so the preparation edits the declared value."""
     declared = {item["name"] for item in standard_declarations()["parameters"]}
+    group_labels = {A.TREE: t("Trees"), A.LINEAR: t("Linear"), A.ENSEMBLE: t("Ensembles"), A.NEURAL: t("Neural networks")}
     out = []
     for item in A.declared():
         if item.get("unavailable"):
             continue  # what this environment cannot run is not listed
+        item = copy.deepcopy(item)
+        for group in ("params", "objectives", "earlyStopOn", "optimizers"):
+            for option in item.get(group, []):
+                for field in ("label", "hint"):
+                    if option.get(field) in STANDARD_WORDS or (group == "optimizers" and field == "label"):
+                        option[field] = t(option[field])
         prefix = ALGORITHM_KEYS.get(item["id"])
         params = [{**entry, **({"setting": f"{prefix}_{entry['key']}"} if prefix and f"{prefix}_{entry['key']}" in declared else {})} for entry in item["params"]]
-        out.append({**item, "groupLabel": A.GROUP_LABELS[item["group"]], "params": params})
+        out.append({**item, "label": t(item["label"]), "groupLabel": group_labels[item["group"]], "params": params})
     return out
 
 
@@ -153,7 +315,7 @@ async def offers(services, obj):
         out.append({"source": "run", "name": f"{record['name']} #{record['number']}", "ref": record["id"], "formula": record.get("formula"),
                     "rankIc": (record.get("numbers") or {}).get("rankIc"), "published": record.get("version"),
                     **({} if kept else {"unavailable": "This run's values were not kept (only the newest runs and starred ones keep them); run the factor again"})})
-    out.extend(copy.deepcopy(BUILTIN))
+    out.extend({**item, "note": t(item["note"])} for item in BUILTIN)
     try:
         fields = (await services.factors.fields(obj["id"]))["fields"]
     except ContractError:
@@ -168,20 +330,15 @@ async def offers(services, obj):
 
 
 def expand(params, vary):
-    """A batch: every combination of the varied settings' values on top of `params` (at most 20 groups), each group with only what differs."""
+    """A batch: every combination of the varied settings' values on top of `params`, each group with only what differs."""
     axes = [(item["name"], list(item["values"])) for item in vary or [] if item.get("values")]
     if not axes:
         return [{"values": {}, "params": params}]
     unknown = [name for name, _ in axes if name not in params]
     if unknown:
-        raise ContractError("invalid_input", f"The preparation has no setting {unknown[0]}.")
+        raise ContractError("invalid_input", t("The preparation has no setting {unknown}.", unknown=unknown[0]))
     if any(len(values) < 1 for _, values in axes):
-        raise ContractError("invalid_input", "Give each varied setting at least one value.")
-    total = 1
-    for _, values in axes:
-        total *= len(values)
-    if total > BATCH_LIMIT:
-        raise ContractError("invalid_input", f"A batch trains at most {BATCH_LIMIT} groups; these values make {total}.", {"groups": total})
+        raise ContractError("invalid_input", t("Give each varied setting at least one value."))
     groups = []
     for combination in itertools.product(*[values for _, values in axes]):
         changed = dict(zip([name for name, _ in axes], combination, strict=True))
@@ -256,12 +413,12 @@ def resolve_inputs(services, rows, info, directory, known_by=None):
         source, name, ref = row.get("source"), (row.get("name") or "").strip(), (row.get("ref") or "").strip()
         identity = f"i{index + 1}"
         if source not in SOURCES:
-            raise ContractError("invalid_input", f"Input {index + 1} has source {source!r}; it is one of {', '.join(SOURCES)}.")
+            raise ContractError("invalid_input", t("Input {index} has source {source}; it is one of {SOURCES}.", index=index + 1, source=repr(source), SOURCES=', '.join(SOURCES)))
         if source in ("library", "value"):
             try:
                 version = services.library.store.version(ref)
             except ContractError as error:
-                raise ContractError("invalid_input", f"{name or ref}: version not found; choose a version.") from error
+                raise ContractError("invalid_input", t("{name}: version not found; choose a version.", name=name or ref)) from error
             summary = services.library.read_version(version["id"])
             path = library_table(services.library, version["id"], info, directory / f"{identity}.parquet", known_by)
             out.append({"id": identity, "name": name or summary["name"], "source": source, "ref": version["id"], "path": path})
@@ -269,34 +426,34 @@ def resolve_inputs(services, rows, info, directory, known_by=None):
         elif source == "run":
             record = services.factors.read(ref)
             if record["state"] != "completed":
-                raise ContractError("invalid_input", f"{name or record['name']}: use a completed factor run.")
+                raise ContractError("invalid_input", t("{name}: use a completed factor run.", name=name or record['name']))
             if record.get("mode") == "formula":
                 out.append({"id": identity, "name": name or f"{record['name']} #{record['number']}", "source": "run", "ref": ref, "formula": record["formula"]})
             else:
                 cross = services.factors.directory(ref) / "output" / "cross"
                 if not (cross / "raw.npy").is_file():
-                    raise ContractError("invalid_input", f"{record['name']} #{record['number']}: this run's values were not kept; run the factor again.")
+                    raise ContractError("invalid_input", t("{name} #{number}: this run's values were not kept; run the factor again.", name=record['name'], number=record['number']))
                 out.append({"id": identity, "name": name or f"{record['name']} #{record['number']}", "source": "run", "ref": ref, "path": str(cross)})
             pins.append({"input": identity, "name": record["name"], "runId": ref, "number": record["number"], "objectId": record["objectId"], "formula": record.get("formula"),
                          "version": record.get("version")})
         elif source == "builtin":
             if ref not in {item["ref"] for item in BUILTIN}:
-                raise ContractError("invalid_input", f"{name or ref}: the built-in sets are alpha158, alpha360 and styles.")
+                raise ContractError("invalid_input", t("{name}: the built-in sets are alpha158, alpha360 and styles.", name=name or ref))
             out.append({"id": identity, "name": name or next(item["name"] for item in BUILTIN if item["ref"] == ref), "source": "builtin", "ref": ref})
         elif source == "market":
             if not ref.startswith("$"):
-                raise ContractError("invalid_input", f"{name or ref}: a Market series is a field such as $close.")
+                raise ContractError("invalid_input", t("{name}: a Market series is a field such as $close.", name=name or ref))
             out.append({"id": identity, "name": name or ref[1:], "source": "market", "ref": ref, "formula": ref})
         else:
             if ":" not in ref or not ref.split(":", 1)[0].endswith(".py"):
-                raise ContractError("invalid_input", f"{name or ref}: a feature in code is file.py:function.")
+                raise ContractError("invalid_input", t("{name}: a feature in code is file.py:function.", name=name or ref))
             out.append({"id": identity, "name": name or ref.split(":", 1)[1], "source": "code", "ref": ref})
     return out, pins
 
 
 def data_ready(data):
     if not all(data.get(key) for key in ("since", "until")) or not (data.get("symbols") or data.get("list") or data.get("index")):
-        raise ContractError("invalid_input", "Choose the names and the period in the data settings first.")
+        raise ContractError("invalid_input", t("Choose the names and the period in the data settings first."))
 
 
 def held_out_of(resolved, day_ms):

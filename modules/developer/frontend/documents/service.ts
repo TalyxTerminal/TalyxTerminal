@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { ContractError, failure, type Json, type ModuleContext } from "@talyx/sdk";
 import type * as MonacoTypes from "monaco-editor";
 import { createClient, type CheckpointReference as Reference, type Document, type RestoreCheckpointInput, type ContributionSource, type FileSource } from "../../public/ts/types";
@@ -45,7 +46,7 @@ export class DocumentStore {
   watch = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   state = () => this.revision;
   changed() { this.revision++; for (const listener of this.listeners) listener(); }
-  context(): ModuleContext { if (!this.ctx) throw failure("unavailable", "Developer is not active."); return this.ctx; }
+  context(): ModuleContext { if (!this.ctx) throw failure("unavailable", t("Developer is not active.")); return this.ctx; }
   private client() { return createClient(this.context()); }
   report(error: unknown) { this.error = error instanceof Error ? error.message : String(error); this.changed(); }
 
@@ -85,7 +86,7 @@ export class DocumentStore {
   activateProject(projectId: string | null) { this.activeProjectId = projectId; this.changed(); }
 
   snapshot(documentId: string): DocumentSnapshot {
-    const entry = this.entries.get(documentId); if (!entry) throw failure("source_unavailable", "This document is no longer open.");
+    const entry = this.entries.get(documentId); if (!entry) throw failure("source_unavailable", t("This document is no longer open."));
     return entry.snapshot;
   }
   /** Open in the backend; `reveal` also shows it as a tab of the full editor; `reference` opens a file outside every project read-only. */
@@ -142,8 +143,8 @@ export class DocumentStore {
   /** Why a document needs the author's review, or null. */
   review(documentId: string): string | null {
     const entry = this.entries.get(documentId);
-    if (entry?.other) return "Changed elsewhere";
-    if (entry?.snapshot.conflict) return entry.snapshot.externalState === "deleted" ? "Deleted on disk" : "Changed on disk";
+    if (entry?.other) return t("Changed elsewhere");
+    if (entry?.snapshot.conflict) return entry.snapshot.externalState === "deleted" ? t("Deleted on disk") : t("Changed on disk");
     return null;
   }
   async read(documentId: string): Promise<DocumentSnapshot> {
@@ -202,10 +203,10 @@ export class DocumentStore {
     await this.flush(documentId);
     const entry = this.entries.get(documentId)!;
     if (entry.model && entry.model.getValue() !== entry.snapshot.content && !entry.other) await this.send(documentId);
-    if (entry.other || (entry.model && entry.model.getValue() !== entry.snapshot.content)) throw failure("conflict", "Another writer changed this document. Review both versions before saving.");
+    if (entry.other || (entry.model && entry.model.getValue() !== entry.snapshot.content)) throw failure("conflict", t("Another writer changed this document. Review both versions before saving."));
     const result = await this.client()["documents.save"]({ documentId, expectedVersion: this.snapshot(documentId).version });
     await this.read(documentId);
-    if (!["saved", "clean"].includes(result.status)) throw failure("save_failed", result.message ?? "The file remains unsaved.");
+    if (!["saved", "clean"].includes(result.status)) throw failure("save_failed", result.message ?? t("The file remains unsaved."));
     return result;
   }
   unsaved() { return privateRequest<{ documents: DocumentSnapshot[] }>(this.context(), "/documents/unsaved"); }
@@ -247,7 +248,7 @@ export class DocumentStore {
     const current = await this.read(conflict.documentId);
     const result = await this.restoreCheckpoint({ checkpoint: conflict.checkpoint, sourceKeys: [conflict.sourceKey], resolutions: [{ sourceKey: conflict.sourceKey, expectedVersion: current.version, expectedSourceVersion: current.sourceVersion }] });
     const receipt = result.documents[0];
-    if (!["restored", "unchanged"].includes(receipt.status)) throw failure("conflict", receipt.message ?? "The source changed again. Compare the latest version and retry.");
+    if (!["restored", "unchanged"].includes(receipt.status)) throw failure("conflict", receipt.message ?? t("The source changed again. Compare the latest version and retry."));
   }
   keepCurrent(conflict: CheckpointConflict) { this.checkpointConflicts = this.checkpointConflicts.filter(item => item.sourceKey !== conflict.sourceKey); this.changed(); }
   readCheckpoint(checkpoint: CheckpointReference) {
@@ -276,7 +277,7 @@ export class DocumentStore {
     const affected = this.lastDocuments(viewId); if (!affected.length) return { decision: "allow" as const };
     this.pendingClose ??= { documentIds: affected.map(item => item.documentId), error: null, working: false, close: () => { this.allowedClose.add(viewId); return this.views.get(viewId)?.close(); } };
     this.changed();
-    return { decision: "block" as const, message: "Choose how to handle unsaved documents in Developer." };
+    return { decision: "block" as const, message: t("Choose how to handle unsaved documents in Developer.") };
   }
   cancelClose() { this.pendingClose = null; this.changed(); }
   async finishClose(mode: "save" | "discard") {
@@ -287,7 +288,7 @@ export class DocumentStore {
         if (mode === "save") await this.save(id);
         else await this.resolve(id, "external");
       }
-      if (mode === "save" && request.documentIds.some(id => this.isDirty(id))) throw failure("conflict", "The document changed while saving. Save the latest edits before closing.");
+      if (mode === "save" && request.documentIds.some(id => this.isDirty(id))) throw failure("conflict", t("The document changed while saving. Save the latest edits before closing."));
       this.pendingClose = null; this.changed();
       await request.close();
     } catch (error) { request.error = error instanceof Error ? error.message : String(error); request.working = false; this.changed(); }

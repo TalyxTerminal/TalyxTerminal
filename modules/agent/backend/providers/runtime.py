@@ -18,6 +18,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.network import (
     NetworkRouteChanged,
     await_network_route,
@@ -92,31 +93,30 @@ class ProviderRuntime:
         resolved = self.catalog.resolve(model_id, billing=True)
         connection = self.catalog.connection(resolved["connectionId"])
         if resolved["contextWindow"] is None:
-            raise ContractError("invalid_input", "Configure this model's context window before using Agent")
+            raise ContractError("invalid_input", t("Configure this model's context window before using Agent"))
         maximum = resolved["maxOutputTokens"]
         output_reserve = maximum if output_reserve is None else min(output_reserve, maximum)
         if require_tools and resolved["tools"] is False:
-            raise ContractError("unsupported", "This model does not support tool calls; choose a tool-capable model")
+            raise ContractError("unsupported", t("This model does not support tool calls; choose a tool-capable model"))
         if require_tools:
             tested = self.catalog.read_test(model_id)
             if "tools" in tested["checks"] and tested["checks"]["tools"]["state"] == "failed":
-                raise ContractError("unsupported", "This connection failed its tool-call test; choose another model or correct its configuration")
+                raise ContractError("unsupported", t("This connection failed its tool-call test; choose another model or correct its configuration"))
             if resolved["tools"] is None and ("tools" not in tested["checks"] or tested["checks"]["tools"]["state"] != "passed"):
-                raise ContractError("unsupported", "Tool support is unknown; test this connection or explicitly configure the model's capabilities")
+                raise ContractError("unsupported", t("Tool support is unknown; test this connection or explicitly configure the model's capabilities"))
         if provider_search and connection.kind == "official" and connection.providerId not in {"openai", "anthropic", "google", "xai"}:
-            raise ContractError("unsupported", "This provider's native search is not integrated")
+            raise ContractError("unsupported", t("This provider's native search is not integrated"))
         levels = self.catalog.thinking(model_id)
         native, budget = thinking_levels.native(connection, resolved, levels, thinking_levels.level(levels, thinking))
         if budget:
             if output_reserve <= 1024:
-                raise ContractError("invalid_input", f"Output limit {output_reserve} tokens cannot fit the minimum "
-                                    "1024-token thinking budget and a reply. Increase the limit or turn thinking off.")
+                raise ContractError("invalid_input", t("Output limit {output_reserve} tokens cannot fit the minimum 1024-token thinking budget and a reply. Increase the limit or turn thinking off.", output_reserve=output_reserve))
             native["thinking"]["budget_tokens"] = min(budget, output_reserve - 1)
         if native.get("thinking_budget", -1) > output_reserve:
             native["thinking_budget"] = output_reserve - 1
         key = await self.get_secret(connection.secretRef) if connection.secretRef is not None else "local"
         if not key:
-            raise ContractError("credential_missing", "Configure the model connection's API key")
+            raise ContractError("credential_missing", t("Configure the model connection's API key"))
         proxy = system_http_proxy_url()
         epoch = system_route_epoch()
         local = connection.kind == "local"
@@ -190,11 +190,11 @@ class ProviderRuntime:
             return []
         connection = self.catalog.connection(resolved["connectionId"])
         if connection.kind == "official" and connection.providerId not in {"openai", "anthropic", "google", "xai"}:
-            raise ContractError("unsupported", "This provider uses TALYX search; its native search is not integrated")
+            raise ContractError("unsupported", t("This provider uses TALYX search; its native search is not integrated"))
         if connection.kind == "relay":
             tests = self.catalog.read_test(model_id)
             if "search" not in tests["checks"] or tests["checks"]["search"]["state"] != "passed":
-                raise ContractError("unsupported", "Test provider search on this relay before using it")
+                raise ContractError("unsupported", t("Test provider search on this relay before using it"))
         if connection.protocol == "openai":
             return [{"type": "web_search"}]
         if connection.protocol == "anthropic":
@@ -202,4 +202,4 @@ class ProviderRuntime:
         if connection.protocol == "google":
             # K8 exposes provider_search(query, objective); grounding runs in a separate request.
             return []
-        raise ContractError("unsupported", "This connection has no supported provider search")
+        raise ContractError("unsupported", t("This connection has no supported provider search"))

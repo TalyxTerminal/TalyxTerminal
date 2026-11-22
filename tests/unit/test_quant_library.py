@@ -14,6 +14,7 @@ from talyx_sdk import ContractError
 from modules.quant.backend.object_store import check_data
 from modules.quant.backend.research_lists import ResearchLists
 from modules.quant.backend.work_records import WorkRecords
+from tests.fixtures.quant_index import frozen_index
 from tests.unit.quant_library_fakes import DAY, NAMES, build, close_of, factor_spec
 from tests.unit.quant_runtime_fakes import adapt
 
@@ -648,7 +649,7 @@ def test_two_versions_share_the_unchanged_frozen_revision_after_serialized_verif
     state = {"revision": "r1", "active": 0, "most": 0}
     async def resolve(settings):
         return settings
-    async def prepare(key, settings, report, directory, calendars="one"):
+    async def prepare(key, settings, report, directory, calendars="one", facts=True):
         state["active"] += 1
         state["most"] = max(state["most"], state["active"])
         await asyncio.sleep(.01)
@@ -657,7 +658,7 @@ def test_two_versions_share_the_unchanged_frozen_revision_after_serialized_verif
         state["active"] -= 1
         return {"key": key, "fingerprint": state["revision"], "frozenAt": 100000, "how": "full"}
     monkeypatch.setattr(data, "resolve", resolve)
-    monkeypatch.setattr(data, "key", lambda settings, calendars: "same-selection")
+    monkeypatch.setattr(data, "key", lambda settings, calendars, facts=True: "same-selection")
     monkeypatch.setattr(data, "_prepare", prepare)
     async def unchanged(ready):
         state["checked"] = state.get("checked", 0) + 1
@@ -801,10 +802,11 @@ def test_a_version_keeps_the_index_summary_not_its_membership(tmp_path):
     are kept beside its values."""
     world = build(tmp_path)
     spec = factor_spec("Momentum", "v1", 50)
-    member = {"assetId": "a1", "instrument": {"instrumentId": "i:A"}, "effectiveTime": 0, "effectiveUntil": 50 * DAY}
+    member = {"assetId": "a1", "instrumentId": "i:A", "effectiveTime": 0, "effectiveUntil": 50 * DAY}
     gone = {"assetId": "a2", "instrumentId": "i:B", "symbol": "B", "since": 0, "until": DAY, "kind": "no_prices", "reason": "none"}
     index = {"selection": {"instrument": {"instrumentId": "idx"}}, "since": 0, "until": 50 * DAY, "exclusions": [gone], "instruments": [{"instrumentId": "i:A"}],
              "unmappedCount": 0, "intervals": [{"since": 0, "until": 50 * DAY, "members": [member]}]}
+    index = frozen_index(index)
     spec["meta"]["info"] = {**spec["meta"]["info"], "index": index}
     world.store.commit_versions([spec])
     kept = world.store.version("v1")["meta"]["info"]["index"]
@@ -820,11 +822,12 @@ def test_a_name_without_a_value_says_which_reason_it_is(tmp_path):
     spec = factor_spec("Momentum", "v1", 50)
     spec["rows"] = [row for row in spec["rows"] if not (row[2] == 50 * DAY and row[0] in {"i:A", "i:B", "i:C"})]
     def member(name, until):
-        return {"assetId": name, "instrument": {"instrumentId": name}, "effectiveTime": 0, "effectiveUntil": until}
+        return {"assetId": name, "instrumentId": name, "effectiveTime": 0, "effectiveUntil": until}
     members = [member(name, 40 * DAY if name == "i:A" else 50 * DAY) for name in NAMES]
     index = {"selection": {"instrument": {"instrumentId": "idx"}}, "since": 0, "until": 50 * DAY, "instruments": [{"instrumentId": name} for name in NAMES],
              "exclusions": [{"assetId": "i:B", "instrumentId": "i:B", "symbol": "B", "since": 45 * DAY, "until": 50 * DAY, "kind": "no_data", "reason": "The free source has no prices for this past member"}],
              "unmappedCount": 0, "intervals": [{"since": 0, "until": 40 * DAY, "members": members}, {"since": 40 * DAY + 1, "until": 50 * DAY, "members": members[1:]}]}
+    index = frozen_index(index)
     spec["meta"]["info"] = {**spec["meta"]["info"], "index": index}
     world.store.commit_versions([spec])
     page = world.library.values_page("v1", date=50 * DAY, order="missing")

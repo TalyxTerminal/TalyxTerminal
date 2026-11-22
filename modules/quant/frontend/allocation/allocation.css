@@ -160,8 +160,6 @@
 .al-pb .pb-ck { white-space: nowrap; }
 .al-pb .pb-ck .pb-t2 { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
-.al-notes { display: grid; gap: 8px; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
-.al-notes p { margin: 0; }
 
 .al-starbtn { background: none; border: 0; padding: 0 2px; cursor: pointer; color: var(--tx-text-3); display: inline-flex; }
 .al-starbtn[aria-pressed="false"] { opacity: .45; }

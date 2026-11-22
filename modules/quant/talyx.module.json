@@ -5,6 +5,7 @@
   "name": "Quant",
   "version": "1.1.0",
   "description": "Write, run and compare strategies and research.",
+  "locales": {"zh-CN": "locales/zh-CN.json"},
   "entries": {
     "backend": "backend.entry",
     "frontend": "frontend/module.tsx"

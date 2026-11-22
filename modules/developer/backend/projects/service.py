@@ -16,6 +16,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t
 from talyx_sdk.recycle import recycle_directory
 
 from .history import FileHistory
@@ -50,7 +51,7 @@ def canonical_uri(path: Path) -> str:
 def file_path(uri: str) -> Path:
     parsed = urlparse(uri)
     if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
-        raise ContractError("invalid_input", "Choose a local file or a contributed source.")
+        raise ContractError("invalid_input", t("Choose a local file or a contributed source."))
     path = re.sub(r"^/([a-zA-Z])%3[Aa]/", r"/\1:/", parsed.path) if os.name == "nt" else parsed.path
     return Path(url2pathname(path))
 
@@ -112,12 +113,12 @@ class ProjectService:
 
     def open(self, directory: str, *, create=False, name=None):
         if not isinstance(directory, str) or not directory.strip():
-            raise ContractError("invalid_input", "Choose a directory to open.")
+            raise ContractError("invalid_input", t("Choose a directory to open."))
         root = Path(directory).expanduser().resolve()
         if create:
             root.mkdir(parents=True, exist_ok=False)
         if not root.is_dir():
-            raise ContractError("source_unavailable", "The selected directory is unavailable.")
+            raise ContractError("source_unavailable", t("The selected directory is unavailable."))
         with self.lock:
             for project in self.projects.values():
                 if os.path.normcase(str(root)) == os.path.normcase(project["root"]):
@@ -165,26 +166,26 @@ class ProjectService:
         registered = Path(project["root"])
         root = registered.resolve()
         if os.path.normcase(str(root)) != os.path.normcase(str(registered)):
-            raise ContractError("source_replaced", "The project directory changed. Reopen it before moving it to the Recycle Bin.")
+            raise ContractError("source_replaced", t("The project directory changed. Reopen it before moving it to the Recycle Bin."))
         if not root.is_dir():
-            raise ContractError("source_unavailable", "The project directory is unavailable. You can remove it from the list.")
+            raise ContractError("source_unavailable", t("The project directory is unavailable. You can remove it from the list."))
         if identity(root) != project.get("rootIdentity"):
-            raise ContractError("source_replaced", "The project directory was replaced. Reopen it before moving it to the Recycle Bin.")
+            raise ContractError("source_replaced", t("The project directory was replaced. Reopen it before moving it to the Recycle Bin."))
         if root == Path(root.anchor) or any(path.is_relative_to(root) for path in self.protected_roots):
-            raise ContractError("permission_denied", "This application, home or drive directory cannot be moved to the Recycle Bin.")
+            raise ContractError("permission_denied", t("This application, home or drive directory cannot be moved to the Recycle Bin."))
         if any(root.is_relative_to(path) or path.is_relative_to(root) for path in self.protected_paths):
-            raise ContractError("permission_denied", "This directory contains protected application, installed module or system data.")
+            raise ContractError("permission_denied", t("This directory contains protected application, installed module or system data."))
         return root
 
     def remove(self, project_id: str, mode: str, expected_root: str, root_identity: str):
         if mode not in ("forget", "trash") or not isinstance(expected_root, str) or not isinstance(root_identity, str):
-            raise ContractError("invalid_input", "Choose how to remove this project.")
+            raise ContractError("invalid_input", t("Choose how to remove this project."))
         with self.lock:
             project = self.projects.get(project_id)
             if project is None:
-                raise ContractError("unavailable", "The project is no longer registered.")
+                raise ContractError("unavailable", t("The project is no longer registered."))
             if os.path.normcase(expected_root) != os.path.normcase(project["root"]) or root_identity != project.get("rootIdentity"):
-                raise ContractError("conflict", "The project changed while the dialog was open. Review it and try again.")
+                raise ContractError("conflict", t("The project changed while the dialog was open. Review it and try again."))
             root = self._trash_target(project) if mode == "trash" else None
             previous_removed = self.removed_projects.get(project_id)
             self.projects.pop(project_id)
@@ -198,7 +199,7 @@ class ProjectService:
                 self.removed_projects.pop(project_id)
                 if previous_removed is not None:
                     self.removed_projects[project_id] = previous_removed
-                raise ContractError("storage_unavailable", "The project list could not be saved. The project folder is preserved.") from exc
+                raise ContractError("storage_unavailable", t("The project list could not be saved. The project folder is preserved.")) from exc
             if root is not None:
                 try:
                     self._trash_target(project)
@@ -216,16 +217,16 @@ class ProjectService:
                     try:
                         self._persist()
                     except OSError:
-                        raise ContractError("storage_unavailable", "The Recycle Bin operation failed and the project list could not be restored. Reopen the folder to recover its listing.", execution="failed", effects="possible") from exc
+                        raise ContractError("storage_unavailable", t("The Recycle Bin operation failed and the project list could not be restored. Reopen the folder to recover its listing."), execution="failed", effects="possible") from exc
                     if isinstance(exc, ContractError):
                         raise
-                    raise ContractError("recycle_failed", "The folder could not be moved to the Windows Recycle Bin. The project remains listed.", {"reason": str(exc)}, execution="failed", effects="possible") from exc
+                    raise ContractError("recycle_failed", t("The folder could not be moved to the Windows Recycle Bin. The project remains listed."), {"reason": str(exc)}, execution="failed", effects="possible") from exc
             return {"projectId": project_id, "mode": mode, "removed": True}
 
     def get(self, project_id: str):
         project = self.projects.get(project_id) or self.references.get(project_id)
         if not project:
-            raise ContractError("unavailable", "The project is no longer registered.")
+            raise ContractError("unavailable", t("The project is no longer registered."))
         return self.summary(project)
 
     def activate(self, project_id: str):
@@ -248,7 +249,7 @@ class ProjectService:
 
     def _reference(self, file: Path):
         if not file.is_file():
-            raise ContractError("source_unavailable", "This reference file is unavailable.")
+            raise ContractError("source_unavailable", t("This reference file is unavailable."))
         parent_identity = identity(file.parent)
         project_id = "reference-" + hashlib.sha256((os.path.normcase(str(file)) + ":" + parent_identity).encode()).hexdigest()[:32]
         with self.lock:
@@ -258,7 +259,7 @@ class ProjectService:
     def locate(self, uri: str, project_id: str | None = None, *, register=False, reference=False):
         parsed = urlparse(uri)
         if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
-            raise ContractError("invalid_input", "Choose a local file or a contributed source.")
+            raise ContractError("invalid_input", t("Choose a local file or a contributed source."))
         # url2pathname decodes percent escapes itself. Decoding twice changes
         # real names such as "%20folder" into another path.
         uri_path = re.sub(r"^/([a-zA-Z])%3[Aa]/", r"/\1:/", parsed.path) if os.name == "nt" else parsed.path
@@ -266,7 +267,7 @@ class ProjectService:
         if project_id and project_id.startswith("reference-") and project_id not in self.references:
             restored = self._reference(file)
             if restored["projectId"] != project_id:
-                raise ContractError("source_replaced", "The reference directory changed. Open the reference again.")
+                raise ContractError("source_replaced", t("The reference directory changed. Open the reference again."))
         candidates = [self.get(project_id)] if project_id else self.list()
         if not project_id and not register:
             candidates.extend(self.summary(project) for project in self.references.values())
@@ -279,24 +280,24 @@ class ProjectService:
         if register:
             project = self._reference(file) if reference else self.open(str(file.parent))
             return {"project": project, "path": file.name, "uri": canonical_uri(file)}
-        raise ContractError("source_unavailable", "This file does not belong to an open project.")
+        raise ContractError("source_unavailable", t("This file does not belong to an open project."))
 
     def path(self, project_id: str, relative: str = "") -> Path:
         project = self.get(project_id)
         root = Path(project["root"]).resolve()
         if not root.is_dir():
-            raise ContractError("source_unavailable", "The project directory is unavailable.")
+            raise ContractError("source_unavailable", t("The project directory is unavailable."))
         current_identity = identity(root)
         if project.get("rootIdentity") and project["rootIdentity"] != current_identity:
-            raise ContractError("source_replaced", "The project directory was replaced. Reopen the directory before changing files.")
+            raise ContractError("source_replaced", t("The project directory was replaced. Reopen the directory before changing files."))
         pure = PurePosixPath(relative.replace("\\", "/"))
         if pure.is_absolute() or ".." in pure.parts or any(":" in part or "\x00" in part for part in pure.parts):
-            raise ContractError("invalid_input", "The file path must stay inside this project.")
+            raise ContractError("invalid_input", t("The file path must stay inside this project."))
         if project.get("readOnly") and os.path.normcase(relative) != os.path.normcase(project["referenceFile"]):
-            raise ContractError("permission_denied", "This context grants access only to the selected reference file.")
+            raise ContractError("permission_denied", t("This context grants access only to the selected reference file."))
         path = (root / Path(*pure.parts)).resolve()
         if not path.is_relative_to(root):
-            raise ContractError("permission_denied", "The linked file is outside this project.")
+            raise ContractError("permission_denied", t("The linked file is outside this project."))
         return path
 
     def stat(self, project_id: str, relative: str):
@@ -310,7 +311,7 @@ class ProjectService:
     def children(self, project_id: str, relative: str = ""):
         path = self.path(project_id, relative)
         if not path.is_dir():
-            raise ContractError("source_unavailable", "This directory is unavailable.")
+            raise ContractError("source_unavailable", t("This directory is unavailable."))
         entries = []
         for child in path.iterdir():
             name = (PurePosixPath(relative) / child.name).as_posix()
@@ -324,30 +325,30 @@ class ProjectService:
         path = self.path(project_id, relative)
         stat = self.stat(project_id, relative)
         if stat["kind"] != "file":
-            raise ContractError("source_unavailable", "This file is unavailable.")
+            raise ContractError("source_unavailable", t("This file is unavailable."))
         if stat["size"] > 16 * 1024 * 1024:
-            raise ContractError("resource_too_large", "This file is too large for the text editor. Open it in an external editor.")
+            raise ContractError("resource_too_large", t("This file is too large for the text editor. Open it in an external editor."))
         data = path.read_bytes()
         try:
             content = data.decode("utf-8-sig")
             if "\x00" in content:
                 raise UnicodeError()
         except UnicodeError:
-            raise ContractError("binary_resource", "This resource is preserved on disk. Open it with an external application.") from None
+            raise ContractError("binary_resource", t("This resource is preserved on disk. Open it with an external application.")) from None
         if not self.get(project_id).get("readOnly"):
-            self._capture_history(project_id, relative, data, "External change")
+            self._capture_history(project_id, relative, data, mark("External change"))
         return {**stat, "content": content, "version": hashlib.sha256(data).hexdigest()}
 
     def write(self, project_id: str, relative: str, content: str, expected_version: str | None):
         with self.lock:
             if self.get(project_id).get("readOnly"):
-                raise ContractError("permission_denied", "Reference files are read-only.")
+                raise ContractError("permission_denied", t("Reference files are read-only."))
             path = self.path(project_id, relative)
             if path.exists() and not path.is_file():
-                raise ContractError("invalid_input", "Choose a file rather than a directory.")
+                raise ContractError("invalid_input", t("Choose a file rather than a directory."))
             current = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
             if current != expected_version:
-                return {"status": "conflict", "version": current, "message": "The file changed outside the editor. Compare the changes before saving."}
+                return {"status": "conflict", "version": current, "message": t("The file changed outside the editor. Compare the changes before saving.")}
             if current is None:
                 # New nested files may create their
                 # parent directories. Recheck authority and CAS after creation.
@@ -356,9 +357,9 @@ class ProjectService:
                 path = self.path(project_id, relative)
                 current = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
                 if current != expected_version:
-                    return {"status": "conflict", "version": current, "message": "The file appeared while creating its directory. Read its current version before saving."}
+                    return {"status": "conflict", "version": current, "message": t("The file appeared while creating its directory. Read its current version before saving.")}
             if path.is_file():
-                self._capture_history(project_id, relative, path.read_bytes(), "Before save")
+                self._capture_history(project_id, relative, path.read_bytes(), mark("Before save"))
             data = content.encode("utf-8")
             temporary = path.with_name(uuid4().hex + ".tmp")
             try:
@@ -367,11 +368,11 @@ class ProjectService:
                 self.path(project_id, relative)
                 verified = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
                 if verified != current:
-                    return {"status": "conflict", "version": verified, "message": "The file changed while saving. Compare the changes before saving."}
+                    return {"status": "conflict", "version": verified, "message": t("The file changed while saving. Compare the changes before saving.")}
                 os.replace(temporary, path)
             finally:
                 temporary.unlink(missing_ok=True)
-            self._capture_history(project_id, relative, data, "Saved")
+            self._capture_history(project_id, relative, data, mark("Saved"))
             return {"status": "saved", "version": hashlib.sha256(data).hexdigest(), **({"historyWarning": self.history_warnings[project_id]} if project_id in self.history_warnings else {})}
 
     async def remove_checked(self, project_id, mode, expected_root, root_identity):
@@ -381,13 +382,13 @@ class ProjectService:
 
     def history_path(self, project_id, path):
         if self.get(project_id).get("readOnly"):
-            raise ContractError("permission_denied", "Reference files do not have editable file history.")
+            raise ContractError("permission_denied", t("Reference files do not have editable file history."))
         return self.path(project_id, path)
 
     def file_history(self, project_id, path):
         file = self.history_path(project_id, path)
         if file.is_file() and file.stat().st_size <= 16 * 1024 * 1024:
-            self._capture_history(project_id, path, file.read_bytes(), "Current file")
+            self._capture_history(project_id, path, file.read_bytes(), mark("Current file"))
         result = self.history.list(project_id, path)
         result["warnings"] = [self.history_warnings[project_id]] if project_id in self.history_warnings else []
         return result
@@ -424,9 +425,9 @@ class ProjectService:
             try:
                 payload = await request.json()
             except (json.JSONDecodeError, UnicodeError) as exc:
-                raise ContractError("invalid_input", "Choose how to remove this project.") from exc
+                raise ContractError("invalid_input", t("Choose how to remove this project.")) from exc
             if not isinstance(payload, dict) or payload.get("mode") not in ("forget", "trash"):
-                raise ContractError("invalid_input", "Choose how to remove this project.")
+                raise ContractError("invalid_input", t("Choose how to remove this project."))
             return await self.remove_checked(project_id, payload["mode"], payload.get("expectedRoot"), payload.get("rootIdentity"))
 
         @root.post("/projects/{project_id}/activate")

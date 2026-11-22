@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   TxButton, TxContextMenu, TxDialog, TxIcon, TxIconButton, TxInput, TxMenu, TxSearch, useTxToast, type ModuleContext, type TxMenuItem,
@@ -77,7 +78,7 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
   const fail = useCallback(
     (reason: unknown) =>
       toast({
-        title: "Bot request failed",
+        title: t("Bot request failed"),
         detail: reason instanceof Error ? reason.message : String(reason),
         tone: "failed",
       }),
@@ -341,8 +342,8 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
 
   const setEntry = (entry: Entry, change: Partial<Bot & Group>) => entry.kind === "bot" ? changeBot(entry.bot.id, change) : changeGroup(entry.group.id, change);
   const newSection = (entry?: Entry) => {
-    let name = "New section", n = 2;
-    while (sections.includes(name)) name = `New section ${n++}`;
+    let name = t("New section"), n = 2;
+    while (sections.includes(name)) name = t("New section {number}", { number: n++ });
     mutate("section",{name});
     if (entry) setEntry(entry, { section: name, pinned: false });
     setRenaming(`section:${name}`);
@@ -351,24 +352,24 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
     const entry = entries.find(item => facts(item).id === id)!;
     const value = facts(entry);
     return [
-      ...entry.kind === "bot" ? [{ id: "settings", label: "Settings", icon: "settings" as const, onSelect: () => { setView({ kind: "chat", id }); setRail({ open: true, page: { kind: "settings", bot: id } }); } }] : [],
-      { id: "rename", label: "Rename", icon: "edit", onSelect: () => setRenaming(id) },
-      { id: "pin", label: value.pinned ? "Unpin" : "Pin", icon: "bookmark", separated: true, onSelect: () => setEntry(entry, { pinned: !value.pinned }) },
-      { id: "hide", label: value.hidden ? "Show in sidebar" : "Hide from sidebar", icon: value.hidden ? "eye" : "eye-off", onSelect: () => setEntry(entry, { hidden: !value.hidden }) },
-      ...entry.kind === "bot" ? [{ id: "pause", label: entry.bot.state === "paused" ? "Resume" : "Pause", icon: entry.bot.state === "paused" ? "play" as const : "pause" as const,
+      ...entry.kind === "bot" ? [{ id: "settings", label: t("Settings"), icon: "settings" as const, onSelect: () => { setView({ kind: "chat", id }); setRail({ open: true, page: { kind: "settings", bot: id } }); } }] : [],
+      { id: "rename", label: t("Rename"), icon: "edit", onSelect: () => setRenaming(id) },
+      { id: "pin", label: value.pinned ? t("Unpin") : t("Pin"), icon: "bookmark", separated: true, onSelect: () => setEntry(entry, { pinned: !value.pinned }) },
+      { id: "hide", label: value.hidden ? t("Show in sidebar") : t("Hide from sidebar"), icon: value.hidden ? "eye" : "eye-off", onSelect: () => setEntry(entry, { hidden: !value.hidden }) },
+      ...entry.kind === "bot" ? [{ id: "pause", label: entry.bot.state === "paused" ? t("Resume") : t("Pause"), icon: entry.bot.state === "paused" ? "play" as const : "pause" as const,
         onSelect: () => changeBot(id, { state: entry.bot.state === "paused" ? "idle" : "paused" }) }] : [],
       // Grok Bot's "Move to": the user's sections, the unnamed rest, or a new section
-      ...sections.map((section, index) => ({ id: `move-${section}`, label: section, icon: "folder" as const, group: index === 0 ? "Move to" : undefined, separated: index === 0,
+      ...sections.map((section, index) => ({ id: `move-${section}`, label: section, icon: "folder" as const, group: index === 0 ? t("Move to") : undefined, separated: index === 0,
         checked: value.section === section && !value.pinned, onSelect: () => setEntry(entry, { section, pinned: false }) })),
-      { id: "move-none", label: "No section", icon: "minus", group: sections.length ? undefined : "Move to", separated: !sections.length, checked: !value.section && !value.pinned,
+      { id: "move-none", label: t("No section"), icon: "minus", group: sections.length ? undefined : t("Move to"), separated: !sections.length, checked: !value.section && !value.pinned,
         onSelect: () => setEntry(entry, { section: "", pinned: false }) },
-      { id: "move-new", label: "New section…", icon: "plus", onSelect: () => newSection(entry) },
-      { id: "delete", label: entry.kind === "bot" ? "Delete bot…" : "Delete group…", icon: "trash", tone: "danger" as const, separated: true, onSelect: () => setDeleting(entry) },
+      { id: "move-new", label: t("New section…"), icon: "plus", onSelect: () => newSection(entry) },
+      { id: "delete", label: entry.kind === "bot" ? t("Delete bot…") : t("Delete group…"), icon: "trash", tone: "danger" as const, separated: true, onSelect: () => setDeleting(entry) },
     ];
   };
   const sectionMenu = (section: string): TxMenuItem[] => [
-    { id: "rename", label: "Rename section", icon: "edit", onSelect: () => setRenaming(`section:${section}`) },
-    { id: "delete", label: "Delete section", icon: "trash", tone: "danger", separated: true, onSelect: () => {
+    { id: "rename", label: t("Rename section"), icon: "edit", onSelect: () => setRenaming(`section:${section}`) },
+    { id: "delete", label: t("Delete section"), icon: "trash", tone: "danger", separated: true, onSelect: () => {
       mutate("section",{old:section});
     } },
   ];
@@ -385,14 +386,14 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
   };
   /** The "…" on a sidebar entry, shown on hover like the chat panel. */
   const more = (id: string, name: string) => <span className="bot-more"><TxMenu label={name} align="end" items={entryMenu(id)}
-    trigger={<TxIconButton size="sm" icon="more" label={`More for ${name}`} />} /></span>;
+    trigger={<TxIconButton size="sm" icon="more" label={t("More for {name}", { name })} />} /></span>;
   const context = (id: string) => (event: React.MouseEvent) => { event.preventDefault(); setMenu({ id, x: event.clientX, y: event.clientY }); };
 
   const row = (entry: Entry) => {
     const value = facts(entry);
     const picture = entry.kind === "bot" ? <Avatar look={entry.bot.look} state={entry.bot.state} dot={dotOf(entry)} /> : <GroupAvatar looks={looks(entry.group.members)} dot={dotOf(entry)} />;
     if (renaming === value.id) return <div key={value.id} className="bot-entry bot-renaming">{picture}
-      <TxInput autoFocus defaultValue={value.name} aria-label="Name" className="bot-rename"
+      <TxInput autoFocus defaultValue={value.name} aria-label={t("Name")} className="bot-rename"
         onBlur={event => rename(value.id, event.target.value)} onKeyDown={event => { if (event.key === "Enter") rename(value.id, event.currentTarget.value); if (event.key === "Escape") setRenaming(null); }} />
     </div>;
     return <div key={value.id} className="bot-entry">
@@ -412,7 +413,7 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
     <TxButton variant="row" className="bot-row" aria-current>
       {view.kind === "new-bot" ? <Avatar look={draft.look} /> : <span className="bot-new-mark"><TxIcon name="messages" /></span>}
       <span className="bot-row-copy"><span className="bot-row-top"><span className="bot-row-name">
-        {view.kind === "new-bot" ? draft.name || (bots.length ? "New bot" : "Create your first bot") : "New group"}</span></span></span>
+        {view.kind === "new-bot" ? draft.name || (bots.length ? t("New bot") : t("Create your first bot")) : t("New group")}</span></span></span>
     </TxButton>
   </div>;
 
@@ -420,28 +421,28 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
   const running = thread?.running ?? false;
   const memberMentions: Mention[] = group ? [
     ...group.members.map(id => byId.get(id)!).map(member => ({ id: member.id, name: member.name, detail: member.intro, lead: <Avatar look={member.look} size="xs" /> })),
-    { id: "everyone", name: "everyone", detail: "Every bot in this group", lead: <GroupAvatar looks={looks(group.members)} size="sm" /> },
+    { id: "everyone", name: "everyone", detail: t("Every bot in this group"), lead: <GroupAvatar looks={looks(group.members)} size="sm" /> },
   ] : [];
   const unsectioned = listed.filter(entry => !facts(entry).section || !sections.includes(facts(entry).section!));
   const nothingMatches = search && !pinned.length && !listed.length && !hidden.length;
 
   return <div ref={root} className="bot-panel">
-    <aside className="bot-side" aria-label="Bots and groups" style={{width:sideWidth.width ?? undefined}}>
-      <DragEdge side="right" label="Resize the bot list" drag={sideWidth} />
+    <aside className="bot-side" aria-label={t("Bots and groups")} style={{width:sideWidth.width ?? undefined}}>
+      <DragEdge side="right" label={t("Resize the bot list")} drag={sideWidth} />
       {mode && <div className="bot-mode">{mode}</div>}
       <div className="bot-side-head">
-        <TxSearch className="bot-search" value={search} onValueChange={setSearch} placeholder="Search" />
-        <TxMenu label="New" align="end" items={[
-          { id: "bot", label: "New bot", icon: "plus", onSelect: () => choose({ kind: "new-bot" }) },
-          { id: "group", label: "New group", icon: "messages", onSelect: () => choose({ kind: "new-group" }) },
-          { id: "section", label: "New section", icon: "list", separated: true, onSelect: () => newSection() },
-        ]} trigger={<TxIconButton size="sm" icon="plus" label="New" className="bot-new" />} />
+        <TxSearch className="bot-search" value={search} onValueChange={setSearch} placeholder={t("Search")} />
+        <TxMenu label={t("New")} align="end" items={[
+          { id: "bot", label: t("New bot"), icon: "plus", onSelect: () => choose({ kind: "new-bot" }) },
+          { id: "group", label: t("New group"), icon: "messages", onSelect: () => choose({ kind: "new-group" }) },
+          { id: "section", label: t("New section"), icon: "list", separated: true, onSelect: () => newSection() },
+        ]} trigger={<TxIconButton size="sm" icon="plus" label={t("New")} className="bot-new" />} />
       </div>
       <div className="bot-side-wrap">
         <div className="bot-side-body" ref={side} onScroll={checkUnreads}>
           {making}
-          {nothingMatches && <p className="bot-side-none">No bots or groups match "{search}"</p>}
-          {!bots.length && !groups.length && view.kind !== "chat" && <p className="bot-side-none bot-side-empty">No chats yet</p>}
+          {nothingMatches && <p className="bot-side-none">{t("No bots or groups match “{query}”", { query: search })}</p>}
+          {!bots.length && !groups.length && view.kind !== "chat" && <p className="bot-side-none bot-side-empty">{t("No chats yet")}</p>}
           {pinned.length > 0 && <div className="bot-pins">{pinned.map(entry => {
             const value = facts(entry);
             return <div key={value.id} className="bot-entry bot-pin-entry">
@@ -460,7 +461,7 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
             const isFolded = folded.includes(section);
             return <section key={section} className="bot-section" aria-label={section}>
               {renaming === `section:${section}`
-                ? <TxInput autoFocus defaultValue={section} aria-label="Section name" className="bot-section-rename"
+                ? <TxInput autoFocus defaultValue={section} aria-label={t("Section name")} className="bot-section-rename"
                   onBlur={event => renameSection(section, event.target.value)}
                   onKeyDown={event => { if (event.key === "Enter") renameSection(section, event.currentTarget.value); if (event.key === "Escape") setRenaming(null); }} />
                 : <div className="bot-section-head">
@@ -468,14 +469,14 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
                     onClick={() => setFolded(all => isFolded ? all.filter(item => item !== section) : [...all, section])}>
                     <span className="bot-section-title">{section}</span><span className="bot-fold-indicator"><TxIcon name={isFolded ? "chevron" : "chevron-down"} /></span>
                   </TxButton>
-                  <span className="bot-section-more"><TxMenu label={section} align="end" items={sectionMenu(section)} trigger={<TxIconButton size="sm" icon="more" label={`More for ${section}`} />} /></span>
+                  <span className="bot-section-more"><TxMenu label={section} align="end" items={sectionMenu(section)} trigger={<TxIconButton size="sm" icon="more" label={t("More for {section}", { section })} />} /></span>
                 </div>}
               {!isFolded && rows.length > 0 && <div className="bot-rows">{rows.map(row)}</div>}
             </section>;
           })}
           {hidden.length > 0 && <div className="bot-hidden">
-            <TxButton variant="row" size="sm" className="bot-hidden-head" title="Hidden bots" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>
-              <span>Hidden bots</span><span className="bot-row-time">{hidden.length}</span>
+            <TxButton variant="row" size="sm" className="bot-hidden-head" title={t("Hidden bots")} aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>
+              <span>{t("Hidden bots")}</span><span className="bot-row-time">{hidden.length}</span>
             </TxButton>
             {showHidden && <div className="bot-rows">{hidden.map(row)}</div>}
           </div>}
@@ -483,7 +484,7 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
         {moreUnreads && <div className="bot-more-unreads"><TxButton size="sm" variant="quiet" onClick={() => {
           const element = side.current!;
           below(element, element.getBoundingClientRect().bottom)[0]?.scrollIntoView({ block: "center", behavior: "smooth" });
-        }}><TxIcon name="arrow-down" />More unreads</TxButton></div>}
+        }}><TxIcon name="arrow-down" />{t("More unreads")}</TxButton></div>}
       </div>
     </aside>
 
@@ -493,48 +494,48 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
         void command<{id:string}>("create_group",{members}).then(({id})=>choose({kind:"chat",id})).catch(()=>undefined);
       }} />}
       {view.kind === "chat" && allHidden && <div className="bot-all-hidden">
-        <p className="bot-all-hidden-title">All your bots are hidden</p>
-        <TxButton onClick={() => setShowHidden(true)}>Show hidden bots</TxButton>
+        <p className="bot-all-hidden-title">{t("All your bots are hidden")}</p>
+        <TxButton onClick={() => setShowHidden(true)}>{t("Show hidden bots")}</TxButton>
       </div>}
       {view.kind === "chat" && !allHidden && head && thread && <>
         <div className="bot-head">
           {mode && <span className="bot-head-mode">{mode}</span>}
           {/* The name opens details: a bot's Settings, a group's members */}
           {bot
-            ? <TxButton variant="tool" size="sm" className="bot-title" title="Settings" onClick={() => setRail({ open: true, page: { kind: "settings", bot: bot.id } })}>
+            ? <TxButton variant="tool" size="sm" className="bot-title" title={t("Settings")} onClick={() => setRail({ open: true, page: { kind: "settings", bot: bot.id } })}>
               <Avatar look={bot.look} size="xs" /><span className="bot-title-name">{head.name}</span>
             </TxButton>
-            : <TxButton variant="tool" size="sm" className="bot-title" title="Members" onClick={() => setRail({ open: true, page: { kind: "overview" } })}>
+            : <TxButton variant="tool" size="sm" className="bot-title" title={t("Members")} onClick={() => setRail({ open: true, page: { kind: "overview" } })}>
               <GroupAvatar looks={looks(group!.members)} size="sm" /><span className="bot-title-name">{head.name}</span>
             </TxButton>}
-          {bot?.state === "paused" && <span className="bot-head-state">Paused</span>}
+          {bot?.state === "paused" && <span className="bot-head-state">{t("Paused")}</span>}
           <span className="bot-spacer" />
           {/* Stop lives in the message box, as in the chat panel; the head keeps Pause, which also holds the routines */}
           {bot && (bot.state === "paused"
-            ? <TxButton size="sm" variant="quiet" onClick={() => changeBot(bot.id, { state: "idle" })}><TxIcon name="play" />Resume</TxButton>
-            : <TxButton size="sm" variant="quiet" onClick={() => changeBot(bot.id, { state: "paused" })}><TxIcon name="pause" />Pause</TxButton>)}
+            ? <TxButton size="sm" variant="quiet" onClick={() => changeBot(bot.id, { state: "idle" })}><TxIcon name="play" />{t("Resume")}</TxButton>
+            : <TxButton size="sm" variant="quiet" onClick={() => changeBot(bot.id, { state: "paused" })}><TxIcon name="pause" />{t("Pause")}</TxButton>)}
           {group && group.members.some(id => byId.get(id)?.state === "running") && <TxButton size="sm" variant="quiet"
-            onClick={stopRun}>Stop all</TxButton>}
-          {bot && <TxIconButton size="sm" icon="settings" label="Bot settings" tone={rail.open && rail.page.kind === "settings" ? "active" : "default"}
+            onClick={stopRun}>{t("Stop all")}</TxButton>}
+          {bot && <TxIconButton size="sm" icon="settings" label={t("Bot settings")} tone={rail.open && rail.page.kind === "settings" ? "active" : "default"}
             onClick={() => setRail({ open: true, page: { kind: "settings", bot: bot.id } })} />}
-          <TxIconButton size="sm" icon="columns" label={rail.open ? "Hide details" : "Show details"} tone={rail.open ? "active" : "default"}
+          <TxIconButton size="sm" icon="columns" label={rail.open ? t("Hide details") : t("Show details")} tone={rail.open ? "active" : "default"}
             onClick={() => setRail({ open: !rail.open, page: { kind: "overview" } })} />
         </div>
         <div className="bot-body">
           <div className="bot-center">
             <div className="bot-stream" ref={stream}>
               <div className="bot-column">
-                {thread.blocks.length === 0 && <p className="bot-empty">{group ? "Say something to the group, or @ a bot" : "No messages yet"}</p>}
+                {thread.blocks.length === 0 && <p className="bot-empty">{group ? t("Say something to the group, or @ a bot") : t("No messages yet")}</p>}
                 {thread.blocks.map((block, index) => <BlockView key={block.id} block={block} previous={thread.blocks[index - 1]} bots={byId} self={bot?.id} inGroup={group !== null} actions={actions}
                   onReply={(speaker, text) => setReply({ bot: speaker, text })} />)}
                 {running && <Working since={Math.max(0,Math.floor(Date.now()/1000-(raw?.blocks.at(-1)?.snapshot?.turns[0]?.startedAt ?? Date.now()/1000)))} />}
               </div>
             </div>
             <div className="bot-column bot-foot">
-              <Composer key={current} bare placeholder={`Message ${head.name}`} mentions={group ? memberMentions : undefined} prefill={prefill}
-                extra={reply && <span className="chat-strip-item bot-replying"><TxIcon name="message" />Replying to {byId.get(reply.bot)?.name}
+              <Composer key={current} bare placeholder={t("Message {name}", { name: head.name })} mentions={group ? memberMentions : undefined} prefill={prefill}
+                extra={reply && <span className="chat-strip-item bot-replying"><TxIcon name="message" />{t("Replying to")} {byId.get(reply.bot)?.name}
                   <span className="bot-replying-text">{reply.text}</span>
-                  <TxIconButton size="sm" icon="close" label="Don't reply" onClick={() => setReply(null)} /></span>}
+                  <TxIconButton size="sm" icon="close" label={t("Don't reply")} onClick={() => setReply(null)} /></span>}
                 choices={{ model: bot?.model ?? models[0]?.id ?? "", thinking: bot?.thinking ?? "", subagents: true, permission: bot?.permission ?? "auto", plan: false }}
                 models={models} commands={[]} findFiles={client.findFiles} view={viewSummary} running={running} queued={[]} allowedCount={0}
                 onChoices={() => undefined} onSend={send} onQueue={send} onQueued={() => undefined} onStop={stopRun}
@@ -548,20 +549,20 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
         </div>
       </>}
     </div>
-    {menu && <TxContextMenu open onOpenChange={open => { if (!open) setMenu(null); }} point={{ x: menu.x, y: menu.y }} label="Bot" items={entryMenu(menu.id)} />}
+    {menu && <TxContextMenu open onOpenChange={open => { if (!open) setMenu(null); }} point={{ x: menu.x, y: menu.y }} label={t("Bot")} items={entryMenu(menu.id)} />}
     {/* Grok Bot's delete: says what goes, offers Hide instead */}
-    <TxDialog open={deleting !== null} onOpenChange={open => { if (!open) setDeleting(null); }} title={deleting ? `Delete ${facts(deleting).name}?` : ""}
+    <TxDialog open={deleting !== null} onOpenChange={open => { if (!open) setDeleting(null); }} title={deleting ? t("Delete {facts}?", { facts: facts(deleting).name }) : ""}
       footer={deleting && <>
-        <TxButton onClick={() => setDeleting(null)}>Cancel</TxButton>
-        <TxButton onClick={() => { setEntry(deleting, { hidden: true }); setDeleting(null); }}>Hide instead</TxButton>
+        <TxButton onClick={() => setDeleting(null)}>{t("Cancel")}</TxButton>
+        <TxButton onClick={() => { setEntry(deleting, { hidden: true }); setDeleting(null); }}>{t("Hide instead")}</TxButton>
         <TxButton variant="primary" onClick={() => {
           const id = facts(deleting).id;
           void command("delete",{id}).then(()=>{if(current===id)choose({kind:"new-bot"});return refresh();}).catch(()=>undefined);
           setDeleting(null);
-        }}>Delete</TxButton></>}>
+        }}>{t("Delete")}</TxButton></>}>
       <p className="bot-dialog-text">{deleting?.kind === "bot"
-        ? "Its chat, settings, memory, routines and run history are erased, and it leaves its groups. This can't be undone. Hiding keeps all of it out of the sidebar instead."
-        : "The group's chat is erased. Its bots stay. This can't be undone."}</p>
+        ? t("Its chat, settings, memory, routines and run history are erased, and it leaves its groups. This can't be undone. Hiding keeps all of it out of the sidebar instead.")
+        : t("The group's chat is erased. Its bots stay. This can't be undone.")}</p>
     </TxDialog>
   </div>;
 }
@@ -607,8 +608,8 @@ function BlockView({ block, previous, bots, self, inGroup, actions, onReply }: {
             </Bubble>
             {/* Grok Bot's Reply on a message: what you send next quotes it */}
             <span className="bot-bubble-actions">
-              <TxIconButton size="sm" icon="message" label="Reply" onClick={() => onReply(block.bot ?? self ?? "", plain(item.text))} />
-              <TxIconButton size="sm" icon="copy" label="Copy" onClick={() => actions.copy(item.text)} />
+              <TxIconButton size="sm" icon="message" label={t("Reply")} onClick={() => onReply(block.bot ?? self ?? "", plain(item.text))} />
+              <TxIconButton size="sm" icon="copy" label={t("Copy")} onClick={() => actions.copy(item.text)} />
             </span>
           </div>
           : <div key={item.id} className="bot-item" data-kind={item.kind}><ItemView item={item} actions={actions} owner="bot" /></div>)}

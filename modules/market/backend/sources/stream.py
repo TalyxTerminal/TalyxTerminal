@@ -24,6 +24,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from talyx_sdk.i18n import t
+
 from ..common import MarketError
 
 BACKOFF = (0.5, 1, 2, 5, 10, 30)
@@ -67,8 +69,7 @@ class _Connection:
                 try:
                     message = await asyncio.wait_for(self.ws.receive(), self.pool.heartbeat)
                 except TimeoutError:
-                    problem = {"code": "source_unavailable", "message": f"{self.pool.source_id} sent nothing for "
-                               f"{self.pool.heartbeat:g} s", "sourceId": self.pool.source_id, "status": None,
+                    problem = {"code": "source_unavailable", "message": t("{source_id} sent nothing for {heartbeat} s", source_id=self.pool.source_id, heartbeat=f'{self.pool.heartbeat:g}'), "sourceId": self.pool.source_id, "status": None,
                                "retryAt": None}
                     break
                 kind = getattr(message.type, "name", str(message.type))
@@ -101,7 +102,7 @@ class _Connection:
                 pinger.cancel()
         if not self.retiring:
             await self.pool.lost(self, problem or {"code": "source_unavailable",
-                                                   "message": f"{self.pool.source_id} closed the connection",
+                                                   "message": t("{source_id} closed the connection", source_id=self.pool.source_id),
                                                    "sourceId": self.pool.source_id, "status": None,
                                                    "retryAt": None})
 

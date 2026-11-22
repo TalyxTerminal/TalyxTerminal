@@ -14,13 +14,14 @@ from zoneinfo import ZoneInfo
 from jsonschema import Draft202012Validator
 from langchain_core.messages import HumanMessage
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t
 
 from ..store import TERMINAL, encode
 from .records import MENTION, SCHEMA, avatar, decode_rows, identity, recipients, stamp, text_value
 from .schedules import due_run, next_due
 from .worker import BotWorker
 
-WELCOME = "What's the main thing you want me to do? Tell me when to run, what to look at, and who to tell."
+WELCOME = mark("What's the main thing you want me to do? Tell me when to run, what to look at, and who to tell.")
 
 
 class Bots:
@@ -64,7 +65,7 @@ class Bots:
             "SELECT value,kind FROM bot_entries WHERE id=? AND workspace=?", (key, ws)
         ).fetchone()
         if row is None or kind and kind != row["kind"]:
-            raise ContractError("not_found", "This bot or group is unavailable in this workspace")
+            raise ContractError("not_found", t("This bot or group is unavailable in this workspace"))
         return json.loads(row["value"])
 
     def put(self, ws, kind, data):
@@ -116,7 +117,7 @@ class Bots:
             return row[0]
         kind = "bot" if line == bot["id"] else "group"
         if kind == "group" and bot["id"] not in self.entry(ws, line, "group")["members"]:
-            raise ContractError("invalid_input", "Choose a member of this group")
+            raise ContractError("invalid_input", t("Choose a member of this group"))
         conversation = self.store.create(
             ws, kind=kind, title=bot["name"], model=bot["model"], bot_id=bot["id"], line_id=line
         )
@@ -166,7 +167,7 @@ class Bots:
                        **({} if "members" in entry else {"routines": routines(id)})}
 
     def make_bot(self, ws, args, *, key=None):
-        name = text_value(args.get("name"), "a bot name")
+        name = text_value(args.get("name"), t("Enter a bot name"))
         defaults = self.store.defaults(ws, kind="bot")
         model = args.get("model")
         if model:
@@ -198,7 +199,7 @@ class Bots:
             "paused": False,
             "failures": 0,
             # Only a bot without a duty asks for one, like Grok Bot; a preset or a bot the agent made already has it.
-            "last": {"at": stamp(time.time()), "text": "" if args.get("duty") else WELCOME},
+            "last": {"at": stamp(time.time()), "text": "" if args.get("duty") else t(WELCOME)},
         }
         with self.store.transaction():
             self.put(ws, "bot", bot)
@@ -208,7 +209,7 @@ class Bots:
             self.line(ws, bot, bot["id"])
             self.agent.usage.configure_group(bot["id"], ws, monthly_limit=None)
             if not bot["duty"]:
-                self.message(ws, bot["id"], bot["id"], WELCOME)
+                self.message(ws, bot["id"], bot["id"], t(WELCOME))
         self.worker.ensure(ws)
         return {"id": bot["id"]}
 
@@ -219,7 +220,7 @@ class Bots:
             or len(set(members)) != len(members)
             or len(members) < 2
         ):
-            raise ContractError("invalid_input", "Choose at least two distinct group members")
+            raise ContractError("invalid_input", t("Choose at least two distinct group members"))
         bots = [self.entry(ws, m, "bot") for m in members]
         group = {
             "id": key or identity(),
@@ -230,7 +231,7 @@ class Bots:
             "pinned": False,
             "hidden": False,
             "unread": False,
-            "last": {"at": stamp(time.time()), "text": "Group created"},
+            "last": {"at": stamp(time.time()), "text": t("Group created")},
         }
         with self.store.transaction():
             self.put(ws, "group", group)
@@ -261,7 +262,7 @@ class Bots:
         self.put(ws, "group" if "members" in entry else "bot", entry)
 
     def recipients(self, ws, args):
-        line, text = args["id"], text_value(args["text"], "a message")
+        line, text = args["id"], text_value(args["text"], t("Enter a message"))
         entry = self.entry(ws, line)
         if "members" in entry:
             names = {self.entry(ws, m)["name"]: m for m in entry["members"]}
@@ -279,7 +280,7 @@ class Bots:
             or not isinstance(reply.get("bot"), str)
             or not isinstance(reply.get("text"), str)
         ):
-            raise ContractError("invalid_input", "Choose a message to reply to")
+            raise ContractError("invalid_input", t("Choose a message to reply to"))
         group = "members" in entry
         targets = (
             recipients(entry["members"], mentions, reply["bot"] if reply else None, user=True)
@@ -287,9 +288,9 @@ class Bots:
             else [line]
         )
         if reply and reply["bot"] not in (entry["members"] if group else [line]):
-            raise ContractError("invalid_input", "The quoted bot is not in this line")
+            raise ContractError("invalid_input", t("The quoted bot is not in this line"))
         if group and any(m not in [*entry["members"], "everyone"] for m in mentions):
-            raise ContractError("invalid_input", "A mentioned bot is no longer in this group")
+            raise ContractError("invalid_input", t("A mentioned bot is no longer in this group"))
         return entry, text, mentions, reply, targets
 
     async def send(self, ws, args):
@@ -391,7 +392,7 @@ class Bots:
             "SELECT value FROM bot_routines WHERE workspace=? AND id=?", (ws, key)
         ).fetchone()
         if row is None:
-            raise ContractError("not_found", "This routine is unavailable")
+            raise ContractError("not_found", t("This routine is unavailable"))
         return json.loads(row[0])
 
     def write_routine(self, ws, value):
@@ -409,7 +410,7 @@ class Bots:
             conversation = self.line(ws, self.entry(ws, bot, "bot"), bot)
         else:
             conversation = text_value(
-                value.get("conversationId"), "the conversation for this routine"
+                value.get("conversationId"), t("Enter the conversation for this routine")
             )
             self.store.conversation(conversation, ws)
         now = time.time()
@@ -417,21 +418,21 @@ class Bots:
             "id": original.get("id") or key or identity(),
             "botId": bot,
             "conversationId": conversation,
-            "name": text_value(value.get("name"), "a routine name"),
-            "instruction": text_value(value.get("instruction"), "an instruction"),
+            "name": text_value(value.get("name"), t("Enter a routine name")),
+            "instruction": text_value(value.get("instruction"), t("Enter an instruction")),
             "when": text_value(
-                value.get("when"), "the trigger in the when field, in your own words"
+                value.get("when"), t("Enter the trigger in the when field, in your own words")
             ),
             "active": value.get("active", True),
             "start": value.get("start", now),
             "nextDue": None,
         }
         if type(rule["active"]) is not bool:
-            raise ContractError("invalid_input", "Active must be boolean")
+            raise ContractError("invalid_input", t("Active must be boolean"))
         if value.get("source"):
             if not bot or value["source"] not in self.sources:
                 raise ContractError(
-                    "invalid_input", "Choose an available trigger source for this bot"
+                    "invalid_input", t("Choose an available trigger source for this bot")
                 )
 
             params = value.get("params", {})
@@ -446,8 +447,8 @@ class Bots:
         else:
             rule.update(
                 kind="schedule",
-                rrule=text_value(value.get("rrule"), "a recurrence"),
-                zone=text_value(value.get("zone"), "a time zone"),
+                rrule=text_value(value.get("rrule"), t("Enter a recurrence")),
+                zone=text_value(value.get("zone"), t("Enter a time zone")),
             )
             rule["nextDue"] = next_due(rule["rrule"], rule["zone"], rule["start"], now)
         with self.store.transaction():
@@ -459,7 +460,7 @@ class Bots:
         """Run a bot's routine once now (the routine's Test run): the run is in the bot's runs like a scheduled one."""
         rule = self.routine(ws, key)
         if not rule["botId"] or self.entry(ws, rule["botId"])["paused"]:
-            raise ContractError("conflict", "Resume this bot before testing its routine")
+            raise ContractError("conflict", t("Resume this bot before testing its routine"))
         cause = {"kind": "you", "routine": rule["name"], "routineId": rule["id"], "test": True}
         with self.store.transaction():
             result = self.worker.queue(ws, rule["botId"], rule["botId"], rule["conversationId"], cause,
@@ -493,7 +494,7 @@ class Bots:
 
     def toggle_routine(self, ws, key, active):
         if type(active) is not bool:
-            raise ContractError("invalid_input", "Active must be true or false")
+            raise ContractError("invalid_input", t("Active must be true or false"))
         value = self.routine(ws, key)
         with self.store.transaction():
             if active and not value["active"]:
@@ -597,7 +598,7 @@ class Bots:
         """Change settings that need nothing stopped first, in the caller's transaction."""
         change = self.checked(ws, key, change)
         if "paused" in change:
-            raise ContractError("invalid_input", "Pause or resume the bot from its settings")
+            raise ContractError("invalid_input", t("Pause or resume the bot from its settings"))
         self.write(ws, key, change)
 
     def checked(self, ws, key, change):
@@ -625,24 +626,24 @@ class Bots:
             }
         )
         if set(change) - fields:
-            raise ContractError("invalid_input", "Unknown bot or group setting")
+            raise ContractError("invalid_input", t("Unknown bot or group setting"))
         if "name" in change:
-            change["name"] = text_value(change["name"], "a name")
+            change["name"] = text_value(change["name"], t("Enter a name"))
         if "look" in change:
             change["look"] = avatar(change["look"])
         for name in ("pinned", "hidden", "memoryOn", "subagents", "paused"):
             if name in change and type(change[name]) is not bool:
-                raise ContractError("invalid_input", f"{name} requires a boolean")
+                raise ContractError("invalid_input", t("{name} requires a boolean", name=name))
         for name in ("skills", "knowledge", "allowed", "members"):
             if name in change and (
                 not isinstance(change[name], list)
                 or not all(isinstance(x, str) for x in change[name])
             ):
-                raise ContractError("invalid_input", f"{name} requires a list of names")
+                raise ContractError("invalid_input", t("{name} requires a list of names", name=name))
         if "skills" in change and any(
             not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name) for name in change["skills"]
         ):
-            raise ContractError("invalid_input", "Choose skill names from the library")
+            raise ContractError("invalid_input", t("Choose skill names from the library"))
         if "knowledge" in change:
 
             if any(
@@ -651,7 +652,7 @@ class Bots:
                 or "\\" in p
                 for p in change["knowledge"]
             ):
-                raise ContractError("invalid_input", "Choose knowledge from the library")
+                raise ContractError("invalid_input", t("Choose knowledge from the library"))
         if "notify" in change:
             notify = change["notify"]
             if (
@@ -661,7 +662,7 @@ class Bots:
                 or not isinstance(notify["phone"], str)
             ):
                 raise ContractError(
-                    "invalid_input", "Choose a notification channel and when to notify"
+                    "invalid_input", t("Choose a notification channel and when to notify")
                 )
         if (
             "section" in change
@@ -670,10 +671,10 @@ class Bots:
                 "SELECT 1 FROM bot_sections WHERE workspace=? AND name=?", (ws, change["section"])
             ).fetchone()
         ):
-            raise ContractError("not_found", "The section no longer exists")
+            raise ContractError("not_found", t("The section no longer exists"))
         if "members" in change:
             if len(set(change["members"])) != len(change["members"]) or len(change["members"]) < 2:
-                raise ContractError("invalid_input", "A group needs two distinct bots")
+                raise ContractError("invalid_input", t("A group needs two distinct bots"))
             for member in change["members"]:
                 self.entry(ws, member, "bot")
         return change
@@ -716,13 +717,13 @@ class Bots:
 
     def section(self, ws, old, new):
         if new:
-            new = text_value(new, "a section name")
+            new = text_value(new, t("Enter a section name"))
         with self.store.transaction():
             if new and not old:
                 if self.db.execute(
                     "SELECT 1 FROM bot_sections WHERE workspace=? AND name=?", (ws, new)
                 ).fetchone():
-                    raise ContractError("conflict", "This section exists")
+                    raise ContractError("conflict", t("This section exists"))
                 self.db.execute("INSERT INTO bot_sections VALUES(?,?)", (ws, new))
             elif old:
                 if (
@@ -732,7 +733,7 @@ class Bots:
                         "SELECT 1 FROM bot_sections WHERE workspace=? AND name=?", (ws, new)
                     ).fetchone()
                 ):
-                    raise ContractError("conflict", "This section exists")
+                    raise ContractError("conflict", t("This section exists"))
                 self.db.execute("DELETE FROM bot_sections WHERE workspace=? AND name=?", (ws, old))
                 if new:
                     self.db.execute("INSERT INTO bot_sections VALUES(?,?)", (ws, new))
@@ -803,7 +804,7 @@ class Bots:
             "SELECT * FROM bot_edits WHERE workspace=? AND id=?", (ws, call_id)
         ).fetchone()
         if row is None:
-            raise ContractError("not_found", "This bot change is unavailable")
+            raise ContractError("not_found", t("This bot change is unavailable"))
         value = json.loads(row["before"] if direction == "undo" else row["after"])
         if row["field"] == "routine":
             with self.store.transaction():

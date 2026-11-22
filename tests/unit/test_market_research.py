@@ -12,6 +12,7 @@ import pytest
 
 from modules.market.backend.app import Market
 from modules.market.backend.common import MarketError, iso_of_ns, ns_of_date
+from modules.market.backend.public_identity import instant
 from tests.fixtures.market.replay import ReplayEgress
 from vocabulary.instruments import MarketInstrument, ohlcv_series
 
@@ -103,8 +104,9 @@ def test_index_members_map_by_code_period_and_never_to_a_later_holder_of_the_cod
                 await market.data.read({"instrument": record, "series": daily(record), "fill": "await",
                                         "start": str(ns_of_date("2015-12-01")), "end": str(ns_of_date("2016-01-01"))})
             index = (await market.instruments.resolve({"text": "^GSPC"}))["instrument"]
+            calendar = index["calendarId"]
             page = await market.research.read({"kind": "members", "index": index, "limit": 5000,
-                                               "at": str(ns_of_date("2016-01-04"))})
+                                               "at": str(instant("2016-01-04", calendar))})
             columns = page["columns"]
             assert len(columns["code"]) == 504
             mapped = {code for code, instrument in zip(columns["code"], columns["instrumentId"], strict=True)
@@ -120,15 +122,15 @@ def test_index_members_map_by_code_period_and_never_to_a_later_holder_of_the_cod
             # A range read maps a member over its whole overlap with the range, so a range starting before
             # the first bar fetched still maps AAPL (a series begins at the first session's open).
             ranged = await market.research.read({"kind": "members", "index": index, "limit": 5000, "fill": "none",
-                                                 "start": str(ns_of_date("2015-11-30")),
-                                                 "end": str(ns_of_date("2016-01-05"))})
+                                                 "start": str(instant("2015-11-30", calendar)),
+                                                 "end": str(instant("2016-01-05", calendar))})
             pairs = list(zip(ranged["columns"]["code"], ranged["columns"]["instrumentId"], strict=True))
             assert {code for code, instrument in pairs if instrument is not None} == {"AAPL", "BRK.B", "BF.B"}
             assert fb_now["instrumentId"] not in ranged["columns"]["instrumentId"]
             assert ranged["unmapped"] == sum(instrument is None for _, instrument in pairs)
             # A fetch of the index takes members that map to none under today's holder of the code while that
             # listing's start is unknown; once its bars show it began later (today's FB), it is left out.
-            start, end = ns_of_date("2016-01-04"), ns_of_date("2016-01-05")
+            start, end = instant("2016-01-04", calendar), instant("2016-01-05", calendar)
             exact, _ = await market.research.members_between(index, start, end)
             assert {item["symbol"] for item in exact} == {"AAPL", "BRK.B", "BF.B"}
             wide, unmapped = await market.research.members_between(index, start, end, candidates=True)
@@ -137,7 +139,7 @@ def test_index_members_map_by_code_period_and_never_to_a_later_holder_of_the_cod
             wide, _ = await market.research.members_between(index, start, end, candidates=True)
             assert "FB" not in {item["symbol"] for item in wide}
             later = await market.research.read({"kind": "members", "index": index, "limit": 5000,
-                                                "at": str(ns_of_date("2020-03-03")), "fill": "none"})
+                                                "at": str(instant("2020-03-03", calendar)), "fill": "none"})
             assert len(later["columns"]["code"]) == 505
             described = await market.research.describe({"kinds": ["members"]})
             assert described["indices"][0]["pointInTime"] is True

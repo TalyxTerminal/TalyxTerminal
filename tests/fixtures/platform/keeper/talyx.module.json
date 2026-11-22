@@ -1,0 +1,2 @@
+{"manifestVersion": 5, "id": "keeper", "name": "Keeper", "version": "1.0.0", "description": "Platform test module whose data format moved on",
+ "entries": {"backend": "backend.entry"}, "requires": {}}

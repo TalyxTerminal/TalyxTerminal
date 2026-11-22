@@ -7,12 +7,14 @@ publication count settled periods only; until they span 60 trading days (days wi
 """
 from __future__ import annotations
 
+from talyx_sdk.i18n import mark, t
+
 MIN_AFTER = 60  # trading days with a settled period (`settledDays` of the figures after publication)
 RANK = {"fail": 0, "miss": 1, "up": 2, "drift": 3, "weak": 4, "late": 5, "ok": 6, "first": 7, "auto_off": 8, "one_off": 9, "stopped": 10}
 ATTENTION = ("fail", "miss", "up", "drift", "weak", "late")
 FIX = ("fail", "miss", "up")
-LABEL = {"fail": "Failed", "miss": "Missing", "up": "Upstream missing", "drift": "Risk drift", "weak": "Weaker", "late": "Late", "ok": "On time", "first": "No period yet",
-         "auto_off": "Auto off", "one_off": "One-off", "stopped": "Stopped"}
+LABEL = {"fail": mark("Failed"), "miss": mark("Missing"), "up": mark("Upstream missing"), "drift": mark("Risk drift"), "weak": mark("Weaker"), "late": mark("Late"), "ok": mark("On time"), "first": mark("No period yet"),
+         "auto_off": mark("Auto off"), "one_off": mark("One-off"), "stopped": mark("Stopped")}
 FREQ = {"d": "Daily", "h": "Hourly", "m": "Intraday", "w": "Weekly"}
 REBALANCED = {"week": "Weekly", "month": "Monthly", "quarter": "Quarterly"}  # an allocation's new weights come at its rebalance, not with each bar
 DAY = 86_400_000
@@ -179,10 +181,10 @@ def fix_action(row):
     if row["state"] == "fail" and row["republish"]:
         origin = row["origin"]
         if origin is not None and origin["objectId"]:
-            return {"id": "republish", "label": f"Open the {row['kind']}", "objectId": origin["objectId"]}
-        return {"id": "republish", "label": "Open in the library"}
+            return {"id": "republish", "label": t("Open the {kind}", kind=row['kind']), "objectId": origin["objectId"]}
+        return {"id": "republish", "label": t("Open in the library")}
     if row["state"] == "miss" and row.get("expired"):
-        return {"id": "open_version", "label": "Open in the library"}
+        return {"id": "open_version", "label": t("Open in the library")}
     return {"id": {"fail": "retry", "miss": "check_source", "up": "open_input"}[row["state"]],
             "label": {"fail": "Retry now", "miss": "Check the source now", "up": "Open the input"}[row["state"]]}
 
@@ -209,9 +211,9 @@ def attention(rows):
     for row in rows:
         review = row.get("review")
         if review and not review["done"] and row["state"] not in FIX:
-            out.append({"tone": "fix", "label": "Review this period", "state": "review", "count": 1,
+            out.append({"tone": "fix", "label": t("Review this period"), "state": "review", "count": 1,
                         "subject": {"kind": "library", "id": row["itemId"], "name": row["name"], "version": row["shownVersion"], "versionId": review["versionId"], "itemKind": row["kind"]},
                         "why": f"The newest period of {row['name']} waits for your review", "since": row["updatedAt"],
                         # the review is done in the allocation's Work, beside the trial of that period
-                        "action": {"id": "review_period", "period": review["period"], "label": "Review this period", **({"objectId": review["objectId"]} if review.get("objectId") else {})}})
+                        "action": {"id": "review_period", "period": review["period"], "label": t("Review this period"), **({"objectId": review["objectId"]} if review.get("objectId") else {})}})
     return out, watch

@@ -34,8 +34,13 @@ def ny(day: str) -> int:
 
 
 async def open_us(root, egress) -> Market:
+    egress.add("/TICKERS.json", {"datatable": {"columns": [], "data": []}, "meta": {"next_cursor_id": None}})
     market = Market(None, root, egress=egress)
     await market.start(load_catalogs=False)
+    # Only these US catalogs have upstream recordings in this fixture.
+    for source_id, entry in market.registry.entries.items():
+        if entry.source.supports("catalog") and source_id not in ("nasdaqtrader", "sharadar"):
+            market.registry.set_enabled(source_id, False)
     await market.instruments.load("nasdaqtrader", "US", "listings")
     return market
 
@@ -120,21 +125,132 @@ def test_ranking_of_us_daily_and_intraday_follows_keys_and_switches(tmp_path):
             await keys(market, "alpaca", {"keyId": "k", "secretKey": "s"})
             assert (first("1d"), first("1m"), first("5m")) == ("yfinance", "alpaca", "alpaca")
             await keys(market, "sharadar", {"apiKey": "k"})
-            assert (first("1d"), first("1m")) == ("sharadar", "alpaca")
+            assert (first("1d"), first("1m")) == ("yfinance", "alpaca")
             await market.admin.write({"operation": {"op": "disable", "source": "alpaca"}})
-            assert (first("1d"), first("1m")) == ("sharadar", "yfinance")
+            assert (first("1d"), first("1m")) == ("yfinance", "yfinance")
             await market.admin.configure("ib", {"port": 4002}, allow_secrets=False)
             for timeframe in ("1d", "1m", "1h"):
                 assert "ib" not in [sid for sid, _row in market.registry.rank(aapl, "bars", timeframe)]
             selection = (await market.admin.read({"view": "selection", "market": "US"}))["selection"]
             daily = next(item for item in selection if item["kind"] == "bars" and item["timeframes"] == "daily")
-            assert daily["source"]["sourceId"] == "sharadar" and "delisted" in daily["reason"]
+            assert daily["source"]["sourceId"] == "yfinance" and "Deeper history" in daily["reason"]
         finally:
             await market.close()
     run(scenario())
 
 
 # ── 28. switching sources ──────────────────────────────────────────────────
+
+
+def test_spy_keeps_yahoo_history_and_reads_yahoo_with_sharadar_configured(tmp_path):
+    async def scenario():
+        egress = ReplayEgress(NASDAQ)
+        market = await open_us(tmp_path, egress)
+        try:
+            spy_id, = market.identity.upsert_listings("US", [{"code": "SPY", "assetClass": "fund"}], source="test")
+            spy = market.identity.record(spy_id)
+            series = ohlcv_series(MarketInstrument.from_wire(spy), "1d", adjustment="raw").to_dict()
+            days = ["1997-12-31", "1998-01-02"]
+            quote = {k: [40, 42] for k in ("open", "high", "low", "close", "volume")}
+            egress.add("/chart/SPY", {"chart": {"result": [{"timestamp": [ny(d) // NS + 36000 for d in days],
+                                                             "indicators": {"quote": [quote]}}]}})
+            args = {"instrument": spy, "series": series, "start": str(ny(days[0])),
+                    "end": str(ny("1998-01-03"))}
+            await market.data.read({**args, "end": str(ny("1998-01-01"))})
+            await keys(market, "sharadar", {"apiKey": "test-key"})
+            await market.admin.switching
+            page = await market.data.read(args)
+            assert page["source"]["sourceId"] == "yfinance"
+            assert page["columns"]["time"] == [str(ny(day)) for day in days]
+            assert page["columns"]["close"] == ["40", "42"] and egress.count("/SEP.json") == 0
+        finally:
+            await market.close()
+    run(scenario())
+
+
+def test_sharadar_cannot_replace_a_longer_stored_series(tmp_path):
+    async def scenario():
+        egress = ReplayEgress(NASDAQ)
+        market = await open_us(tmp_path, egress)
+        try:
+            equity = await us(market, "AAPL")
+            series = ohlcv_series(MarketInstrument.from_wire(equity), "1d", adjustment="raw")
+            key = market.data.plan(equity, series, None).key
+            dates = np.array([ny("1997-12-31"), ny("1998-01-02")])
+            rows = {"time": dates, "close_time": dates + 16 * 3600 * NS,
+                    **{field: np.array([40., 42.]) for field in ("open", "high", "low", "close", "volume")}}
+            market.store.write(key, rows, source="yfinance", fetched=[(int(dates[0]), int(dates[-1]) + DAY_NS)])
+            await keys(market, "sharadar", {"apiKey": "sample"})
+            await market.admin.write({"operation": {"op": "disable", "source": "yfinance"}})
+            assert await market.admin.switching == [] and egress.count("/SEP.json") == 0
+            for candidate in (bars.empty(), bars.take(rows, slice(1, None))):
+                assert not market.store.switch_source(key, candidate, [], "sharadar")
+            assert market.store.read(key)["time"].tolist() == dates.tolist()
+            assert market.store.pointer(key)["source"] == "yfinance"
+        finally:
+            await market.close()
+    run(scenario())
+
+
+def test_sharadar_delisted_prices_and_old_members_follow_the_permaticker(tmp_path):
+    """Nasdaq TICKERS/SEP layouts. Two holders of the same code exercise Sharadar's numeric suffix."""
+    def table(fields, rows):
+        return {"datatable": {"columns": [{"name": name} for name in fields.split()], "data": rows},
+                "meta": {"next_cursor_id": None}}
+
+    async def scenario():
+        egress = ReplayEgress(NASDAQ)
+        market = await open_us(tmp_path, egress)
+        try:
+            current, index = market.identity.upsert_listings("US", [
+                {"code": "SIVB", "codeFrom": str(ny("2025-01-02")), "assetClass": "equity"},
+                {"code": "^GSPC", "assetClass": "index"}], source="test")
+            listing = table("ticker permaticker name firstpricedate lastpricedate relatedtickers isdelisted",
+                            [["SIVB1", 12345, "SVB Financial Group", "1998-01-02", "2023-03-09", None, "Y"]])
+            egress.add("/TICKERS.json", lambda _, p: table("ticker permaticker", [["SIVB1", 12345]])
+                       if p.get("permaticker") == "12345" else listing)
+            egress.add("sp500_ticker_start_end.csv", "ticker,start_date,end_date\nSIVB,2018-03-19,2023-03-15\n")
+            egress.add(lambda url, p: "/SEP.json" in url and p["ticker"] == "SIVB1",
+                       table("date open high low close volume closeunadj",
+                             [["2023-03-09", 176.59, 177, 100, 106.04, 38767000, 106.04]]))
+            await keys(market, "sharadar", {"apiKey": "sample"})
+            await market.instruments.load("sharadar", "US", "delisted_listings")
+            old = market.identity.find_source_key("sharadar", "12345")
+            record = market.identity.record(old)
+            assert old != current and record["active"] is False and record["delistedAt"] == str(ny("2023-03-10"))
+            page = await market.research.read({"index": market.identity.record(index), "kind": "members",
+                                               "at": str(ny("2022-01-03"))})
+            assert page["columns"]["instrumentId"] == [old] and market.identity.find_code("US", "SIVB") == current
+            series = ohlcv_series(MarketInstrument.from_wire(record), "1d", adjustment="raw")
+            price = await market.data.read({"instrument": record, "series": series.to_dict(),
+                                            "start": str(ny("2023-03-09")), "end": str(ny("2023-03-10"))})
+            assert price["columns"]["close"] == ["106.04"] and price["source"]["sourceId"] == "sharadar"
+        finally:
+            await market.close()
+    run(scenario())
+
+
+def test_paid_rpm_settings_release_waiting_upstream_requests(tmp_path):
+    async def scenario():
+        egress = ReplayEgress()
+        market = Market(None, tmp_path, egress=egress)
+        await market.start(load_catalogs=False)
+        try:
+            for name, default in (("alpaca", 200), ("tushare", 50), ("sharadar", 200), ("databento", 100)):
+                assert market.admin.details(name)["settings"]["values"]["requestsPerMinute"] == default
+            source = market.registry.entry("tushare").source
+            egress.add("api.tushare.pro", {"code": 0, "data": {"fields": [], "items": []}})
+            await keys(market, "tushare", {"token": "sample", "requestsPerMinute": 1})
+            await source._call("daily", {"ts_code": "000001.SZ"})
+            pending = asyncio.create_task(source._call("daily", {"ts_code": "000002.SZ"}))
+            await asyncio.sleep(0)
+            assert not pending.done() and egress.count("api.tushare.pro") == 1
+            await market.admin.configure("tushare", {"requestsPerMinute": 2}, allow_secrets=False)
+            await pending
+            assert egress.count("api.tushare.pro") == 2
+        finally:
+            await market.close()
+    run(scenario())
 
 
 # ── 29. conformance tests and "test all" ───────────────────────────────────

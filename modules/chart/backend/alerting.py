@@ -18,6 +18,7 @@ from bisect import bisect_left
 from collections.abc import Callable
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .alert_drawings import ALERT_TOOLS, CHANNEL_TOOLS, furthest, geometry, prices
 from .alert_rules import CHANNEL_OPS, MOVING_OPS, Rule, Values
@@ -69,25 +70,22 @@ def check_spec(spec: dict, watchlists: Watchlists, workspace: str) -> None:
     for condition in spec["conditions"]:
         op, kinds = condition["op"], [item["kind"] for item in operands(condition)]
         if (op == "triggered") != (kinds == ["alertcondition"]):
-            raise ContractError("invalid_input", "Triggered takes an alertcondition and nothing else; an "
-                                                 "alertcondition goes with Triggered")
+            raise ContractError("invalid_input", t("Triggered takes an alertcondition and nothing else; an alertcondition goes with Triggered"))
         if "drawing" in kinds and spec["target"]["kind"] == "watchlist":
-            raise ContractError("invalid_input", "A drawing belongs to one symbol; watchlist alerts use price and "
-                                                 "indicator conditions")
+            raise ContractError("invalid_input", t("A drawing belongs to one symbol; watchlist alerts use price and indicator conditions"))
         if op in MOVING_OPS:
             if condition.get("amount") is None or condition.get("bars") is None or condition.get("right"):
-                raise ContractError("invalid_input", f"{OP_WORDS[op]} takes one operand, an amount and bars")
+                raise ContractError("invalid_input", t("{value} takes one operand, an amount and bars", value=OP_WORDS[op]))
         elif op in CHANNEL_OPS:
             channel = (condition.get("right") or {}).get("kind") == "drawing" and not condition.get("right2")
             if not (channel or condition.get("right") and condition.get("right2")):
-                raise ContractError("invalid_input", f"{OP_WORDS[op]} takes a channel drawing or the two bounds")
+                raise ContractError("invalid_input", t("{value} takes a channel drawing or the two bounds", value=OP_WORDS[op]))
         elif op != "triggered" and not condition.get("right"):
-            raise ContractError("invalid_input", f"{OP_WORDS[op]} takes two operands")
+            raise ContractError("invalid_input", t("{value} takes two operands", value=OP_WORDS[op]))
     target = spec["target"]
     if target["kind"] == "series":
         if target["series"].get("adjustmentAnchor") == "earliest":
-            raise ContractError("invalid_input", "Back-adjusted prices change with corporate actions; "
-                                                 "price and indicator alerts are not offered on them")
+            raise ContractError("invalid_input", t("Back-adjusted prices change with corporate actions; price and indicator alerts are not offered on them"))
     else:
         watchlists.get(workspace, target["watchlistId"])
 
@@ -388,7 +386,7 @@ class Alerts:
         self.load(workspace)
         owner, alert = self.records.get(alert_id, (None, None))
         if owner != workspace:
-            raise ContractError("not_found", f"No alert {alert_id} in this workspace")
+            raise ContractError("not_found", t("No alert {alert_id} in this workspace", alert_id=alert_id))
         return alert
 
     def put(self, workspace: str, alert: dict) -> dict:
@@ -400,7 +398,7 @@ class Alerts:
     def checked_revision(self, workspace: str, alert_id: str, revision: int) -> dict:
         alert = self.get(workspace, alert_id)
         if revision != alert["revision"]:
-            raise ContractError("conflict", "The alert changed meanwhile", {"revision": alert["revision"]})
+            raise ContractError("conflict", t("The alert changed meanwhile"), {"revision": alert["revision"]})
         return alert
 
     # ── routes ──
@@ -487,8 +485,7 @@ class Alerts:
         uses_indicators = any(operand["kind"] in ("indicator", "alertcondition") for condition in alert["conditions"]
                               for operand in operands(condition))
         if uses_indicators and len(instruments) > MAX_INDICATOR_MEMBERS:
-            raise ContractError("invalid_input", f"An alert with indicator conditions watches at most "
-                                                 f"{MAX_INDICATOR_MEMBERS} symbols; this watchlist has {len(instruments)}")
+            raise ContractError("invalid_input", t("An alert with indicator conditions watches at most {MAX_INDICATOR_MEMBERS} symbols; this watchlist has {value}", MAX_INDICATOR_MEMBERS=MAX_INDICATOR_MEMBERS, value=len(instruments)))
         return [(instrument, self.hub.market.default_series(instrument, target["timeframe"]))
                 for instrument in instruments]
 
@@ -619,9 +616,9 @@ class Alerts:
                 drawing = next((item for items in document.drawings.values() for item in items
                                 if item.id == operand["drawingId"]), None)
                 if drawing is None:
-                    raise ContractError("not_found", f"No drawing {operand['drawingId']} on chart {operand['chartId']}")
+                    raise ContractError("not_found", t("No drawing {drawingId} on chart {chartId}", drawingId=operand['drawingId'], chartId=operand['chartId']))
                 if drawing.tool not in ALERT_TOOLS:
-                    raise ContractError("invalid_input", f"Alerts are not offered on a {drawing.tool} drawing")
+                    raise ContractError("invalid_input", t("Alerts are not offered on a {tool} drawing", tool=drawing.tool))
                 channel = condition["op"] in CHANNEL_OPS and side == "right" and not condition.get("right2")
                 if channel != (drawing.tool in CHANNEL_TOOLS):
                     raise ContractError("invalid_input", "Channel conditions take a channel drawing; other "

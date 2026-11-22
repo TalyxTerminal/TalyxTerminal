@@ -11,6 +11,8 @@ import math
 
 import numpy as np
 
+from .i18n import mark
+
 try:  # the research environment has bottleneck; the others fall back to pandas, with the same ranks
     import bottleneck as _bn
 except ImportError:  # pragma: no cover - depends on the environment
@@ -20,14 +22,14 @@ except ImportError:  # pragma: no cover - depends on the environment
 # The site-wide thresholds for signals (factors, models, strategies). A check that fails is listed and never blocks publishing.
 # Checks use in-sample numbers only: the held-out end of the period never enters a check. Allocation has its own set.
 THRESHOLDS = {
-    "significance": {"name": "Significance", "op": ">=", "value": 3.0, "need": "≥ 3.00",
+    "significance": {"name": mark("Significance"), "op": ">=", "value": 3.0, "need": "≥ 3.00",
                      "meaning": "t of the mean daily rank IC, Newey–West for overlapping returns"},
-    "library": {"name": "Like the library", "op": "<", "value": 0.7, "need": "< 0.70",
+    "library": {"name": mark("Like the library"), "op": "<", "value": 0.7, "need": "< 0.70",
                 "meaning": "the highest mean daily rank correlation with a library item"},
-    "group_size": {"name": "Group size", "op": ">=", "value": 30, "need": "≥ 30", "meaning": "names in each group on the median day"},
-    "every_year": {"name": "Every year", "op": ">=", "value": 0.75, "need": "≥ 75%",
+    "group_size": {"name": mark("Group size"), "op": ">=", "value": 30, "need": "≥ 30", "meaning": "names in each group on the median day"},
+    "every_year": {"name": mark("Every year"), "op": ">=", "value": 0.75, "need": "≥ 75%",
                    "meaning": "share of whole years whose rank IC has the sign of the whole period"},
-    "cost_room": {"name": "Cost room", "op": ">=", "value": 2.0, "need": "≥ 2× cost",
+    "cost_room": {"name": mark("Cost room"), "op": ">=", "value": 2.0, "need": "≥ 2× cost",
                   "meaning": "break-even cost a trade, against twice the cost assumed"},
 }
 
@@ -161,9 +163,19 @@ def rank_correlation_on(left, left_basis, right, right_basis, minimum=3):
     return row_correlation(left_basis.ranks(both), right_basis.ranks(both), minimum)
 
 
+def held(close):
+    """Prices as positions see them: a halted name keeps its last price until it trades again, and a name whose prices stop (delisted,
+    or the source has none after) keeps its last close from then on: it is out at that price and earns nothing after. Before its first
+    price a name has none."""
+    import pandas as pd
+    return pd.DataFrame(np.asarray(close, dtype=float)).ffill().to_numpy()
+
+
 def forward_returns(close, holding, delay=0):
-    """The return of each row's names over `holding` bars, starting `delay` bars later: close[t + delay + holding] / close[t + delay] - 1."""
-    close = np.asarray(close, dtype=float)
+    """The return of each row's names over `holding` bars, starting `delay` bars later: close[t + delay + holding] / close[t + delay] - 1,
+    on `held` prices: a name that stops trading inside the window is out at its last close (the move to it counts, nothing after), so it
+    neither drops out of the day nor earns more."""
+    close = held(close)
     out = np.full_like(close, np.nan)
     start, end = delay, delay + holding
     if end < len(close):

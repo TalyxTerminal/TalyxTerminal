@@ -1,3 +1,5 @@
+import { intlLocale } from "@talyx/sdk";
+import { t } from "../i18n";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { TxAlert, TxButton, TxEmpty, TxField, TxPanel, TxRow, TxSelect, type ModuleContext } from "@talyx/sdk";
 import { createClient } from "../../public/ts/types";
@@ -8,7 +10,7 @@ import { message } from "./errors";
 
 export function documentPath(snapshot: DocumentSnapshot) {
   const root = snapshot.context.rootUri;
-  if (snapshot.source.kind !== "file" || !snapshot.context.projectId || !root || !snapshot.uri.toLowerCase().startsWith(root.toLowerCase() + "/")) throw new Error("This document does not belong to a project directory.");
+  if (snapshot.source.kind !== "file" || !snapshot.context.projectId || !root || !snapshot.uri.toLowerCase().startsWith(root.toLowerCase() + "/")) throw new Error(t("This document does not belong to a project directory."));
   return decodeURIComponent(snapshot.uri.slice(root.length + 1));
 }
 export function FileHistory({ ctx, compare }: { ctx: ModuleContext; compare(request: CompareRequest): void }) {
@@ -24,23 +26,23 @@ export function FileHistory({ ctx, compare }: { ctx: ModuleContext; compare(requ
       const projectId = file.context.projectId!, path = documentPath(file);
       if (mode === "compare") {
         const previous = await historyRevision(ctx, projectId, path, revision.revisionId);
-        compare({ documentId: file.documentId, name: `${file.name} ${new Date(revision.createdAt).toLocaleString()}`, content: previous.content });
+        compare({ documentId: file.documentId, name: `${file.name} ${new Date(revision.createdAt).toLocaleString(intlLocale())}`, content: previous.content });
       } else {
-        if (documents.isDirty(file.documentId)) throw new Error("Save or discard this file's current edits before restoring a revision.");
+        if (documents.isDirty(file.documentId)) throw new Error(t("Save or discard this file's current edits before restoring a revision."));
         const result = await createClient(ctx)["projects.restore_revision"]({ projectId, path, revisionId: revision.revisionId,
           expectedVersion: file.sourceVersion as string | null });
-        if (result.status === "conflict") throw new Error(result.message ?? "The file changed before the revision could be restored.");
+        if (result.status === "conflict") throw new Error(result.message ?? t("The file changed before the revision could be restored."));
         await documents.read(file.documentId);
         await load();
       }
     } catch (reason) { setError(message(reason)); }
     finally { setWorking(false); }
   };
-  return <TxPanel title="File history" actions={<TxButton disabled={!file || working} onClick={() => void load().catch(reason => setError(message(reason)))}>Refresh</TxButton>}>
-    {error && <TxAlert title="File history needs attention">{error}</TxAlert>}
-    {files.length ? <TxField label="Open file"><TxSelect value={documentId} disabled={working} onChange={event => setDocumentId(event.target.value)}>{files.map(item => <option key={item.documentId} value={item.documentId}>{documents.projects.get(item.context.projectId!)?.name}: {documentPath(item)}</option>)}</TxSelect></TxField> : <TxEmpty title="Open a project file to view its history" />}
-    {result?.warnings.map((warning, index) => <TxAlert key={index} title="Some history is unavailable">{warning}</TxAlert>)}
-    {result && !result.revisions.length && <TxEmpty title="No recorded revisions" />}
-    {result?.revisions.map(revision => <TxRow key={revision.revisionId} title={new Date(revision.createdAt).toLocaleString()} detail={revision.reason}><TxButton disabled={working} onClick={() => void perform(revision, "compare")}>Compare</TxButton><TxButton disabled={working} onClick={() => void perform(revision, "restore")}>Restore revision</TxButton></TxRow>)}
+  return <TxPanel title={t("File history")} actions={<TxButton disabled={!file || working} onClick={() => void load().catch(reason => setError(message(reason)))}>{t("Refresh")}</TxButton>}>
+    {error && <TxAlert title={t("File history needs attention")}>{error}</TxAlert>}
+    {files.length ? <TxField label={t("Open file")}><TxSelect value={documentId} disabled={working} onChange={event => setDocumentId(event.target.value)}>{files.map(item => <option key={item.documentId} value={item.documentId}>{documents.projects.get(item.context.projectId!)?.name}: {documentPath(item)}</option>)}</TxSelect></TxField> : <TxEmpty title={t("Open a project file to view its history")} />}
+    {result?.warnings.map((warning, index) => <TxAlert key={index} title={t("Some history is unavailable")}>{warning}</TxAlert>)}
+    {result && !result.revisions.length && <TxEmpty title={t("No recorded revisions")} />}
+    {result?.revisions.map(revision => <TxRow key={revision.revisionId} title={new Date(revision.createdAt).toLocaleString(intlLocale())} detail={t(revision.reason)}><TxButton disabled={working} onClick={() => void perform(revision, "compare")}>{t("Compare")}</TxButton><TxButton disabled={working} onClick={() => void perform(revision, "restore")}>{t("Restore revision")}</TxButton></TxRow>)}
   </TxPanel>;
 }

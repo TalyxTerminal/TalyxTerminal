@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dateutil.rrule import rrulestr
 from dateutil.tz import datetime_exists
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 def next_due(rule, zone, start, after):
@@ -20,7 +21,7 @@ def next_due(rule, zone, start, after):
         return None
     except (ValueError, TypeError, ZoneInfoNotFoundError, OverflowError) as exc:
         raise ContractError(
-            "invalid_input", f"Choose an IANA time zone and a valid recurrence: {exc}"
+            "invalid_input", t("Choose an IANA time zone and a valid recurrence: {exc}", exc=exc)
         ) from exc
 
 

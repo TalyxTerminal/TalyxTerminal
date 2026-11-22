@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from . import i18n
+
 
 def index_pairs(value, name):
     """The author's factor as one value per (date, asset): a Series with that index, or a table of dates by assets."""
@@ -88,7 +90,7 @@ def factor(publisher, table, panel, settings, *, volumes=True):
     sections.append(publisher.table(returns, "factor/daily", "Long–short return and rank IC, a bar"))
     publisher.section("factor", "Factor", sections)
     publisher.index["metrics"] = headline
-    publisher.index["units"].append({"id": "summary", "title": "Factor", "state": "completed", "metrics": {"input_samples": int(np.isfinite(raw).sum()), "valid_samples": int(np.isfinite(evaluation.after).sum())}})
+    publisher.index["units"].append({"id": "summary", "title": i18n.t("Factor"), "state": "completed", "metrics": {"input_samples": int(np.isfinite(raw).sum()), "valid_samples": int(np.isfinite(evaluation.after).sum())}})
     publisher.write()
     return headline
 

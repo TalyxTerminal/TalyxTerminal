@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { SerializedDockview } from "dockview-react";
 
 /** One panel in an open workspace. Its state is the module's own JSON, opaque here. */
@@ -83,7 +84,7 @@ async function recoveryTransaction<T>(operation: (store: IDBObjectStore) => () =
   try {
     return await new Promise<T>((resolve, reject) => {
       const tx = db.transaction("workspaces", "readwrite");
-      tx.onabort = () => reject(tx.error ?? new Error("Workspace recovery was interrupted."));
+      tx.onabort = () => reject(tx.error ?? new Error(t("Workspace recovery was interrupted.")));
       try {
         const result = operation(tx.objectStore("workspaces"));
         tx.oncomplete = () => resolve(result());

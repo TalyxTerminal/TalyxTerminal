@@ -11,11 +11,12 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import market_inputs as M
 from . import research_calendar
 from .materials import ExportFiles, Materials, read_selection, release
-from .object_data import check_coverage, day_ms, frozen_data, preflight, required_settings
+from .object_data import day_ms, frozen_data, none_left, preflight, required_settings
 
 
 async def resolve_series(ctx, instrument, timeframe, adjusted):
@@ -61,7 +62,7 @@ def write_bars(selections, raw_by_id, columns, path, timeframe, zone, index, fil
             frame = read_selection(selection, files)
             original = read_selection(raw_by_id[instrument["instrumentId"]], files)
             if not np.array_equal(frame["time"].to_numpy(), original["time"].to_numpy()):
-                raise ContractError("conflict", f"{instrument['displaySymbol']}: raw and adjusted price rows differ.")
+                raise ContractError("conflict", t("{displaySymbol}: raw and adjusted price rows differ.", displaySymbol=instrument['displaySymbol']))
             result = frame[["time", "closeAt", "knownAt", *M.FIELDS]].copy()
             result["column"] = column
             result["label"] = labels_of(result["time"], timeframe, zone[instrument["instrumentId"]] if isinstance(zone, dict) else zone)
@@ -108,7 +109,7 @@ def shared_calendar(schedules, timeframe, calendars="one"):
     return min(sorted(schedules), key=lambda key: len(days[key])), sorted(set.intersection(*days.values()))
 
 
-async def prepare(ctx, data, owner, directory, *, strict=True, progress=None, calendars="one"):
+async def prepare(ctx, data, owner, directory, *, progress=None, calendars="one"):
     """Freeze the data's prices for a run. `calendars="one"` (factors, models, strategies, which compare names bar by bar) refuses names on
     different calendars; `"many"` (an allocation, whose returns are taken on the days every asset has a close, or weekly or monthly) freezes
     each name on its own calendar, and the observations a year are those of the days the calendars share."""
@@ -117,26 +118,27 @@ async def prepare(ctx, data, owner, directory, *, strict=True, progress=None, ca
     required_settings(data)
     data, index = await frozen_data(ctx, data, progress=progress)
     symbols, timeframe = data["symbols"], data["timeframe"]
-    adjusted = data.get("adjustment", "split")
+    adjusted = data.get("adjustment", "split_dividend")  # unset is adjusted for splits and dividends, as the data settings show it
     since, until = day_ms(data["since"], False), day_ms(data["until"], True)
     selected, skipped = [], []
     for position, symbol in enumerate(symbols):
         if progress is not None:
-            progress({"done": position, "total": len(symbols), "waitingFor": None, "waitingUntil": None, "message": "checking names"})
+            progress({"done": position, "total": len(symbols), "waitingFor": None, "waitingUntil": None, "message": t("checking names")})
         try:
             instrument, series = await resolve_series(ctx, symbol["instrument"], timeframe, adjusted)
-            await preflight(ctx, instrument, series, since=None if index is not None else since)
+            await preflight(ctx, instrument, series)
         except ContractError as error:
-            if index is None:
-                raise
+            # A name Market cannot price is left out and named in the run's data notes, for a list as for an index (as Alphalens, JoinQuant
+            # and RiceQuant run a universe whose members lack data); the run fails only when no name is left.
             from .index_universe import exclude
-            exclude(index, symbol["instrument"]["instrumentId"], since, until, "no_price_series", source_reason=error.message)
+            if index is not None:
+                exclude(index, symbol["instrument"]["instrumentId"], since, until, "no_price_series", source_reason=error.message)
             skipped.append({"instrumentId": symbol["instrument"]["instrumentId"], "ticker": symbol["instrument"]["displaySymbol"],
                             "sector": None, "result": "failed", "reason": error.message, "bars": 0, "from": None, "new": 0})
             continue
         selected.append({"instrument": instrument, "series": series})
     if not selected:
-        raise ContractError("no_data", "No selected instruments have price series.", {"index": index})
+        raise none_left(skipped, index)
     windows = await research_calendar.date_windows(ctx, [item["instrument"] for item in selected], timeframe, since, until)
     spans = {(item["instrument"]["calendarId"], item["series"]["sessionScope"]): windows[item["instrument"]["instrumentId"]] for item in selected}
     schedules = {(name, scope): await research_calendar.boundaries(ctx, name, timeframe, scope, *window) for (name, scope), window in sorted(spans.items())}
@@ -147,8 +149,7 @@ async def prepare(ctx, data, owner, directory, *, strict=True, progress=None, ca
             key = f"{item['instrument']['calendarId']} ({item['series']['sessionScope']})"
             by_calendar.setdefault(key, []).append(item["instrument"]["displaySymbol"])
         named = "; ".join(f"{key}: {', '.join(names[:5])}{f' and {len(names) - 5} more' if len(names) > 5 else ''}" for key, names in sorted(by_calendar.items()))
-        raise ContractError("invalid_input", f"These names trade on different calendars ({named}); research runs on one calendar, "
-                            "so keep names of one calendar together here.", {"calendars": by_calendar})
+        raise ContractError("invalid_input", t("These names trade on different calendars ({named}); research runs on one calendar, so keep names of one calendar together here.", named=named), {"calendars": by_calendar})
     calendar_of = {item["instrument"]["instrumentId"]: (item["instrument"]["calendarId"], item["series"]["sessionScope"]) for item in selected}
     zone_of = {identity: schedules[key][0] for identity, key in calendar_of.items()}
     (calendar_id, scope), shared = shared_calendar(schedules, timeframe, calendars)
@@ -158,7 +159,7 @@ async def prepare(ctx, data, owner, directory, *, strict=True, progress=None, ca
     wanted = {item["series"]["seriesId"]: item for item in [*selected, *originals.values()]}
     captured = await Materials(ctx).capture({"market": {
         "selections": list(wanted.values()), "since": since, "until": until, "windows": windows,
-        "allowEmpty": index is not None, "progress": progress}}, owner)
+        "allowEmpty": True, "progress": progress}}, owner)
     files = ExportFiles()
     try:
         by_series = {item["series"]["seriesId"]: item for item in captured["manifest"]["selections"]}
@@ -167,28 +168,30 @@ async def prepare(ctx, data, owner, directory, *, strict=True, progress=None, ca
         expected = {key: np.asarray([opened for opened, closed in found if closed <= now], dtype=np.int64) for key, (_, found) in schedules.items()}
         for position, choice in enumerate(selected):
             if progress is not None:   # the minute after the export was a count standing at its end; this step has its own
-                progress({"done": position, "total": len(selected), "waitingFor": None, "waitingUntil": None, "message": "checking prices"})
+                progress({"done": position, "total": len(selected), "waitingFor": None, "waitingUntil": None, "message": t("checking prices")})
             item = by_series[choice["series"]["seriesId"]]
             instrument = item["instrument"]
             if not item["coverage"]["exportedRows"] or not raw_by_id[instrument["instrumentId"]]["coverage"]["exportedRows"]:
-                if index is None:
-                    raise ContractError("no_data", f"Market has no prices for {instrument['displaySymbol']}.")
                 from .index_universe import exclude
                 reason = item["problem"]["message"] if "problem" in item else "Market has no prices in this period."
-                exclude(index, instrument["instrumentId"], since, until, "no_prices", source_reason=reason)
+                if index is not None:
+                    exclude(index, instrument["instrumentId"], since, until, "no_prices", source_reason=reason)
                 skipped.append({"instrumentId": instrument["instrumentId"], "ticker": instrument["displaySymbol"], "sector": None,
                                 "result": "none", "reason": reason, "bars": 0, "from": None, "new": 0})
                 continue
             frame = await asyncio.to_thread(read_selection, item, files)
-            item["coverage"]["missingBars"] = int(np.count_nonzero(~np.isin(expected[calendar_of[instrument["instrumentId"]]], frame["time"].to_numpy())))
-            if strict and index is None:
-                check_coverage(item, since, until, timeframe, now)
+            # Sessions a name has no bar for between its first and last (halted) leave it out of those days' cross-sections, as Alphalens and
+            # JoinQuant do; before its first bar it was not trading yet, after its last it has ended (delisted, or the source has none after) and
+            # the run holds it out at its last close. None of these stops the run.
+            sessions = expected[calendar_of[instrument["instrumentId"]]]
+            sessions = sessions[(sessions >= frame["time"].min()) & (sessions <= frame["time"].max())]
+            item["coverage"]["missingBars"] = int(np.count_nonzero(~np.isin(sessions, frame["time"].to_numpy())))
             if index is not None:
                 from .index_universe import check_prices
                 check_prices(index, item, frame, now, found)
             usable.append(item)
         if not usable:
-            raise ContractError("no_data", "No selected instruments have prices in the period.", {"index": index})
+            raise none_left(skipped, index)
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "bars.parquet"

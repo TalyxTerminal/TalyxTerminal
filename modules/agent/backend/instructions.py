@@ -18,6 +18,7 @@ from deepagents.backends.protocol import (
 )
 from deepagents.middleware.memory import MemoryMiddleware
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 def instruction_uri(path):
@@ -86,11 +87,11 @@ class InstructionService:
             except FileNotFoundError:
                 continue
             if len(raw) > 1024 * 1024:
-                raise ContractError("context_window_exceeded", "An instruction file exceeds 1 MiB; shorten it")
+                raise ContractError("context_window_exceeded", t("An instruction file exceeds 1 MiB; shorten it"))
             try:
                 contents[virtual] = raw.decode("utf-8-sig")
             except UnicodeError as error:
-                raise ContractError("invalid_input", "Instruction files must be UTF-8", {"uri": path.resolve().as_uri()}) from error
+                raise ContractError("invalid_input", t("Instruction files must be UTF-8"), {"uri": path.resolve().as_uri()}) from error
         for virtual, folder in self.folders.items():
             try:
                 guide = (folder / "AGENTS.md").read_text(encoding="utf-8-sig").strip().split("\n\n", 1)[0]

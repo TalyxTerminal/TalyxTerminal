@@ -1,3 +1,5 @@
+import { intlLocale } from "@talyx/sdk";
+import { t } from "./i18n";
 import { useCallback, useEffect, useState } from "react";
 import {
   ModuleView, TxButton, TxDialog, TxEmpty, TxField, TxIcon, TxIconButton, TxInput, TxMenu, TxRow, TxSettingsGroup, TxSettingsNote, TxSettingsPage,
@@ -14,15 +16,15 @@ type Deliveries = Platform.Delivery;
 
 type Kind = Channel["kind"];
 
-const KINDS: Record<Kind, { name: string; help: string }> = {
-  telegram: { name: "Telegram", help: "Create a bot with @BotFather and send it any message. The chat ID is your own Telegram user ID or a group's ID." },
-  feishu: { name: "Feishu", help: "Add a custom bot to a Feishu group and copy its webhook. Fill in the signing secret if the bot has one." },
-  discord: { name: "Discord", help: "In a channel's settings, open Integrations › Webhooks and copy the webhook URL." },
-};
+const kinds = (): Record<Kind, { name: string; help: string }> => ({
+  telegram: { name: "Telegram", help: t("Create a bot with @BotFather and send it any message. The chat ID is your own Telegram user ID or a group's ID.") },
+  feishu: { name: t("Feishu"), help: t("Add a custom bot to a Feishu group and copy its webhook. Fill in the signing secret if the bot has one.") },
+  discord: { name: "Discord", help: t("In a channel's settings, open Integrations › Webhooks and copy the webhook URL.") },
+});
 
-const STATUS: Record<Delivery["status"], string> = {
-  pending: "Waiting to send", sending: "Sending", sent: "Sent", failed: "Failed", unknown: "Not confirmed", cancelled: "Cancelled",
-};
+const statusLabels = (): Record<Delivery["status"], string> => ({
+  pending: t("Waiting to send"), sending: t("Sending"), sent: t("Sent"), failed: t("Failed"), unknown: t("Not confirmed"), cancelled: t("Cancelled"),
+});
 
 function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
@@ -30,18 +32,18 @@ function errorText(reason: unknown): string {
 
 function since(iso: string): string {
   const seconds = (Date.now() - Date.parse(iso)) / 1000;
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
-  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+  if (seconds < 60) return t("just now");
+  if (seconds < 3600) return t("{minutes} min ago", { minutes: Math.floor(seconds / 60) });
+  if (seconds < 86400) return t("{hours} h ago", { hours: Math.floor(seconds / 3600) });
+  return new Date(iso).toLocaleDateString(intlLocale(), { month: "short", day: "numeric" });
 }
 
 function channelDetail(channel: Channel): string {
-  const parts = channel.name === KINDS[channel.kind].name ? [] : [KINDS[channel.kind].name];
-  if (channel.settings.chatId) parts.push(`chat ${channel.settings.chatId}`);
-  if (channel.credentialMask) parts.push(channel.kind === "telegram" ? `token ${channel.credentialMask}` : `webhook ${channel.credentialMask}`);
+  const parts = channel.name === kinds()[channel.kind].name ? [] : [kinds()[channel.kind].name];
+  if (channel.settings.chatId) parts.push(t("chat {chatId}", { chatId: channel.settings.chatId }));
+  if (channel.credentialMask) parts.push(channel.kind === "telegram" ? t("token {credentialMask}", { credentialMask: channel.credentialMask }) : t("webhook {credentialMask}", { credentialMask: channel.credentialMask }));
   const last = channel.lastDelivery;
-  if (last) parts.push(`last: ${(STATUS[last.status as Delivery["status"]] ?? last.status).toLowerCase()} ${since(last.updatedAt)}`);
+  if (last) parts.push(t("last: {status} {time}", { status: (statusLabels()[last.status as Delivery["status"]] ?? last.status).toLowerCase(), time: since(last.updatedAt) }));
   return parts.join(" · ");
 }
 
@@ -83,9 +85,9 @@ export function NotificationsSection() {
     try {
       const result = await call<Deliveries>("test", { channelId: channel.id });
       const delivery = result.deliveries[0];
-      note(channel.id, delivery.status === "sent" ? { tone: "muted", text: "Test sent. Check your phone." }
-        : delivery.status === "failed" ? { tone: "error", text: `Test failed: ${delivery.error}` }
-        : { tone: "error", text: `${STATUS[delivery.status]}: the service didn't confirm the test${delivery.error ? ` (${delivery.error})` : ""}.` });
+      note(channel.id, delivery.status === "sent" ? { tone: "muted", text: t("Test sent. Check your phone.") }
+        : delivery.status === "failed" ? { tone: "error", text: delivery.error ? t("Test failed: {error}", { error: delivery.error }) : t("Test failed.") }
+        : { tone: "error", text: t("{value}: the service didn't confirm the test{value2}.", { value: statusLabels()[delivery.status], value2: delivery.error ? ` (${delivery.error})` : "" }) });
       await refresh();
     } catch (reason) { note(channel.id, { tone: "error", text: errorText(reason) }); }
     finally { setBusy(null); setTesting(null); }
@@ -95,21 +97,21 @@ export function NotificationsSection() {
     .map(item => ({ moduleId: item.moduleId, key: `${item.moduleId}.${item.id}`, view: `${item.moduleId}.${item.descriptor.view}` }));
 
   return <TxSettingsPage>
-    <TxSettingsGroup title="Phone channels" action={<TxMenu label="Add a channel" align="end" trigger={<TxButton size="sm"><TxIcon name="plus" />Add channel</TxButton>}
-      items={(Object.keys(KINDS) as Kind[]).map(kind => ({ id: kind, label: KINDS[kind].name, onSelect: () => setEditing({ kind, channel: null }) }))} />}>
-      {loadError && <TxSettingsNote tone="error">Couldn't read channels. {loadError}</TxSettingsNote>}
-      {!loadError && !channels && <TxSettingsNote>Loading…</TxSettingsNote>}
-      {channels?.length === 0 && <TxEmpty title="No phone channels" />}
+    <TxSettingsGroup title={t("Phone channels")} action={<TxMenu label={t("Add a channel")} align="end" trigger={<TxButton size="sm"><TxIcon name="plus" />{t("Add channel")}</TxButton>}
+      items={(Object.keys(kinds()) as Kind[]).map(kind => ({ id: kind, label: kinds()[kind].name, onSelect: () => setEditing({ kind, channel: null }) }))} />}>
+      {loadError && <TxSettingsNote tone="error">{t("Couldn't read channels.")} {loadError}</TxSettingsNote>}
+      {!loadError && !channels && <TxSettingsNote>{t("Loading…")}</TxSettingsNote>}
+      {channels?.length === 0 && <TxEmpty title={t("No phone channels")} />}
       {channels?.map(channel => <div key={channel.id}>
         <TxRow title={channel.name} tone={channel.enabled ? "default" : "off"}
           // A test's own result shows under the row, so the last failure isn't repeated beside it.
           detail={channel.lastDelivery?.status === "failed" && !notes[channel.id] ? <>{channelDetail(channel)} · <span className="tx-error">{channel.lastDelivery.error}</span></> : channelDetail(channel)}>
           <div className="tx-row tx-nowrap">
-            <TxButton size="sm" disabled={busy !== null || !channel.enabled} onClick={() => void test(channel)}>{testing === channel.id ? "Sending…" : "Send test"}</TxButton>
-            <TxSwitch hideLabel label={`${channel.name} on`} checked={channel.enabled} disabled={busy !== null} onCheckedChange={next => void save(channel, next)} />
-            <TxMenu label={`${channel.name} actions`} align="end" trigger={<TxIconButton size="sm" label={`${channel.name} actions`} icon="more" disabled={busy !== null} />} items={[
-              { id: "edit", label: "Edit…", onSelect: () => setEditing({ kind: channel.kind, channel }) },
-              { id: "remove", label: "Remove channel", tone: "danger", onSelect: () => void remove(channel) },
+            <TxButton size="sm" disabled={busy !== null || !channel.enabled} onClick={() => void test(channel)}>{testing === channel.id ? t("Sending…") : t("Send test")}</TxButton>
+            <TxSwitch hideLabel label={t("{name} on", { name: channel.name })} checked={channel.enabled} disabled={busy !== null} onCheckedChange={next => void save(channel, next)} />
+            <TxMenu label={t("{name} actions", { name: channel.name })} align="end" trigger={<TxIconButton size="sm" label={t("{name} actions", { name: channel.name })} icon="more" disabled={busy !== null} />} items={[
+              { id: "edit", label: t("Edit…"), onSelect: () => setEditing({ kind: channel.kind, channel }) },
+              { id: "remove", label: t("Remove channel"), tone: "danger", onSelect: () => void remove(channel) },
             ]} />
           </div>
         </TxRow>
@@ -130,7 +132,7 @@ function ChannelDialog({ kind, channel, call, onClose, onSaved }: {
   call: <T>(method: string, input: object) => Promise<T>;
   onClose: () => void; onSaved: (channels: Channel[]) => void;
 }) {
-  const [name, setName] = useState(channel?.name ?? KINDS[kind].name);
+  const [name, setName] = useState(channel?.name ?? kinds()[kind].name);
   const [chatId, setChatId] = useState(channel?.settings.chatId ?? "");
   const [token, setToken] = useState(""), [webhook, setWebhook] = useState(""), [secret, setSecret] = useState("");
   const [saving, setSaving] = useState(false), [error, setError] = useState<string | null>(null);
@@ -141,7 +143,7 @@ function ChannelDialog({ kind, channel, call, onClose, onSaved }: {
     : webhook.trim() ? { webhook: webhook.trim(), ...(kind === "feishu" && secret.trim() ? { secret: secret.trim() } : {}) } : null;
   const ready = name.trim() !== "" && (kind !== "telegram" || chatId.trim() !== "") && (editing || credentials !== null) && !secretOnly;
   // Editing leaves a credential empty to keep the saved one; the field says so in its placeholder.
-  const kept = channel?.credentialMask ? `Saved, ending ${channel.credentialMask}` : undefined;
+  const kept = channel?.credentialMask ? t("Saved, ending {credentialMask}", { credentialMask: channel.credentialMask }) : undefined;
 
   const save = async () => {
     setSaving(true); setError(null);
@@ -154,23 +156,23 @@ function ChannelDialog({ kind, channel, call, onClose, onSaved }: {
     finally { setSaving(false); }
   };
 
-  return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={editing ? `Edit ${channel.name}` : `Add ${KINDS[kind].name}`} size="standard" footer={<>
-    <TxButton variant="quiet" onClick={onClose}>Cancel</TxButton>
-    <TxButton variant="primary" disabled={!ready || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save"}</TxButton>
+  return <TxDialog open onOpenChange={open => { if (!open) onClose(); }} title={editing ? t("Edit {name}", { name: channel.name }) : t("Add {value}", { value: kinds()[kind].name })} size="standard" footer={<>
+    <TxButton variant="quiet" onClick={onClose}>{t("Cancel")}</TxButton>
+    <TxButton variant="primary" disabled={!ready || saving} onClick={() => void save()}>{saving ? t("Saving…") : t("Save")}</TxButton>
   </>}>
     <div className="talyx-settings-form">
-      <TxTooltip label={KINDS[kind].help}><span className="talyx-form-guide" tabIndex={0}><TxIcon name="info" />Where to find these</span></TxTooltip>
-      <TxField label="Name"><TxInput value={name} onChange={event => setName(event.target.value)} /></TxField>
+      <TxTooltip label={kinds()[kind].help}><span className="talyx-form-guide" tabIndex={0}><TxIcon name="info" />{t("Where to find these")}</span></TxTooltip>
+      <TxField label={t("Name")}><TxInput value={name} onChange={event => setName(event.target.value)} /></TxField>
       {kind === "telegram" && <>
-        <TxField label="Bot token">
+        <TxField label={t("Bot token")}>
           <TxInput type="password" autoComplete="off" value={token} placeholder={kept} onChange={event => setToken(event.target.value)} />
         </TxField>
-        <TxField label="Chat ID"><TxInput inputMode="numeric" value={chatId} placeholder="123456789" onChange={event => setChatId(event.target.value)} /></TxField>
+        <TxField label={t("Chat ID")}><TxInput inputMode="numeric" value={chatId} placeholder="123456789" onChange={event => setChatId(event.target.value)} /></TxField>
       </>}
-      {kind !== "telegram" && <TxField label="Webhook URL">
+      {kind !== "telegram" && <TxField label={t("Webhook URL")}>
         <TxInput type="password" autoComplete="off" value={webhook} placeholder={kept} onChange={event => setWebhook(event.target.value)} />
       </TxField>}
-      {kind === "feishu" && <TxField label="Signing secret (optional)" error={secretOnly ? "Enter the webhook again to change the secret." : undefined}>
+      {kind === "feishu" && <TxField label={t("Signing secret (optional)")} error={secretOnly ? t("Enter the webhook again to change the secret.") : undefined}>
         <TxInput type="password" autoComplete="off" value={secret} onChange={event => setSecret(event.target.value)} />
       </TxField>}
       {error && <p className="tx-error" role="alert">{error}</p>}

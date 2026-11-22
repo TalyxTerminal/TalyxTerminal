@@ -28,6 +28,7 @@ from collections import deque
 from dataclasses import replace as dc_replace
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 from vocabulary.instruments import MarketSeries
@@ -527,7 +528,7 @@ class Upstream:
     async def run(self) -> None:
         attempt = 0
         registry = self.market.registry
-        target = await in_worker(self.market.data.target, self.instrument, self.environment)
+        target = await in_worker(self.market.data.target, self.instrument, self.environment, self.source_id)
         while True:
             try:
                 entry = registry.entry(self.source_id)
@@ -550,7 +551,7 @@ class Upstream:
                         self.set_state("recovering", problem)
                     elif kind == "bar":
                         self.on_bar(event["row"], event["closed"])
-                raise MarketError("source_unavailable", f"{self.source_id} ended the live stream",
+                raise MarketError("source_unavailable", t("{source_id} ended the live stream", source_id=self.source_id),
                                   source_id=self.source_id)
             except asyncio.CancelledError:
                 raise
@@ -695,7 +696,7 @@ class Sessions:
         instrument = await in_worker(self.market.instrument_record, params["instrument"])
         series = MarketSeries.from_wire(params["series"])
         if series.instrumentId != params["instrument"]["instrumentId"]:
-            raise MarketError("invalid_input", "series.instrumentId does not name the instrument")
+            raise MarketError("invalid_input", t("series.instrumentId does not name the instrument"))
         if instrument["instrumentId"] != series.instrumentId:
             from .data import _rebase
             series = _rebase(series, instrument)
@@ -704,7 +705,7 @@ class Sessions:
         if series.capability != "ohlcv":
             from . import live_aux
             if series.capability not in live_aux.OBSERVATIONS:
-                raise MarketError("unsupported", f"Live {series.capability} sessions are not available")
+                raise MarketError("unsupported", t("Live {capability} sessions are not available", capability=series.capability))
             depth = int(params.get("depth") or 0)
             key = (series.seriesId, environment, depth)
             session = self.sessions.get(key)

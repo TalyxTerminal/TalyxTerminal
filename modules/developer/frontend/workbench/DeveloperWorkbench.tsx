@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TxAlert, TxButton, TxDialog, TxIcon, TxIconButton, TxMenu, TxSheet, TxSplit, TxToolbarDivider, type ModuleContext, type TxMenuItem } from "@talyx/sdk";
 import { documents, type CheckpointReference, type DocumentSource } from "../documents/service";
@@ -16,7 +17,7 @@ import "./workbench.css";
 
 type Utility = "recovery" | "help" | "history" | "changes";
 export interface WorkbenchState { activeProjectId?: string | null; sources?: DocumentSource[]; activeSource?: DocumentSource | null; treeWidth?: number; checkpoint?: CheckpointReference }
-const utilityNames: Record<Utility, string> = { recovery: "Recovery", help: "Developer help", history: "File history", changes: "External changes" };
+const utilityNames: Record<Utility, string> = { recovery: t("Recovery"), help: t("Developer help"), history: t("File history"), changes: t("External changes") };
 
 export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext; onStateChange?(state: WorkbenchState): void }) {
   useSyncExternalStore(documents.watch, documents.state, documents.state);
@@ -38,7 +39,8 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
       const current = documents.activeDocumentId ? documents.snapshot(documents.activeDocumentId) : undefined;
       const selected = documents.activeProjectId ? documents.projects.get(documents.activeProjectId) : undefined;
       const dirty = current ? documents.isDirty(current.documentId) : false;
-      ctx.view.report({ summary: `${selected?.name ?? "No project"} · ${current?.name ?? "No file"}${dirty ? " · unsaved changes" : ""}`,
+      const place = { project: selected?.name ?? t("No project"), file: current?.name ?? t("No file") };
+      ctx.view.report({ summary: dirty ? t("{project} · {file} · unsaved changes", place) : t("{project} · {file}", place),
         refs: { projectId: selected?.projectId ?? null, documentId: current?.documentId ?? null, version: current?.version ?? null, unsaved: dirty },
         facts: [current?.conflict ? "Changed on disk under unsaved edits" : dirty ? "Unsaved" : "Saved", ...(current ? [`File: ${current.uri}`, `Version: ${current.version}`] : [])],
         // The file on screen, as the open target (the manifest's) that leads here.
@@ -54,7 +56,7 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
       if (initial.current.checkpoint) {
         const result = await documents.restoreCheckpoint({ checkpoint: initial.current.checkpoint });
         if (result.documents.some(item => item.status === "conflict")) setUtility("recovery");
-        if (result.documents.some(item => item.status === "unavailable")) setError("Some files saved with the workspace could not be restored. Your current edits are kept.");
+        if (result.documents.some(item => item.status === "unavailable")) setError(t("Some files saved with the workspace could not be restored. Your current edits are kept."));
       }
       for (const source of initial.current.sources ?? []) await documents.open(source).catch(reason => setError(message(reason)));
       if (initial.current.activeSource) await documents.open(initial.current.activeSource);
@@ -80,7 +82,7 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
     const item = removing;
     setRemovingBusy(true); setRemoveError(null);
     try {
-      if (documents.dirty().some(entry => entry.context.projectId === item.projectId)) throw new Error("Save or discard this project's unsaved files before removing it.");
+      if (documents.dirty().some(entry => entry.context.projectId === item.projectId)) throw new Error(t("Save or discard this project's unsaved files before removing it."));
       await removeProject(ctx, item, mode);
       closeProject(item);
       await documents.refreshProjects();
@@ -105,35 +107,35 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
   const recentProjects = [...projects].sort((a, b) => (b.lastOpened ?? "").localeCompare(a.lastOpened ?? ""));
   const switchItems: TxMenuItem[] = [
     ...recentProjects.map(item => ({ id: item.projectId, label: item.name, checked: project?.projectId === item.projectId, onSelect: () => run(() => openProject(item)) })),
-    { id: "new", label: "New TALYX module", separated: true, onSelect: () => setDialog("new") },
-    { id: "open", label: "Open folder", onSelect: () => setDialog("open") },
-    { id: "remove", label: "Remove project…", separated: true, disabled: !project || project.readOnly, onSelect: () => { if (project) { setRemoveError(null); setRemoving(project); } } },
+    { id: "new", label: t("New TALYX module"), separated: true, onSelect: () => setDialog("new") },
+    { id: "open", label: t("Open folder"), onSelect: () => setDialog("open") },
+    { id: "remove", label: t("Remove project…"), separated: true, disabled: !project || project.readOnly, onSelect: () => { if (project) { setRemoveError(null); setRemoving(project); } } },
   ];
   const utilities: TxMenuItem[] = [
     ...(["history", "changes", "recovery", "help"] as Utility[]).map(name => ({ id: name, label: utilityNames[name], onSelect: () => setUtility(name) })),
-    { id: "close", label: "Close project", disabled: !project, onSelect: () => { if (project) closeProject(project); } },
+    { id: "close", label: t("Close project"), disabled: !project, onSelect: () => { if (project) closeProject(project); } },
   ];
   return <div className="developer-workspace">
     <header className="developer-workspace-toolbar tx-glass">
-      <TxMenu label="Switch project" trigger={<TxButton variant="quiet" className="developer-switch"><span>{project?.name ?? "Developer"}</span><TxIcon name="chevron-down" className="developer-switch-chevron" /></TxButton>} items={switchItems} />
-      <TxMenu label="Workspace tools" trigger={<TxIconButton label="Workspace tools" icon="settings" />} items={utilities} />
+      <TxMenu label={t("Switch project")} trigger={<TxButton variant="quiet" className="developer-switch"><span>{project?.name ?? t("Developer")}</span><TxIcon name="chevron-down" className="developer-switch-chevron" /></TxButton>} items={switchItems} />
+      <TxMenu label={t("Workspace tools")} trigger={<TxIconButton label={t("Workspace tools")} icon="settings" />} items={utilities} />
       <span className="tx-spacer" />
       {project && module && <ModuleBar key={project.projectId} ctx={ctx} projectId={project.projectId} module={module} onError={setError} onProblem={setProblem}
         onUninstalled={module.installed ? () => forget(project) : undefined} />}
-      {project && <><TxToolbarDivider /><TxButton onClick={() => run(() => openInVsCode(ctx, project.projectId))}>Open in VS Code</TxButton></>}
-      <TxButton disabled={!active || active.readOnly || !unsaved} onClick={() => run(save)}>Save</TxButton>
+      {project && <><TxToolbarDivider /><TxButton onClick={() => run(() => openInVsCode(ctx, project.projectId))}>{t("Open in VS Code")}</TxButton></>}
+      <TxButton disabled={!active || active.readOnly || !unsaved} onClick={() => run(save)}>{t("Save")}</TxButton>
     </header>
-    {(error || documents.error) && <TxAlert title="Developer needs attention" actions={<TxButton size="sm" onClick={() => { setError(null); documents.error = null; documents.changed(); }}>Dismiss</TxButton>}>{error ?? documents.error}</TxAlert>}
-    {problem && module && <TxAlert title={`${module.name} couldn't start`}><pre className="developer-project-output">{problem}</pre></TxAlert>}
-    {!!conflicts.length && <TxAlert title={conflictTitles.size === 1 ? [...conflictTitles][0]! : "Changed elsewhere"} actions={<TxButton onClick={() => setUtility("changes")}>Review</TxButton>}>{conflicts.map(id => documents.snapshot(id).name).join(", ")}</TxAlert>}
-    {!!documents.checkpointConflicts.length && <TxAlert title="Files saved with the workspace differ" actions={<TxButton onClick={() => setUtility("recovery")}>Compare versions</TxButton>}>Your current edits and the saved versions are both kept.</TxAlert>}
-    <TxSplit sideLabel="Project files" width={treeWidth} onWidth={setTreeWidth} min={160} max={480} mainMin={320} sideHidden={!project} side={project && <FileTree ctx={ctx} project={project} />}>
+    {(error || documents.error) && <TxAlert title={t("Developer needs attention")} actions={<TxButton size="sm" onClick={() => { setError(null); documents.error = null; documents.changed(); }}>{t("Dismiss")}</TxButton>}>{error ?? documents.error}</TxAlert>}
+    {problem && module && <TxAlert title={t("{name} couldn't start", { name: module.name })}><pre className="developer-project-output">{problem}</pre></TxAlert>}
+    {!!conflicts.length && <TxAlert title={conflictTitles.size === 1 ? [...conflictTitles][0]! : t("Changed elsewhere")} actions={<TxButton onClick={() => setUtility("changes")}>{t("Review")}</TxButton>}>{conflicts.map(id => documents.snapshot(id).name).join(", ")}</TxAlert>}
+    {!!documents.checkpointConflicts.length && <TxAlert title={t("Files saved with the workspace differ")} actions={<TxButton onClick={() => setUtility("recovery")}>{t("Compare versions")}</TxButton>}>{t("Your current edits and the saved versions are both kept.")}</TxAlert>}
+    <TxSplit sideLabel={t("Project files")} width={treeWidth} onWidth={setTreeWidth} min={160} max={480} mainMin={320} sideHidden={!project} side={project && <FileTree ctx={ctx} project={project} />}>
       <EditorPane onReviewChanges={() => setUtility("changes")} onError={setError} />
     </TxSplit>
-    <TxDialog open={!!removing} onOpenChange={open => { if (!open && !removingBusy) setRemoving(null); }} title="Remove project" footer={<><TxButton disabled={removingBusy} onClick={() => setRemoving(null)}>Cancel</TxButton><TxButton disabled={removingBusy} onClick={() => void confirmRemove("forget")}>Remove from list</TxButton><TxButton variant="primary" disabled={removingBusy || removing?.status !== "available"} onClick={() => void confirmRemove("trash")}>Move to Recycle Bin</TxButton></>}>
+    <TxDialog open={!!removing} onOpenChange={open => { if (!open && !removingBusy) setRemoving(null); }} title={t("Remove project")} footer={<><TxButton disabled={removingBusy} onClick={() => setRemoving(null)}>{t("Cancel")}</TxButton><TxButton disabled={removingBusy} onClick={() => void confirmRemove("forget")}>{t("Remove from list")}</TxButton><TxButton variant="primary" disabled={removingBusy || removing?.status !== "available"} onClick={() => void confirmRemove("trash")}>{t("Move to Recycle Bin")}</TxButton></>}>
       <p>{removing?.name}</p><p style={{ overflowWrap: "anywhere" }}>{removing?.root}</p>
-      <p>Remove from list keeps the files. Move to Recycle Bin removes the whole project folder.</p>
-      {removeError && <TxAlert title="Project was not removed">{removeError}</TxAlert>}
+      <p>{t("Remove from list keeps the files. Move to Recycle Bin removes the whole project folder.")}</p>
+      {removeError && <TxAlert title={t("Project was not removed")}>{removeError}</TxAlert>}
     </TxDialog>
     {dialog && <ProjectDialog key={dialog} ctx={ctx} mode={dialog} onClose={() => setDialog(null)} onCreated={created} />}
     <TxSheet open={!!utility} onOpenChange={open => { if (!open) setUtility(null); }} title={utility ? utilityNames[utility] : ""}>

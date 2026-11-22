@@ -1,4 +1,5 @@
 /* What the work area shows for a sweep or a walk-forward run: read from the backend while it goes, the view and the combination looked at kept here. */
+import { t } from "../../i18n";
 import {useCallback, useEffect, useRef, useState} from "react";
 import type {ModuleContext} from "@talyx/sdk";
 import {validationApi} from "./api";
@@ -23,7 +24,7 @@ export function ValidationPane({ctx, runId, state, kind, sourceNumber, onError, 
     const timer = setInterval(() => void read(), 2000);
     return () => clearInterval(timer);
   }, [runId, state]);
-  if (detail === null) return <p className="sv-why" role="status">Reading the {kind === "walk" ? "walk-forward" : "sweep"}…</p>;
+  if (detail === null) return <p className="sv-why" role="status">{(kind === "walk" ? t("Reading the walk-forward…") : t("Reading the sweep…"))}</p>;
   if (kind === "walk") return <WalkView detail={detail} sourceNumber={sourceNumber} onResume={() => void api.resume(runId).then(() => read(), onError)} />;
   return <SweepView detail={detail}
     onCell={index => void api.select(runId, index).then(setDetail, onError)}

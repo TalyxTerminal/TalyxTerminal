@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -67,10 +68,13 @@ class YahooSource(Source):
             # New York (the CSI data schedule), about four hours after the 16:00 close; asked for an hour after the
             # close, Yahoo gave unsettled bars (low above open) and no SPY bar at all. Not measured on Yahoo itself
             # (unreachable when this was set): the published schedule, taken conservatively.
-            row(SCOPE, "bars", [("1d", "1962-01-02", 100000)], live="delayed", live_limit=None, live_periods=["1d"],
+            row({"markets": ["US", "HK", "FX"]}, "bars", [("1d", "1962-01-02", 100000)], live="delayed",
+                live_periods=["1d"], publish_delay="PT4H"),
+            row({"markets": ["CN"]}, "bars", [("1d", "1990-12-19", 100000)], live="delayed", live_periods=["1d"],
                 publish_delay="PT4H"),
             row(SCOPE, "quotes", live="delayed"),
-            row({"markets": ["US", "HK", "CN"]}, "actions", [("1d", "1962-01-02", 100000)]),
+            row({"markets": ["US", "HK"]}, "actions", [("1d", "1962-01-02", 100000)]),
+            row({"markets": ["CN"]}, "actions", [("1d", "1990-12-19", 100000)]),
             row({"markets": ["US"]}, "classification"),
             row({"markets": ["US"]}, "shares", [("1d", "2015-10-01", 100000)]),
         ], concurrency=8, rpm=None)
@@ -111,17 +115,17 @@ class YahooSource(Source):
             if exc.code == "not_found" and missing_ok:
                 return None
             if exc.code == "not_found":
-                raise MarketError("not_found", f"Yahoo has no symbol {symbol}", source_id=self.id, status=404) from exc
+                raise MarketError("not_found", t("Yahoo has no symbol {symbol}", symbol=symbol), source_id=self.id, status=404) from exc
             raise
         chart = data.get("chart") or {}
         if chart.get("error"):
             if missing_ok:
                 return None
-            raise MarketError("not_found", f"Yahoo: {chart['error'].get('description') or chart['error']}",
+            raise MarketError("not_found", t("Yahoo: {description}", description=chart['error'].get('description') or chart['error']),
                               source_id=self.id)
         result = (chart.get("result") or [None])[0]
         if result is None and not missing_ok:
-            raise MarketError("not_found", f"Yahoo returned nothing for {symbol}", source_id=self.id)
+            raise MarketError("not_found", t("Yahoo returned nothing for {symbol}", symbol=symbol), source_id=self.id)
         return result
 
     async def _later_events(self, symbol: str, start: int) -> dict:
@@ -144,10 +148,10 @@ class YahooSource(Source):
         if kind == "actions":
             return await self._actions(symbol, calendar, start, end)
         if kind != "bars":
-            raise MarketError("unsupported", f"Yahoo has no {kind}", source_id=self.id)
+            raise MarketError("unsupported", t("Yahoo has no {kind}", kind=kind), source_id=self.id)
         interval = _INTERVAL.get(timeframe)
         if interval is None:
-            raise MarketError("unsupported", f"Yahoo has no {timeframe} bars", source_id=self.id)
+            raise MarketError("unsupported", t("Yahoo has no {timeframe} bars", timeframe=timeframe), source_id=self.id)
         now = now_ns()
         if timeframe == "1d":
             data = await self._chart(symbol, {"period1": max(start // NS, 0) - 86400,
@@ -273,7 +277,7 @@ class YahooSource(Source):
             return rows
         if kind == "shares":
             return await self.shares(code, market, 0, now_ns())
-        raise MarketError("unsupported", f"{source_id} has no {kind}", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no {kind}", source_id=source_id, kind=kind), source_id=source_id)
 
     # ── live (polled) and quotes ────────────────────────────────────────────
 
@@ -370,8 +374,7 @@ def _on_slots(times: np.ndarray, values: dict, calendar: str, timeframe: str) ->
     latest[-1] = times[-1] < close[-1]
     off = ~found | ~((key == times) | auction | latest)
     if off.any():
-        raise MarketError("unsupported", f"Yahoo's {timeframe} bar at {iso_of_ns(int(times[off][0]))} is off the "
-                          f"{calendars.canonical(calendar)} bar times", source_id="yfinance")
+        raise MarketError("unsupported", t("Yahoo's {timeframe} bar at {times} is off the {calendar} bar times", timeframe=timeframe, times=iso_of_ns(int(times[off][0])), calendar=calendars.canonical(calendar)), source_id="yfinance")
     return bars.group({"time": times, "close_time": close, **values}, key, close)
 
 

@@ -12,6 +12,9 @@ first sees it and moves back to the earliest bar a source returns (codes are reu
 from __future__ import annotations
 
 import io
+from datetime import datetime
+
+from talyx_sdk.i18n import t
 
 from ..common import MarketError
 from ..routing import in_worker
@@ -28,17 +31,20 @@ _SUB = {"Depositary Receipts": ("equity", "depositary_receipt"), "Investment Com
 _CURRENCY = {"RMB": "CNY"}
 
 
-def parse(body: bytes) -> list[dict]:
+def parse(body: bytes) -> tuple[list[dict], dict]:
     import openpyxl
 
     try:
         book = openpyxl.load_workbook(io.BytesIO(body), read_only=True, data_only=True)
     except Exception as exc:  # noqa: BLE001 - any unreadable workbook is the source's problem
-        raise MarketError("source_unavailable", f"HKEX list is unreadable: {exc}", source_id="hkex") from exc
+        raise MarketError("source_unavailable", t("HKEX list is unreadable: {exc}", exc=exc), source_id="hkex") from exc
     sheet = book.active
     sheet.reset_dimensions()  # the file declares a smaller range than it holds
-    candidates = []
-    for values in sheet.iter_rows(values_only=True):
+    candidates, lots = [], {}
+    rows = sheet.iter_rows(values_only=True)
+    next(rows)
+    updated = datetime.strptime(next(rows)[0].split()[-1], "%d/%m/%Y").date().isoformat()
+    for values in rows:
         code, name, category, sub = (values + (None,) * 4)[:4]
         if not code or not str(code).strip().isdigit() or category not in _KEEP:
             continue
@@ -49,8 +55,11 @@ def parse(body: bytes) -> list[dict]:
             "name": str(name).strip() if name else None, "assetClass": asset, "securityType": security,
             "currency": _CURRENCY.get(str(currency).strip(), str(currency).strip()), "mic": "XHKG",
             "calendarId": "XHKG"})
+        if values[4]:
+            lots[candidates[-1]["code"]] = {"size": int(str(values[4]).replace(",", "")),
+                                            "stampDuty": values[7] == "Y"}
     book.close()
-    return candidates
+    return candidates, {"date": updated, "listings": lots}
 
 
 class HkexListings(Source):
@@ -63,4 +72,6 @@ class HkexListings(Source):
 
     async def catalog(self, source_id: str, scope: dict, environment: str, cursor: str | None):
         body = await self.egress.bytes(self.id, URL, timeout=90)
-        return await in_worker(parse, body), None
+        listings, lots = await in_worker(parse, body)
+        await in_worker(self.market.terms.board_lots.write, "HK", lots)
+        return listings, None

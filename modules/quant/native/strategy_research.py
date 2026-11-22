@@ -20,12 +20,9 @@ def read_inputs(invocation, config):
     known = {item["id"] for item in config.get("instruments", [])}
     if set(frame.instrument) - known:
         raise ValueError("Input contains instruments without exact native terms.")
-    frame = frame.copy()
-    for key in ("ts_event", "ts_init"):
-        if key not in frame:
-            frame[key] = frame.ts_event
-        frame[key] = frame[key].map(lambda value: str(int(str(value))))
-    return frame.sort_values("ts_init", key=lambda values: values.map(int), kind="stable")
+    if "ts_init" not in frame:
+        frame["ts_init"] = frame["ts_event"]
+    return frame.sort_values("ts_init", kind="stable", ignore_index=True)
 
 
 def instruments(config):
@@ -45,7 +42,7 @@ def instruments(config):
         currency = Currency.from_str(item["currency"])
         common = dict(instrument_id=iid, raw_symbol=Symbol(item.get("symbol", iid.symbol.value)), price_precision=int(item["pricePrecision"]), price_increment=Price.from_str(item["priceIncrement"]), ts_event=0, ts_init=0)
         if "takerFee" in item:
-            common["info"] = {"taker_fee": item["takerFee"]}
+            common["info"] = {"taker_fee": item["takerFee"], **({"maker_fee": item["makerFee"]} if "makerFee" in item else {})}
         if item["type"] == "equity":
             if 'stock' in item:
                 from native.stock_execution import instrument_info
@@ -65,29 +62,36 @@ def instruments(config):
     return output
 
 
+def fixed_text(values, precision, instrument, key):
+    """Decimal texts at the instrument's native precision ("1.5" at 2 is "1.50"), cast in Arrow: a value with more places than the
+    precision is refused (Arrow will not drop digits), never rounded."""
+    import pyarrow as pa
+    try:
+        return pa.array(values, type=pa.string()).cast(pa.decimal128(38, precision)).cast(pa.string()).to_pylist()
+    except pa.ArrowInvalid as error:
+        raise ValueError(f"{instrument} observation exceeds native {key}.") from error
+
+
 def event_data(config, frame):
+    """The bars as engine data, one instrument and bar type at a time over column arrays (a dict and five Decimals a row took 1.4 GiB and
+    28 s for 1.37 million bars). Equal times keep the input's order."""
     from nautilus_trader.model import (
         Bar,
         BarType,
         Price,
         Quantity,
     )
-    result = []
+    if (frame["ts_init"] < frame["ts_event"]).any():
+        raise ValueError("Received time cannot precede the source event.")
     terms = {item["id"]: item for item in config["instruments"]}
-    for row in frame.to_dict("records"):
-        event, received = int(row["ts_event"]), int(row["ts_init"])
-        if received < event:
-            raise ValueError("Received time cannot precede the source event.")
-        def amount(value, key, constructor):
-            precision = int(terms[row["instrument"]].get(key, 0))
-            number = Decimal(str(value))
-            quantized = number.quantize(Decimal(1).scaleb(-precision))
-            if not number.is_finite() or number != quantized:
-                raise ValueError(f"{row['instrument']} observation exceeds native {key}.")
-            return constructor.from_str(f"{quantized:.{precision}f}")
-        price = lambda value: amount(value, "pricePrecision", Price)
-        size = lambda value: amount(value, "sizePrecision", Quantity)
-        result.append(Bar(BarType.from_str(row["barType"]), *[price(row[key]) for key in ("open", "high", "low", "close")], size(row["volume"]), event, received))
+    result = [None] * len(frame)
+    for (instrument, bar_type), positions in frame.groupby(["instrument", "barType"], sort=False).indices.items():
+        group = frame.iloc[positions]
+        kind, item = BarType.from_str(bar_type), terms[instrument]
+        prices = [fixed_text(group[key], int(item.get("pricePrecision", 0)), instrument, "pricePrecision") for key in ("open", "high", "low", "close")]
+        volumes = fixed_text(group["volume"], int(item.get("sizePrecision", 0)), instrument, "sizePrecision")
+        for at, o, h, low, c, v, event, received in zip(positions.tolist(), *prices, volumes, group["ts_event"].tolist(), group["ts_init"].tolist(), strict=True):
+            result[at] = Bar(kind, Price.from_str(o), Price.from_str(h), Price.from_str(low), Price.from_str(c), Quantity.from_str(v), event, received)
     if config.get('referencePrices'):
         if config['dataType'] != 'bars':
             raise ValueError('Reference OHLC requires executable LAST bars.')
@@ -101,6 +105,20 @@ def stock_metadata(config):
     if stock_materials and not any('executionRaw' in item and item['executionRaw'] for item in config['instruments']):
         config['priceBasis'] = 'split_dividend'
         config['dataMeaning'] = 'Split-and-dividend adjusted research prices; simulated shares, cash and fees use adjusted notional. ' + ' '.join(dict.fromkeys(note for item in stock_materials for note in item['limitations']))
+
+
+def instrument_fees():
+    from nautilus_trader.execution import FeeModel
+    from nautilus_trader.model import LiquiditySide, Money
+
+    class InstrumentFees(FeeModel):
+        """Each instrument's own maker/taker rate (its `info`) on the fill's notional: one venue's symbols may be charged differently."""
+
+        def get_commission(self, order, fill_quantity, fill_px, instrument):
+            notional = instrument.notional_value(fill_quantity, fill_px)
+            rate = instrument.info["maker_fee" if order.liquidity_side == LiquiditySide.MAKER else "taker_fee"]
+            return Money(notional.as_decimal() * Decimal(rate), notional.currency)
+    return InstrumentFees
 
 
 def make_engine(config, *, cache_database_factory=None, trader_id=None, simulation=None):
@@ -126,12 +144,14 @@ def make_engine(config, *, cache_database_factory=None, trader_id=None, simulati
                            portfolio=PortfolioConfig(snapshot_interval_ms=config.get("equitySamplingMs")),
                            data_engine=DataEngineConfig(), risk_engine=RiskEngineConfig(**config.get("riskEngine", {})), **({"trader_id": trader_id} if trader_id is not None else {}))
     engine = BacktestEngine(native_config, cache_database_factory=cache_database_factory) if cache_database_factory is not None else BacktestEngine(native_config)
+    InstrumentFees = instrument_fees()
     for venue in config["venues"]:
         fee = venue.get("fees", {})
         # Venue registration requires a model before instruments exist. The
         # native instrument condition model replaces this registration model;
         # malformed conditions reject orders instead of falling through to it.
-        fee_model = MakerTakerFeeModel(Decimal(str(fee.get("maker", 0))), Decimal(str(fee.get("taker", 0)))) if fee.get("type") == "maker_taker" else FixedFeeModel(Money.from_str(fee.get("amount", "0 USD")))
+        fee_model = InstrumentFees() if fee.get("type") == "per_instrument" else \
+            MakerTakerFeeModel(Decimal(str(fee.get("maker", 0))), Decimal(str(fee.get("taker", 0)))) if fee.get("type") == "maker_taker" else FixedFeeModel(Money.from_str(fee.get("amount", "0 USD")))
         latency = dict(venue.get("latency", {}))
         extras = (simulation or {}).get(venue["name"], {})
         if extras.get("latency"):
@@ -145,19 +165,46 @@ def make_engine(config, *, cache_database_factory=None, trader_id=None, simulati
     return engine
 
 
+class Sessions:
+    """One stock's daily sessions in time order, kept as Arrow columns: the venue reads a few weeks at a time, and a session becomes the dict
+    `stock_execution.conditions` reads only when it is asked for. Slices share the columns."""
+
+    def __init__(self, table):
+        self.table = table
+        self.open_at = table.column("openAt").to_numpy()
+        self.close_at = table.column("closeAt").to_numpy()
+
+    def __len__(self):
+        return self.table.num_rows
+
+    def __iter__(self):
+        for row in self.table.to_pylist():
+            yield {"sessionDate": row["sessionDate"], "openAt": row["openAt"], "closeAt": row["closeAt"], "lower": row["lower"], "upper": row["upper"],
+                   "priceIncrement": row["priceIncrement"], "priceMap": {"scale": row["priceScale"], "offset": row["priceOffset"], "maxError": row["priceMaxError"]}}
+
+    def between(self, first, last):
+        """The sessions that close at or after `first` and open at or before `last` (milliseconds)."""
+        import numpy as np
+        start = int(np.searchsorted(self.close_at, first, "left"))
+        stop = max(start, int(np.searchsorted(self.open_at, last, "right")))
+        return Sessions(self.table.slice(start, stop - start))
+
+
 def stock_sessions(invocation, config):
-    """Stock sessions travel in their own file (one row per stock, its sessions as JSON text); the invocation stays small."""
+    """Stock sessions travel in their own file (one row a session, `backend/object_data.session_table`); the invocation stays small."""
     path = invocation.get("stockSessions")
     if not path:
         return
-    import json as _json
-
-    import pandas as pd
-    table = pd.read_parquet(path)
-    by = dict(zip(table["instrument"], table["sessions"], strict=True))
+    import numpy as np
+    import pyarrow.parquet as pq
+    table = pq.read_table(path).sort_by([("instrument", "ascending"), ("closeAt", "ascending")])
+    names = table.column("instrument").to_numpy(zero_copy_only=False)
+    starts = np.flatnonzero(np.r_[True, names[1:] != names[:-1]])
+    spans = {names[start]: (int(start), int(stop)) for start, stop in zip(starts, [*starts[1:], len(names)], strict=True)}
     for item in config["instruments"]:
         if item.get("type") == "equity" and "stock" in item and "sessions" not in item["stock"]:
-            item["stock"]["sessions"] = _json.loads(by.get(item["id"], "[]"))
+            start, stop = spans.get(item["id"], (0, 0))
+            item["stock"]["sessions"] = Sessions(table.slice(start, stop - start))
 
 
 def sessions_kept(config):
@@ -178,10 +225,9 @@ def windowed(item, at_ms):
     session: the venue refuses a stock whose stretch is empty, for the rest of the run. One with no session in the run (listed after the
     stretch the run covers) has no bar to trade on and keeps its empty stretch."""
     sessions = item["stock"]["sessions"]
-    if sessions:
-        at_ms = min(max(at_ms, sessions[0]["openAt"]), sessions[-1]["closeAt"])
-    rows = [row for row in sessions if row["closeAt"] >= at_ms - WINDOW_BEHIND_MS and row["openAt"] <= at_ms + WINDOW_AHEAD_MS]
-    return {**item, "stock": {**item["stock"], "sessions": rows}}
+    if len(sessions):
+        at_ms = min(max(at_ms, int(sessions.open_at[0])), int(sessions.close_at[-1]))
+    return {**item, "stock": {**item["stock"], "sessions": sessions.between(at_ms - WINDOW_BEHIND_MS, at_ms + WINDOW_AHEAD_MS)}}
 
 
 def session_windows(engine, config, strategy_box):
@@ -233,11 +279,11 @@ def run_sessions(config, frame):
     order, so the rest of the history would only be carried and parsed."""
     if not len(frame):
         return
-    times = frame["ts_event"].map(int)
+    times = frame["ts_event"]
     first, last = int(times.min()) // 1_000_000, int(times.max()) // 1_000_000 + 7 * 86_400_000
     for item in config["instruments"]:
         if item.get("type") == "equity" and "stock" in item:
-            item["stock"]["sessions"] = [row for row in item["stock"]["sessions"] if first <= row["closeAt"] and row["openAt"] <= last]
+            item["stock"]["sessions"] = item["stock"]["sessions"].between(first, last)
 
 
 def simulation_for(invocation, config, frame, strategy_box):
@@ -245,7 +291,7 @@ def simulation_for(invocation, config, frame, strategy_box):
     from native.strategy_costs import Ledger, Prices, fill_model, funding_rates, simulation_module
     settings = invocation.get("runSettings") or {}
     costs, fill = settings.get("costs") or {}, settings.get("fill", "nextOpen")
-    opens = {item["id"]: {row["closeAt"] * 1_000_000: row["openAt"] * 1_000_000 for row in item["stock"]["sessions"]}
+    opens = {item["id"]: dict(zip((item["stock"]["sessions"].close_at * 1_000_000).tolist(), (item["stock"]["sessions"].open_at * 1_000_000).tolist(), strict=True))
              for item in config["instruments"] if item.get("type") == "equity" and "stock" in item}
     prices = Prices(frame, invocation.get("annualization"), opens)
     ledger = Ledger()
@@ -285,6 +331,9 @@ def simulation_for(invocation, config, frame, strategy_box):
     return simulation, ledger, prices
 
 
+STREAM_NS = 365 * 86_400 * 10 ** 9
+
+
 class RunStopped(Exception):
     """The Host asked this run to stop (it wrote `stop.request` in the output folder): what has run so far is kept."""
 
@@ -298,7 +347,7 @@ def progress_actor(engine, output, frame, strategy_box):
 
     from nautilus_trader.common import DataActor, DataActorConfig
     from nautilus_trader.model import ActorId
-    times = frame["ts_event"].map(int)
+    times = frame["ts_event"]
     start, end = int(times.min()), int(times.max())
     step = max((end - start) // 50, 1)
     path = Path(output) / "progress.json"
@@ -429,10 +478,10 @@ def sliced(frame, invocation):
     window = invocation.get("window")
     if not window:
         return frame
-    times = frame["ts_event"].map(int) // 1_000_000
+    times = frame["ts_event"] // 1_000_000
     kept = frame[(times >= window["from"]) & (times <= window["to"])]
     if len(kept) and invocation["backtest"].get("tradeFrom") is not None:
-        first = int(kept["ts_event"].map(int).min()) // 1_000_000
+        first = int(kept["ts_event"].min()) // 1_000_000
         if first > window["from"] + 5 * 86_400_000 and window.get("warmUpMonths"):
             import datetime
             invocation["warmUpNote"] = (f"warm-up from {datetime.datetime.fromtimestamp(first / 1000, datetime.UTC).date().isoformat()}, "
@@ -469,7 +518,7 @@ def run_one(invocation, publisher, config, title):
 
     def mark(name):
         now = time.perf_counter()
-        marks[name] = round(now - marks["last"], 3) if "last" in marks else round(now - marks["start"], 3)
+        marks[name] = round(marks.get(name, 0) + now - marks["last"], 3)
         marks["last"] = now
     marks["last"] = marks["start"]
     from native.python_projects import NativeCollector
@@ -491,10 +540,10 @@ def run_one(invocation, publisher, config, title):
     effective_config = lean(config)
     config = copy.deepcopy(config, sessions_kept(config))
     if len(frame):
-        config["sessionWindowFrom"] = int(frame["ts_event"].map(int).min()) // 1_000_000
+        config["sessionWindowFrom"] = int(frame["ts_event"].min()) // 1_000_000
     # Bound native fine-grained samples well below the million-entry ring even
     # across data gaps. Daily and final snapshots remain native defaults.
-    times = frame["ts_init"].map(int)
+    times = frame["ts_init"]
     config["equitySamplingMs"] = max(1000, math.ceil((int(times.max()) - int(times.min())) / 10_000 / 1_000_000)) if len(times) else None
     strategy_box = [None]
     light = invocation.get("report") == "light"
@@ -517,13 +566,26 @@ def run_one(invocation, publisher, config, title):
         progress = progress_actor(engine, publisher.root, frame, strategy_box)
         session_windows(engine, config, strategy_box)
         mark("build")
-        engine.add_data(event_data(config, frame))
         from native.library_data import events as library_events
-        if library := library_events(invocation):
-            engine.add_data(library)
-        mark("bars")
-        engine.run()
-        mark("engine")
+        from native.library_data import values as library_values
+        library = library_values(invocation)
+        # A year of simulated time at a time: the engine keeps what it is given, and ten years of 559 names' bars and library values took
+        # 2 GB in it; it carries its state from one part to the next (Nautilus streaming), so the result is the same as in one go.
+        times = frame["ts_init"].to_numpy()
+        for start in range(int(times.min()), int(times.max()) + 1, STREAM_NS) if len(times) else ():
+            part = frame[(times >= start) & (times < start + STREAM_NS)]
+            engine.add_data(event_data(config, part))
+            if library is not None:
+                found = library[(library["ts_init"] >= start) & (library["ts_init"] < start + STREAM_NS)]
+                if len(found):
+                    engine.add_data(library_events(invocation, found))
+            mark("bars")
+            engine.run(streaming=True)
+            engine.clear_data()
+            mark("engine")
+            if progress.stopped or (strategy and strategy.failure is not None):
+                break
+        engine.end()
         callbacks.check()
         if progress.stopped:
             raise RunStopped("Stopped by the user")

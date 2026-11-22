@@ -2,11 +2,11 @@
 
 Every call is one HTTP POST to ``api.tushare.pro`` naming the API, the user's token and
 parameters; answers are ``{code, msg, data: {fields, items}}``. The free tier (120
-points) has unadjusted daily bars (``daily``) at 50 requests a minute and 8,000 a day;
+points) defaults to 50 requests a minute for unadjusted daily bars (``daily``);
 ``daily`` by ``trade_date`` gives every stock that traded that day. Volume is in lots of
 100 shares and amount in thousands of yuan; Market stores shares. A token without the
 points an API needs answers code 40203 with the reason in words: the source is then
-set aside in the ranking (``forbidden``) until its settings change. Adjustment factors
+set aside for that data kind until its settings change or it reconnects. Adjustment factors
 (``adj_factor``) and the list with delisted stocks need 2,000 points and are not used.
 """
 
@@ -14,12 +14,16 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
 import numpy as np
+from talyx_sdk.i18n import mark, t
 
 from .. import bars, calendars
 from ..common import DAY_NS, NS, MarketError, now_ns
-from .base import History, Source, coverage, empty_history, row
+from .baostock import day_ns
+from .base import RPM_SETTING, History, MeteredSource, coverage, empty_history, row
+from .indices import CN_INDICES
 
 URL = "https://api.tushare.pro"
 CALENDAR = "XSHG"
@@ -27,38 +31,92 @@ SCOPE = {"markets": ["CN"], "assetClasses": ["equity"]}
 _SPAN_DAYS = 365 * 20  # 6,000 rows a request at most; twenty years of trading days stay below it
 
 
-class TushareSource(Source):
+class TushareSource(MeteredSource):
+    default_rpm = 50
     id = "tushare"
-    descriptor = {"name": "Tushare Pro", "sourceIds": ["tushare"], "kinds": ["bars"],
-                  "assetClasses": ["equity"], "credentials": "required", "paid": True,
-                  "supports": ["history", "bulk"],
-                  "settings": [{"name": "token", "label": "Tushare token", "type": "string", "secret": True,
+    descriptor = {"name": "Tushare Pro", "sourceIds": ["tushare"], "kinds": ["bars", "weights", "shares"],
+                  "assetClasses": ["equity", "index"], "credentials": "required", "paid": True,
+                  "supports": ["history", "bulk", "research"],
+                  "settings": [RPM_SETTING, {"name": "token", "label": mark("Tushare token"), "type": "string", "secret": True,
                                 "required": True}]}
     secret_settings = ("token",)
 
     async def describe(self, source_id: str) -> dict:
-        return coverage([row(SCOPE, "bars", [("1d", "1990-12-19", 6000)], delisted=True)],
-                        concurrency=2, rpm=50, per_day=8000, plan="free (120 points): unadjusted daily bars")
-
-    async def configure(self, source_id: str, values: dict) -> dict:
-        result = await super().configure(source_id, values)
-        entry = self.market.registry.entries.get(source_id)
-        if entry is not None and "token" in values:
-            entry.rejected = None  # a new token is tried again
-        return result
+        return coverage([row(SCOPE, "bars", [("1d", "1990-12-19", 6000)], delisted=True),
+                         row(SCOPE, "shares", [("1d", "1990-12-19", 6000)], point_in_time=True),
+                         row({"markets": ["CN"], "assetClasses": ["index"]}, "weights", point_in_time=True)],
+                        concurrency=2, rpm=self.rpm, plan="Tushare Pro")
 
     async def _call(self, api: str, params: dict, fields: str = "") -> tuple[list[str], list[list]]:
         token = await self.secret(self.id, "token")
         if not token:
-            raise MarketError("unauthorized", "Tushare needs a token in its settings", source_id=self.id)
-        data = await self.egress.json(self.id, URL, method="POST",
+            raise MarketError("unauthorized", t("Tushare needs a token in its settings"), source_id=self.id)
+        data = await self.request(self.egress.json, URL, method="POST",
                                       json_body={"api_name": api, "token": token, "params": params, "fields": fields},
                                       timeout=60)
         code = data.get("code")
         if code not in (0, "0"):
-            raise _error(code, str(data.get("msg") or ""))
+            error = _error(code, str(data.get("msg") or ""))
+            if error.code == "forbidden":
+                error.details["dataKind"] = {"daily": "bars", "index_weight": "weights", "daily_basic": "shares"}[api]
+            raise error
         body = data.get("data") or {}
         return list(body.get("fields") or []), list(body.get("items") or [])
+
+    def research_parts(self, source_id, target, kind, start, end):
+        if kind not in ("weights", "shares"):
+            return None
+        if kind == "weights" and target.code_at() not in CN_INDICES:
+            raise MarketError("unsupported", t("No index weights for {symbol}", symbol=target.code_at()))
+        today = date.fromisoformat(_day(now_ns()))
+        last = min(date.fromisoformat(_day((end or now_ns()) - 1)), today)
+        first = date.fromisoformat(_day(start if start is not None else
+                                       int(target.instrument.get("listedFrom") or now_ns())))
+        first = min(first, last) if start is None else first
+        begin = first.replace(day=1, month=first.month if kind == "weights" else 1)
+        parts = []
+        while begin <= last:
+            following = ((begin + timedelta(days=32)).replace(day=1) if kind == "weights"
+                         else begin.replace(year=begin.year + 1))
+            stop = min(following - timedelta(days=1), today)
+            parts.append(f"{begin:%Y%m%d}:{stop:%Y%m%d}")
+            begin = following
+        return parts
+
+    async def research_part(self, source_id, target, kind, part):
+        start, end = part.split(":")
+        if kind == "shares":
+            fields, items = await self._call("daily_basic", {"ts_code": target.code_at(), "start_date": start,
+                                                            "end_date": end}, "trade_date,total_share,float_share")
+            rows = []
+            for values in items:
+                item = dict(zip(fields, values, strict=True))
+                day = day_ns(date.fromisoformat(item["trade_date"]).isoformat())
+                for field, label in (("total_share", "outstanding"), ("float_share", "float")):
+                    if item[field] is not None:
+                        rows.append({"date": str(day), "knownAt": str(day + 17 * 3600 * NS), "kind": label,
+                                     "shares": str(int(Decimal(str(item[field])) * 10000))})
+            return rows
+        # A month starts with the last published weights of the preceding month.
+        begin = date.fromisoformat(start)
+        previous = (begin - timedelta(days=1)).replace(day=1)
+        fields, items = await self._call("index_weight", {"index_code": CN_INDICES[target.code_at()][1],
+                                        "start_date": previous.strftime("%Y%m%d"), "end_date": end})
+        snapshots = {}
+        for values in items:
+            item = dict(zip(fields, values, strict=True))
+            snapshots.setdefault(item["trade_date"], []).append(item)
+        rows = []
+        days = sorted(snapshots)
+        for i, day in enumerate(days):
+            until = date.fromisoformat(days[i + 1]) if i + 1 < len(days) else date.fromisoformat(end) + timedelta(days=1)
+            if until <= begin:
+                continue
+            known = day_ns(date.fromisoformat(day).isoformat())
+            effective = max(known, day_ns(begin.isoformat()))
+            rows.extend({"code": item["con_code"], "weight": item["weight"], "from": str(effective),
+                         "until": str(day_ns(until.isoformat())), "knownAt": str(known)} for item in snapshots[day])
+        return rows
 
     # ── one instrument ──────────────────────────────────────────────────────
 
@@ -66,7 +124,7 @@ class TushareSource(Source):
                       start: int, end: int,
                       archive: tuple[str, int] | None = None) -> History:
         if kind != "bars" or timeframe != "1d":
-            raise MarketError("unsupported", f"Tushare gives daily bars only (asked {kind} {timeframe})",
+            raise MarketError("unsupported", t("Tushare gives daily bars only (asked {kind} {timeframe})", kind=kind, timeframe=timeframe),
                               source_id=self.id)
         stop = min(end, now_ns())
         if stop <= start:
@@ -86,7 +144,7 @@ class TushareSource(Source):
                    start: int, end: int) -> History:
         """One trading day of every A share (``codes`` empty) or of the listed codes: columns carry ``code``."""
         if kind != "bars" or timeframe != "1d":
-            raise MarketError("unsupported", "Tushare's whole-market answer is daily bars", source_id=self.id)
+            raise MarketError("unsupported", t("Tushare's whole-market answer is daily bars"), source_id=self.id)
         fields, items = await self._call("daily", {"trade_date": _day(start)})
         wanted = set(codes)
         if wanted:

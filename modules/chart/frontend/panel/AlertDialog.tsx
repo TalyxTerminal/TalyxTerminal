@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* Create or edit an alert (TradingView's alert dialog): Condition (the symbol's price, an indicator output on the
    chart, or a drawing; against a value or another source), Trigger, Expiration, Message and Notifications. A watchlist
    can stand in for the symbol: one alert watches every member. Delivery is the platform's notifications. */
@@ -11,8 +12,8 @@ import type { AlertSpec, Frequency } from "../wire";
 import { ConditionFields, OPS, indicatorSources, type Sources } from "./conditions";
 
 const FREQUENCIES: { value: Frequency; label: string }[] = [
-  { value: "once", label: "Only once" }, { value: "once_per_bar", label: "Once per bar" },
-  { value: "once_per_bar_close", label: "Once per bar close" }, { value: "once_per_minute", label: "Once per minute" },
+  { value: "once", label: t("Only once") }, { value: "once_per_bar", label: t("Once per bar") },
+  { value: "once_per_bar_close", label: t("Once per bar close") }, { value: "once_per_minute", label: t("Once per minute") },
 ];
 
 /** Drawings an alert can watch: lines and channels. */
@@ -58,37 +59,37 @@ export function AlertDialog({ ctx, panelId, chartId, alertId, price, drawingId }
   };
   const watchlistId = spec.target.kind === "watchlist" ? spec.target.watchlistId : "";
   const wall = (ms: number) => new Date(ms - new Date(ms).getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-  return <TxDialog open onOpenChange={open => { if (!open) close(); }} title={existing ? `Edit alert on ${symbol}` : `Create alert on ${symbol}`}
-    footer={<><span className="chart-alert-error" role={error ? "alert" : undefined}>{error}</span><TxButton size="sm" onClick={close}>Cancel</TxButton>
-      <TxButton size="sm" variant="primary" loading={busy} onClick={save}>{existing ? "Save" : "Create"}</TxButton></>}>
+  return <TxDialog open onOpenChange={open => { if (!open) close(); }} title={existing ? t("Edit alert on {symbol}", { symbol }) : t("Create alert on {symbol}", { symbol })}
+    footer={<><span className="chart-alert-error" role={error ? "alert" : undefined}>{error}</span><TxButton size="sm" onClick={close}>{t("Cancel")}</TxButton>
+      <TxButton size="sm" variant="primary" loading={busy} onClick={save}>{existing ? t("Save") : t("Create")}</TxButton></>}>
     <div className="chart-form chart-settings-form">
-      {Object.keys(watchlists).length > 0 && <TxField label="Symbols" layout="inline">
-        <TxSelect aria-label="Symbols" value={watchlistId} onChange={event => setSpec({ ...spec, target: event.target.value
+      {Object.keys(watchlists).length > 0 && <TxField label={t("Symbols")} layout="inline">
+        <TxSelect aria-label={t("Symbols")} value={watchlistId} onChange={event => setSpec({ ...spec, target: event.target.value
           ? { kind: "watchlist", watchlistId: event.target.value, timeframe: chart.document.series.timeframe! }
           : { kind: "series", instrument: chart.document.instrument, series: chart.document.series, chartId } })}>
           <option value="">{symbol}</option>
-          {Object.values(watchlists).map(list => <option key={list.id} value={list.id}>Watchlist: {list.name}</option>)}
+          {Object.values(watchlists).map(list => <option key={list.id} value={list.id}>{t("Watchlist: {name}", { name: list.name })}</option>)}
         </TxSelect>
       </TxField>}
-      <TxField label="Condition" layout="inline">
+      <TxField label={t("Condition")} layout="inline">
         <ConditionFields condition={condition} sources={sources} last={last} onChange={next => setSpec({ ...spec, conditions: [next] })} />
       </TxField>
-      <TxField label="Interval" layout="inline"><span className="chart-muted">Same as chart ({timeframe})</span></TxField>
-      <TxField label="Trigger" layout="inline">
-        <TxSelect aria-label="Trigger" value={spec.frequency} onChange={event => setSpec({ ...spec, frequency: event.target.value as Frequency })}>
+      <TxField label={t("Interval")} layout="inline"><span className="chart-muted">{t("Same as chart ({timeframe})", { timeframe })}</span></TxField>
+      <TxField label={t("Trigger")} layout="inline">
+        <TxSelect aria-label={t("Trigger")} value={spec.frequency} onChange={event => setSpec({ ...spec, frequency: event.target.value as Frequency })}>
           {FREQUENCIES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
         </TxSelect>
       </TxField>
-      <TxField label="Expiration" layout="inline"><div className="chart-style-row">
-        <TxCheckbox label="Open-ended" checked={!spec.expiresAt} onCheckedChange={open => setSpec({ ...spec, expiresAt: open ? null : Date.now() + 30 * 86_400_000 })} />
-        {spec.expiresAt && <TxInput type="datetime-local" aria-label="Expires" value={wall(spec.expiresAt)} onChange={event => { if (event.target.value) setSpec({ ...spec, expiresAt: new Date(event.target.value).getTime() }); }} />}
+      <TxField label={t("Expiration")} layout="inline"><div className="chart-style-row">
+        <TxCheckbox label={t("Open-ended")} checked={!spec.expiresAt} onCheckedChange={open => setSpec({ ...spec, expiresAt: open ? null : Date.now() + 30 * 86_400_000 })} />
+        {spec.expiresAt && <TxInput type="datetime-local" aria-label={t("Expires")} value={wall(spec.expiresAt)} onChange={event => { if (event.target.value) setSpec({ ...spec, expiresAt: new Date(event.target.value).getTime() }); }} />}
       </div></TxField>
-      <TxField label="Alert name" layout="inline"><TxInput value={spec.name ?? ""} placeholder={autoMessage} onChange={event => setSpec({ ...spec, name: event.target.value || null })} /></TxField>
-      <TxField label="Message" layout="inline"><TxTextarea rows={3} value={spec.message} placeholder={autoMessage} onChange={event => setSpec({ ...spec, message: event.target.value })} /></TxField>
-      <TxField label="Notifications" layout="inline"><div className="chart-style-row">
-        <TxCheckbox label="Show popup" checked={spec.channels.toast} onCheckedChange={toast => setSpec({ ...spec, channels: { ...spec.channels, toast } })} />
-        <TxCheckbox label="Play sound" checked={spec.channels.sound} onCheckedChange={sound => setSpec({ ...spec, channels: { ...spec.channels, sound } })} />
-        <TxCheckbox label="Send to phone" checked={spec.channels.mobile} onCheckedChange={mobile => setSpec({ ...spec, channels: { ...spec.channels, mobile } })} />
+      <TxField label={t("Alert name")} layout="inline"><TxInput value={spec.name ?? ""} placeholder={autoMessage} onChange={event => setSpec({ ...spec, name: event.target.value || null })} /></TxField>
+      <TxField label={t("Message")} layout="inline"><TxTextarea rows={3} value={spec.message} placeholder={autoMessage} onChange={event => setSpec({ ...spec, message: event.target.value })} /></TxField>
+      <TxField label={t("Notifications")} layout="inline"><div className="chart-style-row">
+        <TxCheckbox label={t("Show popup")} checked={spec.channels.toast} onCheckedChange={toast => setSpec({ ...spec, channels: { ...spec.channels, toast } })} />
+        <TxCheckbox label={t("Play sound")} checked={spec.channels.sound} onCheckedChange={sound => setSpec({ ...spec, channels: { ...spec.channels, sound } })} />
+        <TxCheckbox label={t("Send to phone")} checked={spec.channels.mobile} onCheckedChange={mobile => setSpec({ ...spec, channels: { ...spec.channels, mobile } })} />
       </div></TxField>
     </div>
   </TxDialog>;

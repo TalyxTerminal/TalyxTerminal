@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JsonValue } from "@talyx/sdk-ui";
 import { platformRuntime } from "../kernel/runtime";
@@ -29,10 +30,10 @@ async function openingState(workspaceId: string): Promise<WorkspaceState> {
   if (keptState) return { ...keptState, dockLayout: hydrateDockLayout(keptState.dockLayout, keptState.panels) };
   const opened = await platformRuntime().platform["workspace.list_open"]({});
   const record = opened.find(item => item.workspaceId === workspaceId);
-  if (!record) throw new Error("This workspace is closed.");
+  if (!record) throw new Error(t("This workspace is closed."));
   const kept = record.presentation as WorkspaceState | null | undefined;
   if (kept) return { ...kept, workspaceId, dockLayout: hydrateDockLayout(kept.dockLayout, kept.panels) };
-  const blank: WorkspaceState = { workspaceId, snapshotId: null, snapshotRevision: null, name: record.name ?? "Untitled", panels: [], activePanelId: null,
+  const blank: WorkspaceState = { workspaceId, snapshotId: null, snapshotRevision: null, name: record.name ?? t("Untitled"), panels: [], activePanelId: null,
     dockLayout: null, changes: 0, savedChanges: 0 };
   if (!record.snapshotId) return blank;
   const saved = await loadSaved(record.snapshotId);
@@ -73,7 +74,7 @@ export function useWorkspaceFrameState(workspaceId: string, say: (title: string,
       kernel.workspace.bind({ workspaceId, snapshotId: next.snapshotId });
       await platformRuntime().ready();
       if (!disposed) await workspaceWindowCommand({ kind: "ready", id: workspaceId });
-    }).catch(reason => say(`Workspace not opened: ${detail(reason)}`, true));
+    }).catch(reason => say(t("Workspace not opened: {reason}", { reason: detail(reason) }), true));
     return () => { disposed = true; };
   }, [workspaceId, kernel, say]);
 
@@ -117,7 +118,7 @@ export function useWorkspaceFrameState(workspaceId: string, say: (title: string,
         try { await send(); failed = null; } catch (reason) { failed = reason; }
       }
       sync.busy = false;
-      if (failed !== null && !reloading.forHost) say(`Workspace update failed: ${detail(failed)}`, true);
+      if (failed !== null && !reloading.forHost) say(t("Workspace update failed: {reason}", { reason: detail(failed) }), true);
     })();
   }, [workspaceId, say, workspace]);
 

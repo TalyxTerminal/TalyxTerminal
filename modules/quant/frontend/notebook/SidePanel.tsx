@@ -1,4 +1,5 @@
 /** The side panel (the draft's): the kernel's variables and what the notebook loaded, or the library to browse, where one click inserts the line that reads an item. */
+import { t } from "../i18n";
 import { useState, type UIEvent } from "react";
 import { TxIcon, TxIconButton, TxInput, TxStateWord } from "@talyx/sdk";
 import { TxButton } from "@talyx/sdk";
@@ -9,13 +10,13 @@ import "./notebook.css";
 export interface LibraryEntry { group: "Factors" | "Models" | "Allocations" | "One-off data"; name: string; variable: string; version: number | null; tone: "fix" | "watch" | "ok" | "muted"; note: string }
 export type Side = "vars" | "lib" | null;
 
-const GROUPS: LibraryEntry["group"][] = ["Factors", "Models", "Allocations", "One-off data"];
+const GROUPS = {Factors: t("Factors"), Models: t("Models"), Allocations: t("Allocations"), "One-off data": t("One-off data")};
 /** The line that reads an item: always with the version, so the cell says which one it read. */
 export const readLine = (entry: LibraryEntry) => `${entry.variable} = q.library.read(${JSON.stringify(entry.name)}${entry.version === null ? "" : `, version=${entry.version}`})`;
 export function sizeText(bytes: number | null): string {
   if (bytes === null) return "—";
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 ** 2) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 ** 2) return t("{value} KB", { value: Math.round(bytes / 1024) });
   return `${(bytes / 1024 ** 2).toFixed(bytes < 10 * 1024 ** 2 ? 1 : 0)} MB`;
 }
 
@@ -37,33 +38,33 @@ export function SidePanel({ side, variables, loaded, opened, library, kernelLine
   const [top, setTop] = useState(0);
   const window_ = visibleRows(shown.length, top);
   return <aside className="qv-notebook-side">{side === "vars" ? <>
-    <div className="tx-regionhead"><h3>Variables</h3><span className="tx-regionsub">{variables.length}</span><span className="tx-spacer" />
-      {variables.length > 20 && <span className="qv-notebook-search"><TxIcon name="search" /><TxInput value={filter} placeholder="Name" onChange={event => setFilter(event.target.value)} /></span>}</div>
+    <div className="tx-regionhead"><h3>{t("Variables")}</h3><span className="tx-regionsub">{variables.length}</span><span className="tx-spacer" />
+      {variables.length > 20 && <span className="qv-notebook-search"><TxIcon name="search" /><TxInput value={filter} placeholder={t("Name")} onChange={event => setFilter(event.target.value)} /></span>}</div>
     <div className="qv-scroll" onScroll={(event: UIEvent<HTMLDivElement>) => setTop(event.currentTarget.scrollTop)}><table className="qv-table"><tbody>
       {window_.from > 0 && <tr aria-hidden="true" style={{height: window_.from * ROW}}><td colSpan={4} /></tr>}
       {shown.slice(window_.from, window_.to).map(item =>
-      <tr key={item.name} title={item.fromCell === null ? undefined : `From cell [${item.fromCell}]`} onClick={() => onOpenVariable(item.name)}>
+      <tr key={item.name} title={item.fromCell === null ? undefined : t("From cell [{fromCell}]", { fromCell: item.fromCell })} onClick={() => onOpenVariable(item.name)}>
         <td className="l qv-notebook-var">{item.name}</td><td className="l qv-notebook-dim">{item.type}</td><td>{item.shape ?? ""}</td><td className="qv-notebook-dim">{sizeText(item.size)}</td></tr>)}</tbody></table>
-      {opened !== null && <div className="qv-notebook-opened"><div className="tx-regionhead"><h3>{opened.name}</h3><span className="tx-spacer" /><TxButton variant="quiet" size="sm" onClick={onCloseVariable}><TxIcon name="close" />Close</TxButton></div>
-        {opened.table === null ? <p className="qv-notebook-dim">Not a table</p> : <TableExplorer table={opened.table} />}</div>}
-      {loaded.length > 0 && <><div className="tx-regionhead"><h3>Loaded</h3><span className="tx-regionsub">{loaded.length}</span></div>
+      {opened !== null && <div className="qv-notebook-opened"><div className="tx-regionhead"><h3>{opened.name}</h3><span className="tx-spacer" /><TxButton variant="quiet" size="sm" onClick={onCloseVariable}><TxIcon name="close" />{t.c("action", "Close")}</TxButton></div>
+        {opened.table === null ? <p className="qv-notebook-dim">{t("Not a table")}</p> : <TableExplorer table={opened.table} />}</div>}
+      {loaded.length > 0 && <><div className="tx-regionhead"><h3>{t("Loaded")}</h3><span className="tx-regionsub">{loaded.length}</span></div>
         {loaded.map((item, index) => <div key={index} className="qv-notebook-loaded"><code>{item.call}</code><span>{item.what}</span><small>{item.at}, {item.seconds} s</small></div>)}</>}
       {/* When it started and what it holds; its environment is in the toolbar's dropdown and status already. */}
-      {kernelLine && <><div className="tx-regionhead"><h3>Kernel</h3></div><div className="qv-notebook-loaded"><span>{kernelLine}</span></div></>}</div></>
-    : <><div className="tx-regionhead"><h3>Library</h3><span className="tx-regionsub">{library.length}</span><span className="tx-spacer" />
-        <span className="qv-notebook-search"><TxIcon name="search" /><TxInput value={query} placeholder="Name" onChange={event => setQuery(event.target.value)} /></span></div>
-      <div className="qv-scroll">{GROUPS.map(group => {
+      {kernelLine && <><div className="tx-regionhead"><h3>{t("Kernel")}</h3></div><div className="qv-notebook-loaded"><span>{kernelLine}</span></div></>}</div></>
+    : <><div className="tx-regionhead"><h3>{t("Library")}</h3><span className="tx-regionsub">{library.length}</span><span className="tx-spacer" />
+        <span className="qv-notebook-search"><TxIcon name="search" /><TxInput value={query} placeholder={t("Name")} onChange={event => setQuery(event.target.value)} /></span></div>
+      <div className="qv-scroll">{Object.entries(GROUPS).map(([group, label]) => {
         const items = library.filter(entry => entry.group === group && entry.name.toLowerCase().includes(query.toLowerCase()));
-        return items.length ? <div key={group}><div className="qv-notebook-libgroup">{group}</div>{items.map(entry =>
+        return items.length ? <div key={group}><div className="qv-notebook-libgroup">{label}</div>{items.map(entry =>
           <button key={entry.name} type="button" className="qv-notebook-libitem" onClick={() => onInsert(readLine(entry))}>
-            <TxStateWord tone={entry.tone}>{entry.name}</TxStateWord><span className="qv-notebook-dim">{entry.note}</span><span className="qv-notebook-insert">Insert</span></button>)}</div> : null;
+            <TxStateWord tone={entry.tone}>{entry.name}</TxStateWord><span className="qv-notebook-dim">{entry.note}</span><span className="qv-notebook-insert">{t("Insert")}</span></button>)}</div> : null;
       })}</div></>}</aside>;
 }
 
 export function Rail({ side, onSide }: { side: Side; onSide(next: Side): void }) {
   return <nav className="qv-notebook-rail">
-    <TxIconButton label="Variables" icon="list" tone={side === "vars" ? "active" : "default"} onClick={() => onSide(side === "vars" ? null : "vars")} />
-    <TxIconButton label="Library" icon="bookmark" tone={side === "lib" ? "active" : "default"} onClick={() => onSide(side === "lib" ? null : "lib")} />
+    <TxIconButton label={t("Variables")} icon="list" tone={side === "vars" ? "active" : "default"} onClick={() => onSide(side === "vars" ? null : "vars")} />
+    <TxIconButton label={t("Library")} icon="bookmark" tone={side === "lib" ? "active" : "default"} onClick={() => onSide(side === "lib" ? null : "lib")} />
   </nav>;
 }
 
@@ -75,6 +76,6 @@ export function libraryEntries(listing: unknown): LibraryEntry[] {
     const live = (item.versions ?? []).filter(version => version.state !== "stopped");
     const newest = (live.length ? live : item.versions ?? []).reduce<number | null>((best, version) => best === null || version.version > best ? version.version : best, null);
     const tone = ["fail", "miss", "attention"].includes(item.state) ? "fix" : ["drift", "weak", "late"].includes(item.state) ? "watch" : item.state === "one_off" || item.state === "stopped" ? "muted" : "ok";
-    return { group: group(item.kind === "data" ? "data" : item.kind), name: item.name, variable: item.variable, version: item.state === "one_off" ? null : newest, tone, note: newest === null ? "" : item.state === "one_off" ? "one-off" : `v${newest}` };
+    return { group: group(item.kind === "data" ? "data" : item.kind), name: item.name, variable: item.variable, version: item.state === "one_off" ? null : newest, tone, note: newest === null ? "" : item.state === "one_off" ? t("one-off") : `v${newest}` };
   });
 }

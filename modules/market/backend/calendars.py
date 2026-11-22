@@ -14,6 +14,7 @@ import exchange_calendars as xcals
 import numpy as np
 import pandas as pd
 from exchange_calendars.exchange_calendar_xshg import XSHGExchangeCalendar
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import normalize_timeframe, timeframe_nanoseconds
 
@@ -62,7 +63,7 @@ def _exchange(name: str):
         # session before each ex-date.
         return xcals.get_calendar(name, start=_STARTS.get(name, "1960-01-01"))
     except xcals.errors.InvalidCalendarName as exc:
-        raise MarketError("unsupported", f"Unknown trading calendar {name}") from exc
+        raise MarketError("unsupported", t("Unknown trading calendar {name}", name=name)) from exc
 
 
 def prepare() -> None:
@@ -140,7 +141,7 @@ def coverage(calendar_id: str) -> tuple[date | None, date | None]:
 
 def sessions(calendar_id: str, start: date, end: date) -> dict:
     if end < start or (end - start).days > 3660:
-        raise MarketError("invalid_input", "sessions take a window of at most ten years")
+        raise MarketError("invalid_input", t("sessions take a window of at most ten years"))
     if canonical(calendar_id) == CONTINUOUS:
         days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
         items = [{"date": day.isoformat(), "open": str(_utc(day)), "close": str(_utc(day) + DAY_NS), "breaks": [],
@@ -180,7 +181,7 @@ def bar_times(calendar_id: str, timeframe: str, scope: str, start: int, end: int
     """Open and close instants of the bars of one timeframe inside [start, end)."""
     timeframe = normalize_timeframe(timeframe)
     if end <= start or end - start > 366 * DAY_NS:
-        raise MarketError("invalid_input", "bar_times takes a window of at most 366 days")
+        raise MarketError("invalid_input", t("bar_times takes a window of at most 366 days"))
     opens, closes = bar_grid(calendar_id, timeframe, start, end, scope)
     if after is not None:
         keep = opens > after
@@ -195,7 +196,7 @@ def bar_times(calendar_id: str, timeframe: str, scope: str, start: int, end: int
             "coveredUntil": None if continuous else last.isoformat(),
             "open": [str(int(x)) for x in opens], "close": [str(int(x)) for x in closes],
             "next": str(int(opens[-1])) if more and len(opens) else None,
-            "reason": None if evidence == "verified" else "Outside the bundled exchange calendar"}
+            "reason": None if evidence == "verified" else t("Outside the bundled exchange calendar")}
 
 
 def _date(ns: int) -> date:

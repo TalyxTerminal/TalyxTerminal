@@ -1,4 +1,5 @@
 /* The settings column's values: the factor's current ones (as last run or edited), and how they differ from the selected run. */
+import { t } from "../i18n";
 import type { Parameter, ParamValue } from "../objects";
 import { DEFAULT_RUN, type FactorRun, type FactorRunSettings, type SweepAxis } from "./api";
 
@@ -80,14 +81,14 @@ export const paramValue = (parameter: Parameter, values: Record<string, ParamVal
 
 /** The changes a run made against the one before, in words: "holding 5 → 10". */
 const NAMES: Record<string, string> = {
-  holding: "holding", delay: "delay", "grouping.count": "groups", "grouping.method": "grouping", "grouping.cuts": "cuts", "grouping.withinIndustry": "within industry",
-  extremes: "extremes", scale: "scale", neutralize: "neutralize", costBps: "cost", borrowPct: "borrow", "leaveOut.halted": "halted names", "leaveOut.newListings": "new listings",
-  "leaveOut.illiquid": "illiquid names", "data since": "data from", "data until": "data to", "data heldOutFrom": "held out from", "written as": "written as",
+  holding: "holding", delay: "delay", "grouping.count": "groups", "grouping.method": "grouping", "grouping.cuts": "cuts", "grouping.withinIndustry": t("within industry"),
+  extremes: "extremes", scale: "scale", neutralize: "neutralize", costBps: "cost", borrowPct: "borrow", "leaveOut.halted": t("halted names"), "leaveOut.newListings": t("new listings"),
+  "leaveOut.illiquid": t("illiquid names"), "data since": t("data from"), "data until": t("data to"), "data heldOutFrom": t("held out from"), "written as": t("written as"),
 };
-const LABELS: Record<string, string> = {"industry+size": "industry + size", industry: "industry", none: "none", mad3: "3 MAD", pct1: "1% / 99%", zscore: "z-score", rank: "rank", equal: "equal", cuts: "fixed cuts", sign: "by sign"};
-const show = (value: unknown) => typeof value === "boolean" ? (value ? "on" : "off") : value == null ? "—" : LABELS[String(value)] ?? String(value);
+const LABELS: Record<string, string> = {"industry+size": t("industry + size"), industry: "industry", none: "none", mad3: "3 MAD", pct1: "1% / 99%", zscore: "z-score", rank: "rank", equal: "equal", cuts: t("fixed cuts"), sign: t("by sign")};
+const show = (value: unknown) => typeof value === "boolean" ? (value ? t("on") : t("off")) : value == null ? "—" : LABELS[String(value)] ?? String(value);
 export function changeText(change: {what: string; from: unknown; to: unknown}): {what: string; from: string; to: string} {
-  const what = NAMES[change.what] ?? change.what.replace(/^data /, "data ").replace(/^code /, "");
-  const unit = change.what === "costBps" ? " bps" : change.what === "borrowPct" ? "%" : "";
-  return {what, from: show(change.from) + (change.from == null ? "" : unit), to: show(change.to) + (change.to == null ? "" : unit)};
+  const what = NAMES[change.what] ?? (change.what.startsWith("data ") ? t("data {field}", { field: change.what.slice(5) }) : change.what.replace(/^code /, ""));
+  const format = (value: unknown) => value == null ? show(value) : change.what === "costBps" ? t("{value} bps", { value: show(value) }) : change.what === "borrowPct" ? `${show(value)}%` : show(value);
+  return {what, from: format(change.from), to: format(change.to)};
 }

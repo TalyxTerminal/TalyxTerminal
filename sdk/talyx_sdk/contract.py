@@ -72,6 +72,7 @@ def build(module: Module) -> dict:
     contract["settings"] = {key: {
         "title": spec.title, "description": spec.description, "globalOnly": spec.global_only, "group": spec.group,
         "schema": schemas[("setting", key)], "default": TypeAdapter(spec.type).dump_python(spec.default, mode="json"),
+        **({"options": spec.options} if spec.options else {}),
     } for key, spec in module.settings.items()}
     contract["$defs"] = dict(sorted(definitions.get("$defs", {}).items()))
     if module.change_handlers is not None:

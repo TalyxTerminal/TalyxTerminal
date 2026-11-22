@@ -25,6 +25,20 @@ SPOT = {"id": "ETHUSD-SPOT.COINBASE", "type": "spot", "symbol": "ETHUSD", "curre
 STRATEGY_RUN = {"fill": "nextOpen", "costs": {"halfSpreadBps": 2.0, "impact": 0.0, "funding": True, "borrowPct": 0.3}, "exchange": {"stopTrigger": "last"}}
 
 
+def sessions_file(root, instruments):
+    """The stocks' sessions moved out of the instruments into `stock-sessions.parquet`, as the Host writes them; its path, or None without stocks."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from modules.quant.backend.object_data import SESSION_SCHEMA, session_table
+    tables = [session_table(item["id"], item["stock"].pop("sessions")) for item in instruments if "sessions" in item.get("stock", {})]
+    if not tables:
+        return None
+    path = Path(root) / "stock-sessions.parquet"
+    pq.write_table(pa.concat_tables(tables).cast(SESSION_SCHEMA), path)
+    return str(path)
+
+
 def prepare(root, code, *, frame=None, settings=None, funding=True, instruments=None, venues=None, bar_types=None, annualization=365, display=None,
             benchmark=None, risk_free=None, extra=None, funding_frame=None, params=None):
     """Write the project, the bars and the invocation under `root`; `extra` overrides invocation keys. Returns the bars frame."""
@@ -45,7 +59,8 @@ def prepare(root, code, *, frame=None, settings=None, funding=True, instruments=
                   "barTypes": bar_types or [BAR_TYPE], "params": params or {}, "backtest": backtest, "recipeRef": None, "libraryValues": {"path": None}, "models": [],
                   "index": None, "runSettings": run_settings, "benchmark": benchmark or {"kind": "hold"}, "riskFree": risk_free or {"basis": "zero"},
                   "fundingRates": {"path": str(root / "funding.parquet") if funding else None, "gaps": {}},
-                  "display": display or [{"nativeInstrument": INSTRUMENT, "symbol": "BTC/USDT:USDT"}], **(extra or {})}
+                  "display": display or [{"nativeInstrument": INSTRUMENT, "symbol": "BTC/USDT:USDT"}],
+                  "stockSessions": sessions_file(root, backtest["instruments"]), **(extra or {})}
     (root / "invocation.json").write_text(json.dumps(invocation), encoding="utf-8")
     return frame
 

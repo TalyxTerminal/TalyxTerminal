@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { ModuleContextProvider, TxAlert, TxButton, TxDialog, TxRoot, type ModuleContext } from "@talyx/sdk";
@@ -6,14 +7,14 @@ import { documents } from "./service";
 function CloseProtection() {
   useSyncExternalStore(documents.watch, documents.state, documents.state);
   const request = documents.pendingClose;
-  return <TxDialog open={!!request} onOpenChange={open => { if (!open) documents.cancelClose(); }} title="Unsaved documents" footer={<>
-    <TxButton onClick={() => documents.cancelClose()}>Cancel</TxButton>
-    <TxButton disabled={request?.working} onClick={() => void documents.finishClose("discard")}>Discard and close</TxButton>
-    <TxButton variant="primary" disabled={request?.working} onClick={() => void documents.finishClose("save")}>Save and close</TxButton>
+  return <TxDialog open={!!request} onOpenChange={open => { if (!open) documents.cancelClose(); }} title={t("Unsaved documents")} footer={<>
+    <TxButton onClick={() => documents.cancelClose()}>{t("Cancel")}</TxButton>
+    <TxButton disabled={request?.working} onClick={() => void documents.finishClose("discard")}>{t("Discard and close")}</TxButton>
+    <TxButton variant="primary" disabled={request?.working} onClick={() => void documents.finishClose("save")}>{t("Save and close")}</TxButton>
   </>}>
-    <p>Save your changes before closing, or discard them.</p>
+    <p>{t("Save your changes before closing, or discard them.")}</p>
     {request?.documentIds.map(id => <div key={id}><span>{documents.snapshot(id).name}</span></div>)}
-    {request?.error && <TxAlert title="Document remains open">{request.error}</TxAlert>}
+    {request?.error && <TxAlert title={t("Document remains open")}>{request.error}</TxAlert>}
   </TxDialog>;
 }
 export function mountCloseProtection(ctx: ModuleContext): () => void {

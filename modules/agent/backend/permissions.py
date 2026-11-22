@@ -7,6 +7,7 @@ import time
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .store import encoded
 
@@ -33,7 +34,7 @@ class ConversationPermissions:
 
     def remember(self, approval):
         if approval["decision"] != "allow_conversation" or approval["state"] != "allowed":
-            raise ContractError("permission_denied", "Persistent permission requires the user's approval decision")
+            raise ContractError("permission_denied", t("Persistent permission requires the user's approval decision"))
         if not rememberable(approval["proposal"]):
             return None
         conversation, action, risks = approval["conversationId"], approval["action"], sorted(approval["proposal"]["risks"])
@@ -63,7 +64,7 @@ class ConversationPermissions:
         self.store.conversation(conversation)
         with self.store.transaction():
             if self.db.execute("DELETE FROM conversation_allowances WHERE id=? AND conversation=?", (identity, conversation)).rowcount == 0:
-                raise ContractError("target_gone", "This allowance is no longer in this conversation")
+                raise ContractError("target_gone", t("This allowance is no longer in this conversation"))
 
     def clear(self, conversation):
         """A stricter permission, or deleting the conversation, ends its "allow for this chat" grants."""

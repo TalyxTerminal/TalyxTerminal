@@ -16,6 +16,7 @@ from concurrent.futures import Future
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .instance import identity
 
@@ -37,7 +38,7 @@ class LoginStartup:
             return subprocess.list2cmdline([interpreter, "-B", "-X", "utf8", launcher, *tray_args])
         node = shutil.which("node")
         if not interpreter.is_file() or node is None:
-            raise ContractError("unavailable", "The desktop Python or Node executable is missing")
+            raise ContractError("unavailable", t("The desktop Python or Node executable is missing"))
         return subprocess.list2cmdline([interpreter, "-B", ROOT / "host/desktop/login.py",
                                         *tray_args, "--node", Path(node).resolve()])
 

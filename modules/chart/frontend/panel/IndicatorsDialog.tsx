@@ -1,3 +1,5 @@
+import { displayIndicator } from "../indicatorText";
+import { t } from "../i18n";
 /* Indicators, Metrics & Strategies, TradingView's library: categories on the left (favorites, built-in by kind, the
    user's indicators), search by full name and short name on top; a click adds to the active chart and the dialog stays.
    A row's {} on hover opens its code in the editor under the chart. */
@@ -17,7 +19,8 @@ export function addIndicator(ctx: ModuleContext, chartId: string, entry: Catalog
 }
 
 export function IndicatorsDialog({ ctx, panelId }: { ctx: ModuleContext; panelId: string }) {
-  const catalog = useStore(state => state.catalog);
+  const entries = useStore(state => state.catalog);
+  const catalog = useMemo(() => entries?.map(displayIndicator) ?? null, [entries]);
   const favorites = useStore(state => state.layouts[panelId].favorites.indicators);
   const [query, setQuery] = useState(""), [section, setSection] = useState("Built-in");
   const categories = useMemo(() => [...new Set((catalog ?? []).filter(item => item.source === "builtin").map(item => item.category))].sort(), [catalog]);
@@ -30,25 +33,25 @@ export function IndicatorsDialog({ ctx, panelId }: { ctx: ModuleContext; panelId
     return entry.source === "builtin" && entry.category === section;
   }).sort((a, b) => a.title.localeCompare(b.title));
   const sections = ["Favorites", "My indicators", "Built-in", ...categories];
-  return <TxDialog open onOpenChange={open => { if (!open) openOverlay(panelId, null); }} title="Indicators" size="wide" footer={false}>
+  return <TxDialog open onOpenChange={open => { if (!open) openOverlay(panelId, null); }} title={t("Indicators")} size="wide" footer={false}>
     <div className="chart-library">
-      <TxSearch value={query} onValueChange={setQuery} placeholder="Search" autoFocus />
+      <TxSearch value={query} onValueChange={setQuery} placeholder={t("Search")} autoFocus />
       <div className="chart-library-body">
-        <nav className="chart-library-nav" aria-label="Indicator categories">
+        <nav className="chart-library-nav" aria-label={t("Indicator categories")}>
           {sections.map(name => <TxButton key={name} variant="row" size="sm" aria-current={!words.length && section === name} onClick={() => { setSection(name); setQuery(""); }}
-            className={name === "Built-in" || name === "My indicators" || name === "Favorites" ? undefined : "chart-library-sub"}>{name}</TxButton>)}
+            className={name === "Built-in" || name === "My indicators" || name === "Favorites" ? undefined : "chart-library-sub"}>{name === "Built-in" ? t("Built-in") : name === "Favorites" ? t("Favorites") : name === "My indicators" ? t("My indicators") : name}</TxButton>)}
         </nav>
         <div className="chart-library-list" role="list">
-          {catalog === null && <TxEmpty title="Loading indicators" />}
-          {catalog !== null && rows.length === 0 && <TxEmpty title={words.length ? "Nothing matches" : section === "Favorites" ? "No favorites yet" : section === "My indicators" ? "No indicators of your own yet" : "Nothing here"} />}
+          {catalog === null && <TxEmpty title={t("Loading indicators")} />}
+          {catalog !== null && rows.length === 0 && <TxEmpty title={words.length ? t("Nothing matches") : section === "Favorites" ? t("No favorites yet") : section === "My indicators" ? t("No indicators of your own yet") : t("Nothing here")} />}
           {rows.map(entry => <div key={key(entry)} className="chart-library-row" role="listitem">
             <TxIconButton size="sm" icon="star" tone={favorites.includes(key(entry)) ? "active" : "default"}
-              label={favorites.includes(key(entry)) ? "Remove from favorites" : "Add to favorites"} onClick={() => toggleFavorite(panelId, "indicators", key(entry))} />
+              label={favorites.includes(key(entry)) ? t("Remove from favorites") : t("Add to favorites")} onClick={() => toggleFavorite(panelId, "indicators", key(entry))} />
             <TxButton variant="row" size="sm" disabled={Boolean(entry.error)} title={entry.error ?? entry.description}
               onClick={() => void addIndicator(ctx, store.getState().layouts[panelId].active, entry)}>
               <span>{entry.title}</span>{entry.error && <span className="chart-library-error">{entry.error}</span>}
             </TxButton>
-            <TxIconButton size="sm" icon="code" label="Source code"
+            <TxIconButton size="sm" icon="code" label={t("Source code")}
               onClick={() => { openSource(panelId, { source: entry.source, id: entry.id }); openOverlay(panelId, null); }} />
           </div>)}
         </div>

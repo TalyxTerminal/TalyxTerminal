@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useMemo, useState } from "react";
 import {
   TxAlert, TxButton, TxIcon, TxIconButton, TxMenu, TxRoot, TxSearch, TxSegmented, TxSkeleton, TxToastProvider, TxTooltipProvider,
@@ -103,25 +104,25 @@ function WorkspacePage({ saved, phase, error, onOpen, onCreate, onRetry, onRenam
     try {
       const copy = await platformRuntime().platform["workspace.copy"]({ workspaceId: item.workspaceId });
       onRetry();
-      toast({ title: `Saved ${copy.name}` });
+      toast({ title: t("Saved {name}", { name: copy.name }) });
     } catch (reason) {
-      toast({ title: `Couldn't duplicate ${item.name}`, detail: reason instanceof Error ? reason.message : String(reason), tone: "failed" });
+      toast({ title: t("Couldn't duplicate {name}", { name: item.name }), detail: reason instanceof Error ? reason.message : String(reason), tone: "failed" });
     }
   };
 
   const showFolder = async ({ item, openId }: Row) => {
     try { await openWorkspaceFolder(openId!); }
     catch (reason) {
-      toast({ title: `Couldn't show the folder of ${item.name}`, detail: reason instanceof Error ? reason.message : String(reason), tone: "failed" });
+      toast({ title: t("Couldn't show the folder of {name}", { name: item.name }), detail: reason instanceof Error ? reason.message : String(reason), tone: "failed" });
     }
   };
 
   const menu = (row: Row): TxMenuItem[] => [
-    { id: "open", label: "Open", icon: "external", onSelect: () => onOpen(row.item) },
-    { id: "rename", label: "Rename", icon: "edit", onSelect: () => onRename(row.item) },
-    { id: "duplicate", label: "Duplicate", icon: "copy", onSelect: () => void duplicate(row) },
-    ...(desktop && row.openId ? [{ id: "folder", label: "Show folder", icon: "folder" as const, onSelect: () => void showFolder(row) }] : []),
-    { id: "delete", label: "Delete", icon: "trash", tone: "danger", separated: true, onSelect: () => onDelete(row.item) },
+    { id: "open", label: t("Open"), icon: "external", onSelect: () => onOpen(row.item) },
+    { id: "rename", label: t("Rename"), icon: "edit", onSelect: () => onRename(row.item) },
+    { id: "duplicate", label: t("Duplicate"), icon: "copy", onSelect: () => void duplicate(row) },
+    ...(desktop && row.openId ? [{ id: "folder", label: t("Show folder"), icon: "folder" as const, onSelect: () => void showFolder(row) }] : []),
+    { id: "delete", label: t("Delete"), icon: "trash", tone: "danger", separated: true, onSelect: () => onDelete(row.item) },
   ];
 
   const nothingSaved = phase === "ready" && !error && all.length === 0;
@@ -129,63 +130,63 @@ function WorkspacePage({ saved, phase, error, onOpen, onCreate, onRetry, onRenam
   return <div className="ws-shell">
     {nothingSaved
       ? <div className="ws-empty">
-        <h1>No saved workspaces yet</h1>
-        <TxButton variant="primary" onClick={onCreate}><TxIcon name="plus" />New workspace</TxButton>
+        <h1>{t("No saved workspaces yet")}</h1>
+        <TxButton variant="primary" onClick={onCreate}><TxIcon name="plus" />{t("New workspace")}</TxButton>
       </div>
       : <div className="ws-page">
         <div className="ws-main">
           <header className="ws-head">
-            <h1>Workspace</h1>
+            <h1>{t("Workspace")}</h1>
             {phase === "ready" && <span className="ws-count">{shown.length}</span>}
             <div className="ws-tools">
-              <TxSearch className="ws-search" value={query} onValueChange={setQuery} aria-label="Search workspaces" placeholder="Search workspaces" />
-              <TxSegmented size="sm" label="Sort" value={sort} onChange={setSort} options={[
-                { value: "modified", label: "Last modified" }, { value: "name", label: "Name" },
+              <TxSearch className="ws-search" value={query} onValueChange={setQuery} aria-label={t("Search workspaces")} placeholder={t("Search workspaces")} />
+              <TxSegmented size="sm" label={t("Sort")} value={sort} onChange={setSort} options={[
+                { value: "modified", label: t("Last modified") }, { value: "name", label: t("Name") },
               ]} />
-              <TxButton variant="primary" onClick={onCreate}><TxIcon name="plus" />New workspace</TxButton>
+              <TxButton variant="primary" onClick={onCreate}><TxIcon name="plus" />{t("New workspace")}</TxButton>
             </div>
           </header>
 
-          <div className="ws-table" role="table" aria-label="Saved workspaces">
+          <div className="ws-table" role="table" aria-label={t("Saved workspaces")}>
             <div className="ws-table-head" role="row">
-              <span role="columnheader" className="ws-col-name">Name</span>
-              <span role="columnheader">Modified</span>
+              <span role="columnheader" className="ws-col-name">{t("Name")}</span>
+              <span role="columnheader">{t("Modified")}</span>
               <span />
             </div>
             <div className="ws-rows" role="rowgroup">
               {phase === "loading" && <>
-                <span className="ws-sr" role="status">Loading saved workspaces</span>
+                <span className="ws-sr" role="status">{t("Loading saved workspaces")}</span>
                 {Array.from({ length: 6 }, (_, index) => <div key={index} className="ws-row" aria-hidden="true">
                   <span className="ws-sketch" /><span className="ws-name"><TxSkeleton width="40%" /><TxSkeleton width="22%" /></span>
                 </div>)}
               </>}
               {phase === "error" && <div className="ws-state">
-                <TxAlert title="Saved workspaces are unavailable" actions={<TxButton size="sm" onClick={onRetry}><TxIcon name="refresh" />Retry</TxButton>}>
+                <TxAlert title={t("Saved workspaces are unavailable")} actions={<TxButton size="sm" onClick={onRetry}><TxIcon name="refresh" />{t("Retry")}</TxButton>}>
                   {error ?? undefined}
                 </TxAlert>
               </div>}
-              {phase === "ready" && error && <TxAlert title="Some saved workspaces could not be read">{error}</TxAlert>}
+              {phase === "ready" && error && <TxAlert title={t("Some saved workspaces could not be read")}>{error}</TxAlert>}
               {shown.map(row => {
                 const when = savedWhen(row.item.savedAt);
                 return <div key={row.item.snapshotId} className="ws-row" role="row">
-                  <button type="button" className="ws-hit" aria-label={`Open ${row.item.name}`} onClick={() => onOpen(row.item)} />
+                  <button type="button" className="ws-hit" aria-label={t("Open {name}", { name: row.item.name })} onClick={() => onOpen(row.item)} />
                   <Sketch tiles={row.tiles} />
                   <span className="ws-name" role="cell">
                     <span className="ws-name-line">
                       <strong title={row.item.name}>{row.item.name}</strong>
-                      {row.openId && <span className="ws-open"><i />Open</span>}
+                      {row.openId && <span className="ws-open"><i />{t("Open")}</span>}
                     </span>
                     <span className="ws-sub">{row.tiles ? moduleLine(row.tiles) : ""}</span>
                   </span>
                   <span role="cell" className="ws-when" title={when.full}>{when.label}</span>
                   <span role="cell" className="ws-actions">
-                    <TxButton size="sm" onClick={() => onOpen(row.item)}>Open</TxButton>
-                    <TxMenu label={`Actions for ${row.item.name}`} align="end" items={menu(row)}
-                      trigger={<TxIconButton size="sm" icon="more" label={`More actions for ${row.item.name}`} />} />
+                    <TxButton size="sm" onClick={() => onOpen(row.item)}>{t("Open")}</TxButton>
+                    <TxMenu label={t("Actions for {name}", { name: row.item.name })} align="end" items={menu(row)}
+                      trigger={<TxIconButton size="sm" icon="more" label={t("More actions for {name}", { name: row.item.name })} />} />
                   </span>
                 </div>;
               })}
-              {phase === "ready" && !shown.length && <div className="ws-nothing">No workspace matches “{query.trim()}”</div>}
+              {phase === "ready" && !shown.length && <div className="ws-nothing">{t("No workspace matches “{query}”", { query: query.trim() })}</div>}
             </div>
           </div>
         </div>

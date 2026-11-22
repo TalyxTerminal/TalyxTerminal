@@ -20,6 +20,7 @@ from uuid import uuid4
 
 import aiohttp
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import mark, t
 from talyx_sdk.network import (
     NetworkConfigurationError,
     NetworkRouteChanged,
@@ -48,14 +49,14 @@ def clipped(text, limit):
 def validate_channel(kind, settings, credentials):
     if kind == "telegram":
         if set(credentials) != {"token"} or not re.fullmatch(r"[0-9]+:[A-Za-z0-9_-]+", credentials["token"]):
-            raise ContractError("invalid_input", "Enter a Telegram bot token")
+            raise ContractError("invalid_input", t("Enter a Telegram bot token"))
         if set(settings) != {"chatId"} or not isinstance(settings["chatId"], str) or not settings["chatId"].strip():
-            raise ContractError("invalid_input", "Telegram requires a chat ID")
+            raise ContractError("invalid_input", t("Telegram requires a chat ID"))
         return
     if kind not in {"feishu", "discord"} or settings:
-        raise ContractError("invalid_input", "Unsupported notification channel or settings")
+        raise ContractError("invalid_input", t("Unsupported notification channel or settings"))
     if set(credentials) - ({"webhook", "secret"} if kind == "feishu" else {"webhook"}) or "webhook" not in credentials:
-        raise ContractError("invalid_input", "Enter the channel webhook")
+        raise ContractError("invalid_input", t("Enter the channel webhook"))
     url = urlsplit(credentials["webhook"])
     valid = url.scheme == "https" and not url.username and not url.password and not url.query and not url.fragment
     if kind == "feishu":
@@ -63,7 +64,7 @@ def validate_channel(kind, settings, credentials):
     else:
         valid = valid and url.netloc == "discord.com" and re.fullmatch(r"/api(?:/v[0-9]+)?/webhooks/[0-9]+/[A-Za-z0-9_.-]+", url.path)
     if not valid:
-        raise ContractError("invalid_input", "Use the official channel webhook URL without query parameters")
+        raise ContractError("invalid_input", t("Use the official channel webhook URL without query parameters"))
 
 
 def request_body(kind, settings, credentials, title, body):
@@ -120,28 +121,28 @@ async def send_http(url, payload):
 
 def response_status(kind, status, result):
     if status == 429:
-        return "retry", "The channel rate limit was reached"
+        return "retry", t("The channel rate limit was reached")
     if not 200 <= status < 300:
-        return ("unknown" if status >= 500 else "failed"), f"Channel returned HTTP {status}"
+        return ("unknown" if status >= 500 else "failed"), t("Channel returned HTTP {status}", status=status)
     if not isinstance(result, dict):
-        return "unknown", "The channel returned no verifiable delivery receipt"
+        return "unknown", t("The channel returned no verifiable delivery receipt")
     if kind == "telegram":
         if result.get("ok") is True and isinstance(result.get("result"), dict) and "message_id" in result["result"]:
             return "sent", None
         code = result.get("error_code")
         if type(code) is not int:
-            return "unknown", "Telegram did not return a message receipt"
-        return ("retry" if code == 429 else "failed"), f"Telegram rejected the message (code {code})"
+            return "unknown", t("Telegram did not return a message receipt")
+        return ("retry" if code == 429 else "failed"), t("Telegram rejected the message (code {code})", code=code)
     if kind == "feishu":
         code = result.get("code")
         if type(code) is not int:
-            return "unknown", "Feishu did not return a message receipt"
+            return "unknown", t("Feishu did not return a message receipt")
         if code == 0:
             return "sent", None
-        return ("retry" if code == 11232 else "failed"), f"Feishu rejected the message (code {code})"
+        return ("retry" if code == 11232 else "failed"), t("Feishu rejected the message (code {code})", code=code)
     if isinstance(result.get("id"), str):
         return "sent", None
-    return "unknown", "Discord did not return a message receipt"
+    return "unknown", t("Discord did not return a message receipt")
 
 
 class Toasts:
@@ -149,19 +150,21 @@ class Toasts:
 
     def __init__(self) -> None:
         self.toaster = self.kind = None
-        self.reason = "Windows toasts are not available on this system"
+        self.error_type = ""
+        self.reason = mark("Windows toasts are not available on this system")
         if sys.platform == "win32":
             try:
                 module = importlib.import_module("windows_toasts")
                 self.kind, self.toaster = module.Toast, module.WindowsToaster("TALYX")
             except ImportError:
-                self.reason = "The Windows-Toasts package is not installed"
+                self.reason = mark("The Windows-Toasts package is not installed")
             except Exception as exc:  # noqa: BLE001 - the WinRT runtime itself may be missing
-                self.reason = f"Windows toasts are unavailable: {type(exc).__name__}"
+                self.reason = mark("Windows toasts are unavailable: {reason}")
+                self.error_type = type(exc).__name__
 
     async def show(self, title: str, message: str, *, activate=None) -> None:
         if self.toaster is None:
-            raise ContractError("unavailable", self.reason)
+            raise ContractError("unavailable", t(self.reason, reason=self.error_type))
 
         def deliver():
             toast = self.kind()
@@ -185,7 +188,7 @@ class ChannelSecrets:
     def read(self, ref):
         value = self.secrets.read("platform", ref)
         if value is None:
-            raise ContractError("secret_store_failed", "The channel's credentials are missing; enter them again")
+            raise ContractError("secret_store_failed", t("The channel's credentials are missing; enter them again"))
         return value
 
     def write(self, ref, value):
@@ -257,27 +260,27 @@ class NotificationService:
         channel_id = args["channelId"]
         current = self.db.execute("SELECT * FROM channels WHERE id=?", (channel_id,)).fetchone() if channel_id else None
         if args["expectedRevision"] != (current["revision"] if current else None):
-            raise ContractError("conflict", "Notification channel changed")
+            raise ContractError("conflict", t("Notification channel changed"))
         if channel_id is not None and current is None:
-            raise ContractError("not_found", "Notification channel was deleted")
+            raise ContractError("not_found", t("Notification channel was deleted"))
         if args["operation"] == "delete":
             if current is None:
-                raise ContractError("not_found", "Notification channel does not exist")
+                raise ContractError("not_found", t("Notification channel does not exist"))
             with self.db:
                 self._cancel_pending(channel_id)
                 self.db.execute("DELETE FROM channels WHERE id=?", (channel_id,))
             self.secrets.delete(current["secret_ref"])
             return self._channels()
         if args["operation"] != "save":
-            raise ContractError("invalid_input", "Unknown channel configuration operation")
+            raise ContractError("invalid_input", t("Unknown channel configuration operation"))
         if not args["name"].strip():
-            raise ContractError("invalid_input", "Channel name is required")
+            raise ContractError("invalid_input", t("Channel name is required"))
         if "credentials" in args:
             credentials = args["credentials"]
         elif current is not None:
             credentials = json.loads(self.secrets.read(current["secret_ref"]))
         else:
-            raise ContractError("invalid_input", "Channel credentials are required")
+            raise ContractError("invalid_input", t("Channel credentials are required"))
         validate_channel(args["kind"], args["settings"], credentials)
         channel_id = channel_id or uuid4().hex
         revision = current["revision"] + 1 if current else 1
@@ -298,22 +301,22 @@ class NotificationService:
 
     def _send(self, producer, args):
         if set(args) - {"notificationId", "channelIds", "title", "body", "navigation"}:
-            raise ContractError("invalid_input", "Notifications accept configured channel IDs, not destinations")
+            raise ContractError("invalid_input", t("Notifications accept configured channel IDs, not destinations"))
         ids = args["channelIds"]
         if not ids or len(ids) != len(set(ids)):
-            raise ContractError("invalid_input", "Choose distinct configured notification channels")
+            raise ContractError("invalid_input", t("Choose distinct configured notification channels"))
         payload = encoded(args)
         previous = self.db.execute("SELECT body FROM notifications WHERE producer=? AND id=?",
                                    (producer, args["notificationId"])).fetchone()
         if previous is not None:
             if json.loads(previous["body"]) != args:
-                raise ContractError("conflict", "Notification ID already belongs to different content")
+                raise ContractError("conflict", t("Notification ID already belongs to different content"))
             return self._read_delivery(producer, args["notificationId"])
         channels = []
         for channel_id in ids:
             channel = self.db.execute("SELECT * FROM channels WHERE id=?", (channel_id,)).fetchone()
             if channel is None or not channel["enabled"] or not self.secrets.exists(channel["secret_ref"]):
-                raise ContractError("unavailable", "A selected notification channel is unavailable", {"channelId": channel_id})
+                raise ContractError("unavailable", t("A selected notification channel is unavailable"), {"channelId": channel_id})
             channels.append(channel)
         timestamp = now()
         with self.db:
@@ -326,7 +329,7 @@ class NotificationService:
         rows = list(self.db.execute("SELECT * FROM deliveries WHERE producer=? AND notification_id=? ORDER BY channel_id",
                                     (producer, notification_id)))
         if not rows:
-            raise ContractError("not_found", "Notification does not belong to this producer")
+            raise ContractError("not_found", t("Notification does not belong to this producer"))
         return {"producer": producer, "notificationId": notification_id, "deliveries": [
             {"channelId": row["channel_id"], "status": row["status"], "attempts": row["attempts"],
              "createdAt": row["created_at"], "updatedAt": row["updated_at"], "error": row["error"],
@@ -336,8 +339,8 @@ class NotificationService:
         """Send a test message and answer once its delivery ended, or as it stands after 25 s."""
         identity = uuid4().hex
         await self.send("platform", {"notificationId": identity, "channelIds": [channel_id],
-                                     "title": "TALYX test notification",
-                                     "body": "Your notification channel is connected. Results will be delivered here."})
+                                     "title": t("TALYX test notification"),
+                                     "body": t("Your notification channel is connected. Results will be delivered here.")})
         try:
             async with asyncio.timeout(25):
                 while True:

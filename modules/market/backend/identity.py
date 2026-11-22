@@ -18,6 +18,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from talyx_sdk.i18n import t
+
 from vocabulary.instruments import MarketInstrument
 
 from . import codes as codes_module
@@ -91,7 +93,7 @@ class IdentityStore:
     def instrument(self, instrument_id: str) -> MarketInstrument:
         record = self.record(instrument_id)
         if record is None:
-            raise MarketError("not_found", f"Market does not know instrument {instrument_id}")
+            raise MarketError("not_found", t("Market does not know instrument {instrument_id}", instrument_id=instrument_id))
         return MarketInstrument.from_wire(record)
 
     def codes(self, instrument_id: str) -> list[dict]:
@@ -176,6 +178,7 @@ class IdentityStore:
                 periods.setdefault(code.upper(), []).append([rowid, start, end, instrument_id])
             keys = {key: instrument_id for key, instrument_id in
                     db.execute("select key, id from source_keys where source=?", (source,))}
+            identified = set(keys.values())
             merged = {i: m for i, m in db.execute("select id, merged_into from instruments where market=? and "
                                                   "merged_into is not null", (market,))}
             records = {i: r for i, r in db.execute("select id, record from instruments where market=?", (market,))}
@@ -200,6 +203,8 @@ class IdentityStore:
                     found = at(code, (until - 1) if until else now)
                     if found is None and start is not None:
                         found = at(code, start)
+                    if row.get("sourceKey") and found in identified:
+                        found = None  # this source already identifies that holder as another security
                 instrument_id = found or new_listing_id()
                 previous = json.loads(records[instrument_id]) if found and instrument_id in records else None
                 if naming == "fill" and previous and previous.get("name"):
@@ -231,6 +236,7 @@ class IdentityStore:
                     code_inserts.append((market, code, value[1], until, instrument_id, row.get("name")))
                 if row.get("sourceKey"):
                     keys[row["sourceKey"]] = instrument_id
+                    identified.add(instrument_id)
                     key_inserts.append((source, row["sourceKey"], start or -FAR, instrument_id, until))
                 for name, key in (row.get("externalIds") or {}).items():
                     key_inserts.append((name, key, -FAR, instrument_id, None))

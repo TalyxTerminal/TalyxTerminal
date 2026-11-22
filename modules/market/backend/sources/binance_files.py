@@ -33,6 +33,7 @@ import zipfile
 from datetime import UTC, datetime
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -118,7 +119,7 @@ def filler(columns: bars.Columns) -> np.ndarray:
 
 def spans_of(times: np.ndarray, step: int) -> list[tuple[int, int]]:
     out: list[tuple[int, int]] = []
-    for moment in (int(t) for t in times):
+    for moment in map(int, times):
         if out and out[-1][1] == moment:
             out[-1] = (out[-1][0], moment + step)
         else:
@@ -185,7 +186,7 @@ class BinanceFiles:
         try:
             return await in_worker(_unzip_csv, body)
         except (zipfile.BadZipFile, StopIteration, ValueError) as exc:
-            raise MarketError("source_unavailable", f"binance file {url.rsplit('/', 1)[-1]} is unreadable: {exc}",
+            raise MarketError("source_unavailable", t("binance file {value} is unreadable: {exc}", value=url.rsplit('/', 1)[-1], exc=exc),
                               source_id="binance") from exc
 
     async def listing(self, prefix: str) -> list[str]:
@@ -204,7 +205,7 @@ class BinanceFiles:
                     break
                 await asyncio.sleep(1.5 * (attempt + 1))
             else:
-                raise MarketError("rate_limited", "binance file listing answers 503 Slow Down", source_id="binance",
+                raise MarketError("rate_limited", t("binance file listing answers 503 Slow Down"), source_id="binance",
                                   status=503, retry_at=now_ns() + 60 * NS)
             text = body.decode("utf-8", "replace")
             found = re.findall(r"<Prefix>([^<]+)</Prefix>", text)[1:] + re.findall(r"<Key>([^<]+)</Key>", text)

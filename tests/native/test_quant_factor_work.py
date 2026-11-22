@@ -173,7 +173,7 @@ fields = {"open": close, "high": close * 1.01, "low": close * .99, "close": clos
 fields.update(rawClose=fields["close"], rawVolume=fields["volume"])
 panel = W.Panel(labels, columns, fields, np.ones((days, names), dtype=bool), {"annualization": 252}, industry=[f"I{i % 11}" for i in range(names)],
                 shares=np.full((days, names), 1e6))
-raw = F.evaluate(sys.argv[2], F.Context(panel.tables(), panel.industry_series())).to_numpy()
+raw = F.evaluate(sys.argv[2], F.Context(panel.tables(), panel.industry)).to_numpy()
 plain = W.settings_of({"leaveOut": {"halted": False, "newListings": False, "illiquid": False}, "extremes": "none", "scale": "none", "neutralize": "none",
                        "delay": 0, "holding": 5})
 ours = W.Evaluation(panel, raw, plain, with_decay=False, with_similar=False).numbers["rankIc"]
@@ -213,12 +213,12 @@ gaps = []
 for formula in ["-($close / Ref($close, 4) - 1) / Std($close / Ref($close, 1) - 1, 20)", "CSRank(Mean($volume, 5)) - CSRank(Ref($close, 3) / $close)",
                 "Corr($close / Ref($close, 1) - 1, Log($volume), 10) * Mean($close, 5)"]:
     parts = F.inputs(F.parse(formula), formula)
-    together, found = F.evaluate(formula, F.Context(panel.tables(), panel.industry_series()), parts)
-    alone = F.evaluate(formula, F.Context(panel.tables(), panel.industry_series()))
+    together, found = F.evaluate(formula, F.Context(panel.tables(), panel.industry), parts)
+    alone = F.evaluate(formula, F.Context(panel.tables(), panel.industry))
     gaps.append(float(np.nanmax(np.abs(together.to_numpy() - alone.to_numpy()))))
     assert np.array_equal(np.isnan(together.to_numpy()), np.isnan(alone.to_numpy()))
     for part in parts:
-        own = F.evaluate(part, F.Context(panel.tables(), panel.industry_series()))
+        own = F.evaluate(part, F.Context(panel.tables(), panel.industry))
         assert np.array_equal(np.isnan(found[part].to_numpy()), np.isnan(own.to_numpy())), part
         gaps.append(float(np.nanmax(np.abs(found[part].to_numpy() - own.to_numpy()))))
 print(json.dumps({"gap": max(gaps)}))

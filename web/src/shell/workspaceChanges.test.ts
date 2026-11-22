@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { transformSync } from "esbuild";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 import { chromium } from "playwright";
 import { describe, expect, it } from "vitest";
 import { change, followSaved, savedAt, saveWorkspace, undoFailedOpen, unsaved, type WorkspaceState } from "./workspaceChanges";
@@ -75,11 +75,15 @@ it("recovers unsaved workspaces once and commits all their drafts together in br
   try {
     const page = await browser.newPage();
     const origin = "http://127.0.0.1:5249";
-    const source = readFileSync(new URL("./workspaceChanges.ts", import.meta.url), "utf8");
-    const js = transformSync(source, { loader: "ts", format: "iife", globalName: "recovery" }).code;
+    const bundle = await build({
+      entryPoints: [fileURLToPath(new URL("./workspaceChanges.ts", import.meta.url))],
+      alias: { "@talyx/sdk": fileURLToPath(new URL("../../../sdk/ui/src/i18n.ts", import.meta.url)) },
+      nodePaths: [fileURLToPath(new URL("../../node_modules", import.meta.url))],
+      bundle: true, write: false, format: "iife", globalName: "recovery",
+    });
     await page.route(origin + "/", route => route.fulfill({ contentType: "text/html", body: "<title>Recovery</title>" }));
     await page.goto(origin);
-    await page.addScriptTag({ content: js });
+    await page.addScriptTag({ content: bundle.outputFiles[0].text });
     const states = [change(opened(), { name: "Uncommitted" }), { ...opened(), workspaceId: "other" }];
     const result = await page.evaluate(async states => {
       const { stashUnsaved, takeStash } = (window as Window & { recovery: typeof import("./workspaceChanges") }).recovery;

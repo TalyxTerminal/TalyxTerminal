@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { Instrument } from "@talyx/vocab";
 import type { OverlayPoint, OverlaySettings } from "./types";
 
@@ -8,13 +9,13 @@ export type PositionInstrument=Pick<Instrument,"marketType"|"assetClass"|"contra
  * tick and inverse/quanto valuation need metadata that Instrument does not carry. */
 export function positionUnits(instrument?:PositionInstrument): PositionUnits {
   const currency=instrument?.quote??instrument?.currency??null;
-  if (!instrument) return {pointValue:null,currency,reason:"Instrument units are unavailable."};
+  if (!instrument) return {pointValue:null,currency,reason:t("Instrument units are unavailable.")};
   if (instrument.contractOrientation==="linear") {
     const pointValue=Number(instrument.contractSize);
     if(Number.isFinite(pointValue)&&pointValue>0) return {pointValue,currency,reason:null};
   }
   if(instrument.marketType==="spot" && instrument.contractOrientation==="none" && ["crypto","equity","tokenized_equity","fund"].includes(instrument.assetClass)) return {pointValue:1,currency,reason:null};
-  return {pointValue:null,currency,reason:"Position quantity needs the instrument's price unit value."};
+  return {pointValue:null,currency,reason:t("Position quantity needs the instrument's price unit value.")};
 }
 
 export interface PositionMetrics {

@@ -9,6 +9,7 @@ from uuid import uuid4
 from fastapi import APIRouter
 from pydantic import BaseModel
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .checkpoints import digest
 from .service import origin
@@ -29,17 +30,17 @@ def page(items, query, cursor=None, limit=50):
         try:
             value = json.loads(base64.b64decode(cursor, altchars=b"-_", validate=True))
             if value["identity"] != identity:
-                raise ContractError("conflict", "The page contents or query changed; read again without a cursor.")
+                raise ContractError("conflict", t("The page contents or query changed; read again without a cursor."))
             offset = value["offset"]
             if type(offset) is not int or offset < 0 or offset > len(items):
                 raise ValueError("Invalid offset")
         except (ValueError, KeyError, TypeError, UnicodeError) as exc:
-            raise ContractError("invalid_input", "Invalid page cursor") from exc
+            raise ContractError("invalid_input", t("Invalid page cursor")) from exc
     selected = []
     for item in items[offset:offset + limit]:
         if len(json.dumps([*selected, item], ensure_ascii=False).encode()) > PAGE_BYTES - 1000:
             if not selected:
-                raise ContractError("too_large", "One entry exceeds the response budget.")
+                raise ContractError("too_large", t("One entry exceeds the response budget."))
             break
         selected.append(item)
     end = offset + len(selected)
@@ -58,7 +59,7 @@ def read_chars(snapshot, offset, limit=PAGE_BYTES, *, fields=("content", "baseCo
         if len(json.dumps(part, ensure_ascii=False).encode()) <= PAGE_BYTES:
             return part
         if length <= 1:
-            raise ContractError("too_large", "The document metadata exceeds the response budget.")
+            raise ContractError("too_large", t("The document metadata exceeds the response budget."))
         length //= 2
 
 
@@ -103,7 +104,7 @@ def read_lines(snapshot, start, count, char=None):
 async def create_checkpoint(documents, value):
     request = sorted(value["documents"], key=lambda item: item["documentId"])
     if len({item["documentId"] for item in request}) != len(request):
-        raise ContractError("invalid_input", "Capture each document only once.")
+        raise ContractError("invalid_input", t("Capture each document only once."))
     previous = documents.checkpoints.submission(value["submissionId"], request)
     if previous:
         return previous
@@ -137,11 +138,11 @@ async def restore_checkpoint(documents, value, call):
                         record["documentId"] == saved["capturedDocumentId"] and record["version"] == saved["version"]
                         or record["content"] == record["baseContent"] == saved["baseContent"])
                 if record["readOnly"]:
-                    result.update(status="read_only", message="This source is read-only.")
+                    result.update(status="read_only", message=t("This source is read-only."))
                 elif record["content"] == saved["content"] and not record["conflict"] and record["externalState"] == "present":
                     result["status"] = "unchanged"
                 elif not accepted:
-                    result.update(status="conflict", message="Current input and the saved version are both kept. Compare before replacing.")
+                    result.update(status="conflict", message=t("Current input and the saved version are both kept. Compare before replacing."))
                 else:
                     if resolution:
                         preserved = {"capturedDocumentId": document_id, "source": record["source"], "name": record["name"],
@@ -177,7 +178,7 @@ def router(documents):
     @routes.post("/{document_id}/resolve")
     async def resolve(document_id: str, value: Resolution):
         if value.mode not in {"mine", "external"}:
-            raise ContractError("invalid_input", "Choose to keep your edits or use the external version.")
+            raise ContractError("invalid_input", t("Choose to keep your edits or use the external version."))
         return await documents.resolve(document_id, value.mode, value.expectedVersion, value.expectedSourceVersion)
 
     @routes.get("/checkpoints/{checkpoint_id}")

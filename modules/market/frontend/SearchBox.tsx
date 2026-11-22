@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useId, useRef, useState } from "react";
 import { TxButton, TxEmpty, TxIconButton, TxSearch, TxSelect, TxSkeleton, TxTabs, TxTag, type ModuleContext } from "@talyx/sdk";
 import type { Instrument, SeriesId } from "@talyx/vocab";
@@ -10,12 +11,12 @@ type CatalogState = SearchOutput["venues"][number];
 type CallerAction = NonNullable<SearchViewProps["callerActions"]>[number];
 
 const assets = [
-  { value: "", label: "All" }, { value: "crypto", label: "Crypto" }, { value: "equity", label: "Stocks" },
-  { value: "fund", label: "Funds" }, { value: "index", label: "Indices" }, { value: "fx", label: "Forex" },
+  { value: "", label: t("All") }, { value: "crypto", label: t("Crypto") }, { value: "equity", label: t("Stocks") },
+  { value: "fund", label: t("Funds") }, { value: "index", label: t("Indices") }, { value: "fx", label: t("Forex") },
 ];
-const products: Record<string, string> = { spot: "Spot", swap: "Perpetual", future: "Futures", option: "Options" };
-const kinds: Record<string, string> = { equity: "Stock", fund: "Fund", index: "Index", fx: "Forex", commodity: "Commodity" };
-const families: Record<string, string> = { listings: "listings", ...Object.fromEntries(Object.entries(products).map(([key, label]) => [key, label.toLowerCase()])) };
+const products: Record<string, string> = { spot: t("Spot"), swap: t("Perpetual"), future: t("Futures"), option: t("Options") };
+const kinds: Record<string, string> = { equity: t("Stock"), fund: t("Fund"), index: t("Index"), fx: t("Forex"), commodity: t("Commodity") };
+const families: Record<string, string> = { listings: t("listings"), ...Object.fromEntries(Object.entries(products).map(([key, label]) => [key, label.toLowerCase()])) };
 
 const dateOf = (ns: string | null) => ns === null ? "" : new Date(Number(BigInt(ns) / 1_000_000n)).toISOString().slice(0, 10);
 
@@ -34,12 +35,13 @@ function CatalogFeedback({ states, onRetry }: { states: CatalogState[]; onRetry:
   const name = (item: CatalogState) => `${item.venueName} ${families[item.family] ?? item.family}`;
   // A region block is answered the same way every time: say so in a few words, not the source's whole reply.
   const why = (item: CatalogState) => item.problem?.code === "forbidden" && item.problem.status
-    ? `blocked from your region, HTTP ${item.problem.status}` : item.problem?.message ?? "failed";
+    ? t("blocked from your region, HTTP {status}", { status: item.problem.status }) : item.problem?.message ?? t("failed");
+  const failures = failed.slice(0, 3).map(item => `${name(item)} (${why(item)})`).join("; ");
   return <>
-    {!!loading.length && <p role="status" className="tx-hint">Still loading: {loading.map(name).join(", ")}</p>}
+    {!!loading.length && <p role="status" className="tx-hint">{t("Still loading: {loading}", { loading: loading.map(name).join(", ") })}</p>}
     {!!failed.length && <div role="alert" className="market-search-source-error tx-hint">
-      <span>Could not load {failed.slice(0, 3).map(item => `${name(item)} (${why(item)})`).join("; ")}{failed.length > 3 ? ` and ${failed.length - 3} more` : ""}</span>
-      <TxButton size="sm" variant="quiet" onClick={onRetry}>Retry</TxButton>
+      <span>{failed.length > 3 ? t("Could not load {failures} and {count} more", { failures, count: failed.length - 3 }) : t("Could not load {failures}", { failures })}</span>
+      <TxButton size="sm" variant="quiet" onClick={onRetry}>{t("Retry")}</TxButton>
     </div>}
   </>;
 }
@@ -96,7 +98,7 @@ export function SearchBox({ ctx, props, onSelected, onCallerAction, onClosed, au
   useEffect(() => { if (active) list.current?.querySelector(`[id="${listId}-${active}"]`)?.scrollIntoView({ block: "nearest" }); }, [active, listId]);
   const allowed = props.constraint ? new Set(props.constraint.products) : null;
   return <div data-market-search="" className="market-search">
-    <TxSearch value={query} onValueChange={setQuery} autoFocus={autoFocus} placeholder={props.placeholder ?? "Search instruments"} aria-label="Search instruments"
+    <TxSearch value={query} onValueChange={setQuery} autoFocus={autoFocus} placeholder={props.placeholder ?? t("Search instruments")} aria-label={t("Search instruments")}
       role="combobox" aria-autocomplete="list" aria-expanded={results.length > 0} aria-controls={listId}
       aria-activedescendant={active ? `${listId}-${active}` : undefined}
       onKeyDown={event => {
@@ -113,17 +115,17 @@ export function SearchBox({ ctx, props, onSelected, onCallerAction, onClosed, au
       }} />
     {!props.constraint && <TxTabs value={asset} options={assets} onChange={setAsset} />}
     {(asset === "" || asset === "crypto") && <div className="market-search-filters">
-      <TxSelect value={product} aria-label="Product type" onChange={event => setProduct(event.target.value)}>
-        <option value="">All products</option>
+      <TxSelect value={product} aria-label={t("Product type")} onChange={event => setProduct(event.target.value)}>
+        <option value="">{t("All products")}</option>
         {Object.entries(products).filter(([id]) => !allowed || allowed.has(id as "spot")).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
       </TxSelect>
     </div>}
     <CatalogFeedback states={states} onRetry={() => setRetry(value => value + 1)} />
     {loading && !results.length && <div className="tx-search-loading"><TxSkeleton width="70%" /></div>}
-    {error && <div role="alert" className="tx-error">{error} <TxButton size="sm" variant="quiet" onClick={() => setRetry(value => value + 1)}>Retry</TxButton></div>}
-    {!query.trim() && <TxEmpty title="Search for a symbol" text="Type a code or a name, such as BTCUSDT, AAPL or 00700." />}
-    {!loading && !error && query.trim() && !results.length && !states.some(item => item.state !== "ready") && <TxEmpty title="No matches" text={`Nothing matches "${query.trim()}".`} />}
-    {!!results.length && <div ref={list} id={listId} role="listbox" aria-label="Instruments" className="market-search-results">
+    {error && <div role="alert" className="tx-error">{error} <TxButton size="sm" variant="quiet" onClick={() => setRetry(value => value + 1)}>{t("Retry")}</TxButton></div>}
+    {!query.trim() && <TxEmpty title={t("Search for a symbol")} text={t("Type a code or a name, such as BTCUSDT, AAPL or 00700.")} />}
+    {!loading && !error && query.trim() && !results.length && !states.some(item => item.state !== "ready") && <TxEmpty title={t("No matches")} text={t("Nothing matches \"{query}\".", { query: query.trim() })} />}
+    {!!results.length && <div ref={list} id={listId} role="listbox" aria-label={t("Instruments")} className="market-search-results">
       {results.map(result => {
         const instrument = result.instrument, id = instrument.instrumentId;
         return <div key={id} className="market-search-item">
@@ -133,10 +135,10 @@ export function SearchBox({ ctx, props, onSelected, onCallerAction, onClosed, au
               <span className="market-search-symbol" title={instrument.displaySymbol}><Matched text={instrument.displaySymbol} query={query} /></span>
               <span className="market-search-name" title={instrument.name ?? instrument.base ?? instrument.symbol}>
                 {instrument.name ?? instrument.base ?? instrument.symbol}
-                {result.formerCode && <small> · former code {result.formerCode.code}{result.formerCode.until ? `, until ${dateOf(result.formerCode.until)}` : ""}</small>}
+                {result.formerCode && <small>{(result.formerCode.until ? t(" · former code {code}, until {until}", { code: result.formerCode.code, until: dateOf(result.formerCode.until) }) : t(" · former code {code}", { code: result.formerCode.code }))}</small>}
               </span>
-              <span className="market-search-kind"><TxTag tone="muted">{kindLabel(instrument)}</TxTag>{instrument.retiredAt || instrument.delistedAt ? <TxTag tone="muted">{instrument.identityVersion === 2 ? "Delisted" : "Retired"}</TxTag> : null}</span>
-              <span className="market-search-venue">{result.local && <><small>Local data</small>{" "}</>}{instrument.venueName}</span>
+              <span className="market-search-kind"><TxTag tone="muted">{kindLabel(instrument)}</TxTag>{instrument.retiredAt || instrument.delistedAt ? <TxTag tone="muted">{instrument.identityVersion === 2 ? t("Delisted") : t("Retired")}</TxTag> : null}</span>
+              <span className="market-search-venue">{result.local && <><small>{t("Local data")}</small>{" "}</>}{instrument.venueName}</span>
             </TxButton>
             {props.callerActions?.map(action => {
               const on = action.activeInstrumentIds?.includes(id);
@@ -151,7 +153,7 @@ export function SearchBox({ ctx, props, onSelected, onCallerAction, onClosed, au
           </div>)}
         </div>;
       })}
-      {cursor !== null && <TxButton size="sm" variant="quiet" onClick={() => void more()}>More matches</TxButton>}
+      {cursor !== null && <TxButton size="sm" variant="quiet" onClick={() => void more()}>{t("More matches")}</TxButton>}
     </div>}
   </div>;
 }

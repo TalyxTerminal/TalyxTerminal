@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .materials import plain
 from .project_snapshots import snapshot_project
@@ -86,7 +87,7 @@ async def prepare_lock(ctx, lock, origin, publish=None):
             log = ""
         lines = log.strip().splitlines()
         reason = lines[-1].strip() if lines else "the preparation stopped without saying why"
-        raise ContractError("unavailable", f"The research environment could not be prepared: {reason}", {"preparation": state})
+        raise ContractError("unavailable", t("The research environment could not be prepared: {reason}", reason=reason), {"preparation": state})
     return {**state, "origin": origin}
 
 
@@ -106,7 +107,7 @@ async def command(ctx, argv, cwd, directory, name):
             await asyncio.sleep(.2)
         if await ctx.processes.wait(lease) != 0:
             message = (directory / (name + ".stderr.log")).read_text(encoding="utf-8", errors="replace")[-3000:]
-            raise ContractError("unavailable", f"Native project environment step {name} failed: {message}")
+            raise ContractError("unavailable", t("Native project environment step {name} failed: {message}", name=name, message=message))
     except asyncio.CancelledError:
         if lease:
             await ctx.processes.cancel(lease)
@@ -128,7 +129,7 @@ async def project_lock(ctx, project, captured, directory, baseline):
     elif (root / "pyproject.toml").is_file():
         uv = shutil.which("uv")
         if not uv:
-            raise ContractError("unavailable", "uv is required to prepare this original Python project.")
+            raise ContractError("unavailable", t("uv is required to prepare this original Python project."))
         fixed_python = version
 
         async def run(arguments, working, name):

@@ -4,6 +4,8 @@ from __future__ import annotations
 import pandas as pd
 from native.chart_publication import plotly_figures
 
+from . import i18n
+
 
 def feature_importance(publisher, recorder, paths, name, failures, *, figures=True):
     if "params.pkl" not in paths:
@@ -41,7 +43,7 @@ def feature_importance(publisher, recorder, paths, name, failures, *, figures=Tr
             artifacts.extend(plotly_figures(publisher, [figure], f"{name}/feature-importance-{kind}", "LightGBM feature importance · " + kind,
                                             chapter="training", order=order, engine="lightgbm"))
     except Exception as error:
-        failures.append({"title": "Feature importance", "message": str(error)})
+        failures.append({"title": i18n.t("Feature importance"), "message": str(error)})
     return artifacts
 
 

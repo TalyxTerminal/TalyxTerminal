@@ -45,7 +45,7 @@ def run(basis, config):
         for index in range(3):
             at = (1_700_000_000_000 + (index + 1) * 60_000) * 1_000_000
             row = {'instrument': instrument, 'barType': kind, 'open': '100.0', 'high': '101.01', 'low': '99.0', 'close': '100.0',
-                   'volume': '10.000', 'ts_event': str(at), 'ts_init': str(at)}
+                   'volume': '10.000', 'ts_event': at, 'ts_init': at}
             for key in ('mark', 'index'):
                 cross = index == 0 or (index == 1 and key != basis) or (index == 2 and key == basis)
                 low = '90.0' if cross else '95.04'  # Above the stop, even though it rounds to 95.0 at the trading tick.

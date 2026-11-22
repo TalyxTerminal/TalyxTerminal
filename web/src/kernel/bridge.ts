@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* The window's connection to the Host. A frame is one binary WebSocket message: an envelope (JSON) line, then the
    body (JSON). The Host reads only envelopes and passes bodies on as they are; the module that receives a call
    checks its input, and the module that answers checked its output. When the Host restarts (a new instance id on
@@ -82,7 +83,7 @@ export class BridgeClient implements Remote {
     const deadline = Date.now() + CALL_SECONDS * 1000;
     if (!this.session) await Promise.race([this.ready, new Promise((_, reject) => setTimeout(() => reject(failure("timeout")), Math.max(0, deadline - Date.now())))]);
     if (options.signal?.aborted) throw failure("cancelled");
-    if (this.pending.size >= MAX_PENDING) throw failure("backpressure", "Too many calls are waiting for the Host");
+    if (this.pending.size >= MAX_PENDING) throw failure("backpressure", t("Too many calls are waiting for the Host"));
     const id = `w${++this.ids}`;
     return new Promise((resolve, reject) => {
       const pending: Pending = { resolve, reject, timer: setTimeout(() => {
@@ -170,7 +171,7 @@ export class BridgeClient implements Remote {
             console.error(`A subscriber of ${id} failed`, error);
             live.closed = true; this.subscriptions.delete(id);
             try { this.send({ t: "unsub", sub: id }); } catch { /* the connection is gone already */ }
-            live.onEnd?.(failure("handler_error", "Subscriber failed", undefined, "failed").value);
+            live.onEnd?.(failure("handler_error", t("Subscriber failed"), undefined, "failed").value);
           }
         });
         return;
@@ -181,7 +182,7 @@ export class BridgeClient implements Remote {
         const id = String(envelope.id);
         try {
           const action = this.windowActions[String(envelope.cap).replace(/^platform\./, "")];
-          if (!action) throw failure("unknown_capability", `This window has no action ${String(envelope.cap)}`);
+          if (!action) throw failure("unknown_capability", t("This window has no action {action}", { action: String(envelope.cap) }));
           const result = await action(value as Json, envelope.from as Caller);
           this.send({ t: "result", id }, result);
         } catch (error) {

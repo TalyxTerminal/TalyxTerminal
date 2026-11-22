@@ -286,7 +286,7 @@ def test_the_trial_for_a_reviewed_period_is_fitted_on_returns_before_its_weights
     days = pd.bdate_range("2026-09-01", "2026-11-06")
     returns = pd.DataFrame({"SPY": 0.001, "IEF": 0.0005}, index=days)
     seen = {}
-    monkeypatch.setattr(allocation_run, "cached_returns", lambda job: (returns, {"cutShort": [], "proxies": {}, "spliced": []}))
+    monkeypatch.setattr(allocation_run, "cached_returns", lambda job: (returns, {"cutShort": [], "proxies": {}, "spliced": [], "benchmark": None}))
     monkeypatch.setattr(allocation_run, "too_few_periods", lambda *args: None)
     monkeypatch.setattr(allocation_run.W, "check_feasible", lambda *args: None)
     monkeypatch.setattr(allocation_run.W, "check_settings", lambda *args: None)

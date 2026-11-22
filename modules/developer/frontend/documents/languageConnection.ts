@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /** JSON-RPC to the Python language server through Developer's backend: requests with answers and cancellation, notifications both ways. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Lsp = any;
@@ -26,14 +27,14 @@ export class LanguageConnection {
       const connection = new LanguageConnection(socket, handlers);
       socket.onopen = () => resolve(connection);
       const early = socket.onclose;
-      socket.onclose = event => { if (!connection.closed) reject(new Error("The Python language service did not start.")); early?.call(socket, event); };
+      socket.onclose = event => { if (!connection.closed) reject(new Error(t("The Python language service did not start."))); early?.call(socket, event); };
     });
   }
 
   private end(code: number) {
     if (this.closed) return;
     this.closed = true;
-    for (const waiting of this.pending.values()) waiting.reject(new Error("The Python language service closed."));
+    for (const waiting of this.pending.values()) waiting.reject(new Error(t("The Python language service closed.")));
     this.pending.clear();
     this.handlers.closed(code);
   }
@@ -56,7 +57,7 @@ export class LanguageConnection {
     const waiting = this.pending.get(message.id);
     if (!waiting) return;
     this.pending.delete(message.id);
-    if (message.error) waiting.reject(new Error(message.error.message ?? "The language server refused the request."));
+    if (message.error) waiting.reject(new Error(message.error.message ?? t("The language server refused the request.")));
     else waiting.resolve(message.result);
   }
 

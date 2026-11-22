@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from talyx_sdk.i18n import t
+
 from .common import MarketError
 
 MARKET_CALENDARS = {"US": "XNYS", "CN": "XSHG", "HK": "XHKG", "FX": "24_7", "COIN": "24_7"}
@@ -28,7 +30,7 @@ def yahoo_symbol(market: str, code: str) -> str:
             return f"{number}.SS"
         if exchange == "SZ":
             return f"{number}.SZ"
-        raise MarketError("unsupported", f"Yahoo has no Beijing listings ({code})", source_id="yfinance")
+        raise MarketError("unsupported", t("Yahoo has no Beijing listings ({code})", code=code), source_id="yfinance")
     if market == "HK":
         number = code.split(".")[0]
         return (number[1:] if number.startswith("0") else number) + ".HK"
@@ -66,7 +68,7 @@ def cn_code(number: str) -> str:
         return f"{number}.SH"
     if number.startswith(("0", "2", "3", "1")):
         return f"{number}.SZ"
-    raise MarketError("invalid_input", f"Unknown A-share number {number}")
+    raise MarketError("invalid_input", t("Unknown A-share number {number}", number=number))
 
 
 def baostock_code(code: str) -> str:

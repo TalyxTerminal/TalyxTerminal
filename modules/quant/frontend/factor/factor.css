@@ -122,8 +122,6 @@
 .fx-lhead.fx-sub { border-top: 1px solid var(--tx-line); }
 .fx-lhead .fx-combo { font-family: var(--tx-font); font-weight: var(--tx-weight-strong); color: var(--tx-text); }
 .fx-down { transform: rotate(90deg); width: 12px !important; height: 12px !important; }
-.fx-noteslist { max-width: 420px; padding: 2px 0; font-size: var(--tx-size-sm); color: var(--tx-text-2); }
-.fx-noteslist div { padding: 4px 0; line-height: 1.45; }
 .fx-stats { border-top: 1px solid var(--tx-line); }
 .fx-stats .tx-keynumbers { grid-template-columns: repeat(6, minmax(0, 1fr)); border-bottom: 0; }
 @container (max-width: 760px) { .fx-stats .tx-keynumbers { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

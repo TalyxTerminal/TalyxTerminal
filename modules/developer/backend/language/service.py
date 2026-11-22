@@ -17,6 +17,7 @@ from pathlib import Path
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..projects.service import canonical_uri, file_path
 from .environment import environment_key, language_spec, packages_stamp
@@ -29,7 +30,7 @@ NONE = {"session": None}
 def server_command() -> list[str]:
     program = Path(sys.executable).parent / ("basedpyright-langserver.exe" if os.name == "nt" else "basedpyright-langserver")
     if not program.is_file():
-        raise ContractError("unavailable", "The Python language service (basedpyright) is not installed.")
+        raise ContractError("unavailable", t("The Python language service (basedpyright) is not installed."))
     return [str(program), "--stdio"]
 
 

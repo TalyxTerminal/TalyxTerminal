@@ -1,5 +1,6 @@
 /* A model's preparation: the standard pipeline's settings in their groups (Data, Inputs, Processing, Label, Split, Algorithm), then the run settings and the batch.
    Generated from the pipeline's declarations; the groups with their own layout are the inputs table, the label, the algorithm and the batch. */
+import { t } from "../i18n";
 import { Fragment, useState, type ReactNode } from "react";
 import { TxButton, TxCheckbox, TxIcon, TxInput, TxParamGroup, TxParamRow, TxPopover, TxSegmented, TxSelect, TxTable, TxTag, TxTd, TxTh } from "@talyx/sdk";
 import type { Parameter, ParamValue } from "../objects";
@@ -27,8 +28,8 @@ const quick = (days: number, form: string) => {
   const core = `Ref($open, -${days + 1}) / Ref($open, -1) - 1`;
   return form === "rank" ? `CSRank(${core})` : form === "demean" ? `CSDemean(${core})` : core;
 };
-const DAYS = [1, 5, 10, 20], FORMS = [["raw", "Raw"], ["demean", "Less the mean"], ["rank", "Rank"]] as const;
-const SOURCES: Record<string, string> = {library: "Library factor", value: "Library value", run: "Factor run", builtin: "Built-in set", market: "Market series", code: "Own code"};
+const DAYS = [1, 5, 10, 20], FORMS = [["raw", t.c("label", "Raw")], ["demean", t("Less the mean")], ["rank", t("Rank")]] as const;
+const SOURCES: Record<string, string> = {library: t("Library factor"), value: "Library value", run: t("Factor run"), builtin: t("Built-in set"), market: t("Market series"), code: t("Own code")};
 
 export interface PrepProps {
   prep: ModelPrep; values: Record<string, ParamValue>; base: Record<string, ParamValue> | null; baseNumber: number | null; width: Width; check: CheckAnswer | null; checking: boolean;
@@ -68,10 +69,10 @@ export function AuxLabels({value, onChange}: {value: string; onChange(next: stri
   const filled = rows.some(row => row.trim()) || blank;
   return <div className="mx-label" data-testid="aux-labels">
     {filled ? rows.map((row, index) => <div key={index} className="mx-auxrow">
-      <TxInput aria-label={`Auxiliary label ${index + 1}`} value={row} placeholder="e.g. Ref($open, -8) / Ref($open, -1) - 1" onChange={event => write(rows.map((other, at) => at === index ? event.target.value.replace(/\n/g, " ") : other))} />
-      <TxButton size="sm" variant="quiet" aria-label={`Remove auxiliary label ${index + 1}`} onClick={() => { const left = rows.filter((_other, at) => at !== index); if (!left.some(row => row.trim())) setBlank(false); onChange(left.join("\n")); }}>Remove</TxButton></div>)
-      : <span className="mx-t3">next 1 and 2 bars further out</span>}
-    <TxButton size="sm" variant="quiet" onClick={() => { if (!filled) setBlank(true); else write([...rows, ""]); }}>Add label</TxButton></div>;
+      <TxInput aria-label={t("Auxiliary label {index}", { index: index + 1 })} value={row} placeholder={t("e.g. Ref($open, -8) / Ref($open, -1) - 1")} onChange={event => write(rows.map((other, at) => at === index ? event.target.value.replace(/\n/g, " ") : other))} />
+      <TxButton size="sm" variant="quiet" aria-label={t("Remove auxiliary label {index}", { index: index + 1 })} onClick={() => { const left = rows.filter((_other, at) => at !== index); if (!left.some(row => row.trim())) setBlank(false); onChange(left.join("\n")); }}>{t("Remove")}</TxButton></div>)
+      : <span className="mx-t3">{t("next 1 and 2 bars further out")}</span>}
+    <TxButton size="sm" variant="quiet" onClick={() => { if (!filled) setBlank(true); else write([...rows, ""]); }}>{t("Add label")}</TxButton></div>;
 }
 
 export function Prep(props: PrepProps) {
@@ -89,12 +90,12 @@ export function Prep(props: PrepProps) {
     if (item.name === "label") return <LabelBox value={String(value)} error={check?.label?.error ?? null} reach={check?.label?.reach ?? null} fields={props.fields} onChange={set(item)} />;
     if (item.name === "weight_formula") {
       const problem = check?.checks?.find(entry => entry.name === "Sample weight" && entry.state === "fix");
-      return <div className="mx-label"><FormulaBox value={String(value ?? "")} error={null} fields={props.fields} onChange={set(item)} onRun={() => undefined} label="Weight formula" placeholder="Weight, e.g. $volume * $close" />
+      return <div className="mx-label"><FormulaBox value={String(value ?? "")} error={null} fields={props.fields} onChange={set(item)} onRun={() => undefined} label={t("Weight formula")} placeholder={t("Weight, e.g. $volume * $close")} />
         {problem && <div className="mx-labelnote" data-error="" role="alert">{problem.value}</div>}</div>;
     }
     if (item.name === "objective") {
       const options = (algorithm ?? prep.algorithms.find(entry => entry.id === "lightgbm"))?.objectives ?? [];
-      return <TxSelect aria-label="Objective" value={String(value)} onChange={event => set(item)(event.target.value)}>{options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</TxSelect>;
+      return <TxSelect aria-label={t("Objective")} value={String(value)} onChange={event => set(item)(event.target.value)}>{options.map(option => <option key={option.id} value={option.id}>{t(option.label)}</option>)}</TxSelect>;
     }
     if (item.name === "objective_param") {
       const objective = algorithm?.objectives?.find(option => option.id === values.objective);
@@ -103,26 +104,26 @@ export function Prep(props: PrepProps) {
     }
     if (item.name === "nn_base") {
       const options = matchingBases(prep.baseRuns, values);
-      return <TxSelect aria-label="Start from" value={String(value ?? "")} onChange={event => set(item)(event.target.value)}><option value="">none</option>
-        {options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</TxSelect>;
+      return <TxSelect aria-label={t("Start from")} value={String(value ?? "")} onChange={event => set(item)(event.target.value)}><option value="">{t("none")}</option>
+        {options.map(option => <option key={option.id} value={option.id}>{t(option.label)}</option>)}</TxSelect>;
     }
     if (item.name === "label_aux") return <AuxLabels value={String(value ?? "")} onChange={set(item)} />;
     if (item.name === "nn_concepts") {
       const options = prep.concepts ?? [];
-      return options.length ? <TxSelect aria-label="Concepts" value={String(value ?? "")} onChange={event => set(item)(event.target.value)}><option value="">none</option>
-        {options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</TxSelect> : <span className="mx-t3">none</span>;
+      return options.length ? <TxSelect aria-label={t("Concepts")} value={String(value ?? "")} onChange={event => set(item)(event.target.value)}><option value="">{t("none")}</option>
+        {options.map(option => <option key={option.id} value={option.id}>{t(option.label)}</option>)}</TxSelect> : <span className="mx-t3">{t("none")}</span>;
     }
-    if (item.name === "nn_lookback" && alpha360Only(values.inputs)) return <span className="mx-t3">60 days (Alpha360)</span>;
+    if (item.name === "nn_lookback" && alpha360Only(values.inputs)) return <span className="mx-t3">{t("60 days (Alpha360)")}</span>;
     if (item.name === "nn_device" && props.deep?.installed) {
       const options = props.deep.devices;
-      return options.length > 1 ? <TxSelect aria-label="Device" value={String(value || options[0].id)} onChange={event => set(item)(event.target.value)}>{options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</TxSelect>
+      return options.length > 1 ? <TxSelect aria-label={t("Device")} value={String(value || options[0].id)} onChange={event => set(item)(event.target.value)}>{options.map(option => <option key={option.id} value={option.id}>{t(option.label)}</option>)}</TxSelect>
         : <span className="mx-t3">{options[0]?.label}</span>;
     }
     if (item.name === "algorithm") return <AlgorithmSelect algorithms={prep.algorithms} value={String(value)} onChange={set(item)} />;
     if (item.type === "bool") return <TxCheckbox label={label(item)} checked={Boolean(value)} onCheckedChange={set(item)} />;
     if (item.type === "int" || item.type === "float") return <TxInput numeric aria-label={label(item)} value={String(value)} onChange={event => {const next = Number(event.target.value); if (Number.isFinite(next)) set(item)(next);}} />;
     if (item.type === "choice") return <TxSelect aria-label={label(item)} value={JSON.stringify(value)} onChange={event => set(item)(JSON.parse(event.target.value))}>
-      {(item.options ?? []).map(option => <option key={JSON.stringify(option.value)} value={JSON.stringify(option.value)}>{option.label}</option>)}</TxSelect>;
+      {(item.options ?? []).map(option => <option key={JSON.stringify(option.value)} value={JSON.stringify(option.value)}>{prep.ownCode ? option.label : t(option.label)}</option>)}</TxSelect>;
     // The first test day is a day in the app's writing (as Held out from), empty for after the first training and validation.
     if (item.name === "first_test") return <DayInput label={label(item)} value={value ? String(value) : null} empty onChange={day => set(item)(day ?? "")} />;
     return <TxInput aria-label={label(item)} value={String(value ?? "")} onChange={event => set(item)(event.target.value)} />;
@@ -141,16 +142,16 @@ export function Prep(props: PrepProps) {
   const group = (name: string, body?: ReactNode) => {
     const items = prep.groups.find(entry => entry.name === name)?.settings.filter(item => visible(item, values, all)) ?? [];
     const settingsChanged = items.some(item => changed(item.name));
-    return <TxParamGroup key={`${name}-${width}`} title={name} summary={summaryOf(name)} changed={settingsChanged} defaultOpen={width !== "narrow"}>
+    return <TxParamGroup key={`${name}-${width}`} title={name === "Processing" ? t("Processing") : t(name)} summary={summaryOf(name)} changed={settingsChanged} defaultOpen={width !== "narrow"}>
       {body ?? items.map(row)}</TxParamGroup>;
   };
   /** Inputs and the label side by side, as the draft lays them out: a row for missing, extremes and scale, a column each. */
   const processingBody = () => {
     const find = (name: string) => all.find(item => item.name === name);
-    const pairs: [string, string, string][] = [["Missing", "inputs_missing", "label_missing"], ["Extremes", "inputs_extremes", "label_extremes"], ["Scale", "inputs_scale", "label_scale"]];
+    const pairs: [string, string, string][] = [[t("Missing"), "inputs_missing", "label_missing"], [t("Extremes"), "inputs_extremes", "label_extremes"], [t("Scale"), "inputs_scale", "label_scale"]];
     const rest = ["take_out_industry", "take_out_size"].map(find).filter((item): item is Parameter => Boolean(item));
     return <>
-      <div className="mx-proc"><span /><span className="mx-t3">Inputs</span><span className="mx-t3">Label</span>
+      <div className="mx-proc"><span /><span className="mx-t3">{t("Inputs")}</span><span className="mx-t3">{t("Label")}</span>
         {pairs.map(([title, left, right]) => <Fragment key={title}><span className="mx-t3">{title}</span>{[left, right].map(name => { const item = find(name); return item ? <TxParamRow key={name} wide changed={changed(name)} onRevert={() => props.onRevert(name, base?.[name] ?? item.default as ParamValue)}>{control(item)}</TxParamRow> : <span key={name} />; })}</Fragment>)}</div>
       {rest.map(row)}</>;
   };
@@ -175,41 +176,41 @@ export function Prep(props: PrepProps) {
   const minimum = Number(values.min_dollar ?? all.find(item => item.name === "min_dollar")?.default ?? 0);
   const dollars = minimum >= 1e6 ? `$${(minimum / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1})}M` : `$${minimum.toLocaleString("en-US")}`;
   const summaryOf = (name: string): string => {
-    if (name === "Data") return [["halted days", values.leave_out_halted], ["listed under 1 year", values.leave_out_young], [`under ${dollars} a day`, values.leave_out_illiquid]].filter(([, on]) => on).map(([text]) => text).join(", ") || "nothing left out";
-    if (name === "Inputs") { const rows = (values.inputs ?? []) as unknown as unknown[]; return rows.length ? `${rows.length} input${rows.length > 1 ? "s" : ""}${check?.features ? ` · ${check.features} features` : ""}` : "none yet"; }
+    if (name === "Data") return [[t("halted days"), values.leave_out_halted], [t("listed under 1 year"), values.leave_out_young], [t("under {amount} a day", { amount: dollars }), values.leave_out_illiquid]].filter(([, on]) => on).map(([text]) => text).join(", ") || t("nothing left out");
+    if (name === "Inputs") { const rows = (values.inputs ?? []) as unknown as unknown[]; return rows.length ? (rows.length > 1 ? (check?.features ? t("{count} inputs · {features} features", { count: rows.length, features: check.features }) : t("{count} inputs", { count: rows.length })) : (check?.features ? t("{count} input · {features} features", { count: rows.length, features: check.features }) : t("{count} input", { count: rows.length }))) : t("none yet"); }
     if (name === "Processing") return `${optionLabel("inputs_missing").toLowerCase()}, ${optionLabel("inputs_extremes").toLowerCase()}, ${optionLabel("inputs_scale").toLowerCase()}`;
-    if (name === "Label") return check?.label?.reach ? `${check.label.reach.ahead - check.label.reach.start.bar} bars from ${check.label.reach.start.bar === 1 ? "the next open" : "this close"}` : String(values.label ?? "").slice(0, 40);
-    if (name === "Split") return `${optionLabel("window_mode").toLowerCase()} ${optionLabel("train_months").toLowerCase()} · validation ${optionLabel("valid_months")} · retrain every ${optionLabel("every_months")}`;
-    if (name === "Algorithm") return algorithm?.label ?? "not chosen";
+    if (name === "Label") return check?.label?.reach ? t("{bars} bars from {start}", { bars: check.label.reach.ahead - check.label.reach.start.bar, start: check.label.reach.start.bar === 1 ? t("the next open") : t("this close") }) : String(values.label ?? "").slice(0, 40);
+    if (name === "Split") return t("{mode} {train} · validation {validation} · retrain every {interval}", { mode: optionLabel("window_mode").toLowerCase(), train: optionLabel("train_months").toLowerCase(), validation: optionLabel("valid_months"), interval: optionLabel("every_months") });
+    if (name === "Algorithm") return algorithm?.label ?? t("not chosen");
     return "";
   };
   const G: Record<string, ReactNode> = {
-    data: width !== "narrow" && props.dataBasics ? <TxParamGroup key={`Data-${width}`} title="Data" summary={summaryOf("Data")} defaultOpen>{props.dataBasics}
-      <TxParamRow label="Leave out"><div className="mx-chips">{([["leave_out_halted", "Halted days"], ["leave_out_young", "Listed under 1 year"], ["leave_out_illiquid", `Under ${dollars} a day`]] as const).map(([name, text]) =>
+    data: width !== "narrow" && props.dataBasics ? <TxParamGroup key={`Data-${width}`} title={t("Data")} summary={summaryOf("Data")} defaultOpen>{props.dataBasics}
+      <TxParamRow label={t("Leave out")}><div className="mx-chips">{([["leave_out_halted", t("Halted days")], ["leave_out_young", t("Listed under 1 year")], ["leave_out_illiquid", t("Under {amount} a day", { amount: dollars })]] as const).map(([name, text]) =>
         <button key={name} type="button" aria-pressed={Boolean(values[name] ?? all.find(item => item.name === name)?.default)} onClick={() => props.onChange(name, !(values[name] ?? all.find(item => item.name === name)?.default))}>{text}</button>)}</div></TxParamRow></TxParamGroup>
-      : <TxParamGroup key={`Data-${width}`} title="Data" summary={summaryOf("Data")} defaultOpen={width !== "narrow"}>{prep.groups.find(entry => entry.name === "Data")?.settings.filter(item => visible(item, values, all)).map(row)}</TxParamGroup>,
+      : <TxParamGroup key={`Data-${width}`} title={t("Data")} summary={summaryOf("Data")} defaultOpen={width !== "narrow"}>{prep.groups.find(entry => entry.name === "Data")?.settings.filter(item => visible(item, values, all)).map(row)}</TxParamGroup>,
     inputs: group("Inputs"), processing: group("Processing", processingBody()), label: group("Label", <LabelGroup items={prep.groups.find(entry => entry.name === "Label")?.settings.filter(item => visible(item, values, all)) ?? []}
       values={values} onChange={props.onChange} row={row} />),
     split: group("Split"), algorithm: group("Algorithm", algorithmBody()),
-    run: <TxParamGroup key={`Run-${width}`} title="Run settings" summary={`cost ${run.cost} bps · top ${run.topN}${heldOut ? ` · held out from ${dayShown(heldOut)}` : ""}`} defaultOpen={width !== "narrow"}>
-      <TxParamRow label="Held out from"><DayInput label="Held out from" value={heldOut || null} empty onChange={props.onHeldOut} /></TxParamRow>
-      <TxParamRow label="Cost a trade" changed={props.baseRun !== null && run.cost !== props.baseRun.cost} onRevert={() => props.baseRun && props.onRun({cost: props.baseRun.cost})}><TxInput numeric suffix="bps" aria-label="Cost a trade" value={String(run.cost)} onChange={event => {const next = Number(event.target.value); if (Number.isFinite(next)) props.onRun({cost: next});}} /></TxParamRow>
-      <TxParamRow label="Top N" changed={props.baseRun !== null && run.topN !== props.baseRun.topN} onRevert={() => props.baseRun && props.onRun({topN: props.baseRun.topN})}><TxInput numeric aria-label="Top N" value={String(run.topN)} onChange={event => {const next = Number(event.target.value); if (Number.isInteger(next) && next > 0) props.onRun({topN: next});}} /></TxParamRow>
+    run: <TxParamGroup key={`Run-${width}`} title={t("Run settings")} summary={(heldOut ? t("cost {cost} bps · top {topN} · held out from {heldOut}", { cost: run.cost, topN: run.topN, heldOut: dayShown(heldOut) }) : t("cost {cost} bps · top {topN}", { cost: run.cost, topN: run.topN }))} defaultOpen={width !== "narrow"}>
+      <TxParamRow label={t("Held out from")}><DayInput label={t("Held out from")} value={heldOut || null} empty onChange={props.onHeldOut} /></TxParamRow>
+      <TxParamRow label={t("Cost a trade")} changed={props.baseRun !== null && run.cost !== props.baseRun.cost} onRevert={() => props.baseRun && props.onRun({cost: props.baseRun.cost})}><TxInput numeric suffix={t("bps")} aria-label={t("Cost a trade")} value={String(run.cost)} onChange={event => {const next = Number(event.target.value); if (Number.isFinite(next)) props.onRun({cost: next});}} /></TxParamRow>
+      <TxParamRow label={t("Top N")} changed={props.baseRun !== null && run.topN !== props.baseRun.topN} onRevert={() => props.baseRun && props.onRun({topN: props.baseRun.topN})}><TxInput numeric aria-label={t("Top N")} value={String(run.topN)} onChange={event => {const next = Number(event.target.value); if (Number.isInteger(next) && next > 0) props.onRun({topN: next});}} /></TxParamRow>
     </TxParamGroup>,
-    batch: <TxParamGroup key={`Batch-${width}`} title="Batch" summary={props.vary.length ? `${props.vary.reduce((count, item) => count * item.values.length, 1)} groups` : "one run"} defaultOpen={width !== "narrow" || props.vary.length > 0}><BatchGroup prep={prep} values={values} vary={props.vary} onVary={props.onVary} check={check} /></TxParamGroup>
+    batch: <TxParamGroup key={`Batch-${width}`} title={t("Batch")} summary={props.vary.length ? t("{vary} groups", { vary: props.vary.reduce((count, item) => count * item.values.length, 1) }) : t("one run")} defaultOpen={width !== "narrow" || props.vary.length > 0}><BatchGroup prep={prep} values={values} vary={props.vary} onVary={props.onVary} check={check} /></TxParamGroup>
   };
   const order = ["data", "inputs", "processing", "label", "split", "algorithm", "run", "batch"];
   const columns = width === "full" ? [["data", "inputs"], ["processing", "label", "split"], ["algorithm", "run", "batch"]] : width === "wide" ? [["data", "inputs", "processing", "label"], ["split", "algorithm", "run", "batch"]] : [order];
   return <aside className="mx-prep" data-width={width}>
-    <div className="mx-phead">{baseNumber !== null ? <span>Based on <b>#{baseNumber}</b></span> : <b>Next run</b>}
-      {changes > 0 && <><span className="mx-chg">{changes} changed</span><button type="button" className="mx-link" onClick={props.onReset}>Reset</button></>}
+    <div className="mx-phead">{baseNumber !== null ? <span>{t.rich("Based on {baseNumber}", { baseNumber: <b>#{baseNumber}</b> })}</span> : <b>{t("Next run")}</b>}
+      {changes > 0 && <><span className="mx-chg">{t("{changes} changed", { changes })}</span><button type="button" className="mx-link" onClick={props.onReset}>{t("Reset")}</button></>}
       <span className="tx-spacer" />
-      <button type="button" className="mx-icon" title={width === "full" ? "Back to the experiments" : "Fill the panel"} aria-label={width === "full" ? "Back to the experiments" : "Fill the panel"}
+      <button type="button" className="mx-icon" title={width === "full" ? t("Back to the experiments") : t("Fill the panel")} aria-label={width === "full" ? t("Back to the experiments") : t("Fill the panel")}
         onClick={() => props.onWidth(width === "full" ? "narrow" : "full")}><TxIcon name={width === "full" ? "restore" : "maximize"} /></button></div>
     <div className="mx-pscroll">
       <CheckBand check={check} checking={props.checking} width={width} onGo={props.onGo} />
-      <div className="mx-layer"><b>Code settings</b><span className="mx-t3" title="TALYX's standard model pipeline; improvements arrive by themselves">standard pipeline</span><span className="tx-spacer" />
-        <button type="button" className="mx-link" onClick={props.onWriteCode}>Write as code</button></div>
+      <div className="mx-layer"><b>{t("Code settings")}</b><span className="mx-t3" title={t("TALYX's standard model pipeline; improvements arrive by themselves")}>{t("standard pipeline")}</span><span className="tx-spacer" />
+        <button type="button" className="mx-link" onClick={props.onWriteCode}>{t("Write as code")}</button></div>
       <div className="mx-groups" data-columns={columns.length}>{columns.map((ids, index) => <div key={index}>{ids.map(id => <Fragment key={id}>{G[id]}</Fragment>)}</div>)}</div>
     </div>
   </aside>;
@@ -217,8 +218,8 @@ export function Prep(props: PrepProps) {
 
 export function AlgorithmSelect({algorithms, value, onChange}: {algorithms: Algorithm[]; value: string; onChange(next: string): void}) {
   const groups = [...new Set(algorithms.map(item => item.groupLabel))];
-  return <TxSelect aria-label="Algorithm" value={value} onChange={event => onChange(event.target.value)}>
-    <option value="">Choose</option>{groups.map(name => <optgroup key={name} label={name}>{algorithms.filter(item => item.groupLabel === name).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</optgroup>)}</TxSelect>;
+  return <TxSelect aria-label={t("Algorithm")} value={value} onChange={event => onChange(event.target.value)}>
+    <option value="">{t("Choose")}</option>{groups.map(name => <optgroup key={name} label={name}>{algorithms.filter(item => item.groupLabel === name).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</optgroup>)}</TxSelect>;
 }
 
 function LabelGroup({items, values, onChange, row}: {items: Parameter[]; values: Record<string, ParamValue>; onChange(name: string, value: ParamValue): void; row(item: Parameter): ReactNode}) {
@@ -228,15 +229,15 @@ function LabelGroup({items, values, onChange, row}: {items: Parameter[]; values:
   const pick = (days: number | undefined, form: string | undefined) => onChange("label", quick(days ?? 5, form ?? "rank"));
   return <>
     {items.filter(item => item.name === "label").map(row)}
-    <TxParamRow label="Bars ahead"><TxSegmented label="Bars ahead" value={dayOf === undefined ? "" : String(dayOf)} options={DAYS.map(days => ({value: String(days), label: String(days)}))} onChange={next => pick(Number(next), formOf)} /></TxParamRow>
-    <TxParamRow label="Form"><TxSegmented label="Form" value={formOf ?? ""} options={FORMS.map(([value, text]) => ({value, label: text}))} onChange={next => pick(dayOf, next)} /></TxParamRow>
+    <TxParamRow label={t("Bars ahead")}><TxSegmented label={t("Bars ahead")} value={dayOf === undefined ? "" : String(dayOf)} options={DAYS.map(days => ({value: String(days), label: String(days)}))} onChange={next => pick(Number(next), formOf)} /></TxParamRow>
+    <TxParamRow label={t("Form")}><TxSegmented label={t("Form")} value={formOf ?? ""} options={FORMS.map(([value, text]) => ({value, label: text}))} onChange={next => pick(dayOf, next)} /></TxParamRow>
     {items.filter(item => item.name !== "label").map(row)}
   </>;
 }
 
 function LabelBox({value, error, reach, fields, onChange}: {value: string; error: FormulaError | null; reach: {ahead: number; start: {bar: number; at: string}} | null; fields: FactorFields | null; onChange(next: string): void}) {
-  const text = error ? null : reach ? `reads ${reach.ahead} bars ahead · from ${reach.start.bar === 1 && reach.start.at === "open" ? "the next open" : "this close"}` : null;
-  return <div className="mx-label"><FormulaBox value={value} error={error} fields={fields} onChange={onChange} onRun={() => undefined} label="Label formula" placeholder="Label, e.g. CSRank(Ref($open, -6) / Ref($open, -1) - 1)" />
+  const text = error ? null : reach ? t("reads {bars} bars ahead · from {start}", { bars: reach.ahead, start: reach.start.bar === 1 && reach.start.at === "open" ? t("the next open") : t("this close") }) : null;
+  return <div className="mx-label"><FormulaBox value={value} error={error} fields={fields} onChange={onChange} onRun={() => undefined} label={t("Label formula")} placeholder={t("Label, e.g. CSRank(Ref($open, -6) / Ref($open, -1) - 1)")} />
     {text && <div className="mx-labelnote">{text}</div>}</div>;
 }
 
@@ -260,7 +261,7 @@ function InputsTable({rows, offers, check, onChange, inspect}: {inspect(input: s
   const list = (source: string) => offers.filter(offer => (source === "library" ? offer.source === "library" || offer.source === "value" : offer.source === source)
     && `${offer.name} ${offer.ref}`.toLowerCase().includes(query.toLowerCase()) && !offer.unavailable);
   return <div className="mx-inputs">
-    {rows.length === 0 && <div className="mx-none">No inputs yet</div>}
+    {rows.length === 0 && <div className="mx-none">{t("No inputs yet")}</div>}
     {rows.map((row, index) => {
       const found = covered(row);
       const id = found?.id ?? null, shown = id !== null && seen?.id === id ? seen : null;
@@ -268,26 +269,26 @@ function InputsTable({rows, offers, check, onChange, inspect}: {inspect(input: s
       return <div key={`${row.name}-${index}`} className="mx-inputbox"><div className="mx-input" data-flag={found?.flag} data-open={shown ? "" : undefined} role={id ? "button" : undefined} tabIndex={id ? 0 : undefined}
         onClick={() => {if (id) {if (shown) setSeen(null); else look(id);}}} onKeyDown={event => {if (id && (event.key === "Enter" || event.key === " ")) {event.preventDefault(); if (shown) setSeen(null); else look(id);}}}>
         <span className="mx-iname" title={row.name}>{row.name}</span><span className="mx-t3">{SOURCES[row.source] ?? row.source}{version ? ` · v${version}` : ""}</span>
-        <span className="mx-t3" title="First day with a value">{found?.start ? dayYear(found.start) : ""}</span><span className="mx-t3 mx-num">{found ? `${Math.round(found.coverage * 100)}%` : ""}</span>
-        <button type="button" className="mx-x" aria-label={`Remove ${row.name}`} onClick={event => {event.stopPropagation(); onChange(rows.filter((_, other) => other !== index));}}><TxIcon name="close" /></button></div>
-        {shown && <div className="mx-inspect">{shown.error ? <div className="mx-none">{shown.error}</div> : shown.data === null ? <div className="mx-none">Looking at the training segments…</div> : <>
-          {shown.data.features.length > 1 && <TxSelect aria-label="Feature" value={shown.data.name} onChange={event => look(id!, event.target.value)}>{shown.data.features.map(name => <option key={name} value={name}>{name}</option>)}</TxSelect>}
-          <div className="mx-insgrid"><div className="mx-insfig"><Plot figure={shown.data.figures["model.inspect.distribution"]} ariaLabel={`Distribution of ${shown.data.name} before and after processing`} /></div>
-            <div className="mx-insfig"><Plot figure={shown.data.figures["model.inspect.missing"]} ariaLabel={`Share of ${shown.data.name} missing each week`} /></div></div>
-          <div className="mx-insstats">{shown.data.stats.map(stat => `${stat.label} ${stat.before}${stat.after !== stat.before ? ` → ${stat.after}` : ""}`).join(" · ")}</div>
+        <span className="mx-t3" title={t("First day with a value")}>{found?.start ? dayYear(found.start) : ""}</span><span className="mx-t3 mx-num">{found ? `${Math.round(found.coverage * 100)}%` : ""}</span>
+        <button type="button" className="mx-x" aria-label={t("Remove {name}", { name: row.name })} onClick={event => {event.stopPropagation(); onChange(rows.filter((_, other) => other !== index));}}><TxIcon name="close" /></button></div>
+        {shown && <div className="mx-inspect">{shown.error ? <div className="mx-none">{shown.error}</div> : shown.data === null ? <div className="mx-none">{t("Looking at the training segments…")}</div> : <>
+          {shown.data.features.length > 1 && <TxSelect aria-label={t("Feature")} value={shown.data.name} onChange={event => look(id!, event.target.value)}>{shown.data.features.map(name => <option key={name} value={name}>{name}</option>)}</TxSelect>}
+          <div className="mx-insgrid"><div className="mx-insfig"><Plot figure={shown.data.figures["model.inspect.distribution"]} ariaLabel={t("Distribution of {name} before and after processing", { name: shown.data.name })} /></div>
+            <div className="mx-insfig"><Plot figure={shown.data.figures["model.inspect.missing"]} ariaLabel={t("Share of {name} missing each week", { name: shown.data.name })} /></div></div>
+          <div className="mx-insstats">{shown.data.stats.map(stat => `${stat.label === "Beyond 3 MAD" ? t("Beyond 3 MAD") : t(stat.label)} ${stat.before}${stat.after !== stat.before ? ` → ${stat.after}` : ""}`).join(" · ")}</div>
           <div className="mx-t3">{shown.data.note}</div></>}</div>}</div>;
     })}
     <div className="mx-adds">{["library", "run", "builtin", "market", "code"].map(source => <TxPopover key={source} open={open === source} onOpenChange={next => {setOpen(next ? source : null); setQuery("");}} label={SOURCES[source]}
-      trigger={<TxButton size="sm" variant="quiet">{source === "library" ? "Library factor" : source === "run" ? "Factor run" : source === "builtin" ? "Built-in set" : source === "market" ? "Market series" : "Own code"}</TxButton>}>
-      <div className="mx-picker"><TxInput autoFocus placeholder="Search" aria-label="Search" value={query} onChange={event => setQuery(event.target.value)} />
+      trigger={<TxButton size="sm" variant="quiet">{source === "library" ? t("Library factor") : source === "run" ? t("Factor run") : source === "builtin" ? t("Built-in set") : source === "market" ? t("Market series") : t("Own code")}</TxButton>}>
+      <div className="mx-picker"><TxInput autoFocus placeholder={t("Search")} aria-label={t("Search")} value={query} onChange={event => setQuery(event.target.value)} />
         <div className="mx-plist">{rowsOf(source).slice(0, 80).map(group => {
           const offer = group.find(item => item.ref === picked[`${group[0].source}:${group[0].name}`]) ?? group[0];
           return <div key={`${offer.source}-${offer.name}`} className="mx-prow"><button type="button" onClick={() => add(offer)}>
-            <span>{offer.name}</span><span className="mx-t3">{offer.version ? `v${offer.version}${group.length === 1 ? ` · ${offer.state === "fixed" ? "Fixed" : "Producing"}` : ""}` : offer.features ? `${offer.features} features` : offer.rankIc !== undefined && offer.rankIc !== null ? `Rank IC ${offer.rankIc.toFixed(4)}${offer.published?.version ? ` · v${offer.published.version}` : ""}` : ""}</span>
+            <span>{offer.name}</span><span className="mx-t3">{offer.version ? `v${offer.version}${group.length === 1 ? ` · ${offer.state === "fixed" ? t("Fixed") : t("Producing")}` : ""}` : offer.features ? t("{features} features", { features: offer.features }) : offer.rankIc !== undefined && offer.rankIc !== null ? (offer.published?.version ? t("Rank IC {rankIc} · v{version}", { rankIc: offer.rankIc.toFixed(4), version: offer.published.version }) : t("Rank IC {rankIc}", { rankIc: offer.rankIc.toFixed(4) })) : ""}</span>
             </button>
-            {group.length > 1 && <TxSelect aria-label={`Version of ${offer.name}`} value={offer.ref} onChange={event => setPicked({...picked, [`${offer.source}:${offer.name}`]: event.target.value})}>
-              {group.map(item => <option key={item.ref} value={item.ref}>v{item.version}{item.state === "fixed" ? " · Fixed" : " · Producing"}</option>)}</TxSelect>}</div>;})}
-          {list(source).length === 0 && <div className="mx-none">{source === "code" ? "No feature functions in this project; write one with @q.feature in a .py file." : "Nothing to add"}</div>}</div></div>
+            {group.length > 1 && <TxSelect aria-label={t("Version of {name}", { name: offer.name })} value={offer.ref} onChange={event => setPicked({...picked, [`${offer.source}:${offer.name}`]: event.target.value})}>
+              {group.map(item => <option key={item.ref} value={item.ref}>{item.state === "fixed" ? t("v{version} · Fixed", { version: item.version ?? "" }) : t("v{version} · Producing", { version: item.version ?? "" })}</option>)}</TxSelect>}</div>;})}
+          {list(source).length === 0 && <div className="mx-none">{source === "code" ? t("No feature functions in this project; write one with @q.feature in a .py file.") : t("Nothing to add")}</div>}</div></div>
     </TxPopover>)}</div></div>;
 }
 
@@ -314,19 +315,19 @@ function BatchGroup({prep, values, vary, onVary, check}: {prep: ModelPrep; value
   const add = () => {const next = parse(); if (name && next.length) {onVary([...vary.filter(item => item.name !== name), {name, values: next}]); setOpen(false); setName(""); setText("");}};
   return <div className="mx-batch">
     {vary.map(item => <div key={item.name} className="mx-var"><span>{prep.groups.flatMap(group => group.settings).find(entry => entry.name === item.name)?.label ?? item.name}</span>
-      <span className="mx-num">{item.values.join(", ")}</span><button type="button" className="mx-x" aria-label={`Remove ${item.name}`} onClick={() => onVary(vary.filter(other => other.name !== item.name))}><TxIcon name="close" /></button></div>)}
-    {vary.length > 0 && check?.batch && check.batch.groups.length > 1 && <TxTable className="mx-groups"><thead><tr><TxTh>Group</TxTh>
-      {vary.map(item => <TxTh key={item.name}>{prep.groups.flatMap(group => group.settings).find(entry => entry.name === item.name)?.label ?? item.name}</TxTh>)}<TxTh align="right">Memory</TxTh><TxTh align="right">Time</TxTh></tr></thead>
+      <span className="mx-num">{item.values.join(", ")}</span><button type="button" className="mx-x" aria-label={t("Remove {name}", { name: item.name })} onClick={() => onVary(vary.filter(other => other.name !== item.name))}><TxIcon name="close" /></button></div>)}
+    {vary.length > 0 && check?.batch && check.batch.groups.length > 1 && <TxTable className="mx-groups"><thead><tr><TxTh>{t("Group")}</TxTh>
+      {vary.map(item => <TxTh key={item.name}>{prep.groups.flatMap(group => group.settings).find(entry => entry.name === item.name)?.label ?? item.name}</TxTh>)}<TxTh align="right">{t("Memory")}</TxTh><TxTh align="right">{t("Time")}</TxTh></tr></thead>
       <tbody>{check.batch.groups.map(group => <tr key={group.group}><TxTd className="mx-num">{group.group}</TxTd>{vary.map(item => <TxTd key={item.name} className="mx-num">{String(group.values[item.name] ?? values[item.name] ?? "")}</TxTd>)}
-        <TxTd align="right" className="mx-num">{group.memory === null ? "" : `${(group.memory / 1024 ** 3).toFixed(1)} GB`}</TxTd><TxTd align="right" className="mx-num">{group.time === null ? "" : `${Math.max(1, Math.round(group.time / 60))} min`}</TxTd></tr>)}</tbody></TxTable>}
-    {vary.length > 0 && <div className="mx-est"><b>{total}</b> groups{check?.batch && check.batch.total ? ` · about ${Math.round(check.batch.total / 60)} min` : ""}{total > prep.batchLimit && <span className="mx-over"> A batch trains at most {prep.batchLimit} groups; these values make {total}.</span>}</div>}
-    <TxPopover open={open} onOpenChange={setOpen} label="Vary a setting" trigger={<TxButton size="sm" variant="quiet">Vary a setting</TxButton>}>
-      <div className="mx-picker"><TxSelect aria-label="Setting" value={name} onChange={event => setName(event.target.value)}><option value="">Choose a setting</option>
+        <TxTd align="right" className="mx-num">{group.memory === null ? "" : t("{value} GB", { value: (group.memory / 1024 ** 3).toFixed(1) })}</TxTd><TxTd align="right" className="mx-num">{group.time === null ? "" : t("{minutes} min", { minutes: Math.max(1, Math.round(group.time / 60)) })}</TxTd></tr>)}</tbody></TxTable>}
+    {vary.length > 0 && <div className="mx-est">{check?.batch && check.batch.total ? t.rich("{count} groups · about {minutes} min", { count: <b>{total}</b>, minutes: Math.round(check.batch.total / 60) }) : t.rich("{count} groups", { count: <b>{total}</b> })}</div>}
+    <TxPopover open={open} onOpenChange={setOpen} label={t("Vary a setting")} trigger={<TxButton size="sm" variant="quiet">{t("Vary a setting")}</TxButton>}>
+      <div className="mx-picker"><TxSelect aria-label={t("Setting")} value={name} onChange={event => setName(event.target.value)}><option value="">{t("Choose a setting")}</option>
         {settings.map(item => <option key={item.name} value={item.name}>{item.label || item.name}</option>)}</TxSelect>
-        <TxInput aria-label="Values" placeholder={name ? `${String(values[name] ?? "")}, …` : "0.03, 0.05, 0.1"} value={text} onChange={event => setText(event.target.value)} />
-        {name && parse().length > 0 && <div className="mx-t3 mx-live">{parse().length} values · {vary.filter(item => item.name !== name).reduce((count, item) => count * item.values.length, parse().length)} groups with {settings.find(entry => entry.name === name)?.label || name}</div>}
-        <TxButton size="sm" variant="primary" onClick={add}>Add</TxButton></div></TxPopover>
-    <TxButton size="sm" variant="quiet" onClick={() => {const seed = Number(values.seed ?? 42); onVary([...vary.filter(item => item.name !== "seed"), {name: "seed", values: [seed, seed + 1, seed + 2]}]);}}>Repeat with 3 seeds</TxButton>
+        <TxInput aria-label={t("Values")} placeholder={name ? `${String(values[name] ?? "")}, …` : "0.03, 0.05, 0.1"} value={text} onChange={event => setText(event.target.value)} />
+        {name && parse().length > 0 && <div className="mx-t3 mx-live">{t("{parseCount} values · {groups} groups with {setting}", { parseCount: parse().length, groups: vary.filter(item => item.name !== name).reduce((count, item) => count * item.values.length, parse().length), setting: settings.find(entry => entry.name === name)?.label || name })}</div>}
+        <TxButton size="sm" variant="primary" onClick={add}>{t("Add")}</TxButton></div></TxPopover>
+    <TxButton size="sm" variant="quiet" onClick={() => {const seed = Number(values.seed ?? 42); onVary([...vary.filter(item => item.name !== "seed"), {name: "seed", values: [seed, seed + 1, seed + 2]}]);}}>{t("Repeat with 3 seeds")}</TxButton>
   </div>;
 }
 

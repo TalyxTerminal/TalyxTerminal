@@ -4,6 +4,7 @@ from pathlib import Path
 from deepagents.backends import CompositeBackend, FilesystemBackend
 from deepagents.middleware.skills import SkillsMiddleware
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..store import digest
 
@@ -21,6 +22,6 @@ class SkillsService:
         backend = CompositeBackend(default=mounts["/skills/user/"], routes=mounts)
         found = SkillsMiddleware(backend=backend, sources=list(roots)).before_agent({}, None, {})
         if found["skills_load_errors"]:
-            raise ContractError("skill_invalid", "Fix the skill metadata before using Skills", found["skills_load_errors"])
+            raise ContractError("skill_invalid", t("Fix the skill metadata before using Skills"), found["skills_load_errors"])
         items = found["skills_metadata"]
         return {"version": digest(items), "items": items}

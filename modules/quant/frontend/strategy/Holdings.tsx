@@ -1,4 +1,5 @@
 /* A portfolio's tables: the rebalances (what it aimed for, what it held, what did not fill and why), what it holds now, and what each name contributed. */
+import { t } from "../i18n";
 import { useEffect, useState } from "react";
 import { TxIcon, TxIconButton } from "@talyx/sdk";
 import { mdy, nf, pct, tone } from "../factor/format";
@@ -25,26 +26,26 @@ export function RebalanceTable({api, runId, during, onClearDuring}: {api: Strate
   names.sort((a, b) => weight(b) - weight(a) || (row?.ranks?.[a] ?? Infinity) - (row?.ranks?.[b] ?? Infinity));
   const hasRank = Boolean(row && Object.keys(row.ranks ?? {}).length);
   return <div className="qx-rebalances">
-    <div className="qx-tfilters"><TxIconButton label="Earlier rebalance" icon="chevron" style={{transform: "rotate(180deg)"}} disabled={at <= 0} onClick={() => setAt(at - 1)} />
-      <span className="qx-stepday">{row ? mdy(row.at) : "—"}</span><TxIconButton label="Later rebalance" icon="chevron" disabled={at >= rows.length - 1} onClick={() => setAt(at + 1)} />
-      {during && <button type="button" className="qx-chip on" onClick={onClearDuring} aria-label={`Clear ${during.label ?? `drawdown ${during.n}`}`}>{during.label ?? `Drawdown ${during.n}`} <TxIcon name="close" /></button>}
-      <span className="tx-spacer" /><span className="fx-t3">{total} rebalances</span></div>
-    {row && <div className="fx-rtable"><table className="fx-g" aria-label="Rebalance"><thead><tr><th className="l">Name</th><th className="l">Side</th>{hasRank && <><th>Rank</th><th>Signal</th></>}<th>After</th><th className="l">Fill</th></tr></thead>
+    <div className="qx-tfilters"><TxIconButton label={t("Earlier rebalance")} icon="chevron" style={{transform: "rotate(180deg)"}} disabled={at <= 0} onClick={() => setAt(at - 1)} />
+      <span className="qx-stepday">{row ? mdy(row.at) : "—"}</span><TxIconButton label={t("Later rebalance")} icon="chevron" disabled={at >= rows.length - 1} onClick={() => setAt(at + 1)} />
+      {during && <button type="button" className="qx-chip on" onClick={onClearDuring} aria-label={t("Clear {label}", { label: during.label ?? t("drawdown {n}", { n: String(during.n) }) })}>{during.label ?? t("Drawdown {n}", { n: during.n ?? "" })} <TxIcon name="close" /></button>}
+      <span className="tx-spacer" /><span className="fx-t3">{t("{total} rebalances", { total })}</span></div>
+    {row && <div className="fx-rtable"><table className="fx-g" aria-label={t("Rebalance")}><thead><tr><th className="l">{t("Name")}</th><th className="l">{t("Side")}</th>{hasRank && <><th>{t("Rank")}</th><th>{t.c("portfolio", "Signal")}</th></>}<th>{t("After")}</th><th className="l">{t.c("execution", "Fill")}</th></tr></thead>
       <tbody>{names.map(name => {
         const target = row.targets[name] ?? 0, held = row.actual[name] ?? 0, miss = row.unfilled.find(item => item.name === name);
-        return <tr key={name}><td className="l">{name}</td><td className="l fx-t2">{(target || held) < 0 ? "Short" : (target || held) > 0 ? "Long" : "Not held"}</td>{hasRank && <><td>{row.ranks?.[name] ?? ""}</td><td className={tone(row.values?.[name] ?? null)}>{row.values?.[name] == null ? "" : signed(row.values[name])}</td></>}
-          <td className={tone(held)}>{(held < 0 ? "−" : "") + pct(Math.abs(held), 2)}</td><td className="l fx-t2">{miss ? `Not filled: ${miss.reason}` : row.skipped ?? (target || held ? "Filled" : "")}</td></tr>;})}</tbody></table></div>}
+        return <tr key={name}><td className="l">{name}</td><td className="l fx-t2">{(target || held) < 0 ? t.c("position side", "Short") : (target || held) > 0 ? t.c("position side", "Long") : t("Not held")}</td>{hasRank && <><td>{row.ranks?.[name] ?? ""}</td><td className={tone(row.values?.[name] ?? null)}>{row.values?.[name] == null ? "" : signed(row.values[name])}</td></>}
+          <td className={tone(held)}>{(held < 0 ? "−" : "") + pct(Math.abs(held), 2)}</td><td className="l fx-t2">{miss ? t("Not filled: {reason}", { reason: miss.reason }) : row.skipped ?? (target || held ? t("Filled") : "")}</td></tr>;})}</tbody></table></div>}
   </div>;
 }
 
 export function HoldingsTable({work}: {work: StrategyWork}) {
   const rows = work.multi?.holdings ?? [];
-  return <div className="fx-rtable"><table className="fx-g" aria-label="Holdings"><thead><tr><th className="l">Name</th><th>Weight</th><th>P&amp;L {work.currency}</th><th>Days</th></tr></thead>
+  return <div className="fx-rtable"><table className="fx-g" aria-label={t("Holdings")}><thead><tr><th className="l">{t("Name")}</th><th>{t("Weight")}</th><th>{t("P&L {currency}", { currency: work.currency })}</th><th>{t("Days")}</th></tr></thead>
     <tbody>{rows.map(row => <tr key={row.name}><td className="l">{row.name}</td><td>{pct(row.weight, 1)}</td><td className={tone(row.pnl)}>{row.pnl === null ? "" : nf(row.pnl, 2)}</td><td>{row.days === null ? "" : nf(row.days, 0)}</td></tr>)}</tbody></table></div>;
 }
 
 export function Contributions({rows, currency}: {rows: ContributionRow[]; currency: string}) {
-  return <div className="fx-rtable"><table className="fx-g" aria-label="Contributions"><thead><tr><th className="l">Name</th><th>Net {currency}</th><th>Costs</th><th>Trades</th></tr></thead>
+  return <div className="fx-rtable"><table className="fx-g" aria-label={t("Contributions")}><thead><tr><th className="l">{t("Name")}</th><th>{t("Net {currency}", { currency })}</th><th>{t("Costs")}</th><th>{t("Trades")}</th></tr></thead>
     <tbody>{rows.map(row => <tr key={row.name}><td className="l">{row.name}</td><td className={tone(row.pnl)}>{row.pnl === null ? "" : nf(row.pnl, 0)}</td><td>{nf(row.fees ?? 0, 0)}</td><td>{row.trades}</td></tr>)}</tbody></table></div>;
 }
 

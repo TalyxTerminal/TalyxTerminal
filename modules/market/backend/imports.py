@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pyarrow.parquet as pq
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import normalize_timeframe, timeframe_nanoseconds
 
@@ -45,7 +46,7 @@ MAX_FILE = 512 * 1024 * 1024
 
 def folder_files(folder: Path) -> list[str]:
     if not folder.is_dir():
-        raise MarketError("not_found", f"No folder {folder}")
+        raise MarketError("not_found", t("No folder {folder}", folder=folder))
     return sorted(str(path) for path in folder.iterdir() if path.suffix.lower() in (".csv", ".parquet") and path.is_file())
 
 
@@ -53,7 +54,7 @@ async def read_import_file(path: str) -> bytes:
     def read():
         target = Path(path)
         if target.stat().st_size > MAX_FILE:
-            raise MarketError("invalid_file", f"{path} is larger than 512 MB")
+            raise MarketError("invalid_file", t("{path} is larger than 512 MB", path=path))
         return target.read_bytes()
     return await in_worker(read)
 
@@ -173,7 +174,7 @@ class WriteData:
     async def import_folder(self, folder: Path, spec: dict) -> dict:
         paths = await in_worker(folder_files, folder)
         if not paths:
-            raise MarketError("invalid_file", f"No CSV or Parquet files in {folder}")
+            raise MarketError("invalid_file", t("No CSV or Parquet files in {folder}", folder=folder))
         return await self.import_files(paths, {"name": folder.name, **spec}, read_import_file)
 
     async def scan(self, paths: list[str], spec: dict, read) -> list[dict]:
@@ -231,7 +232,7 @@ class WriteData:
                               "rejected": len(parsed.rejected)})
         result["instruments"] = len(seen)
         if not seen:
-            raise MarketError("invalid_file", "No file held rows Market could read",
+            raise MarketError("invalid_file", t("No file held rows Market could read"),
                               details={"rejectedRows": result["rejectedRows"]})
         await in_worker(self.imports.write, import_id, {
             "importId": import_id, "name": spec.get("name") or _default_name(paths), "spec": spec, "files": files,
@@ -284,20 +285,20 @@ class WriteData:
             line = index + 2
             code = (str(row.get(code_column) or "").strip() if code_column else "") or file_code
             if not code:
-                parsed.rejected.append({"line": line, "reason": "missing instrument code"})
+                parsed.rejected.append({"line": line, "reason": t("missing instrument code")})
                 continue
             moment, is_date = _instant(row.get(time_column), zone, exchange_zone)
             if moment is None:
-                parsed.rejected.append({"line": line, "reason": f"time {row.get(time_column)!r} is not a date or time"})
+                parsed.rejected.append({"line": line, "reason": t("time {time_column} is not a date or time", time_column=repr(row.get(time_column)))})
                 continue
             values = {field: _number(row.get(column)) if column else None for field, column in mapped.items()}
             missing = [field for field in ("open", "high", "low", "close") if values[field] is None]
             if missing:
-                parsed.rejected.append({"line": line, "reason": f"{', '.join(missing)} is not a number"})
+                parsed.rejected.append({"line": line, "reason": t("{missing} is not a number", missing=', '.join(missing))})
                 continue
             o, h, low, c = values["open"], values["high"], values["low"], values["close"]
             if h < max(o, c, low) or low > min(o, c, h):
-                parsed.rejected.append({"line": line, "reason": "high is below or low is above the other prices"})
+                parsed.rejected.append({"line": line, "reason": t("high is below or low is above the other prices")})
                 continue
             date_only = date_only and is_date
             grouped.setdefault(code.upper(), []).append((moment, o, h, low, c, values["volume"], line))
@@ -326,12 +327,12 @@ class WriteData:
             for i, (moment, *_, line) in enumerate(items):
                 matches = {id_ for lo, hi, id_ in holders if lo <= moment and (hi is None or moment < hi)}
                 if len(matches) > 1 or not matches and (holders or parsed.market not in ("US", "CN", "HK")):
-                    parsed.rejected.append({"line": line, "reason": f"No unique {parsed.market} instrument for {code} on this date"})
+                    parsed.rejected.append({"line": line, "reason": t("No unique {market} instrument for {code} on this date", market=parsed.market, code=code)})
                     continue
                 instrument_id = next(iter(matches), None)
                 key = (instrument_id, opens[i])
                 if key in seen:
-                    parsed.rejected.append({"line": line, "reason": "a second row for the same time"})
+                    parsed.rejected.append({"line": line, "reason": t("a second row for the same time")})
                     continue
                 seen.add(key)
                 groups.setdefault(instrument_id, []).append(i)
@@ -358,10 +359,10 @@ class WriteData:
         actions: list[str] = []
         if operation.get("importId"):
             if environment != "production":
-                raise MarketError("invalid_input", "Imported datasets do not belong to exchange test environments")
+                raise MarketError("invalid_input", t("Imported datasets do not belong to exchange test environments"))
             keys = [key for key in store.keys() if key.import_id == operation["importId"]]
             if not keys and self.imports.read(operation["importId"]) is None:
-                raise MarketError("not_found", f"No import {operation['importId']}")
+                raise MarketError("not_found", t("No import {importId}", importId=operation['importId']))
         elif operation.get("sourceId"):
             source = operation["sourceId"]
             keys = [key for key in store.keys(environment=environment) if (store.pointer(key) or {}).get("source") == source]
@@ -369,7 +370,7 @@ class WriteData:
                        if environment == "production" and self.market.actions.read(i).get("source") == source]
         else:
             if not operation.get("symbols"):
-                raise MarketError("invalid_input", "Name symbols with kinds, an importId or a sourceId")
+                raise MarketError("invalid_input", t("Name symbols with kinds, an importId or a sourceId"))
             wanted = operation.get("kinds") or [{"kind": "bars"}]
             for symbol in operation["symbols"]:
                 record = (await self.market.instruments.resolve({"text": symbol, "environment": environment}))["instrument"]

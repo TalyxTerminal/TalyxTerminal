@@ -21,6 +21,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import research_process
 from .materials import plain
@@ -84,7 +85,7 @@ class FactorEngine:
                     while True:
                         event = plain(await self.ctx.processes.receive(lease, 1.0))
                         if event["state"] == "closed":
-                            raise ContractError("unavailable", "The research process stopped while it was starting.", {"stderr": self._tail(directory)})
+                            raise ContractError("unavailable", t("The research process stopped while it was starting."), {"stderr": self._tail(directory)})
                         if event["state"] == "message" and isinstance(event["message"], dict) and event["message"].get("ready"):
                             break
             except BaseException:
@@ -131,7 +132,7 @@ class FactorEngine:
                 # The job being computed ends with the process; the ones waiting go on in a fresh one.
                 waiting = self.pending.pop(self.current, None) if self.current is not None else None
                 if waiting is not None and not waiting.done():
-                    waiting.set_exception(ContractError("unavailable", "The research process stopped during the run.", {"stderr": stderr}))
+                    waiting.set_exception(ContractError("unavailable", t("The research process stopped during the run."), {"stderr": stderr}))
                 self.later.pop(self.current, None)
                 self.current = None
                 with contextlib.suppress(ContractError):
@@ -203,7 +204,7 @@ class FactorEngine:
                 return await waiting
         except TimeoutError as error:
             await asyncio.shield(self._drop(identity))
-            raise ContractError("unavailable", f"{late}; the research process was restarted.") from error
+            raise ContractError("unavailable", t("{late}; the research process was restarted.", late=late)) from error
         except asyncio.CancelledError:
             # Its workspace closed or its caller stopped it: computed, the process ends with it (the next job starts a fresh one).
             await asyncio.shield(self._drop(identity))
@@ -270,7 +271,7 @@ class FactorEngine:
         answer = output / "answer.json"
         if not answer.is_file():
             stderr = (output / "stderr.log").read_text(encoding="utf-8", errors="replace")[-2000:] if (output / "stderr.log").is_file() else ""
-            raise ContractError("unavailable", "The model process stopped before it answered.", {"stderr": stderr})
+            raise ContractError("unavailable", t("The model process stopped before it answered."), {"stderr": stderr})
         return json.loads(answer.read_text(encoding="utf-8"))
 
     # ------------------------------------------------------------------------------------------------------------ a job on its own
@@ -317,7 +318,7 @@ class FactorEngine:
         answer = output / "answer.json"
         if not answer.is_file():
             stderr = (output / "stderr.log").read_text(encoding="utf-8", errors="replace")[-2000:] if (output / "stderr.log").is_file() else ""
-            raise ContractError("unavailable", "The research process stopped before it answered.", {"stderr": stderr})
+            raise ContractError("unavailable", t("The research process stopped before it answered."), {"stderr": stderr})
         return json.loads(answer.read_text(encoding="utf-8"))
 
     async def close(self):
@@ -331,5 +332,5 @@ class FactorEngine:
         for identity, _message in self.queue:
             waiting = self.pending.pop(identity, None)
             if waiting is not None and not waiting.done():
-                waiting.set_exception(ContractError("unavailable", "Quant stopped."))
+                waiting.set_exception(ContractError("unavailable", t("Quant stopped.")))
         self.queue.clear()

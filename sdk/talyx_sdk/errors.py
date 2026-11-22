@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .i18n import platform_t
+
 
 class ContractError(Exception):
     def __init__(self, code: str, message: str | None = None, details: Any = None,
@@ -29,5 +31,4 @@ class ContractError(Exception):
 
 def provider_restarted(name: str) -> ContractError:
     """A call or stream whose provider's process went away before it answered."""
-    return ContractError("provider_restarted", f"The module providing {name} restarted before it answered; "
-                         "whether it ran is unknown", execution="unknown", effects="may_have_occurred")
+    return ContractError("provider_restarted", platform_t("The module providing {name} restarted before it answered; whether it ran is unknown", name=name), execution="unknown", effects="may_have_occurred")

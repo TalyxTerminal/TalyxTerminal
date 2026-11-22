@@ -23,6 +23,8 @@ import asyncio
 import contextlib
 import logging
 
+from talyx_sdk.i18n import t
+
 from vocabulary.identity import timeframe_nanoseconds
 from vocabulary.instruments import MarketSeries
 
@@ -209,12 +211,12 @@ class AuxSession:
         recent = getattr(entry.source, "recent_trades", None)
         if recent is None:
             return []
-        target = await in_worker(self.market.data.target, self.instrument, self.environment)
+        target = await in_worker(self.market.data.target, self.instrument, self.environment, self.source_id)
         return (await recent(self.source_id, target, self.warmup))[-self.warmup:]
 
     async def run(self) -> None:
         attempt = 0
-        target = await in_worker(self.market.data.target, self.instrument, self.environment)
+        target = await in_worker(self.market.data.target, self.instrument, self.environment, self.source_id)
         while True:
             try:
                 entry = self.market.registry.entry(self.source_id)
@@ -238,7 +240,7 @@ class AuxSession:
                     elif kind == "trades":
                         self.set_status("live")
                         self._on_trades(event["rows"])
-                raise MarketError("source_unavailable", f"{self.source_id} ended the live stream",
+                raise MarketError("source_unavailable", t("{source_id} ended the live stream", source_id=self.source_id),
                                   source_id=self.source_id)
             except asyncio.CancelledError:
                 raise
@@ -274,5 +276,5 @@ def source_for(market, instrument: dict, capability: str) -> str:
         return instrument["venueId"]
     ranked = registry.rank(instrument, "quotes" if capability == "ticker" else KIND[capability], history=False)
     if not ranked:
-        raise MarketError("unsupported", f"No source streams {capability} for {instrument['symbol']}")
+        raise MarketError("unsupported", t("No source streams {capability} for {symbol}", capability=capability, symbol=instrument['symbol']))
     return ranked[0][0]

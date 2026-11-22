@@ -30,6 +30,7 @@
     resizeWindow: edge => api.resize_window(edge),
     openFolder: path => api.open_folder(path),
     requestExit: () => api.request_exit(),
+    installUpdate: () => api.install_update(),
     confirmExit: requestId => api.confirm_exit(requestId),
     cancelExit: requestId => api.cancel_exit(requestId),
   });

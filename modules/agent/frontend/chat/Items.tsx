@@ -1,3 +1,5 @@
+import { intlLocale } from "@talyx/sdk";
+import { t } from "../i18n";
 import { useEffect, useState, type ReactNode } from "react";
 import { TxAlert, TxButton, TxIcon, TxIconButton, TxInput, TxKeyNumbers, TxTag, TxTextarea } from "@talyx/sdk";
 import { Markdown } from "../cards/markdown";
@@ -38,9 +40,9 @@ export function AnswerReference({ reference, open }: { reference: ObjectRef; ope
 }
 
 export function duration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 60) return t("{seconds}s", { seconds });
   const minutes = Math.floor(seconds / 60), rest = seconds % 60;
-  return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+  return rest ? t("{minutes}m {seconds}s", { minutes, seconds: rest }) : t("{minutes}m", { minutes });
 }
 
 /** Whose stream it is: the "don't ask again" answer names the chat or the bot. */
@@ -68,10 +70,10 @@ function render(item: Item, actions: ItemActions, owner: Owner): ReactNode {
       {actions.editing === item.id
         ? <EditBox text={item.text} onDone={text => actions.resend?.(item.id, text)} />
         : <><div className="chat-bubble">{item.text}</div>
-          {item.undelivered && <div className="chat-meta chat-undelivered">Not read: you stopped the run first</div>}
+          {item.undelivered && <div className="chat-meta chat-undelivered">{t("Not read: you stopped the run first")}</div>}
           <div className="chat-actions">
-            {actions.editFrom && <TxIconButton size="sm" icon="history" label="Edit from here" onClick={() => actions.editFrom!(item.id)} />}
-            <TxIconButton size="sm" icon="copy" label="Copy" onClick={() => actions.copy(item.text)} />
+            {actions.editFrom && <TxIconButton size="sm" icon="history" label={t("Edit from here")} onClick={() => actions.editFrom!(item.id)} />}
+            <TxIconButton size="sm" icon="copy" label={t("Copy")} onClick={() => actions.copy(item.text)} />
           </div></>}
     </div>;
     case "work": return <Work seconds={item.seconds} running={item.running} interrupted={item.interrupted} steps={item.steps} />;
@@ -82,12 +84,12 @@ function render(item: Item, actions: ItemActions, owner: Owner): ReactNode {
       return <TxButton variant="quiet" size="sm" className="chat-group" onClick={() => actions.pane("agents")}><TxIcon name="workflow" />{parts.join(" · ")}<TxIcon name="chevron" /></TxButton>;
     }
     case "approval": return item.state === "waiting" ? <Ask item={item} actions={actions} owner={owner} />
-      : <div className="chat-line">{item.state === "allowed" ? "Allowed" : item.state === "denied" ? "Denied" : "Expired, not done"} · {item.action}</div>;
+      : <div className="chat-line">{item.state === "allowed" ? t("Allowed") : item.state === "denied" ? t("Denied") : t("Expired, not done")} · {item.action}</div>;
     case "result": return <div className="chat-card">
       <div className="chat-card-head">
         <span className="chat-tile"><TxIcon name="flask" /></span>
         <span className="chat-card-titles"><span className="chat-card-title">{item.title}</span><span className="chat-card-sub">{item.subtitle}</span></span>
-        <TxButton size="sm" onClick={() => actions.open({ id: item.id, label: item.title, target:item.target })}>Open</TxButton>
+        <TxButton size="sm" onClick={() => actions.open({ id: item.id, label: item.title, target:item.target })}>{t("Open")}</TxButton>
       </div>
       <div className="chat-card-body"><TxKeyNumbers items={item.numbers} columns={item.numbers.length} /></div>
     </div>;
@@ -100,24 +102,24 @@ function render(item: Item, actions: ItemActions, owner: Owner): ReactNode {
         {!!item.sources?.length && <ol className="chat-sources">{item.sources.map(source => <li key={source.n}><a className="chat-link" href={source.url} target="_blank" rel="noreferrer">{source.title}</a> <span className="chat-meta">{[source.site,source.published].filter(Boolean).join(" · ")}</span></li>)}</ol>}
       </div>
       <div className="chat-actions">
-        <TxIconButton size="sm" icon="copy" label="Copy" onClick={() => actions.copy(item.text)} />
-        <TxIconButton size="sm" icon="fork" label="Fork from here" onClick={() => actions.fork(item.id)} />
+        <TxIconButton size="sm" icon="copy" label={t("Copy")} onClick={() => actions.copy(item.text)} />
+        <TxIconButton size="sm" icon="fork" label={t("Fork from here")} onClick={() => actions.fork(item.id)} />
       </div>
     </div>;
     case "changes": return <Changes id={item.id} changes={item.changes} undone={item.undone} actions={actions} />;
     case "memory": return <div className="chat-line" data-undone={item.undone || undefined}>
-      <span className="chat-line-text">{item.undone ? "Forgot" : "Remembered"}: {item.text}</span>
-      <TxButton size="sm" variant="quiet" onClick={() => actions.undo(item.id, !item.undone)}>{item.undone ? "Redo" : "Undo"}</TxButton>
+      <span className="chat-line-text">{item.undone ? t("Forgot: {text}", { text: item.text }) : t("Remembered: {text}", { text: item.text })}</span>
+      <TxButton size="sm" variant="quiet" onClick={() => actions.undo(item.id, !item.undone)}>{item.undone ? t("Redo") : t("Undo")}</TxButton>
     </div>;
     case "error": return <TxAlert title={item.title} actions={<>
-      {item.retry && <TxButton size="sm" onClick={() => actions.retry?.(item.id)}><TxIcon name="refresh" />Retry</TxButton>}
+      {item.retry && <TxButton size="sm" onClick={() => actions.retry?.(item.id)}><TxIcon name="refresh" />{t("Retry")}</TxButton>}
       {item.action && <TxButton size="sm" variant="quiet" onClick={() => actions.failure(item.action!)}>{item.action}</TxButton>}
     </>}>{item.text}</TxAlert>;
     case "plan": return <div className="chat-card chat-plan-card">
       <div className="chat-plan-head">
-        <TxIcon name="list" /><span className="chat-plan-label">Plan</span><span className="chat-spacer" />
-        <TxIconButton size="sm" icon="download" label="Download" onClick={() => { const url = URL.createObjectURL(new Blob([item.text], {type:"text/markdown;charset=utf-8"})); const link = document.createElement("a"); link.href = url; link.download = "plan.md"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }} />
-        <TxIconButton size="sm" icon="copy" label="Copy" onClick={() => actions.copy(item.text)} />
+        <TxIcon name="list" /><span className="chat-plan-label">{t("Plan")}</span><span className="chat-spacer" />
+        <TxIconButton size="sm" icon="download" label={t("Download")} onClick={() => { const url = URL.createObjectURL(new Blob([item.text], {type:"text/markdown;charset=utf-8"})); const link = document.createElement("a"); link.href = url; link.download = "plan.md"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }} />
+        <TxIconButton size="sm" icon="copy" label={t("Copy")} onClick={() => actions.copy(item.text)} />
       </div>
       <div className="chat-plan-body">
         <h3 className="chat-plan-title">{item.title}</h3>
@@ -125,9 +127,9 @@ function render(item: Item, actions: ItemActions, owner: Owner): ReactNode {
       </div>
     </div>;
     case "plan-ask": return item.state === "waiting" ? <PlanAsk id={item.id} actions={actions} />
-      : <div className="chat-line">{item.state === "accepted" ? "Carrying out the plan" : "Plan not carried out"}</div>;
+      : <div className="chat-line">{item.state === "accepted" ? t("Carrying out the plan") : t("Plan not carried out")}</div>;
     case "notice": return <div className="chat-notice"><span>{item.text}</span></div>;
-    case "wake": return <div className="chat-mark"><span>{new Date(item.at * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span><span>·</span><WakeIcon wake={item.wake} /><span>{wakeText(item.wake)}</span></div>;
+    case "wake": return <div className="chat-mark"><span>{new Date(item.at * 1000).toLocaleTimeString(intlLocale(), { hour: "2-digit", minute: "2-digit" })}</span><span>·</span><WakeIcon wake={item.wake} /><span>{wakeText(item.wake)}</span></div>;
   }
 }
 
@@ -138,7 +140,7 @@ function Todo({ items }: { items: TodoItem[] }) {
   const done = items.filter(entry => entry.state === "done").length;
   return <div className="chat-todo">
     <TxButton variant="quiet" size="sm" className="chat-group" aria-expanded={open} onClick={() => setOpen(!open)}>
-      <TxIcon name="list" />{done} of {items.length} done<TxIcon name={open ? "chevron-down" : "chevron"} /></TxButton>
+      <TxIcon name="list" />{t("{done} of {total} done", { done, total: items.length })}<TxIcon name={open ? "chevron-down" : "chevron"} /></TxButton>
     {open && <ol className="chat-plan">{items.map(entry => <li key={entry.text} data-state={entry.state}>
       <TxIcon name={entry.state === "done" ? "check-circle" : entry.state === "active" ? "loader" : "circle"} /><span>{entry.text}</span>
     </li>)}</ol>}
@@ -155,8 +157,8 @@ function EditBox({ text, onDone }: { text: string; onDone(text: string | null): 
         if (event.key === "Enter" && !event.shiftKey && value.trim()) { event.preventDefault(); onDone(value.trim()); }
       }} />
     <div className="chat-edit-actions">
-      <TxButton size="sm" variant="quiet" onClick={() => onDone(null)}>Cancel</TxButton>
-      <TxButton size="sm" variant="primary" disabled={!value.trim()} onClick={() => onDone(value.trim())}>Send</TxButton>
+      <TxButton size="sm" variant="quiet" onClick={() => onDone(null)}>{t("Cancel")}</TxButton>
+      <TxButton size="sm" variant="primary" disabled={!value.trim()} onClick={() => onDone(value.trim())}>{t("Send")}</TxButton>
     </div>
   </div>;
 }
@@ -166,24 +168,24 @@ function Instead({ onNo }: { onNo(reason: string): void }) {
   const [instead, setInstead] = useState("");
   return <div className="chat-ask-other">
     <TxIcon name="edit" />
-    <TxInput className="chat-ask-input" value={instead} onChange={event => setInstead(event.target.value)} placeholder="No, and tell it what to do differently"
+    <TxInput className="chat-ask-input" value={instead} onChange={event => setInstead(event.target.value)} placeholder={t("No, and tell it what to do differently")}
       onKeyDown={event => { if (event.key === "Enter" && instead.trim()) onNo(instead.trim()); }} />
   </div>;
 }
 
 /** The numbered answers of an approval card, in order; the number keys pick them (ChatPanel). */
 export function askOptions(canAlwaysAllow: boolean, owner: Owner): { key: "allow" | "always" | "deny"; label: string }[] {
-  return [{ key: "allow", label: "Yes" }, ...canAlwaysAllow ? [{ key: "always" as const, label: `Yes, and don't ask again ${owner === "bot" ? "for this bot" : "in this chat"}` }] : [],
-    { key: "deny", label: "No" }];
+  return [{ key: "allow", label: t("Yes") }, ...canAlwaysAllow ? [{ key: "always" as const, label: owner === "bot" ? t("Yes, and don't ask again for this bot") : t("Yes, and don't ask again in this chat") }] : [],
+    { key: "deny", label: t("No") }];
 }
 
 /** the chat panel's question card: numbered answers (Yes, Yes and don't ask again, No), a line to say what to do instead, × to dismiss. Number keys pick (ChatPanel). */
 function Ask({ item, actions, owner }: { item: Extract<Item, { kind: "approval" }>; actions: ItemActions; owner: Owner }) {
   const options = askOptions(item.canAlwaysAllow, owner);
   return <div className="chat-card chat-ask">
-    <div className="chat-ask-head"><span className="chat-card-title">{item.action}?</span><span className="chat-meta">{item.target}</span>
-      <span className="chat-spacer" />{item.expires !== undefined && <span className="chat-meta">Expires at {new Date(item.expires * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
-      <TxIconButton size="sm" icon="close" label="Dismiss" onClick={() => actions.decide(item.id, "deny")} /></div>
+    <div className="chat-ask-head"><span className="chat-card-title">{t("{action}?", { action: item.action })}</span><span className="chat-meta">{item.target}</span>
+      <span className="chat-spacer" />{item.expires !== undefined && <span className="chat-meta">{t("Expires at")} {new Date(item.expires * 1000).toLocaleTimeString(intlLocale(), { hour: "2-digit", minute: "2-digit" })}</span>}
+      <TxIconButton size="sm" icon="close" label={t("Dismiss")} onClick={() => actions.decide(item.id, "deny")} /></div>
     <ul className="chat-ask-lines">{item.lines.map(line => <li key={line}>{line}</li>)}</ul>
     <div className="chat-ask-options">
       {options.map((option, index) => <TxButton key={option.key} variant="row" className="chat-ask-option" onClick={() => actions.decide(item.id, option.key)}>
@@ -197,11 +199,11 @@ function Ask({ item, actions, owner }: { item: Extract<Item, { kind: "approval" 
 /** the chat panel's "Implement this plan?" card under the plan. */
 function PlanAsk({ id, actions }: { id: string; actions: ItemActions }) {
   return <div className="chat-card chat-ask">
-    <div className="chat-ask-head"><span className="chat-card-title">Implement this plan?</span><span className="chat-spacer" />
-      <TxIconButton size="sm" icon="close" label="Dismiss" onClick={() => actions.plan?.(id, false)} /></div>
+    <div className="chat-ask-head"><span className="chat-card-title">{t("Implement this plan?")}</span><span className="chat-spacer" />
+      <TxIconButton size="sm" icon="close" label={t("Dismiss")} onClick={() => actions.plan?.(id, false)} /></div>
     <div className="chat-ask-options">
-      <TxButton variant="row" className="chat-ask-option" onClick={() => actions.plan?.(id, true)}><span className="chat-ask-key">1</span>Yes, implement this plan</TxButton>
-      <TxButton variant="row" className="chat-ask-option" onClick={() => actions.plan?.(id, false)}><span className="chat-ask-key">2</span>No</TxButton>
+      <TxButton variant="row" className="chat-ask-option" onClick={() => actions.plan?.(id, true)}><span className="chat-ask-key">1</span>{t("Yes, implement this plan")}</TxButton>
+      <TxButton variant="row" className="chat-ask-option" onClick={() => actions.plan?.(id, false)}><span className="chat-ask-key">2</span>{t("No")}</TxButton>
       <Instead onNo={reason => actions.plan?.(id, false, reason)} />
     </div>
   </div>;
@@ -215,13 +217,13 @@ function Changes({ id, changes, undone, actions }: { id: string; changes: Change
     <div className="chat-card-head">
       <span className="chat-tile"><TxIcon name="edit" /></span>
       <span className="chat-card-titles">
-        <span className="chat-card-title">{undone ? "Undid" : "Made"} {changes.length} {changes.length === 1 ? "change" : "changes"}</span>
+        <span className="chat-card-title">{undone ? changes.length === 1 ? t("Undid 1 change") : t("Undid {count} changes", { count: changes.length }) : changes.length === 1 ? t("Made 1 change") : t("Made {count} changes", { count: changes.length })}</span>
       </span>
-      <TxButton size="sm" variant="quiet" disabled={changes.every(c=>c.reversible===false)} onClick={() => actions.undo(id, !undone)}>{undone ? "Redo" : "Undo"}<TxIcon name={undone ? "redo" : "undo"} /></TxButton>
-      <TxButton size="sm" onClick={() => actions.pane("changes")}>Review</TxButton>
+      <TxButton size="sm" variant="quiet" disabled={changes.every(c=>c.reversible===false)} onClick={() => actions.undo(id, !undone)}>{undone ? t("Redo") : t("Undo")}<TxIcon name={undone ? "redo" : "undo"} /></TxButton>
+      <TxButton size="sm" onClick={() => actions.pane("changes")}>{t("Review")}</TxButton>
     </div>
     {shown.map(change => <ChangeRow key={change.id} change={change} actions={actions} />)}
-    {changes.length > 3 && <TxButton variant="quiet" size="sm" className="chat-more" onClick={() => setAll(!all)}>{all ? "Show less" : `Show ${changes.length - 3} more`}<TxIcon name="chevron-down" /></TxButton>}
+    {changes.length > 3 && <TxButton variant="quiet" size="sm" className="chat-more" onClick={() => setAll(!all)}>{all ? t("Show less") : t("Show {value} more", { value: changes.length - 3 })}<TxIcon name="chevron-down" /></TxButton>}
   </div>;
 }
 
@@ -244,12 +246,12 @@ function Work({ seconds, running, interrupted, steps }: { seconds: number; runni
   return <div className="chat-worked" data-interrupted={interrupted || undefined}>
     <TxButton variant="quiet" size="sm" className="chat-worked-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
       {running
-        ? <><span className="chat-shimmer">Working</span><span className="chat-meta">{duration(elapsed)}</span></>
-        : <span className="chat-worked-label">{interrupted ? `Stopped by you after ${duration(seconds)}` : `Worked for ${duration(seconds)}`}</span>}
-      {failed > 0 && <span className="chat-failed-count"> · {failed} failed</span>}
+        ? <><span className="chat-shimmer">{t("Working")}</span><span className="chat-meta">{duration(elapsed)}</span></>
+        : <span className="chat-worked-label">{interrupted ? t("Stopped by you after {duration}", { duration: duration(seconds) }) : t("Worked for {duration}", { duration: duration(seconds) })}</span>}
+      {failed > 0 && <span className="chat-failed-count"> · {failed} {t("failed")}</span>}
     </TxButton>
     {(running || open) && <div className="chat-work">
-      {earlier > 0 && <span className="chat-work-earlier">{earlier} earlier {earlier === 1 ? "step" : "steps"}</span>}
+      {earlier > 0 && <span className="chat-work-earlier">{earlier === 1 ? t("1 earlier step") : t("{count} earlier steps", { count: earlier })}</span>}
       <Steps steps={earlier ? steps.slice(-LIVE_STEPS) : steps} />
     </div>}
   </div>;
@@ -265,7 +267,7 @@ export function Steps({ steps }: { steps: Step[] }) {
 /** The last line while the turn runs "Working": how long it has been at it. */
 export function Working({ since }: { since: number }) {
   const elapsed = useElapsed(since);
-  return <div className="chat-working"><span className="chat-shimmer">Working</span><span className="chat-meta">{duration(elapsed)}</span></div>;
+  return <div className="chat-working"><span className="chat-shimmer">{t("Working")}</span><span className="chat-meta">{duration(elapsed)}</span></div>;
 }
 
 function StepRow({ step }: { step: Step }) {

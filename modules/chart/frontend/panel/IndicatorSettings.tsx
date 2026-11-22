@@ -1,3 +1,5 @@
+import { displayIndicator, indicatorLabel } from "../indicatorText";
+import { t } from "../i18n";
 /* Indicator settings (TradingView): a small dialog that does not dim the chart, Inputs and Style tabs, labels on the
    left and controls on the right; every change shows on the chart at once, Cancel puts back what was there. */
 import { useRef, useState } from "react";
@@ -26,9 +28,10 @@ function InputControl({ input, value, onChange }: { input: IndicatorInput; value
 
 export function IndicatorSettings({ ctx, panelId, chartId, indicatorId }: { ctx: ModuleContext; panelId: string; chartId: string; indicatorId: string }) {
   const indicator = useStore(state => state.charts[chartId]?.chart?.document.indicators.find(item => item.id === indicatorId));
-  const definition = useStore(state => indicator && state.catalog?.find(item => item.source === indicator.definition.source && item.id === indicator.definition.id));
+  const catalogEntry = useStore(state => indicator && state.catalog?.find(item => item.source === indicator.definition.source && item.id === indicator.definition.id));
   const meta = useStore(state => state.charts[chartId]?.feed.indicators.get(indicatorId)?.meta ?? []);
   const original = useRef(indicator);
+  const definition = catalogEntry && displayIndicator(catalogEntry);
   const [tab, setTab] = useState<"inputs" | "style">("inputs");
   const close = () => openOverlay(panelId, null);
   if (!indicator) return null;
@@ -46,31 +49,31 @@ export function IndicatorSettings({ ctx, panelId, chartId, indicatorId }: { ctx:
   const plots = meta.filter(item => item.kind === "plot" || item.kind === "hline" || item.kind === "fill" || item.kind === "bgcolor");
   return <TxDialog open dim={false} onOpenChange={open => { if (!open) cancel(); }} title={indicator.name ?? definition?.title ?? indicator.definition.id}
     footer={<>
-      <TxMenu label="Defaults" items={[{ id: "reset", label: "Reset settings", onSelect: () => patch({ params: Object.fromEntries(inputs.map(input => [input.id, input.default as Scalar])), styles: {} }) }]}
-        trigger={<TxButton size="sm">Defaults</TxButton>} />
+      <TxMenu label={t("Defaults")} items={[{ id: "reset", label: t("Reset settings"), onSelect: () => patch({ params: Object.fromEntries(inputs.map(input => [input.id, input.default as Scalar])), styles: {} }) }]}
+        trigger={<TxButton size="sm">{t("Defaults")}</TxButton>} />
       <span className="chart-tb-spacer" />
-      <TxButton size="sm" onClick={cancel}>Cancel</TxButton>
-      <TxButton size="sm" variant="primary" onClick={close}>Ok</TxButton>
+      <TxButton size="sm" onClick={cancel}>{t("Cancel")}</TxButton>
+      <TxButton size="sm" variant="primary" onClick={close}>{t("Ok")}</TxButton>
     </>}>
-    <TxTabs value={tab} onChange={setTab} label="Indicator settings" options={[{ value: "inputs", label: "Inputs" }, { value: "style", label: "Style" }]} />
+    <TxTabs value={tab} onChange={setTab} label={t("Indicator settings")} options={[{ value: "inputs", label: t("Inputs") }, { value: "style", label: t("Style") }]} />
     <div className="chart-form chart-settings-form">
       {tab === "inputs" && (inputs.length ? inputs.map(input => input.type === "bool"
         ? <InputControl key={input.id} input={input} value={indicator.params[input.id] ?? input.default as Scalar} onChange={value => setParam(input.id, value)} />
         : <TxField key={input.id} label={input.title} hint={input.tooltip ?? undefined} layout="inline">
           <InputControl input={input} value={indicator.params[input.id] ?? input.default as Scalar} onChange={value => setParam(input.id, value)} />
-        </TxField>) : <p className="chart-muted">This indicator has no inputs.</p>)}
+        </TxField>) : <p className="chart-muted">{t("This indicator has no inputs.")}</p>)}
       {tab === "style" && plots.map(item => {
         const style = indicator.styles[item.id] ?? {};
         const color = style.color ?? pineColor(item.color ?? null) ?? "";
         return <div key={item.id} className="chart-style-row">
-          <TxCheckbox label={item.title ?? item.id} checked={style.visible !== false} onCheckedChange={visible => setStyle(item.id, { visible })} />
-          <TxColorInput aria-label={`${item.title ?? item.id} color`} value={color} onValueChange={value => setStyle(item.id, { color: value })} />
+          <TxCheckbox label={indicatorLabel(indicator.definition.source, item.title ?? item.id)} checked={style.visible !== false} onCheckedChange={visible => setStyle(item.id, { visible })} />
+          <TxColorInput aria-label={t("{value} color", { value: indicatorLabel(indicator.definition.source, item.title ?? item.id) })} value={color} onValueChange={value => setStyle(item.id, { color: value })} />
           {item.kind === "plot" || item.kind === "hline" ? <>
-            <TxSelect aria-label="Line width" value={String(style.lineWidth ?? item.linewidth ?? 1)} onChange={event => setStyle(item.id, { lineWidth: Number(event.target.value) })}>
-              {WIDTHS.map(width => <option key={width} value={width}>{width}px</option>)}
+            <TxSelect aria-label={t("Line width")} value={String(style.lineWidth ?? item.linewidth ?? 1)} onChange={event => setStyle(item.id, { lineWidth: Number(event.target.value) })}>
+              {WIDTHS.map(width => <option key={width} value={width}>{width}{t("px")}</option>)}
             </TxSelect>
-            <TxSelect aria-label="Line style" value={style.lineStyle ?? "solid"} onChange={event => setStyle(item.id, { lineStyle: event.target.value as PlotStyle["lineStyle"] })}>
-              {LINE_STYLES.map(lineStyle => <option key={lineStyle} value={lineStyle!}>{lineStyle![0].toUpperCase() + lineStyle!.slice(1)}</option>)}
+            <TxSelect aria-label={t("Line style")} value={style.lineStyle ?? "solid"} onChange={event => setStyle(item.id, { lineStyle: event.target.value as PlotStyle["lineStyle"] })}>
+              {LINE_STYLES.map(lineStyle => <option key={lineStyle} value={lineStyle!}>{{ solid: t("Solid"), dashed: t("Dashed"), dotted: t("Dotted") }[lineStyle!]}</option>)}
             </TxSelect>
           </> : null}
         </div>;

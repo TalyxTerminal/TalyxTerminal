@@ -1,13 +1,15 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   ModuleView, TxButton, TxDetails, TxEmpty, TxIconButton, TxRoot, TxRow, TxSegmented, TxSettingsGroup, TxSettingsNote, TxSettingsPage,
-  TxStatus, TxDialog, TxToastProvider, TxTooltip, TxTooltipProvider,
+  TxStatus, TxDialog, TxToastProvider, TxTooltip, TxTooltipProvider, intlLocale, translator,
   type Json,
 } from "@talyx/sdk";
 import { platformRuntime } from "../kernel/runtime";
 import { DeclaredSettings, declaredSettings } from "./DeclaredSettings";
 import { workspaceFrameId, workspaceWindowCommand } from "./workspaceWindows";
 import { NotificationsSection } from "./NotificationSettings";
+import { t } from "./i18n";
+import { VersionGroup } from "./UpdateNotice";
 import type { TalyxDesktop } from "../../../host/desktop/preload";
 import type { Platform } from "@talyx/sdk";
 import "./PlatformUi.css";
@@ -55,8 +57,8 @@ export function attentionItems(): Attention[] {
   const names = new Map([...kernel.definitions.values()].map(item => [item.id, item.name]));
   const broken: Attention[] = [...kernel.definitions.values(), ...runtime.unreadable]
     .filter(item => item.id !== "platform" && item.enabled && (item.state === "failed" || runtime.faults.has(item.id) && !kernel.modules.get(item.id)?.ready))
-    .map(item => ({ key: `module:${item.id}`, title: item.name, text: item.problem ?? runtime.faults.get(item.id) ?? "This module couldn't start.",
-      error: true, action: { label: "Retry", run: () => runtime.retry(item.id) } }));
+    .map(item => ({ key: `module:${item.id}`, title: translator(item.id)(item.name), text: item.problem ?? runtime.faults.get(item.id) ?? t("This module couldn't start."),
+      error: true, action: { label: t("Retry"), run: () => runtime.retry(item.id) } }));
   const platformFaults: Attention[] = [...runtime.faults.entries()]
     .filter(([owner]) => !names.has(owner))
     .map(([owner, text]) => ({ key: `fault:${owner}`, title: "TALYX", text, error: true }));
@@ -66,8 +68,8 @@ export function attentionItems(): Attention[] {
     if (!value || value.visible === false || (value.level !== "warn" && value.level !== "error")) return [];
     const { title, action } = item.descriptor;
     // A status item's tooltip starts with what its action does ("Retry cleanup", "Data sources").
-    return [{ key, title, text: value.text || "Needs attention", error: value.level === "error",
-      action: action ? { run: () => kernel.call("platform", action, {}), label: value.tooltip?.split("\n")[0] || "Retry" } : undefined }];
+    return [{ key, title: translator(item.moduleId)(title), text: value.text || t("Needs attention"), error: value.level === "error",
+      action: action ? { run: () => kernel.call("platform", action, {}), label: value.tooltip?.split("\n")[0] || t("Retry") } : undefined }];
   });
   return [...broken, ...platformFaults, ...reported];
 }
@@ -80,7 +82,7 @@ function AttentionGroup({ items }: { items: Attention[] }) {
   const [pending, setPending] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
   if (!items.length) return null;
-  return <TxSettingsGroup title="Needs attention" className="talyx-settings-attention" aria-label="Needs attention">
+  return <TxSettingsGroup title={t("Needs attention")} className="talyx-settings-attention" aria-label={t("Needs attention")}>
     {items.map(item => <TxRow key={item.key} tone={item.error ? "failed" : "default"} title={item.title}
       detail={failed?.key === item.key ? <span role="alert">{failed.message}</span> : item.text}>
       {item.action && <TxButton size="sm" disabled={pending !== null} aria-busy={pending === item.key || undefined}
@@ -100,6 +102,7 @@ function GeneralSection({ attention, workspaceId }: { attention: Attention[]; wo
   return <TxSettingsPage>
     {workspaceId === "global" && <AttentionGroup items={attention} />}
     <DeclaredSettings moduleId="platform" workspaceId={workspaceId} />
+    {workspaceId === "global" && <VersionGroup />}
   </TxSettingsPage>;
 }
 
@@ -107,16 +110,16 @@ function GeneralSection({ attention, workspaceId }: { attention: Attention[]; wo
 type CallRecord = Omit<Recorded, "caller"> & { caller: { origin?: string; module?: string | null; workspaceId?: string | null; ai?: { client?: string } | null } };
 
 const callStatus = (call: CallRecord): { tone: "busy" | "done" | "failed"; label: string } =>
-  call.endedAt === null ? { tone: "busy", label: "Running" } : call.ok ? { tone: "done", label: "Done" } : { tone: "failed", label: "Failed" };
+  call.endedAt === null ? { tone: "busy", label: t("Running") } : call.ok ? { tone: "done", label: t("Done") } : { tone: "failed", label: t("Failed") };
 
 /** An ISO time, as the call log records it. */
 function when(iso: string): string {
   const date = new Date(iso), now = new Date();
   const ago = (now.getTime() - date.getTime()) / 1000;
-  if (ago < 60) return "just now";
-  if (ago < 3600) return `${Math.floor(ago / 60)} min ago`;
-  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return date.toDateString() === now.toDateString() ? time : `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+  if (ago < 60) return t("just now");
+  if (ago < 3600) return t("{minutes} min ago", { minutes: Math.floor(ago / 60) });
+  const time = date.toLocaleTimeString(intlLocale(), { hour: "2-digit", minute: "2-digit" });
+  return date.toDateString() === now.toDateString() ? time : `${date.toLocaleDateString(intlLocale(), { month: "short", day: "numeric" })} ${time}`;
 }
 
 /** An action, in its declaration's words: the first line of its description. */
@@ -149,7 +152,7 @@ function ExternalAiSection() {
   useEffect(() => {
     void refresh();
     void workspaceWindowCommand({ kind: "list" })
-      .then(open => setNames(new Map(open.map(item => [item.workspaceId, item.name ?? "Untitled"]))))
+      .then(open => setNames(new Map(open.map(item => [item.workspaceId, item.name ?? t("Untitled")]))))
       .catch(() => setNames(new Map()));
     // Calls are recorded as they happen; there is no push for them, so the list is re-read while open.
     const timer = window.setInterval(() => void refresh(), 5000);
@@ -158,13 +161,13 @@ function ExternalAiSection() {
 
   const apps = new Map<string, CallRecord[]>();
   for (const call of calls ?? []) {
-    const app = call.caller.ai?.client ?? "AI app";
+    const app = call.caller.ai?.client ?? t("AI app");
     apps.set(app, [...apps.get(app) ?? [], call]);
   }
   return <TxSettingsPage>
-    {error && <TxSettingsGroup title="AI apps"><TxSettingsNote tone="error">Couldn't read the call record. {error}</TxSettingsNote></TxSettingsGroup>}
-    {!error && !calls && <TxSettingsGroup title="AI apps"><TxSettingsNote>Loading…</TxSettingsNote></TxSettingsGroup>}
-    {calls && calls.length === 0 && <TxSettingsGroup title="AI apps"><TxEmpty title="No AI app has called TALYX yet" /></TxSettingsGroup>}
+    {error && <TxSettingsGroup title={t("AI apps")}><TxSettingsNote tone="error">{t("Couldn't read the call record. {error}", { error })}</TxSettingsNote></TxSettingsGroup>}
+    {!error && !calls && <TxSettingsGroup title={t("AI apps")}><TxSettingsNote>{t("Loading…")}</TxSettingsNote></TxSettingsGroup>}
+    {calls && calls.length === 0 && <TxSettingsGroup title={t("AI apps")}><TxEmpty title={t("No AI app has called TALYX yet")} /></TxSettingsGroup>}
     {[...apps].map(([app, items]) => <TxSettingsGroup key={app} title={app}>
       <div className="talyx-calls">
         {items.map(call => {
@@ -173,12 +176,12 @@ function ExternalAiSection() {
             <button type="button" className="talyx-call" aria-expanded={opened === call.callId}
               onClick={() => setOpened(current => current === call.callId ? null : call.callId)}>
               <span className="talyx-call-action">{actionTitle(call.capability)}</span>
-              <span className="talyx-call-time">{names.get(call.caller.workspaceId ?? "") ?? "Closed workspace"}</span>
+              <span className="talyx-call-time">{names.get(call.caller.workspaceId ?? "") ?? t("Closed workspace")}</span>
               <TxStatus tone={status.tone} label={status.label} />
               <span className="talyx-call-time">{when(call.startedAt)}</span>
             </button>
             {opened === call.callId && <div className="talyx-call-body">
-              {call.error ? <span className="tx-error" role="alert">{call.error}</span> : <TxDetails label="Result">{call.summary}</TxDetails>}
+              {call.error ? <span className="tx-error" role="alert">{call.error}</span> : <TxDetails label={t("Result")}>{call.summary}</TxDetails>}
             </div>}
           </Fragment>;
         })}
@@ -190,12 +193,13 @@ function ExternalAiSection() {
 /** A module's management page: `key` is moduleId.sectionId, `view` the module's view drawn as the page. */
 type Section = { moduleId: string; key: string; title: string; view: string; workspace: boolean };
 
-/** Sections owned and drawn by the platform. Modules moved to Community, Installed. */
-const platformItems: Record<string, NavItem> = {
-  general: { key: "general", title: "General" },
-  notifications: { key: "notifications", title: "Notifications" },
-  external_ai: { key: "external_ai", title: "External AI" },
-};
+/** Sections owned and drawn by the platform. Modules moved to Community, Installed. (Made when drawn: the shell's
+    files load before the window knows its language.) */
+const platformItems = (): Record<string, NavItem> => ({
+  general: { key: "general", title: t("General") },
+  notifications: { key: "notifications", title: t("Notifications") },
+  external_ai: { key: "external_ai", title: t("External AI") },
+});
 
 type Scope = "global" | "workspace";
 
@@ -203,8 +207,9 @@ type Scope = "global" | "workspace";
     workspace side lists only declared settings: management pages (sources, connections, keys) are global. */
 function navigation(sections: Section[], names: Map<string, string>, scope: Scope): { groups: NavGroup[]; titles: Map<string, string> } {
   const titles = new Map<string, string>();
-  const groups: NavGroup[] = [{ key: "platform", label: "Platform", items: scope === "global"
-    ? [platformItems.general, platformItems.notifications, platformItems.external_ai] : [platformItems.general] }];
+  const platform = platformItems();
+  const groups: NavGroup[] = [{ key: "platform", label: t("Platform"), items: scope === "global"
+    ? [platform.general, platform.notifications, platform.external_ai] : [platform.general] }];
   const owned = new Map<string, Section[]>();
   for (const moduleId of [...names.keys()].sort((a, b) => names.get(a)!.localeCompare(names.get(b)!))) {
     if (moduleId !== "platform" && declaredSettings(moduleId).length) owned.set(moduleId, []);
@@ -212,14 +217,14 @@ function navigation(sections: Section[], names: Map<string, string>, scope: Scop
   for (const section of sections) owned.set(section.moduleId, [...owned.get(section.moduleId) ?? [], section]);
   for (const [moduleId, entries] of owned) {
     const items = [
-      ...declaredSettings(moduleId).length ? [{ key: `settings:${moduleId}`, title: "General" }] : [],
+      ...declaredSettings(moduleId).length ? [{ key: `settings:${moduleId}`, title: t("General") }] : [],
       ...entries.filter(section => scope === "global" || section.workspace).map(section => ({ key: section.key, title: section.title })),
     ];
     groups.push({ key: `module:${moduleId}`, label: names.get(moduleId) ?? moduleId, items });
     titles.set(`settings:${moduleId}`, names.get(moduleId) ?? moduleId);
   }
   for (const section of sections) if (!titles.has(section.key)) titles.set(section.key, section.title);
-  for (const entry of Object.values(platformItems)) titles.set(entry.key, entry.title);
+  for (const entry of Object.values(platform)) titles.set(entry.key, entry.title);
   return { groups: groups.filter(group => group.items.length), titles };
 }
 
@@ -236,7 +241,7 @@ function useCurrentWorkspace(open: boolean): { id: string; name: string } | null
       const id = workspaceFrameId() ?? (window.top === window ? new URL(location.href).searchParams.get("workspaceId") : null);
       if (!id) { setWorkspace(null); return; }
       void workspaceWindowCommand({ kind: "list" }).then(records => {
-        const name = records.find(record => record.workspaceId === id)?.name ?? "Untitled";
+        const name = records.find(record => record.workspaceId === id)?.name ?? t("Untitled");
         if (live) setWorkspace(current => current?.id === id && current.name === name ? current : { id, name });
       }).catch(() => { if (live) setWorkspace(null); });
     };
@@ -262,10 +267,12 @@ function SettingsDialog({ open, onOpenChange, selection, onSelectionChange }: {
   const workspace = useCurrentWorkspace(open);
   const attention = attentionItems();
   const sections = kernel.contributions<PlatformTypes["point:settings_section"]>("platform.settings_section").map((item): Section =>
-    ({ moduleId: item.moduleId, key: `${item.moduleId}.${item.id}`, title: item.descriptor.title, view: `${item.moduleId}.${item.descriptor.view}`,
+    ({ moduleId: item.moduleId, key: `${item.moduleId}.${item.id}`, title: translator(item.moduleId)(item.descriptor.title), view: `${item.moduleId}.${item.descriptor.view}`,
       workspace: item.descriptor.workspace === true }));
+  // Names stay English for finding a module by its name ("my-module"); they are shown translated with its dictionary.
   const names = new Map([...kernel.definitions.values()].map(item => [item.id, item.name]));
-  const { groups, titles } = navigation(sections, names, scope);
+  const shownNames = new Map([...names].map(([id, name]) => [id, translator(id)(name)]));
+  const { groups, titles } = navigation(sections, shownNames, scope);
   const selected = requested ?? "general";
   // A module id or name ("my-module") opens that module's first section, as Installed links to it.
   const settingsOf = selected.startsWith("settings:") ? selected.slice("settings:".length)
@@ -275,7 +282,7 @@ function SettingsDialog({ open, onOpenChange, selection, onSelectionChange }: {
     ?? visibleSections.find(item => item.moduleId === selected || slug(item.moduleId) === selected || slug(names.get(item.moduleId) ?? "") === selected);
   const ctx = current ? kernel.modules.get(current.moduleId)?.ctx : undefined;
   const activeKey = current?.key ?? (settingsOf ? `settings:${settingsOf}`
-    : scope === "global" && selected in platformItems ? selected : "general");
+    : scope === "global" && selected in platformItems() ? selected : "general");
   const heading = titles.get(activeKey)!;
   const layer = scope === "global" ? "global" : workspace?.id;
 
@@ -296,14 +303,14 @@ function SettingsDialog({ open, onOpenChange, selection, onSelectionChange }: {
     : activeKey === "notifications" ? <NotificationsSection />
     : <GeneralSection key={layer} attention={attention} workspaceId={layer} />;
 
-  return <TxDialog open={open} onOpenChange={onOpenChange} title="Settings" size="wide" className="talyx-settings" footer={<></>}>
+  return <TxDialog open={open} onOpenChange={onOpenChange} title={t("Settings")} size="wide" className="talyx-settings" footer={<></>}>
     <div className="talyx-settings-layout">
-      <nav className="talyx-settings-nav" aria-label="Settings sections">
-        <div className="talyx-settings-nav-title" aria-hidden="true">Settings</div>
+      <nav className="talyx-settings-nav" aria-label={t("Settings sections")}>
+        <div className="talyx-settings-nav-title" aria-hidden="true">{t("Settings")}</div>
         <div className="talyx-settings-scope">
-          <TxSegmented label="Scope" size="sm" value={scope} onChange={setScope} options={[
-            { value: "global", label: "Global" },
-            { value: "workspace", label: "This workspace" },
+          <TxSegmented label={t("Scope")} size="sm" value={scope} onChange={setScope} options={[
+            { value: "global", label: t("Global") },
+            { value: "workspace", label: t("This workspace") },
           ]} />
         </div>
         {scope === "global" || workspace ? groups.map(group => <div key={group.key} className="talyx-settings-group">
@@ -318,8 +325,8 @@ function SettingsDialog({ open, onOpenChange, selection, onSelectionChange }: {
           <TxButton variant="row" className="talyx-settings-link" onClick={() => {
             setExitError(null);
             // Exit takes the tray's path, so running work is listed before anything stops.
-            desktop.requestExit().catch(reason => setExitError(`TALYX could not exit: ${reason instanceof Error ? reason.message : String(reason)}`));
-          }}><span>Exit TALYX</span></TxButton>
+            desktop.requestExit().catch(reason => setExitError(t("TALYX could not exit: {reason}", { reason: reason instanceof Error ? reason.message : String(reason) })));
+          }}><span>{t("Exit TALYX")}</span></TxButton>
         </div>}
       </nav>
       <div className="talyx-settings-main">
@@ -329,11 +336,11 @@ function SettingsDialog({ open, onOpenChange, selection, onSelectionChange }: {
           <div className="talyx-settings-page">
             {scope === "global" || workspace
               ? <><header className="talyx-settings-head"><h3 className="talyx-settings-heading">{heading}</h3></header>{page}</>
-              : workspace === null && <div className="talyx-settings-blank"><TxEmpty title="No workspace is open" /></div>}
+              : workspace === null && <div className="talyx-settings-blank"><TxEmpty title={t("No workspace is open")} /></div>}
           </div>
         </section>
       </div>
-      <TxIconButton className="talyx-settings-close" label="Close settings" icon="close" onClick={() => onOpenChange(false)} />
+      <TxIconButton className="talyx-settings-close" label={t("Close settings")} icon="close" onClick={() => onOpenChange(false)} />
     </div>
   </TxDialog>;
 }
@@ -347,8 +354,8 @@ export function PlatformControls() {
   return <TxToastProvider>
     <TxTooltipProvider>
       <TxRoot className="talyx-platform-controls" data-platform-controls="">
-        <TxTooltip label="Settings">
-          <TxIconButton label="Settings" icon="settings" onClick={() => { setSelection(null); setOpen(true); }} />
+        <TxTooltip label={t("Settings")}>
+          <TxIconButton label={t("Settings")} icon="settings" onClick={() => { setSelection(null); setOpen(true); }} />
         </TxTooltip>
       </TxRoot>
       <SettingsDialog open={open} onOpenChange={setOpen} selection={selection} onSelectionChange={setSelection} />

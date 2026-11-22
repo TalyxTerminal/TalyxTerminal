@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* Layout: TradingView's grid of pictures, one row per chart count (1 to 8), then the sync switches. A larger layout adds
    charts that copy the active chart's symbol and timeframe; a smaller one closes the last charts. */
 import { useState } from "react";
@@ -6,7 +7,7 @@ import { ARRANGEMENTS, type Arrangement } from "../chart/layouts";
 import { closeChart, createChart, reportChartError, message, setLayout, store, useStore, type SyncOptions } from "../store";
 import { ChartGlyph } from "../chart/icons";
 
-const SYNC: [keyof SyncOptions, string][] = [["symbol", "Symbol"], ["interval", "Interval"], ["crosshair", "Crosshair"], ["time", "Time"], ["dateRange", "Date range"]];
+const SYNC: [keyof SyncOptions, string][] = [["symbol", t("Symbol")], ["interval", t("Interval")], ["crosshair", t("Crosshair")], ["time", t("Time")], ["dateRange", t("Date range")]];
 
 async function arrange(ctx: ModuleContext, panelId: string, next: Arrangement): Promise<void> {
   const layout = store.getState().layouts[panelId];
@@ -28,18 +29,18 @@ export function LayoutMenu({ ctx, panelId }: { ctx: ModuleContext; panelId: stri
   const layout = useStore(state => state.layouts[panelId]);
   const [open, setOpen] = useState(false);
   const counts = [...new Set(ARRANGEMENTS.map(item => item.count))];
-  return <TxPopover open={open} onOpenChange={setOpen} label="Layout" align="end"
-    trigger={<TxButton variant="tool" size="sm" aria-label="Layout"><ChartGlyph name="layout" /></TxButton>}>
+  return <TxPopover open={open} onOpenChange={setOpen} label={t("Layout")} align="end"
+    trigger={<TxButton variant="tool" size="sm" aria-label={t("Layout")}><ChartGlyph name="layout" /></TxButton>}>
     <div className="chart-layouts">
       {counts.map(count => <div key={count} className="chart-layouts-row">
         <span className="chart-layouts-count">{count}</span>
-        {ARRANGEMENTS.filter(item => item.count === count).map(item => <TxTooltip key={item.id} label={`${count} chart${count > 1 ? "s" : ""}`}>
-          <TxButton variant="tool" size="sm" aria-label={`Layout ${item.id}`} aria-pressed={item.id === layout.arrangement}
+        {ARRANGEMENTS.filter(item => item.count === count).map(item => <TxTooltip key={item.id} label={count === 1 ? t("1 chart") : t("{count} charts", { count })}>
+          <TxButton variant="tool" size="sm" aria-label={t("Layout {id}", { id: item.id })} aria-pressed={item.id === layout.arrangement}
             onClick={() => { setOpen(false); arrange(ctx, panelId, item).catch(error => reportChartError(layout.active, message(error))); }}><Picture item={item} /></TxButton>
         </TxTooltip>)}
       </div>)}
       {layout.charts.length > 1 && <div className="chart-layouts-sync">
-        <span className="chart-layouts-title">Sync in layout</span>
+        <span className="chart-layouts-title">{t("Sync in layout")}</span>
         {SYNC.map(([key, label]) => <TxSwitch key={key} label={label} checked={layout.sync[key]}
           onCheckedChange={checked => setLayout(panelId, current => ({ ...current, sync: { ...current.sync, [key]: checked } }))} />)}
       </div>}

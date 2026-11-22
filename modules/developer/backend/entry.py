@@ -5,6 +5,7 @@ from typing import Any
 
 from talyx_sdk import ContractError
 from talyx_sdk.declare import Module
+from talyx_sdk.i18n import t
 from talyx_sdk.process import Call, Context
 
 from . import models as m
@@ -24,7 +25,7 @@ async def show_file(input: dict, call: Call) -> dict:
 
     path = Path(input["path"])
     if not path.is_absolute() or not path.is_file():
-        raise ContractError("not_found", "Choose an existing file to open in the editor.")
+        raise ContractError("not_found", t("Choose an existing file to open in the editor."))
     await call.call("platform.panels.open_target",
                     {"module": "developer", "panelType": "main", "objectId": "file:" + path.resolve().as_uri()})
     return {}
@@ -87,7 +88,7 @@ def routes(ctx: Context):
 
 def _running() -> Developer:
     if app is None:
-        raise ContractError("unavailable", "Developer is starting")
+        raise ContractError("unavailable", t("Developer is starting"))
     return app
 
 
@@ -295,7 +296,7 @@ async def restore_revision(input: m.RestoreRevisionInput, call: Call) -> m.Revis
     app = _running()
     uri = canonical_uri(app.projects.path(input.projectId, input.path))
     if any(item["uri"] == uri for item in app.documents.unsaved_records()):
-        raise ContractError("conflict", "Save or discard this file's unsaved edits before restoring a revision.")
+        raise ContractError("conflict", t("Save or discard this file's unsaved edits before restoring a revision."))
     return await app.projects.restore_revision(input.projectId, input.path, input.revisionId, input.expectedVersion)
 
 

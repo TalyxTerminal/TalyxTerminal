@@ -1,8 +1,11 @@
 /** One place for how Quant shows numbers and times. */
 
-const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const monthDayYear = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-const clock = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
+import { intlLocale } from "@talyx/sdk";
+import { t } from "./i18n";
+
+const monthDay = new Intl.DateTimeFormat(intlLocale(), { month: "short", day: "numeric", timeZone: "UTC" });
+const monthDayYear = new Intl.DateTimeFormat(intlLocale(), { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const clock = new Intl.DateTimeFormat(intlLocale(), { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
 
 /** In UTC, as every time in Quant: "Oct 15, 14:32 UTC" this year, "Oct 15, 2025" otherwise. */
 export function formatWhen(value: number | string | undefined | null): string {
@@ -17,10 +20,10 @@ export function formatWhen(value: number | string | undefined | null): string {
 export function formatAge(value: number | undefined | null): string {
   if (!value) return "—";
   const seconds = (Date.now() - value) / 1000;
-  if (seconds < 60) return "Just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
-  if (seconds < 172800) return "Yesterday";
+  if (seconds < 60) return t("Just now");
+  if (seconds < 3600) return t("{minutes} min ago", { minutes: Math.floor(seconds / 60) });
+  if (seconds < 86400) return t("{hours} h ago", { hours: Math.floor(seconds / 3600) });
+  if (seconds < 172800) return t("Yesterday");
   return formatWhen(value);
 }
 

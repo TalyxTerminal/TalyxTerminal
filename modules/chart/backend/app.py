@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import bars, exports, redirects, research
 from .alerting import Alerts, Notifier
@@ -150,7 +151,7 @@ class ChartApp:
     def flow(self, workspace: str, chart_id: str) -> ChartFlow:
         flows = self.flows.get((workspace, chart_id))
         if not flows:
-            raise ContractError("unavailable", f"Open chart {chart_id} with platform.panels.open_target first")
+            raise ContractError("unavailable", t("Open chart {chart_id} with platform.panels.open_target first", chart_id=chart_id))
         return flows[-1]
 
     async def chart_stream(self, workspace: str, chart_id: str):
@@ -177,7 +178,7 @@ class ChartApp:
         for layer in doc.layers:
             if layer.id == body.id:
                 return layer.model_dump(mode="json", by_alias=True, exclude={"visible", "version", "symbol"})
-        raise ContractError("not_found", f"No layer {body.id} on this chart")
+        raise ContractError("not_found", t("No layer {id} on this chart", id=body.id))
 
     async def research_file(self, ref):
         return await asyncio.to_thread(research.load_reference, ref, self.module_data)
@@ -223,7 +224,7 @@ class ChartApp:
         elif body.bars is None and body.left is not None and body.right is not None and body.left <= body.right:
             view = {"left": body.left, "right": body.right}
         else:
-            raise ContractError("invalid_input", "Give left and right (left first), or bars")
+            raise ContractError("invalid_input", t("Give left and right (left first), or bars"))
         self.flow(workspace, body.chartId).set_view(view)
         return {}
 
@@ -251,12 +252,12 @@ class ChartApp:
     def template(self, template_id: str) -> dict:
         record = self.store.object("template", template_id)
         if record is None:
-            raise ContractError("not_found", f"No template {template_id}")
+            raise ContractError("not_found", t("No template {template_id}", template_id=template_id))
         return record["value"]
 
     async def save_template(self, workspace, body):
         if body.templateId is not None and self.store.object("template", body.templateId) is None:
-            raise ContractError("not_found", f"No template {body.templateId}")
+            raise ContractError("not_found", t("No template {templateId}", templateId=body.templateId))
         value = {"id": body.templateId or "tp-" + uuid.uuid4().hex[:12], "kind": body.kind, "name": body.name,
                  "content": body.content}
         self.store.put_object("template", {"id": value["id"], "value": value}, None)
@@ -265,7 +266,7 @@ class ChartApp:
 
     async def delete_template(self, workspace, body):
         if self.store.object("template", body.templateId) is None:
-            raise ContractError("not_found", f"No template {body.templateId}")
+            raise ContractError("not_found", t("No template {templateId}", templateId=body.templateId))
         self.store.delete_object("template", body.templateId)
         self.workspaces.publish_all({"type": "template_removed", "id": body.templateId})
         return {}

@@ -18,7 +18,7 @@ def text(values, digits):
 
 def frame_of(instrument, bar_type, opened, start, close, volume, *, span_ns, price_digits=1, size_digits=3, spread=.002):
     """Bars as the engine takes them: decimal text, `ts_event` the bar's close time in nanoseconds."""
-    ends = (opened.as_unit("ns").asi8 + span_ns).astype(str)
+    ends = opened.as_unit("ns").asi8 + span_ns
     return pd.DataFrame({"open": text(start, price_digits), "high": text(np.maximum(start, close) * (1 + spread), price_digits),
                          "low": text(np.minimum(start, close) * (1 - spread), price_digits), "close": text(close, price_digits),
                          "volume": text(volume, size_digits), "instrument": instrument, "barType": bar_type, "ts_event": ends, "ts_init": ends})
@@ -35,7 +35,7 @@ def perp_bars(count=24 * 40, seed=3, instrument=INSTRUMENT, bar_type=BAR_TYPE, f
 def hand_bars(rows, *, instrument=INSTRUMENT, bar_type=BAR_TYPE, start=START, step="h", span_ns=HOUR_NS, price_digits=1):
     """Bars written by hand: rows of (open, high, low, close[, volume])."""
     opened = pd.date_range(start, periods=len(rows), freq=step, tz="UTC")
-    ends = (opened.as_unit("ns").asi8 + span_ns).astype(str)
+    ends = opened.as_unit("ns").asi8 + span_ns
     columns = list(zip(*[(*row, 1000)[:5] for row in rows]))
     names = ("open", "high", "low", "close", "volume")
     out = {name: text(column, 3 if name == "volume" else price_digits) for name, column in zip(names, columns)}
@@ -61,7 +61,7 @@ def fine_bars(coarse, *, minutes=5, instrument=INSTRUMENT, seed=5):
             if i == down:
                 low = l
             rows.append((a, high, low, b, end - HOUR_NS + (i + 1) * minutes * 60_000_000_000))
-    ends = [str(row[4]) for row in rows]
+    ends = [row[4] for row in rows]
     return pd.DataFrame({"open": text([r[0] for r in rows], 1), "high": text([r[1] for r in rows], 1), "low": text([r[2] for r in rows], 1), "close": text([r[3] for r in rows], 1),
                          "volume": "10.000", "instrument": instrument, "barType": f"{instrument}-{minutes}-MINUTE-LAST-EXTERNAL", "ts_event": ends, "ts_init": ends})
 

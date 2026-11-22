@@ -138,12 +138,10 @@ def test_manual_stop_is_not_resumed_by_recover(tmp_path, monkeypatch):
     run(scenario())
 
 
-def test_a_batch_is_at_most_twenty_groups_and_each_group_is_one_run(tmp_path, monkeypatch):
+def test_each_group_of_a_batch_is_one_run(tmp_path, monkeypatch):
     async def scenario():
         world = model_world(tmp_path, monkeypatch, windows=2, cpus=2)
         identity = await world.make()
-        with pytest.raises(ContractError, match="at most 20 groups"):
-            await world.models.train(identity, {"vary": [{"name": "seed", "values": list(range(21))}]})
         started = await world.models.train(identity, {"vary": [{"name": "seed", "values": [1, 2, 3]}]})
         assert [item["group"] for item in started["runs"]] == [1, 2, 3] and len({item["number"] for item in started["runs"]}) == 3
         await asyncio.gather(*[settled(world.models, item["id"]) for item in started["runs"]])

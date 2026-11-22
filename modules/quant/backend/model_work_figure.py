@@ -6,6 +6,8 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from talyx_sdk.i18n import t
+
 from ..native import model_figures as F
 
 MISSING = "This run's code keeps no windows (no q.record); numbers are for the whole period."
@@ -83,14 +85,14 @@ def work_figure(summary, compare=None):
     total = summary.get("windowsTotal") or done
     if summary.get("status") == "running" and done < total:
         shapes.append({"type": "rect", "xref": "x", "yref": "paper", "x0": done + 0.5, "x1": done + 1.5, "y0": 0, "y1": 1, "meta": {"role": "benchmark", "key": key}})
-        notes.append({"x": str(done + 1), "xref": "x", "yref": "paper", "y": 1, "text": "training", "showarrow": False})
+        notes.append({"x": str(done + 1), "xref": "x", "yref": "paper", "y": 1, "text": t("training"), "showarrow": False})
     elif summary.get("status") in ("failed",) or summary.get("state") == "failed":
         slot = (summary.get("failure") or {}).get("window") or done + 1
         shapes.append({"type": "rect", "xref": "x", "yref": "paper", "x0": slot - 0.5, "x1": slot + 0.5, "y0": 0, "y1": 1, "meta": {"role": "attention", "key": key}})
         notes.append({"x": str(slot), "xref": "x", "yref": "paper", "y": 1, "text": _failure_note(summary.get("failure")), "showarrow": False})
     # One axis of windows under both plots; a window read anywhere reads its bars and its running totals together.
     return F.figure(key, _title_once(traces), shapes=shapes, annotations=notes, hovermode="x unified", hoversubplots="axis", barmode="group",
-                    xaxis={"title": "Window", "type": "category", "anchor": "y2"}, yaxis={"tickformat": "+.3f", "domain": [0.5, 1], "nticks": 4},
+                    xaxis={"title": t("Window"), "type": "category", "anchor": "y2"}, yaxis={"tickformat": "+.3f", "domain": [0.5, 1], "nticks": 4},
                     yaxis2={"tickformat": "+.2f", "domain": [0, 0.4], "nticks": 3}, margin={"l": 8, "r": 52, "t": 12, "b": 26})
 
 
@@ -106,7 +108,7 @@ def compare_figure(summaries):
                        "line": {"dash": "dash" if role == "compare" else "solid"}, "customdata": [_title(entry) for entry in windows],
                        "hovertemplate": f"%{{customdata}}<br>{name} %{{y:+.4f}}<extra></extra>", "meta": {"role": role, "key": key}})
     return F.figure(key, _title_once(traces), shapes=[{"type": "line", "xref": "paper", "yref": "y", "x0": 0, "x1": 1, "y0": 0, "y1": 0, "meta": {"role": "benchmark", "key": key}}],
-                    hovermode="x unified", xaxis={"title": "Window", "type": "category"})
+                    hovermode="x unified", xaxis={"title": t("Window"), "type": "category"})
 
 
 def epoch_figure(summary):
@@ -123,4 +125,4 @@ def epoch_figure(summary):
     best = progress.get("bestEpoch")
     if best:
         shapes.append({"type": "line", "xref": "x", "yref": "paper", "x0": best, "x1": best, "y0": 0, "y1": 1, "line": {"dash": "dash"}, "meta": {"role": "benchmark", "key": key}})
-    return F.figure(key, traces, shapes=shapes, hovermode="x unified", xaxis={"title": "Epoch", **({"dtick": 1} if len(x) <= 15 else {})}, yaxis={"tickformat": ".4f"})
+    return F.figure(key, traces, shapes=shapes, hovermode="x unified", xaxis={"title": t("Epoch"), **({"dtick": 1} if len(x) <= 15 else {})}, yaxis={"tickformat": ".4f"})

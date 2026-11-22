@@ -1,5 +1,6 @@
+import { intlLocale } from "@talyx/sdk";
+import { t } from "../i18n";
 /** Number and date formatting for the Quant pages. Signs only on signed quantities; a delta keeps its value's decimals. */
-export const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** A plain number; a negative one (a Sharpe below zero) takes the true minus, and one that rounds to zero has no sign. */
 export const nf = (value: number, digits = 2) => {
   const text = value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -12,9 +13,9 @@ export const pc = (value: number, digits = 1) => sgn(value * 100, digits) + "%";
 /** An unsigned share from a fraction (turnover, weights, win rate). */
 export const pct = (value: number, digits = 1) => nf(value * 100, digits) + "%";
 /** A change in percentage points from fractions. */
-export const pp = (value: number, digits = 1) => sgn(value * 100, digits) + " pt";
+export const pp = (value: number, digits = 1) => t("{value} pt", { value: sgn(value * 100, digits) });
 export const tone = (value: number): "up" | "down" | undefined => (value > 0 ? "up" : value < 0 ? "down" : undefined);
-export const mdy = (date: Date) => `${MON[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
-export const md = (date: Date) => `${MON[date.getUTCMonth()]} ${date.getUTCDate()}`;
+export const mdy = (date: Date) => date.toLocaleDateString(intlLocale(), { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+export const md = (date: Date) => date.toLocaleDateString(intlLocale(), { timeZone: "UTC", month: "short", day: "numeric" });
 export const hm = (date: Date) => `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
-export const my = (date: Date) => `${MON[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+export const my = (date: Date) => date.toLocaleDateString(intlLocale(), { timeZone: "UTC", month: "short", year: "numeric" });

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ModuleContext } from "@talyx/sdk";
 import type * as MonacoTypes from "monaco-editor";
 import { jsonRequest, privateRequest } from "../api";
@@ -298,7 +299,7 @@ export class LanguageManager {
           const found = this.connectionOf(model);
           const result = found && await found.connection.request("textDocument/prepareRename", at(found.attached, position), token);
           const target = result?.range ?? result;
-          if (!target) return { rejectReason: "This name cannot be renamed.", range: new m.Range(1, 1, 1, 1), text: "" };
+          if (!target) return { rejectReason: t("This name cannot be renamed."), range: new m.Range(1, 1, 1, 1), text: "" };
           const where = range(target);
           return { range: where, text: result.placeholder ?? model.getValueInRange(where) };
         },
@@ -308,7 +309,7 @@ export class LanguageManager {
           const changes: [string, Lsp[]][] = [...Object.entries<Lsp[]>(result?.changes ?? {}), ...(result?.documentChanges ?? []).filter((change: Lsp) => change.edits).map((change: Lsp) => [change.textDocument.uri, change.edits] as [string, Lsp[]])];
           // Only the documents an editor shows are changed here: a file that is not open would be edited behind the author's back.
           const closed = changes.filter(([uri]) => !this.byUri.has(sameUri(uri))).map(([uri]) => decodeURIComponent(uri.split("/").pop() ?? uri));
-          if (closed.length) return { edits: [], rejectReason: `Renaming this also changes ${closed.join(", ")}. Open ${closed.length > 1 ? "them" : "it"} first.` };
+          if (closed.length) return { edits: [], rejectReason: closed.length === 1 ? t("Renaming this also changes {file}. Open it first.", { file: closed[0] }) : t("Renaming this also changes {files}. Open them first.", { files: closed.join(", ") }) };
           return { edits: changes.flatMap(([uri, list]) => list.map(item => ({ resource: this.byUri.get(sameUri(uri))!.model.uri, versionId: undefined, textEdit: { range: range(item.range), text: item.newText } }))) };
         },
       }),

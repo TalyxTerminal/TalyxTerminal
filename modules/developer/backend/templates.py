@@ -14,6 +14,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 PLATFORM = Path(__file__).resolve().parents[3]
 
@@ -23,7 +24,7 @@ def module_id(name: str) -> str:
     value = re.sub(r"[^a-z0-9]+", "_", name.strip().lower()).strip("_")
     value = re.sub(r"^[^a-z]+", "", value)[:64]
     if not value:
-        raise ContractError("invalid_input", "Name the module with at least one letter, or give its id.")
+        raise ContractError("invalid_input", t("Name the module with at least one letter, or give its id."))
     return value
 
 
@@ -120,7 +121,7 @@ async def create_module(modules_dir: Path, name: str, identifier: str | None) ->
     identifier = identifier or module_id(name)
     directory = Path(modules_dir) / identifier
     if directory.exists():
-        raise ContractError("conflict", f"{directory} already exists. Choose another name or id.")
+        raise ContractError("conflict", t("{directory} already exists. Choose another name or id.", directory=directory))
     staging = Path(modules_dir) / f".new-{uuid4().hex}"
     try:
         for relative, content in files(identifier, name).items():

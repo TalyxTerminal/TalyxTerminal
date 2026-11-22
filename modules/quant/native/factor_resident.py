@@ -25,6 +25,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from native import factor_work as W  # noqa: E402
 from native import formula as F  # noqa: E402
+from native import i18n
 
 PANELS = {}  # data key -> Panel; the newest two are kept
 LIMIT_PANELS = 2
@@ -55,8 +56,7 @@ def load_panel(spec):
     extras = json.loads(Path(spec["extrasPath"]).read_text(encoding="utf-8")) if spec.get("extrasPath") else {}
     columns = [item["column"] for item in info["instruments"]]
     labels = np.sort(bars["label"].unique())
-    industry = extras.get("industry")
-    industry = [industry.get(column) for column in columns] if industry else None
+    industry = W.industry_table(labels, columns, extras["industry"]) if extras.get("industry") else None
     shares = None
     clocks = bars.pivot(index="label", columns="column", values="knownAt").reindex(index=labels, columns=columns).to_numpy(dtype=float) \
         if extras.get("shares") or spec.get("libraryPath") else None
@@ -85,14 +85,14 @@ def formula_values(text, panel):
     try:
         tree = F.parse(text, fields)
     except F.FormulaError as error:
-        raise JobError({"stage": "code", "title": "The formula has a mistake", "message": error.message, "formula": error.to_dict()}) from error
-    context = F.Context(panel.tables(), panel.industry_series())
+        raise JobError({"stage": "code", "title": i18n.t("The formula has a mistake"), "message": error.message, "formula": error.to_dict()}) from error
+    context = F.Context(panel.tables(), panel.industry)
     try:
         values, parts = F.evaluate(text, context, F.inputs(tree, text) or ("$close",))
         values = values.to_numpy(dtype=float)
         inputs = {name: table.to_numpy(dtype=float) for name, table in parts.items()}
     except F.FormulaError as error:
-        raise JobError({"stage": "code", "title": "The formula cannot be computed on this data", "message": error.message, "formula": error.to_dict()}) from error
+        raise JobError({"stage": "code", "title": i18n.t("The formula cannot be computed on this data"), "message": error.message, "formula": error.to_dict()}) from error
     return values, inputs
 
 
@@ -130,8 +130,8 @@ def code_values(code, panel, roots):
         os.chdir(previous)
     work = q._Run.work
     if work is None:
-        raise JobError({"stage": "code", "title": "No factor values", "message": "The code finished without q.report.factor(factor): hand the factor's table to it."})
-    return _wide(work["factor"], panel, "The factor"), {name: _wide(table, panel, name) for name, table in work["inputs"].items()}
+        raise JobError({"stage": "code", "title": i18n.t("No factor values"), "message": i18n.t("The code finished without q.report.factor(factor): hand the factor's table to it.")})
+    return _wide(work["factor"], panel, i18n.t("The factor")), {name: _wide(table, panel, name) for name, table in work["inputs"].items()}
 
 
 def _wide(value, panel, label):
@@ -139,7 +139,7 @@ def _wide(value, panel, label):
     if isinstance(value, pd.Series):
         value = reports.index_pairs(value, "factor").unstack("asset")
     if not isinstance(value, pd.DataFrame):
-        raise JobError({"stage": "code", "title": "Not a table", "message": f"{label} must be a table of dates by instruments, such as one built from q.data().close."})
+        raise JobError({"stage": "code", "title": i18n.t("Not a table"), "message": i18n.t("{label} must be a table of dates by instruments, such as one built from q.data().close.", label=label)})
     index = pd.DatetimeIndex(value.index)
     index = index.tz_localize("UTC") if index.tz is None else index.tz_convert("UTC")
     value = value.copy()
@@ -168,8 +168,8 @@ def future_check(job, panel, roots, values):
             row, col = np.argwhere(~same)[0]
             day = panel.dates[rows.start + row]
             return {"value": "changed", "passed": False, "line": None,
-                    "title": f"{panel.columns[col]} on {day.strftime('%b')} {day.day}, {day.year} changes when later prices are removed: the code reads later days"}
-    return {"value": "none", "passed": True, "line": None, "title": f"{len(positions)} dates recomputed without later prices: the values stay the same"}
+                    "title": i18n.t("{symbol} on {month} {day}, {year} changes when later prices are removed: the code reads later days", symbol=panel.columns[col], month=day.strftime(i18n.t("%b")), day=day.day, year=day.year)}
+    return {"value": "none", "passed": True, "line": None, "title": i18n.t("{dates} dates recomputed without later prices: the values stay the same", dates=len(positions))}
 
 
 # ---------------------------------------------------------------------------------------------------------------- jobs
@@ -207,30 +207,30 @@ def enough_names(panel, settings):
     names = len(panel.columns)
     shown = ", ".join(panel.columns[:3]) + ("…" if names > 3 else "")
     if names < 2:
-        raise JobError({"stage": "compute", "title": "needs more than one name",
-                        "message": f"A factor is scored by ranking names against each other each day, and these data have one name ({shown}). "
-                                   "Choose at least two: several symbols, a research list with more members, or an index."})
+        raise JobError({"stage": "compute", "title": i18n.t("needs more than one name"),
+                        "message": i18n.t("A factor is scored by ranking names against each other each day, and these data have one name ({shown}). Choose at least two: several symbols, a research list with more members, or an index.", shown=shown)})
     count = settings["grouping"]["count"]
     if settings["grouping"]["method"] == "equal" and count > names:
-        raise JobError({"stage": "compute", "title": "has fewer names than groups",
-                        "message": f"Groups is {count} but these data have {names} names ({shown}). Lower Groups to {names} or fewer, or add names."})
+        raise JobError({"stage": "compute", "title": i18n.t("has fewer names than groups"),
+                        "message": i18n.t("Groups is {count} but these data have {names} names ({shown}). Lower Groups to {names} or fewer, or add names.", count=count, names=names, shown=shown)})
 
 
 def industry_settings(panel, settings):
     """a setting that needs an industry stops the run before anything is computed when Market gives none for these names, naming the
     setting and what to set instead (not the engine's internal error, and not done some other way)."""
-    if panel.industry_series() is not None:
+    if panel.industry is not None:
         return
-    needs = []
-    if settings["neutralize"] != "none":
-        needs.append(("Neutralize is " + ("Industry + size" if settings["neutralize"] == "industry+size" else "Industry"), "set Neutralize to None"))
-    if settings["grouping"].get("withinIndustry"):
-        needs.append(("Group within each industry is on", "turn it off"))
-    if needs:
-        fix = " and ".join(fix for _, fix in needs)
-        raise JobError({"stage": "compute", "title": "needs an industry",
-                        "message": "; ".join(what for what, _ in needs) + ", which needs an industry for each name, and Market gives none for these names. "
-                                   + fix[0].upper() + fix[1:] + "."})
+    neutral = settings["neutralize"] != "none"
+    grouped = settings["grouping"].get("withinIndustry")
+    if neutral or grouped:
+        mode = i18n.t("Industry + size") if settings["neutralize"] == "industry+size" else i18n.t("Industry")
+        if neutral and grouped:
+            message = i18n.t("Neutralize is {mode}; Group within each industry is on, which needs an industry for each name, and Market gives none for these names. Set Neutralize to None and turn it off.", mode=mode)
+        elif neutral:
+            message = i18n.t("Neutralize is {mode}, which needs an industry for each name, and Market gives none for these names. Set Neutralize to None.", mode=mode)
+        else:
+            message = i18n.t("Group within each industry is on, which needs an industry for each name, and Market gives none for these names. Turn it off.")
+        raise JobError({"stage": "compute", "title": i18n.t("needs an industry"), "message": message})
 
 
 def run_job(job):
@@ -390,7 +390,7 @@ def held_out(job, panel, raw, settings, start, output):
                          "yaxis": {"tickformat": ".0%", "side": "right"}, "xaxis": {"type": "date"},
                          "shapes": [{"type": "rect", "xref": "x", "yref": "paper", "x0": x[0] if x else None, "x1": x[-1] if x else None, "y0": 0, "y1": 1,
                                      "line": {"width": 0}, "meta": {"role": "group"}}] if x else [],
-                         "annotations": [{"x": x[0], "y": 1, "yref": "paper", "text": "held out", "showarrow": False, "xanchor": "left", "yanchor": "top", "name": "held-out"}] if x else []}}
+                         "annotations": [{"x": x[0], "y": 1, "yref": "paper", "text": i18n.t("held out"), "showarrow": False, "xanchor": "left", "yanchor": "top", "name": "held-out"}] if x else []}}
     numbers = evaluation.numbers
     years = [item for item in evaluation.details["years"] if item["year"] >= dates[0].year] if len(dates) else []
     last, begin = panel.dates[-1], dates[0] if len(dates) else None
@@ -406,8 +406,8 @@ def held_out(job, panel, raw, settings, start, output):
 
 def engine_failure(error):
     """What a run shows when the engine itself breaks: what broke, not the folders or ids in the error (the traceback goes to the log)."""
-    return {"stage": "compute", "title": "The factor engine failed",
-            "message": f"The factor engine hit an internal error ({type(error).__name__}) and stopped; the details are in Quant's log."}
+    return {"stage": "compute", "title": i18n.t("The factor engine failed"),
+            "message": i18n.t("The factor engine hit an internal error ({error_type}) and stopped; the details are in Quant's log.", error_type=type(error).__name__)}
 
 
 def handle(message):

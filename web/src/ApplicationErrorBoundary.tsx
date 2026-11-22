@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportFrontendError, type FrontendErrorReporter } from "./applicationErrorDiagnostics";
 
@@ -8,18 +9,16 @@ interface ApplicationFailureProps {
 }
 
 export function ApplicationFailure({
-  message = "The workspace stopped before it could finish loading. Reload TALYX to try again.",
+  message = t("The workspace stopped before it could finish loading. Reload TALYX to try again."),
   onReload = () => window.location.reload(),
-  title = "TALYX encountered a problem",
+  title = t("TALYX encountered a problem"),
 }: ApplicationFailureProps) {
   return (
     <main className="application-failure" aria-live="assertive" role="alert">
       <section className="application-failure__panel">
         <h1>{title}</h1>
         <p>{message}</p>
-        <button type="button" onClick={onReload}>
-          Reload TALYX
-        </button>
+        <button type="button" onClick={onReload}>{t("Reload TALYX")}</button>
       </section>
     </main>
   );
@@ -74,11 +73,11 @@ export function renderStaticApplicationFailure(
   main.setAttribute("aria-live", "assertive");
   main.setAttribute("role", "alert");
   panel.className = "application-failure__panel";
-  title.textContent = "TALYX encountered a problem";
+  title.textContent = t("TALYX encountered a problem");
   message.textContent =
-    "The workspace stopped before it could finish loading. Reload TALYX to try again.";
+    t("The workspace stopped before it could finish loading. Reload TALYX to try again.");
   reload.type = "button";
-  reload.textContent = "Reload TALYX";
+  reload.textContent = t("Reload TALYX");
   reload.addEventListener("click", onReload);
 
   panel.append(title, message, reload);

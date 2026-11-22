@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { TxButton, TxEmpty, TxFailure, type ModuleContext } from "@talyx/sdk";
 import { createClient, type ContractTypes, type ResearchLayer } from "../../public/ts/types";
@@ -64,10 +65,10 @@ export function LayerChart({ ctx, layer, focusTime }: LayerProps & { ctx: Module
       await ctx.platform.panels.openTarget({ module: "chart", panelType: "main", objectId: `chart:${result.chartId}` });
     } catch (cause) { setError(message(cause)); } finally { setBusy(false); }
   }
-  return <section className="chart-research" aria-label="Research chart" style={{ "--chart-research-axis": `${axis}px` } as CSSProperties}>
-    <div className="chart-research-head"><TxButton size="sm" disabled={busy} onClick={() => void open()}>Open in Chart</TxButton></div>
-    {error && <TxFailure title="Chart unavailable" message={error} />}
-    {!ready && !error && <TxEmpty title={empty ? "No bars in this period" : "Loading chart…"} />}
+  return <section className="chart-research" aria-label={t("Research chart")} style={{ "--chart-research-axis": `${axis}px` } as CSSProperties}>
+    <div className="chart-research-head"><TxButton size="sm" disabled={busy} onClick={() => void open()}>{t("Open in Chart")}</TxButton></div>
+    {error && <TxFailure title={t("Chart unavailable")} message={error} />}
+    {!ready && !error && <TxEmpty title={empty ? t("No bars in this period") : t("Loading chart…")} />}
     <div className="chart-research-canvas" ref={canvas} />
   </section>;
 }

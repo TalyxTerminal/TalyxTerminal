@@ -1,6 +1,8 @@
+import { displayedPanelTitle } from "./workspaceSummary";
+import { t } from "./i18n";
 import { TxTooltipProvider } from "@talyx/sdk";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
-import { type DockviewGroupPanel, DockviewReact, type DockviewApi, type DockviewReadyEvent, type SerializedDockview } from "dockview-react";
+import { type IDockviewReactProps, type DockviewGroupPanel, DockviewReact, type DockviewApi, type DockviewReadyEvent, type SerializedDockview } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
 import "./ExperienceDockview.css";
 
@@ -40,12 +42,35 @@ function addInitialPanels(api: DockviewApi, panels: ShellPanel[]) {
     api.addPanel({
       id: panel.id,
       component: "module",
-      title: panel.title,
+      title: displayedPanelTitle(panel),
       params: { panel },
       position: referencePanel ? { referencePanel, direction } : undefined,
     });
     previousId = panel.id;
   });
+}
+
+const dockMessages: NonNullable<IDockviewReactProps["messages"]> = {
+  panelOpened: title => t("{title} opened", { title }),
+  panelClosed: title => t("{title} closed", { title }),
+  groupMaximized: title => t("{title} maximized", { title }),
+  groupRestored: title => t("{title} restored", { title }),
+  groupFloated: title => t("{title} floated", { title }),
+  groupDocked: title => t("{title} docked", { title }),
+  groupPoppedOut: title => t("{title} opened in a new window", { title }),
+  movePickTarget: (source, target, current, total) => t("Moving {source}. Target {target}, {current} of {total}. Enter to choose where, Escape to cancel.", { source, target, current, total }),
+  movePickEdge: (position, target) => position === "center"
+    ? t("Tab into {target}. Arrows to change, Enter to confirm, Escape to go back.", { target })
+    : t("Split {side} of {target}. Arrows to change, Enter to confirm, Escape to go back.", { side: dockSide(position), target }),
+  moveCommitted: (source, target, position) => position === "center"
+    ? t("{source} docked into {target}.", { source, target })
+    : t("{source} split {side} of {target}.", { source, side: dockSide(position), target }),
+  moveCancelled: () => t("Move cancelled."),
+  moveNotAllowed: () => t("That move is not allowed."),
+};
+
+function dockSide(side: "left" | "right" | "top" | "bottom"): string {
+  return { left: t("left"), right: t("right"), top: t("top"), bottom: t("bottom") }[side];
 }
 
 export function ExperienceDockview({
@@ -195,7 +220,8 @@ export function ExperienceDockview({
       panels.forEach((panel) => {
         const existing = api.getPanel(panel.id);
         if (existing) {
-          if (existing.title !== panel.title) existing.api.setTitle(panel.title);
+          const title = displayedPanelTitle(panel);
+          if (existing.title !== title) existing.api.setTitle(title);
           // Dockview keeps an existing portal while its component is unchanged; hand it the current panel.
           existing.api.updateParameters({ panel });
           return;
@@ -204,7 +230,7 @@ export function ExperienceDockview({
         api.addPanel({
           id: panel.id,
           component: "module",
-          title: panel.title,
+          title: displayedPanelTitle(panel),
           params: { panel },
           position: referencePanel ? { referencePanel, direction: "within" } : undefined,
         });
@@ -269,7 +295,7 @@ export function ExperienceDockview({
         {hint && <div className="talyx-dock-drop-hint" data-line={hint.line || undefined} aria-hidden="true"
           style={{ left: hint.rect.x, top: hint.rect.y, width: hint.rect.width, height: hint.rect.height }} />}
         <TxTooltipProvider>
-        <DockviewReact
+        <DockviewReact messages={dockMessages}
           components={dockComponents}
           defaultTabComponent={DockModuleTab}
           leftHeaderActionsComponent={DockGroupAdd}

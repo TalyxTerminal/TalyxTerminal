@@ -15,6 +15,7 @@ from pathlib import Path
 
 import orjson
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 
 log = logging.getLogger("talyx.host")
 # Recorded calls are kept this many days.
@@ -37,7 +38,7 @@ class Tasks:
 
     def start(self, caller: dict, action: str) -> dict:
         if caller["origin"] != "module" or not action.startswith(caller["module"] + "."):
-            raise ContractError("permission_denied", "Only a module's SDK records its own tasks")
+            raise ContractError("permission_denied", t("Only a module's SDK records its own tasks"))
         self._forget()
         task_id = "t_" + secrets.token_hex(8)
         self.tasks[task_id] = {"taskId": task_id, "action": action, "module": caller["module"],
@@ -49,7 +50,7 @@ class Tasks:
         try:
             return self.tasks[task_id]
         except KeyError:
-            raise ContractError("not_found", f"No task {task_id}") from None
+            raise ContractError("not_found", t("No task {task_id}", task_id=task_id)) from None
 
     def progress(self, module: str, task_id: str, value) -> None:
         task = self.tasks.get(task_id)
@@ -84,7 +85,7 @@ class Tasks:
         for task in self.tasks.values():
             if task["module"] == module and task["state"] == "running":
                 task.update(state="failed", error=ContractError(
-                    "provider_restarted", f"{module} restarted while the task ran; whether it finished is unknown",
+                    "provider_restarted", t("{module} restarted while the task ran; whether it finished is unknown", module=module),
                     execution="unknown", effects="may_have_occurred").to_dict())
                 self.ended[task["taskId"]] = time.monotonic()
 
@@ -177,7 +178,7 @@ class CallLog:
                 for call_id in call_ids:
                     row = db.execute("SELECT record FROM calls WHERE id = ?", (call_id,)).fetchone()
                     if row is None:
-                        raise ContractError("not_found", f"No recorded call {call_id}")
+                        raise ContractError("not_found", t("No recorded call {call_id}", call_id=call_id))
                     records.append(public(row))
                 return records
         return await asyncio.to_thread(read)
@@ -200,7 +201,7 @@ class Runs:
 
     def start(self, caller: dict, workspace_id: str | None, context, conversation: str | None = None) -> dict:
         if caller["origin"] != "module":
-            raise ContractError("permission_denied", "Runs are started by modules")
+            raise ContractError("permission_denied", t("Runs are started by modules"))
         cutoff = time.time() - ENDED_SECONDS
         for run_id, run in list(self.runs.items()):
             if run["ended"] and run["ended"] < cutoff:
@@ -216,7 +217,7 @@ class Runs:
     def caller(self, token: str) -> dict:
         run_id = self.by_token.get(token)
         if run_id is None:
-            raise ContractError("permission_denied", "Unknown or ended run token")
+            raise ContractError("permission_denied", t("Unknown or ended run token"))
         run = self.runs[run_id]
         return {"origin": "code", "module": run["module"], "workspaceId": run["workspaceId"],
                 "run": {"id": run_id, "context": run["context"],
@@ -225,7 +226,7 @@ class Runs:
     def _own(self, caller: dict, run_id: str) -> dict:
         run = self.runs.get(run_id)
         if run is None or caller.get("module") != run["module"]:
-            raise ContractError("not_found", f"No run {run_id} of this module")
+            raise ContractError("not_found", t("No run {run_id} of this module", run_id=run_id))
         return run
 
     async def calls(self, caller: dict, run_id: str) -> list[dict]:

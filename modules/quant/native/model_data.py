@@ -236,7 +236,7 @@ def input_tables(panel, inputs, *, code=None, columns=None):
                     f"The {len(dropped)} VWAP features have no values (the source gives no VWAP) and are left out"
         elif item.formula is not None:
             if context is None:
-                context = F.Context(panel.tables(), panel.industry_series())
+                context = F.Context(panel.tables(), panel.industry)
             try:
                 values = F.evaluate(item.formula, context).to_numpy(dtype=float)
             except F.FormulaError as error:
@@ -321,34 +321,39 @@ def _day_median(x):
 
 
 def _industry_median(x, industry):
+    """Missing values filled with the median of the names in the same industry that day, then the day's median."""
     if industry is None:
         return _day_median(x)
-    labels = pd.Series(industry).fillna("__none__")
+    from .factor_work import industry_segments, label_codes
     out = x.copy()
-    for _, members in labels.groupby(labels).groups.items():
-        index = np.asarray(list(members))
-        part = x[:, index]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            median = np.nanmedian(part, axis=1, keepdims=True)
-        out[:, index] = np.where(np.isnan(part), np.broadcast_to(median, part.shape), part)
+    for first, end, codes in industry_segments(label_codes(industry, "__none__")[0]):
+        for code in np.unique(codes):
+            index = np.flatnonzero(codes == code)
+            part = x[first:end, index]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                median = np.nanmedian(part, axis=1, keepdims=True)
+            out[first:end, index] = np.where(np.isnan(part), np.broadcast_to(median, part.shape), part)
     return _day_median(out)
 
 
 def _take_out(x, panel, what):
     """The residual of each feature after industry dummies and/or log size, each day."""
     from .formula import neutralize
-    industry = panel.industry_series() if "industry" in what else None
+    industry = panel.industry if "industry" in what else None
     size = None
     if "size" in what:
         value = panel.derived("size")
         with np.errstate(invalid="ignore", divide="ignore"):
             size = pd.DataFrame(np.log(np.where(value > 0, value, np.nan)), index=panel.dates, columns=panel.columns)
     # What is asked to be taken out must be there: without it the residual would be the raw input or, for a size with no values, zero.
-    if "industry" in what and (industry is None or not industry.notna().any()):
+    if "industry" in what and (industry is None or not industry.notna().to_numpy().any()):
         raise DataError("cannot take out industry", "Taking out industry needs the names' industries; Market gives none for this pool.")
     if "size" in what and not np.isfinite(size.to_numpy()).any():
         raise DataError("cannot take out size", "Taking out size needs the names' market values; Market gives no share counts for this pool.")
+    if industry is not None:
+        from .formula import industry_codes
+        industry = industry_codes(industry, pd.DataFrame(x[:, :, 0], index=panel.dates, columns=panel.columns))  # coded once for every feature
     out = np.empty_like(x)
     for f in range(x.shape[2]):
         frame = pd.DataFrame(x[:, :, f], index=panel.dates, columns=panel.columns)
@@ -475,10 +480,13 @@ def split_form(source):
     return text, "raw"
 
 
-def held(frame):
+def held(frame, close=None):
     """Prices held over a halt until the name trades again, as the factor's returns hold them: its first bar back carries the whole move over the
-    halt. After its last price (delisted) there is none."""
-    return frame.ffill().where(frame.bfill().notna())
+    halt. After its last price (delisted, or the source has none after) the name is out at its last close (`close`, else its own last price) and earns
+    nothing after, as the factor's forward returns hold it (metrics.held): a label reaching past it is the move to that price, not missing."""
+    inside = frame.bfill().notna()
+    last = (frame if close is None else close.where(frame.notna())).ffill()  # the close of its last bar
+    return frame.ffill().where(inside, last)
 
 
 def label_of(panel, source):
@@ -487,7 +495,7 @@ def label_of(panel, source):
     arithmetic as the formula's, without the formula engine."""
     if isinstance(source, (int, np.integer)):
         source = quick_formula(int(source), "raw")
-    opens = held(pd.DataFrame(panel.fields["open"])).to_numpy()
+    opens = held(pd.DataFrame(panel.fields["open"]), pd.DataFrame(panel.fields["close"])).to_numpy()
     quick = QUICK_LABEL.match(source.strip())
     if quick:
         days = int(quick.group(1)) - 1
@@ -500,8 +508,9 @@ def label_of(panel, source):
         return out
     from . import formula as F
     tables = dict(panel.tables())
-    tables["$open"] = held(tables["$open"])
-    values = F.evaluate(source, F.Context(tables, panel.industry_series()), ahead=True).to_numpy(dtype=float)
+    tables["$open"] = held(tables["$open"], tables["$close"])
+    tables["$close"] = held(tables["$close"])
+    values = F.evaluate(source, F.Context(tables, panel.industry), ahead=True).to_numpy(dtype=float)
     values[~np.isfinite(values)] = np.nan
     return values
 
@@ -524,7 +533,7 @@ def weights_of(panel, label, rows):
         if not source:
             raise DataError("needs a weight formula", "Sample weight is a formula; write it.")
         try:
-            value = F.evaluate(source, F.Context(dict(panel.tables()), panel.industry_series())).to_numpy(dtype=float)
+            value = F.evaluate(source, F.Context(dict(panel.tables()), panel.industry)).to_numpy(dtype=float)
         except F.FormulaError as error:
             raise DataError("a weight cannot be computed", "Sample weight: " + ("A weight reads only past and current bars" if getattr(error, "kind", "") == "future" else error.message)) from error
     value = np.where(np.isfinite(value) & (value > 0), value, 0.0)

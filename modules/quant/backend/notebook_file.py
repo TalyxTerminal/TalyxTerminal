@@ -9,6 +9,7 @@ import json
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .materials import plain
 
@@ -48,13 +49,13 @@ def parse(text):
     try:
         raw = json.loads(text)
         if raw["nbformat"] != 4:
-            raise ContractError("unavailable", f"This notebook is nbformat {raw['nbformat']}; only nbformat 4 is supported.")
+            raise ContractError("unavailable", t("This notebook is nbformat {nbformat}; only nbformat 4 is supported.", nbformat=raw['nbformat']))
         cells = []
         used = {cell["id"] for cell in raw["cells"] if "id" in cell}
         for index, item in enumerate(raw["cells"]):
             kind = item["cell_type"]
             if kind not in CELL_TYPES:
-                raise ContractError("invalid_input", f"A cell has the unknown type {kind}.")
+                raise ContractError("invalid_input", t("A cell has the unknown type {kind}.", kind=kind))
             cell_id = item.get("id")
             if cell_id is None:
                 cell_id = f"cell-{index}"
@@ -71,7 +72,7 @@ def parse(text):
             cells.append(cell)
         metadata = {key: value for key, value in (raw["metadata"] if "metadata" in raw else {}).items() if key != "kernelspec"}
     except (ValueError, KeyError, TypeError, AttributeError) as error:
-        raise ContractError("invalid_input", "This file is not a notebook Quant can read.", {"reason": str(error)}) from error
+        raise ContractError("invalid_input", t("This file is not a notebook Quant can read."), {"reason": str(error)}) from error
     return {"cells": cells, "metadata": metadata}
 
 
@@ -94,30 +95,30 @@ def write_output(output):
 
 def check_model(model):
     if not isinstance(model, dict) or not isinstance(model.get("cells"), list):
-        raise ContractError("invalid_input", "A notebook needs a list of cells.")
+        raise ContractError("invalid_input", t("A notebook needs a list of cells."))
     seen = set()
     for cell in model["cells"]:
         if (not isinstance(cell, dict) or cell.get("type") not in CELL_TYPES or not isinstance(cell.get("id"), str) or not cell["id"]
                 or not isinstance(cell.get("source"), str) or not isinstance(cell.get("outputs"), list)):
-            raise ContractError("invalid_input", "Each cell needs an id, a type (code, markdown or raw), its source text and a list of outputs.")
+            raise ContractError("invalid_input", t("Each cell needs an id, a type (code, markdown or raw), its source text and a list of outputs."))
         if cell["id"] in seen:
-            raise ContractError("invalid_input", "Cell ids must be unique.", {"id": cell["id"]})
+            raise ContractError("invalid_input", t("Cell ids must be unique."), {"id": cell["id"]})
         seen.add(cell["id"])
         if cell["type"] != "code" and cell["outputs"]:
-            raise ContractError("invalid_input", "Only code cells can have outputs.")
+            raise ContractError("invalid_input", t("Only code cells can have outputs."))
         if "attachments" in cell and (cell["type"] == "code" or not isinstance(cell["attachments"], dict)):
-            raise ContractError("invalid_input", "Only Markdown and raw cells can contain an attachment bundle.")
+            raise ContractError("invalid_input", t("Only Markdown and raw cells can contain an attachment bundle."))
         for output in cell["outputs"]:
             if not isinstance(output, dict) or output.get("output_type") not in {"stream", "display_data", "execute_result", "error"}:
-                raise ContractError("invalid_input", "An output needs an output_type: stream, display_data, execute_result or error.")
+                raise ContractError("invalid_input", t("An output needs an output_type: stream, display_data, execute_result or error."))
             kind = output["output_type"]
             if kind == "stream" and (output.get("name") not in ("stdout", "stderr") or not isinstance(output.get("text"), str)):
-                raise ContractError("invalid_input", "Stream output needs stdout or stderr and its text.")
+                raise ContractError("invalid_input", t("Stream output needs stdout or stderr and its text."))
             if kind in {"display_data", "execute_result"} and not isinstance(output.get("data"), dict):
-                raise ContractError("invalid_input", "Display output needs its MIME data bundle.")
+                raise ContractError("invalid_input", t("Display output needs its MIME data bundle."))
             if kind == "error" and not (isinstance(output.get("ename"), str) and isinstance(output.get("evalue"), str)
                                          and isinstance(output.get("traceback"), list)):
-                raise ContractError("invalid_input", "Error output needs ename, evalue and traceback.")
+                raise ContractError("invalid_input", t("Error output needs ename, evalue and traceback."))
 
 
 def serialize(model):
@@ -138,7 +139,7 @@ def serialize(model):
 def code_of(model, cell_id):
     cell = next((item for item in model["cells"] if item["id"] == cell_id), None)
     if cell is None or cell["type"] != "code":
-        raise ContractError("not_found", "This notebook has no code cell with that id.", {"cellId": cell_id})
+        raise ContractError("not_found", t("This notebook has no code cell with that id."), {"cellId": cell_id})
     return cell["source"]
 
 
@@ -151,7 +152,7 @@ class NotebookFiles:
     def path(self, object_id):
         record = self.store.read(object_id)
         if record["kind"] != "notebook":
-            raise ContractError("invalid_input", "This Quant object is not a notebook.")
+            raise ContractError("invalid_input", t("This Quant object is not a notebook."))
         return self.store.source_path(record), record
 
     async def document(self, path):
@@ -162,7 +163,7 @@ class NotebookFiles:
             return {"documentId": None, "dirty": False, "conflict": False,
                     "version": hashlib.sha256(path.read_bytes()).hexdigest()[:16]}
         if opened["conflict"]:
-            raise ContractError("conflict", f"{path.name} changed on disk while it has unsaved edits. Resolve it in Developer first.")
+            raise ContractError("conflict", t("{name} changed on disk while it has unsaved edits. Resolve it in Developer first.", name=path.name))
         return opened
 
     async def saved(self, path):
@@ -171,7 +172,7 @@ class NotebookFiles:
         if opened["dirty"]:
             saved = plain(await self.ctx.call("developer.documents.save", {"documentId": opened["documentId"], "expectedVersion": opened["version"]}))
             if saved["status"] not in {"saved", "clean"}:
-                raise ContractError("conflict", f"{path.name} could not be saved before it was read: {saved['message'] or saved['status']}.")
+                raise ContractError("conflict", t("{name} could not be saved before it was read: {message}.", name=path.name, message=saved['message'] or saved['status']))
             opened = await self.document(path)
         return opened
 
@@ -187,14 +188,14 @@ class NotebookFiles:
         content = serialize(model)
         opened = await self.document(path)
         if opened["version"] != expected_version:
-            raise ContractError("conflict", "The notebook changed since it was read. Reload it before saving.", {"version": opened["version"]})
+            raise ContractError("conflict", t("The notebook changed since it was read. Reload it before saving."), {"version": opened["version"]})
         if opened["documentId"] is None:   # no Developer: written directly
             path.write_text(content, encoding="utf-8")
             return {"objectId": object_id, "version": (await self.document(path))["version"], "documentId": None}
         edited = plain(await self.ctx.call("developer.documents.edit", {"documentId": opened["documentId"], "expectedVersion": opened["version"], "content": content}))
         saved = plain(await self.ctx.call("developer.documents.save", {"documentId": edited["documentId"], "expectedVersion": edited["version"]}))
         if saved["status"] not in {"saved", "clean"}:
-            raise ContractError("conflict", f"{path.name} could not be saved: {saved['message'] or saved['status']}.")
+            raise ContractError("conflict", t("{name} could not be saved: {message}.", name=path.name, message=saved['message'] or saved['status']))
         return {"objectId": object_id, "version": saved["version"], "documentId": edited["documentId"]}
 
     async def cell_code(self, object_id, cell_id):
@@ -208,4 +209,4 @@ class NotebookFiles:
                 cell.update(outputs=result["outputs"], executionCount=result["executionCount"])
                 await self.write(object_id, read["notebook"], read["version"])
                 return
-        raise ContractError("conflict", "The executed cell was edited or removed before its output could be saved.", {"cellId": cell_id})
+        raise ContractError("conflict", t("The executed cell was edited or removed before its output could be saved."), {"cellId": cell_id})

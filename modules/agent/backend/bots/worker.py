@@ -6,6 +6,7 @@ import logging
 import time
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..store import TERMINAL, encode
 from .records import MENTION, decode_rows, group_handoff, identity, recipients, stamp
@@ -93,7 +94,7 @@ class BotWorker:
             return
         if self.needed(ws):
             self.signals[ws] = asyncio.Event()
-            activity = self.agent.ctx.activity(ws, "Agent routines and bots", origin="ai")
+            activity = self.agent.ctx.activity(ws, t("Agent routines and bots"), origin="ai")
             self.tasks[ws] = activity.add_task(asyncio.create_task(self.run(ws)))
 
     def needed(self, ws):

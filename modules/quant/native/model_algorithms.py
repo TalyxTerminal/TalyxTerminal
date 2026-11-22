@@ -17,6 +17,8 @@ import pickle
 import numpy as np
 import pandas as pd
 
+from . import i18n
+
 # ---------------------------------------------------------------------------------------------------------------- the table
 TREE = "tree"
 LINEAR = "linear"
@@ -80,14 +82,14 @@ def _qlib_params(key):
 
 
 ALGORITHMS = [
-    {"id": "lightgbm", "label": "LightGBM", "group": TREE, "params": _LGB, "engine": "lightgbm.train"},
-    {"id": "xgboost", "label": "XGBoost", "group": TREE, "params": _XGB, "engine": "xgboost.train"},
-    {"id": "catboost", "label": "CatBoost", "group": TREE, "params": _CAT, "engine": "catboost.CatBoost"},
-    {"id": "linear", "label": "Least squares", "group": LINEAR, "params": [], "engine": "qlib.contrib.model.linear.LinearModel(ols)"},
-    {"id": "ridge", "label": "Ridge", "group": LINEAR, "params": _ALPHA, "engine": "qlib.contrib.model.linear.LinearModel(ridge)"},
-    {"id": "lasso", "label": "Lasso", "group": LINEAR, "params": [("alpha", "Alpha", "float", 0.001, "Regularization strength")], "engine": "qlib.contrib.model.linear.LinearModel(lasso)"},
-    {"id": "nnls", "label": "Non-negative least squares", "group": LINEAR, "params": [], "engine": "qlib.contrib.model.linear.LinearModel(nnls)"},
-    {"id": "double_ensemble", "label": "DoubleEnsemble", "group": ENSEMBLE, "params": _DENS, "engine": "qlib.contrib.model.double_ensemble.DEnsembleModel"},
+    {"id": "lightgbm", "label": i18n.mark("LightGBM"), "group": TREE, "params": _LGB, "engine": "lightgbm.train"},
+    {"id": "xgboost", "label": i18n.mark("XGBoost"), "group": TREE, "params": _XGB, "engine": "xgboost.train"},
+    {"id": "catboost", "label": i18n.mark("CatBoost"), "group": TREE, "params": _CAT, "engine": "catboost.CatBoost"},
+    {"id": "linear", "label": i18n.mark("Least squares"), "group": LINEAR, "params": [], "engine": "qlib.contrib.model.linear.LinearModel(ols)"},
+    {"id": "ridge", "label": i18n.mark("Ridge"), "group": LINEAR, "params": _ALPHA, "engine": "qlib.contrib.model.linear.LinearModel(ridge)"},
+    {"id": "lasso", "label": i18n.mark("Lasso"), "group": LINEAR, "params": [("alpha", "Alpha", "float", 0.001, "Regularization strength")], "engine": "qlib.contrib.model.linear.LinearModel(lasso)"},
+    {"id": "nnls", "label": i18n.mark("Non-negative least squares"), "group": LINEAR, "params": [], "engine": "qlib.contrib.model.linear.LinearModel(nnls)"},
+    {"id": "double_ensemble", "label": i18n.mark("DoubleEnsemble"), "group": ENSEMBLE, "params": _DENS, "engine": "qlib.contrib.model.double_ensemble.DEnsembleModel"},
     *({"id": key, "label": label, "group": NEURAL, "params": _neural_params(key, shape), "deep": True, "shape": shape, **({"note": note} if note else {}),
                                                                                                                                   **({"needs": ["base_run"]} if key == "gats" else {})}
       for key, label, shape, note in (
@@ -101,18 +103,17 @@ ALGORITHMS = [
 ]
 BY_ID = {item["id"]: item for item in ALGORITHMS}
 # Which optimizer and early-stop measure each network offers, the first being its default (Qlib 0.9.8's constructors and metric functions, read from the source).
-_ADAM = [{"id": "adam", "label": "Adam"}, {"id": "gd", "label": "SGD"}]
-_SGD = [{"id": "gd", "label": "SGD"}, {"id": "adam", "label": "Adam"}]
+_ADAM = [{"id": "adam", "label": i18n.mark("Adam")}, {"id": "gd", "label": "SGD"}]
+_SGD = [{"id": "gd", "label": "SGD"}, {"id": "adam", "label": i18n.mark("Adam")}]
 NETWORK_OPTIONS = {
     **{key: {"optimizers": _ADAM, "earlyStopOn": []} for key in EPOCH_IDS if key != "mlp"},
     "mlp": {"optimizers": _SGD, "earlyStopOn": []},
     "igmtf": {"optimizers": _ADAM, "earlyStopOn": []}, "hist": {"optimizers": _ADAM, "earlyStopOn": []},
-    "add": {"optimizers": _ADAM, "earlyStopOn": [{"id": "ic", "label": "Validation IC"}, {"id": "loss", "label": "Validation loss"}, {"id": "ric", "label": "Validation rank IC"}]},
-    "adarnn": {"optimizers": _ADAM, "earlyStopOn": [{"id": "loss", "label": "Validation loss"}, {"id": "ic", "label": "Validation IC"}]},
+    "add": {"optimizers": _ADAM, "earlyStopOn": [{"id": "ic", "label": i18n.mark("Validation IC")}, {"id": "loss", "label": i18n.mark("Validation loss")}, {"id": "ric", "label": i18n.mark("Validation rank IC")}]},
+    "adarnn": {"optimizers": _ADAM, "earlyStopOn": [{"id": "loss", "label": i18n.mark("Validation loss")}, {"id": "ic", "label": i18n.mark("Validation IC")}]},
     "tra": {"optimizers": [], "earlyStopOn": []},
     "tcts": {"optimizers": _ADAM, "earlyStopOn": []},
 }
-GROUP_LABELS = {TREE: "Trees", LINEAR: "Linear", ENSEMBLE: "Ensembles", NEURAL: "Neural networks"}
 
 
 def declared():

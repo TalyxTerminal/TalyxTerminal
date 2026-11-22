@@ -70,3 +70,42 @@ def test_buy_the_account_cannot_fully_pay_is_filled_in_part_and_the_rest_cancele
     assert order["status"] == "CANCELED"
     assert 0 < Decimal(order["filled"]) < Decimal(str(result["requested"]))
     assert all(value >= 0 for value in amounts(result).values())
+
+
+PER_INSTRUMENT = '''
+import json, sys
+sys.path.insert(0, sys.argv[1])
+from native.strategy_research import make_engine
+from nautilus_trader.model import Bar, BarType, InstrumentId, OrderSide, Price, Quantity, StrategyId
+from nautilus_trader.trading import Strategy, StrategyConfig
+spot = {"type": "spot", "currency": "USDT", "pricePrecision": 2, "sizePrecision": 3, "priceIncrement": "0.01", "sizeIncrement": "0.001"}
+config = {"venues": [{"name": "OKX", "accountType": "CASH", "omsType": "NETTING", "balances": ["100000 USDT"], "fees": {"type": "per_instrument"}}],
+          "instruments": [{**spot, "id": "BTCUSDT.OKX", "symbol": "BTCUSDT", "baseCurrency": "BTC", "makerFee": "0.0008", "takerFee": "0.001"},
+                          {**spot, "id": "ETHUSDT.OKX", "symbol": "ETHUSDT", "baseCurrency": "ETH", "makerFee": "0.0002", "takerFee": "0.004"}]}
+engine = make_engine(config)
+ids = [InstrumentId.from_str(item["id"]) for item in config["instruments"]]
+types = [BarType.from_str(f"{iid}-1-MINUTE-LAST-EXTERNAL") for iid in ids]
+engine.add_data([Bar(kind, Price(100.0, 2), Price(100.0, 2), Price(100.0, 2), Price(100.0, 2), Quantity(1000, 3), i * 60_000_000_000, i * 60_000_000_000)
+                 for i in range(1, 4) for kind in types])
+fills = []
+class Both(Strategy):
+    def __init__(self):
+        super().__init__(StrategyConfig(strategy_id=StrategyId("S-001")))
+    def on_start(self):
+        for kind in types:
+            self.subscribe_bars(kind)
+    def on_bar(self, bar):
+        if bar.ts_init == 120_000_000_000:
+            self.submit_order(self.order_factory.market(bar.bar_type.instrument_id, OrderSide.BUY, Quantity.from_str("10.000")))
+    def on_order_filled(self, event):
+        fills.append([str(event.instrument_id), str(event.commission)])
+engine.add_strategy(Both())
+engine.run()
+print(json.dumps(sorted(fills)))
+'''
+
+
+def test_symbols_on_one_venue_each_pay_their_own_fee():
+    done = subprocess.run([str(interpreter()), "-I", "-c", PER_INSTRUMENT, str(ROOT / "modules" / "quant")], capture_output=True, text=True, timeout=180)
+    assert done.returncode == 0, done.stderr[-3000:]
+    assert json.loads(done.stdout.strip().splitlines()[-1]) == [["BTCUSDT.OKX", "1.00000000 USDT"], ["ETHUSDT.OKX", "4.00000000 USDT"]]

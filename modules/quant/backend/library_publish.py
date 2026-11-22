@@ -21,6 +21,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import library_after, library_checks, research_calendar, research_process
 from .object_runs import RESEARCH_KINDS, RUN
@@ -61,7 +62,7 @@ def edge_times(labels, timeframe, zone, found, edge):
     by_label = {research_calendar.label_of(opened, timeframe, zone): (opened, closed) for opened, closed in found}
     missing = [label for label in labels if label not in by_label]
     if missing:
-        raise ContractError("unavailable", f"Market's calendar has no bar at {stamp(missing[0], timeframe)}, where this publication has a value.", {"label": missing[0]})
+        raise ContractError("unavailable", t("Market's calendar has no bar at {missing}, where this publication has a value.", missing=stamp(missing[0], timeframe)), {"label": missing[0]})
     return {label: by_label[label][1 if edge == "close" else 0] for label in labels}
 
 
@@ -69,7 +70,7 @@ def long_rows(values, instruments, availability, recorded, mode):
     """Value rows as the library stores them: instrument id, field, datetime, value, available at, recorded at, mode."""
     unknown = sorted(set(values["instrument"]) - set(instruments))
     if unknown:
-        raise ContractError("invalid_input", f"The publication names {unknown[0]}, which is not one of the symbols in this run's data.", {"instruments": unknown})
+        raise ContractError("invalid_input", t("The publication names {unknown}, which is not one of the symbols in this run's data.", unknown=unknown[0]), {"instruments": unknown})
     return [(instruments[row.instrument], row.field, int(row.datetime), float(row.value), int(availability[int(row.datetime)]), recorded, mode) for row in values.itertuples()]
 
 
@@ -77,7 +78,7 @@ def long_table(values, instruments, availability, recorded, mode, field=None):
     """The same as a table, for many rows at once."""
     unknown = sorted(set(values["instrument"]) - set(instruments))
     if unknown:
-        raise ContractError("invalid_input", f"The publication names {unknown[0]}, which is not one of the symbols in this run's data.", {"instruments": unknown})
+        raise ContractError("invalid_input", t("The publication names {unknown}, which is not one of the symbols in this run's data.", unknown=unknown[0]), {"instruments": unknown})
     labels = values["datetime"].astype("int64")
     return pd.DataFrame({"instrument": values["instrument"].map(instruments), "field": field if field is not None else values["field"], "datetime": labels,
                          "value": values["value"].astype(float), "availableAt": labels.map(availability).astype("int64"), "recordedAt": recorded, "mode": mode})
@@ -117,17 +118,17 @@ class Publisher:
     # --- starting ----------------------------------------------------------------------------------------------------------
     def check_source(self, source, args):
         if source["runKind"] != "run" or source["objectKind"] not in RESEARCH_KINDS:
-            raise ContractError("invalid_input", "Publish a factor, model or allocation run.")
+            raise ContractError("invalid_input", t("Publish a factor, model or allocation run."))
         if source["state"] != "completed" or source["mode"] != "run":
-            raise ContractError("conflict", "Publish a completed standard run; a quick check or a failed run cannot be published.")
+            raise ContractError("conflict", t("Publish a completed standard run; a quick check or a failed run cannot be published."))
         result = self.runs.result(source)
         listed = result["publications"] if result and "publications" in result else []
         if not listed:
-            raise ContractError("invalid_input", "This run's report holds nothing to publish. Call q.report.factor, q.report.model or q.report.allocation in the code.")
+            raise ContractError("invalid_input", t("This run's report holds nothing to publish. Call q.report.factor, q.report.model or q.report.allocation in the code."))
         names = args.get("items")
         chosen = [item for item in listed if names is None or item["name"] in names]
         if not chosen or (names and len(chosen) != len(set(names))):
-            raise ContractError("invalid_input", "Choose among what this run can publish: " + ", ".join(item["name"] for item in listed) + ".", {"items": [item["name"] for item in listed]})
+            raise ContractError("invalid_input", t("Choose among what this run can publish: {items}.", items=', '.join(item['name'] for item in listed)), {"items": [item["name"] for item in listed]})
         return result, chosen
 
     def plan_factor(self, run_id, name=None):
@@ -135,10 +136,10 @@ class Publisher:
         who uses the last version, the checks to look at, the library factor this run is closest to, and whether the name is taken by another kind."""
         source = self.runs.read(run_id)
         if source.get("objectKind") != "factor" or source["runKind"] != "run" or source["state"] != "completed":
-            raise ContractError("conflict", "Publish a completed factor run; a sweep or a held-out validation cannot be published.")
+            raise ContractError("conflict", t("Publish a completed factor run; a sweep or a held-out validation cannot be published."))
         name = (name or source["name"]).strip()
         existing = self.store.find_item(name)
-        blocked = {"reason": f"{name} is already a {existing[0]['kind']} in the library; choose another name."} if existing and existing[0]["kind"] != "factor" else None
+        blocked = {"reason": t("{name} is already a {kind} in the library; choose another name.", name=name, kind=existing[0]['kind'])} if existing and existing[0]["kind"] != "factor" else None
         versions = self.store.item_versions(existing[0]["id"]) if existing and blocked is None else []
         last = versions[0] if versions else None
         before = self.store.version(last["versionId"])["meta"] if last else {}
@@ -179,16 +180,16 @@ class Publisher:
         # An allocation's backtest becomes a research run of the standard flow first (the frozen code, values, bars and lock the checks below read).
         source = await self.allocations.freeze(run_id) if self.allocations is not None and self.allocations.owns(run_id) else self.runs.read(run_id)
         if self.runs.closed:
-            raise ContractError("unavailable", "Quant is closing.")
+            raise ContractError("unavailable", t("Quant is closing."))
         if run_id in self.active:
-            raise ContractError("conflict", f"Already publishing #{source.get('number')}", {"publicationId": self.active[run_id]})
+            raise ContractError("conflict", t("Already publishing #{number}", number=source.get('number')), {"publicationId": self.active[run_id]})
         name = args["name"].strip()
         if not name or len(name) > 120:
-            raise ContractError("invalid_input", "Choose a name of 1 to 120 characters.")
+            raise ContractError("invalid_input", t("Choose a name of 1 to 120 characters."))
         factor = source.get("objectKind") == "factor"
         if factor:
             if source["runKind"] != "run" or source["state"] != "completed":
-                raise ContractError("conflict", "Publish a completed factor run; a sweep or a held-out validation cannot be published.")
+                raise ContractError("conflict", t("Publish a completed factor run; a sweep or a held-out validation cannot be published."))
             items, result, chosen = [name], None, None
         else:
             result, chosen = self.check_source(source, args)
@@ -196,7 +197,7 @@ class Publisher:
         existing = self.store.find_item(name)
         kind = "factor" if factor else "model" if any(item["kind"] in ("prediction", "model") for item in chosen) else chosen[0]["kind"]
         if existing and existing[0]["kind"] != kind:
-            raise ContractError("conflict", f"{name} is already a {existing[0]['kind']} in the library; choose another name.", {"kind": existing[0]["kind"]})
+            raise ContractError("conflict", t("{name} is already a {kind} in the library; choose another name.", name=name, kind=existing[0]['kind']), {"kind": existing[0]["kind"]})
         identity = "run-" + uuid4().hex
         now = int(time.time() * 1000)
         record = self.records.put(RUN, {"id": identity, "objectId": source["objectId"], "objectKind": source["objectKind"], "name": source["name"], "runKind": "publish", "mode": "publish",
@@ -249,7 +250,7 @@ class Publisher:
     @staticmethod
     def ending_of(error, closed, stage):
         if isinstance(error, asyncio.CancelledError) or isinstance(error, ContractError) and error.code == "cancelled":
-            return {"state": "interrupted" if closed else "cancelled", "message": "Stopped before anything was added to the library."}
+            return {"state": "interrupted" if closed else "cancelled", "message": t("Stopped before anything was added to the library.")}
         return {"state": "failed", "message": error.message, "error": {"stage": stage, **error.to_dict()}}
 
     # --- a factor run -----------------------------------------------------------------------------------------------------
@@ -268,7 +269,7 @@ class Publisher:
         except ContractError as error:
             ending = self.ending_of(error, self.runs.closed, self.runs.read(identity)["stage"])
         finally:
-            await self.finish(identity, ending or {"state": "failed", "message": "The publication stopped."}, versions)
+            await self.finish(identity, ending or {"state": "failed", "message": t("The publication stopped.")}, versions)
 
     async def factor_values(self, identity, source, directory, *, checks=None, report=None, ready=None, held_out=None):
         """The factor's values over its whole data period, and the same values with the data cut at three dates before the held-out start.
@@ -287,7 +288,7 @@ class Publisher:
         inside = labels[labels < held] if held else labels
         count = max(1, min(int(checks if checks is not None else self.runs.read(identity)["publish"]["checks"]), len(CHECK_POINTS)))
         if len(inside) <= 20:
-            raise ContractError("invalid_input", "There are too few bars before the held-out period to check this publication against future data.")
+            raise ContractError("invalid_input", t("There are too few bars before the held-out period to check this publication against future data."))
         cutoffs = [int(inside[int(len(inside) * point)]) for point in CHECK_POINTS[-count:]]
         output = directory / "output"
         output.mkdir(parents=True, exist_ok=True)
@@ -322,15 +323,17 @@ class Publisher:
             stop.set()
             await follower
         if not answer.get("ok"):
-            failure = answer.get("failure") or {"message": "The factor engine gave no answer."}
-            raise ContractError("code_failed", "The factor failed when it was computed for publication: " + failure["message"], {"failure": failure})
+            failure = answer.get("failure") or {"message": t("The factor engine gave no answer.")}
+            raise ContractError("code_failed", t("The factor failed when it was computed for publication: {message}", message=failure['message']), {"failure": failure})
         # Not "future": the engine reads a message with that key as a later check of another run.
         found = answer.get("futureFound")
         if found:
             timeframe = ready["info"]["timeframe"]
             changed = found["changed"]
-            raise ContractError("future_data", f"{found['instrument']}'s value on {human(found['datetime'], timeframe)} changes when data after {human(found['cutoff'], timeframe)} is removed "
-                                f"({changed} value{'s change' if changed != 1 else ' changes'}). The formula or code reads later data.",
+            raise ContractError("future_data", t("{instrument}'s value on {datetime} changes when data after {cutoff} is removed ({changed} value changes). The formula or code reads later data.",
+                                                 instrument=found['instrument'], datetime=human(found['datetime'], timeframe), cutoff=human(found['cutoff'], timeframe), changed=changed)
+                                               if changed == 1 else t("{instrument}'s value on {datetime} changes when data after {cutoff} is removed ({changed} values change). The formula or code reads later data.",
+                                                 instrument=found['instrument'], datetime=human(found['datetime'], timeframe), cutoff=human(found['cutoff'], timeframe), changed=changed),
                                 {"instrument": found["instrument"], "valueTime": found["datetime"], "cutoff": found["cutoff"], "withAll": found["withAll"],
                                  "whenCut": found["whenCut"], "changed": found["changed"]})
         report("future", len(cutoffs), len(cutoffs))
@@ -383,7 +386,10 @@ class Publisher:
                 "origin": {"objectId": source["objectId"], "runId": source["id"], "objectName": source["name"], "objectKind": "factor", "runNumber": source.get("number")},
                 "measure": measure_text(holding, info["timeframe"]), "horizon": {"holding": holding, "delay": delay}, "universe": universe_text(source["settings"]["data"]),
                 "settingsText": settings_text(source["settings"]["data"], run, info["timeframe"]), "publishedThrough": labels[-1] if labels else None,
-                "instrumentCount": len(ids), "sectors": {ids[column]: sector for column, sector in industry.items() if column in ids},
+                # Each name's industry at the end of the run: what the values published from here on are measured within (a run frozen by
+                # TALYX 0.1 kept one label per name).
+                "instrumentCount": len(ids), "sectors": {ids[column]: history if isinstance(history, str) else history[-1][2]
+                                                         for column, history in industry.items() if column in ids and history},
                 "environment": None, "checked": answer.get("checked")}
         # The run's own numbers, by the definitions the library follows it on afterwards (the run's horizon; the long-short after costs, as after publication)
         published = {"metric": "rank_ic", "value": numbers.get("rankIc"), "t": numbers.get("t"), "se": numbers["rankIc"] / numbers["t"] if numbers.get("rankIc") is not None and numbers.get("t") else None,
@@ -418,7 +424,7 @@ class Publisher:
         except ContractError as error:
             ending = self.ending_of(error, self.runs.closed, self.runs.read(identity)["stage"])
         finally:
-            await self.finish(identity, ending or {"state": "failed", "message": "The publication stopped."}, versions)
+            await self.finish(identity, ending or {"state": "failed", "message": t("The publication stopped.")}, versions)
 
     async def history(self, identity, source, result, chosen):
         """The values the run already computed, with when each could be known; and the run's frozen bars, to check them and to judge them."""
@@ -426,7 +432,7 @@ class Publisher:
         invocation = json.loads((run_directory / "invocation.json").read_text(encoding="utf-8"))
         research = invocation["research"]
         if research is None:
-            raise ContractError("invalid_input", "This run's code picked its own symbols, so there are no frozen bars to check and update it against. Choose the symbols in the data settings to publish.")
+            raise ContractError("invalid_input", t("This run's code picked its own symbols, so there are no frozen bars to check and update it against. Choose the symbols in the data settings to publish."))
         info = research["info"]
         instruments = {item["column"]: item["instrumentId"] for item in info["instruments"]}
         zone, found = await research_calendar.date_boundaries(self.ctx, info["calendarId"], info["timeframe"], info["sessionScope"], info["since"], info["until"])
@@ -456,7 +462,7 @@ class Publisher:
         count = max(1, min(int(self.runs.read(identity)["publish"]["checks"]), len(CHECK_POINTS)))
         cutoffs = [int(labels[int(len(labels) * point)]) for point in CHECK_POINTS[-count:]] if len(labels) > 20 else []
         if not cutoffs:
-            raise ContractError("invalid_input", "There are too few bars to check this publication against future data.")
+            raise ContractError("invalid_input", t("There are too few bars to check this publication against future data."))
         self.progress(identity, "future", 0, len(cutoffs))
         source_directory = self.runs.directory(source["id"])
         shutil.copytree(filesystem_path(source_directory / "source"), filesystem_path(directory / "source"))
@@ -490,23 +496,21 @@ class Publisher:
         self.runs.update(identity, exitCode=code, data={"calls": calls})
         if (output / "error.json").is_file():
             failure = json.loads((output / "error.json").read_text(encoding="utf-8"))
-            raise ContractError("code_failed", "The code failed when it ran on the data cut for the check: " + failure["message"], {"failure": failure})
+            raise ContractError("code_failed", t("The code failed when it ran on the data cut for the check: {message}", message=failure['message']), {"failure": failure})
         if code != 0 or not (output / "done.json").is_file():
-            raise ContractError("code_failed", f"The check run ended with exit code {code} before it finished.")
+            raise ContractError("code_failed", t("The check run ended with exit code {code} before it finished.", code=code))
         for number, cutoff in enumerate(cutoffs):
             report = json.loads((output / f"values-{number}.json").read_text(encoding="utf-8"))
             for item in valued:
                 made = next((entry for entry in report["publications"] if entry["name"] == item["name"]), None)
                 if made is None:
-                    raise ContractError("invalid_input", f"When the data was cut at {stamp(cutoff, info['timeframe'])} the code made no {item['name']}.")
+                    raise ContractError("invalid_input", t("When the data was cut at {cutoff} the code made no {name}.", cutoff=stamp(cutoff, info['timeframe']), name=item['name']))
                 cut = await asyncio.to_thread(pd.read_parquet, output / made["path"])
                 difference = await asyncio.to_thread(first_difference, item["values"], cut, cutoff)
                 if difference:
                     row = difference["row"]
                     then = None if pd.isna(row["valueCut"]) else float(row["valueCut"])
-                    raise ContractError("future_data", f"{item['name']} uses data from after the time it is dated: its value for {row['instrument']} at {stamp(int(row['datetime']), info['timeframe'])} "
-                        f"is {float(row['value']):.6g} with all the data, but {'missing' if then is None else format(then, '.6g')} when the data is cut at {stamp(cutoff, info['timeframe'])} "
-                        f"({difference['count']} value(s) change in this check).",
+                    raise ContractError("future_data", t("{name} uses data from after the time it is dated: its value for {instrument} at {datetime} is {value} with all the data, but {value2} when the data is cut at {cutoff} ({count} value(s) change in this check).", name=item['name'], instrument=row['instrument'], datetime=stamp(int(row['datetime']), info['timeframe']), value=f"{float(row['value']):.6g}", value2='missing' if then is None else format(then, '.6g'), cutoff=stamp(cutoff, info['timeframe']), count=difference['count']),
                         {"name": item["name"], "instrument": row["instrument"], "valueTime": int(row["datetime"]), "cutoff": cutoff, "withAll": float(row["value"]), "whenCut": then,
                          "changed": difference["count"]})
 
@@ -525,7 +529,7 @@ class Publisher:
         valued = [item for item in prepared["publications"] if item["kind"] in VALUE_KINDS]
         trained = next((item for item in prepared["publications"] if item["kind"] == "model"), None)
         if not valued and trained is None:
-            raise ContractError("invalid_input", "Nothing to publish.")
+            raise ContractError("invalid_input", t("Nothing to publish."))
         item = valued[0] if valued else trained
         kind = "model" if item["kind"] in ("prediction", "model") else item["kind"]
         version_id = "ver-" + uuid4().hex[:12]

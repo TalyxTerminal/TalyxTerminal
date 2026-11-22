@@ -20,7 +20,7 @@ def test_awkward_symbols_are_prepared_each_as_a_column_of_its_own(tmp_path, monk
                 "instruments": [{"column": item["displaySymbol"], "instrumentId": item["instrumentId"], "instrument": item,
                     "series": SERIES, "revision": "r1", "source": {"sourceId": "test"}} for item in chosen]}
         return {"research": {"barsPath": str(path), "info": info}, "references": [], "summary": {"requested": len(chosen),
-                "fetchRows": [{"instrumentId": item["instrumentId"], "ticker": item["displaySymbol"]} for item in chosen]}}
+                "fetchRows": [{"instrumentId": item["instrumentId"], "ticker": item["displaySymbol"], "result": "fetched"} for item in chosen]}}
     async def describe(ctx, instruments):
         return {"fields": [], "limits": [], "sources": []}
     monkeypatch.setattr(D.research_data, "prepare", prepare)
@@ -36,7 +36,7 @@ def test_a_run_that_breaks_inside_says_what_broke_without_folders(tmp_path, monk
     from tests.unit.test_quant_object_runs import DATA
     ctx, shell, factors = services(tmp_path, monkeypatch, [])
 
-    async def broken(settings, report=None):
+    async def broken(settings, report=None, facts=True):
         raise OSError(f"Cannot save file into a non-existent directory: '{tmp_path}\\factor-data\\c163cf\\names\\BTC'")
     monkeypatch.setattr(factors.data, "prepare", broken)
 

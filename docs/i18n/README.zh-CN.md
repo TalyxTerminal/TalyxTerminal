@@ -73,6 +73,10 @@ TalyxTerminal 不是一个大而全的应用，而是一层很薄的平台加上
 
 **[Developer](../../modules/developer/README.md)：写模块和指标的地方。** 代码、文档和示例放在一起，可以在 VS Code 里打断点调试。
 
+## 使用指南
+
+[中文版](../user-guide.zh-CN.md)和[英文版](../user-guide.md)介绍安装、工作区、各模块的用法及数据存放位置。
+
 ## 快速开始
 
 从 [Releases](https://github.com/talyxterminal/TalyxTerminal/releases) 下载安装包运行即可。也可以从源码运行：

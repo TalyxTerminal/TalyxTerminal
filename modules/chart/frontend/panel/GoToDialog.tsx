@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* Go to (TradingView): a date, or a custom range, brought into view on the chart (older bars are fetched first). */
 import { useState } from "react";
 import { TxButton, TxDialog, TxField, TxInput, TxTabs } from "@talyx/sdk";
@@ -20,16 +21,16 @@ export function GoToDialog({ panelId, chartId }: { panelId: string; chartId: str
     close();
   };
   const valid = tab === "date" ? Boolean(date) : Boolean(from && to && from <= to);
-  return <TxDialog open onOpenChange={open => { if (!open) close(); }} title="Go to"
-    footer={<><TxButton size="sm" onClick={close}>Cancel</TxButton><TxButton size="sm" variant="primary" disabled={!valid} onClick={go}>Go to</TxButton></>}>
-    <TxTabs value={tab} onChange={setTab} label="Go to" options={[{ value: "date", label: "Date" }, { value: "range", label: "Custom range" }]} />
+  return <TxDialog open onOpenChange={open => { if (!open) close(); }} title={t("Go to")}
+    footer={<><TxButton size="sm" onClick={close}>{t("Cancel")}</TxButton><TxButton size="sm" variant="primary" disabled={!valid} onClick={go}>{t("Go to")}</TxButton></>}>
+    <TxTabs value={tab} onChange={setTab} label={t("Go to")} options={[{ value: "date", label: t("Date") }, { value: "range", label: t("Custom range") }]} />
     <div className="chart-form">
       {tab === "date" ? <>
-        <TxField label="Date" layout="inline"><TxInput type="date" value={date} onChange={event => setDate(event.target.value)} /></TxField>
-        <TxField label="Time" layout="inline"><TxInput type="time" value={time} onChange={event => setTime(event.target.value)} /></TxField>
+        <TxField label={t("Date")} layout="inline"><TxInput type="date" value={date} onChange={event => setDate(event.target.value)} /></TxField>
+        <TxField label={t("Time")} layout="inline"><TxInput type="time" value={time} onChange={event => setTime(event.target.value)} /></TxField>
       </> : <>
-        <TxField label="Start" layout="inline"><TxInput type="date" value={from} onChange={event => setFrom(event.target.value)} /></TxField>
-        <TxField label="End" layout="inline"><TxInput type="date" value={to} onChange={event => setTo(event.target.value)} /></TxField>
+        <TxField label={t("Start")} layout="inline"><TxInput type="date" value={from} onChange={event => setFrom(event.target.value)} /></TxField>
+        <TxField label={t("End")} layout="inline"><TxInput type="date" value={to} onChange={event => setTo(event.target.value)} /></TxField>
       </>}
     </div>
   </TxDialog>;

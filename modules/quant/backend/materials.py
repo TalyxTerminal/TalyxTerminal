@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .teardown import cleanup
 
@@ -23,7 +24,7 @@ def task_failure(task):
         raise ContractError(error['code'], error['message'], error.get('details'),
                             **({key: error[key] for key in ('execution', 'effects')} if 'execution' in error else {}))
     if task['state'] in {'cancelled', 'interrupted'}:
-        raise ContractError(task['state'], f"Market export was {task['state']}.", {'terminationReason': task['state']}, execution='failed')
+        raise ContractError(task['state'], t("Market export was {state}.", state=task['state']), {'terminationReason': task['state']}, execution='failed')
 
 
 async def run_task(ctx, name, arguments, progress=None):
@@ -152,11 +153,11 @@ class Materials:
             from .work_records import digest
             files = await asyncio.to_thread(source_identity, source)
             if expected and digest(files) != expected:
-                raise ContractError("conflict", "The selected input directory changed since it was chosen")
+                raise ContractError("conflict", t("The selected input directory changed since it was chosen"))
             return {"kind": "directory", "path": str(source), "digest": digest(files), "source": str(source),
                     "files": [{"path": path, "sha256": value} for path, value in sorted(files.items())]}
         file_digest = await asyncio.to_thread(lambda: hashlib.sha256(source.read_bytes()).hexdigest())
         if expected and file_digest != expected:
-            raise ContractError("conflict", "The selected input changed since it was chosen")
+            raise ContractError("conflict", t("The selected input changed since it was chosen"))
         return {"kind": "file", "path": str(source), "digest": file_digest, "source": str(source),
                 **({"componentSource": selection["componentSource"]} if selection.get("componentSource") else {})}

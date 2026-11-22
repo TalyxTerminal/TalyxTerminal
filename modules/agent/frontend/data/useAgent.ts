@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModuleContext, Subscription } from "@talyx/sdk";
 import { AgentClient } from "./client";
@@ -31,7 +32,7 @@ export function useAgentConversation(ctx: ModuleContext, conversationId: string 
         const waiting = current.conversation.activity.waitingApproval;
         const busy = current.conversation.activity.running;
         ctx.platform.panels.setStatus(ctx.panelRef, { state: waiting ? "attention" : busy ? "running" : "idle",
-          text: waiting ? "Approval needed" : busy ? "Agent is running" : "",
+          text: waiting ? t("Approval needed") : busy ? t("Agent is running") : "",
           navigation: { conversationId } });
       }
     };

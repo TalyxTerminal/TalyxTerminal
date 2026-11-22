@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 
 MAX_BYTES = 2560
 NOT_FOUND = 1168
@@ -57,7 +58,7 @@ class CredentialSecrets:
         if not self.api.CredReadW(target, 1, 0, ctypes.byref(pointer)):
             if ctypes.get_last_error() == NOT_FOUND:
                 return None
-            raise ContractError("secret_store_failed", "Windows Credential Manager could not be read")
+            raise ContractError("secret_store_failed", t("Windows Credential Manager could not be read"))
         try:
             item = pointer.contents
             return ctypes.string_at(item.CredentialBlob, item.CredentialBlobSize).decode("utf-8")
@@ -67,18 +68,18 @@ class CredentialSecrets:
     def write(self, target: str, value: str | None) -> None:
         if value is None:
             if not self.api.CredDeleteW(target, 1, 0) and ctypes.get_last_error() != NOT_FOUND:
-                raise ContractError("secret_store_failed", "Windows Credential Manager could not delete the key")
+                raise ContractError("secret_store_failed", t("Windows Credential Manager could not delete the key"))
             return
         blob = value.encode("utf-8")
         if not blob or len(blob) > MAX_BYTES:
-            raise ContractError("invalid_input", f"A secret is 1 to {MAX_BYTES} bytes")
+            raise ContractError("invalid_input", t("A secret is 1 to {MAX_BYTES} bytes", MAX_BYTES=MAX_BYTES))
         buffer = ctypes.create_string_buffer(blob)
         item = self.Credential()
         item.Type, item.TargetName, item.Persist, item.UserName = 1, target, 2, "TALYX"
         item.CredentialBlobSize = len(blob)
         item.CredentialBlob = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte))
         if not self.api.CredWriteW(ctypes.byref(item), 0):
-            raise ContractError("secret_store_failed", "Windows Credential Manager could not store the key")
+            raise ContractError("secret_store_failed", t("Windows Credential Manager could not store the key"))
 
 
 class Secrets:

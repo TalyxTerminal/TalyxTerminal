@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { WidgetBusContext, type CommMessage } from "./bus";
 
@@ -21,7 +22,7 @@ export function WidgetOutput({modelId}: {modelId: string}) {
     let waited: ReturnType<typeof setTimeout> | null = null;
     const receive = (event: MessageEvent) => {
       if (frame.current === null || event.source !== frame.current.contentWindow || event.data === null || typeof event.data !== "object" || event.data.source !== "talyx-widget") return;
-      const message = event.data as {type: string; commId?: string; data?: unknown; height?: number};
+      const message = event.data as {type: string; commId?: string; data?: unknown; height?: number; plotly?: boolean; library?: string};
       if (message.type === "ready") {
         const start = () => {
           if (!bus.opened.has(modelId)) return false;
@@ -31,12 +32,15 @@ export function WidgetOutput({modelId}: {modelId: string}) {
         };
         // The kernel's open messages arrive with the connection, a moment after the output itself.
         if (!start()) waited = setTimeout(() => {if (!start()) setGone(true);}, 1500);
+      } else if (message.type === "unsupported") {
+        post({type: "notice", text: message.plotly ? t("plotly widgets don't run here; use fig.show()") : message.library
+          ? t("{library} widgets don't run here", { library: message.library }) : t("This widget library doesn't run here")});
       } else if (message.type === "comm_msg") bus.send(message.commId!, message.data);
       else if (message.type === "height" && Number.isFinite(message.height)) setHeight(Math.min(2000, Math.max(24, Number(message.height))));
     };
     window.addEventListener("message", receive);
     return () => {unsubscribe(); window.removeEventListener("message", receive); if (waited !== null) clearTimeout(waited);};
   }, [bus, modelId, content]);
-  if (gone) return <p className="qx-muted">Widget from before the restart</p>;
-  return <div className="qx-nb-html">{content !== null && <iframe ref={frame} title="Widget" srcDoc={content} sandbox="allow-scripts" style={{height}} />}</div>;
+  if (gone) return <p className="qx-muted">{t("Widget from before the restart")}</p>;
+  return <div className="qx-nb-html">{content !== null && <iframe ref={frame} title={t("Widget")} srcDoc={content} sandbox="allow-scripts" style={{height}} />}</div>;
 }

@@ -1,8 +1,10 @@
+import { intlLocale } from "@talyx/sdk";
 /* An allocation's page: one row on top (name, data, Run, Work or Results), the settings column, and in the middle either Work (key numbers, this period beside every period's stack, checks,
    runs) or Results (tabs). The state of every run comes from the backend; this period is a trial of the newest period whenever the settings differ from the run shown. */
+import { t } from "../i18n";
 import { restoreNotice } from "../shared/restored";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { TxButton, TxDialog, TxEmpty, TxIcon, TxIconButton, TxMenu, TxRunButton, TxRunProgress, TxSegmented, TxTag, TxRunPicker, TxRegionHead, TxRunStrip, TxCompare, TxSkeleton, useTxToast, type ModuleContext, type TxMenuItem } from "@talyx/sdk";
+import { TxButton, TxEmpty, TxIcon, TxIconButton, TxMenu, TxRunButton, TxRunProgress, TxSegmented, TxTag, TxRunPicker, TxRegionHead, TxRunStrip, TxCompare, TxSkeleton, useTxToast, type ModuleContext, type TxMenuItem } from "@talyx/sdk";
 import { DataSettingsChip } from "../DataSettings";
 import { dataReady, periodText, useEvent, useThrottled, type Api, type DataDefaults, type ObjectDetail, type ParamValue } from "../objects";
 import type { ShellState } from "../QuantShell";
@@ -17,9 +19,11 @@ import { PoolSheet, Settings, listValues } from "./Settings";
 import { PublishSheet } from "./PublishSheet";
 import { SweepDialog, SweepGrid, sweepSummary } from "./SweepGrid";
 import { CodeArea } from "../shared/CodeArea";
+import { DataNotes } from "../shared/DataNotes";
 import { FirstRun, NoResultsYet, type FirstLine } from "../shared/FirstRun";
 import { HeldOutConfirm } from "../strategy/validation/HeldOutConfirm";
 import { nf, pct } from "../shared/format";
+import { LongRunConfirm, isLong, sweepSeconds } from "../shared/LongRun";
 import "../factor/factor.css";
 import "./allocation.css";
 
@@ -30,8 +34,8 @@ export const proxiedAt = (notes: string[], date: string) => new Set(notes.flatMa
   return found && date < new Date(Date.parse(`1 ${found[2]} UTC`)).toISOString().slice(0, 10) ? [found[1]] : [];
 }));
 const RUN_ONLY = new Set(["frequency", "costs", "cost_multiple", "cost_aware", "pool", "capital"]);
-const progressText = (run: AllocationRun | null) => run?.progress?.of ? {stage: "Optimizing period", count: `${run.progress.done}/${run.progress.of}`, value: run.progress.done / run.progress.of}
-  : {stage: run?.state === "queued" ? "Waiting in the queue" : "Fetching prices", count: undefined, value: null};
+const progressText = (run: AllocationRun | null) => run?.progress?.of ? {stage: t("Optimizing period"), count: `${run.progress.done}/${run.progress.of}`, value: run.progress.done / run.progress.of}
+  : {stage: run?.state === "queued" ? t("Waiting in the queue") : t("Fetching prices"), count: undefined, value: null};
 
 /** When the newest period is worked out fresh rather than read from the shown run: no run yet, settings changed since it (a trial), a held weight, a failed run, or a
     published period (waiting for review or decided); the version's period is compared with this method's weights for that same period, never with the run's last one. */
@@ -96,7 +100,6 @@ export function AllocationPage({ctx, api, detail, onDetail, state, update, title
   // ---- the code: the standard flow as the run ran it, read-only; a project of its own opens in the code area
   const [snap, setSnap] = useState<{id: string; text: string} | null>(null);
   const [tree, setTree] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
   const selected = list.find(item => item.id === state.runId) ?? list[0] ?? null;
   const ownCode = detail.hasCode === true && prep?.mode === "code";
   const snapRun = selected && selected.state === "completed" && !ownCode ? selected : null;
@@ -203,11 +206,17 @@ export function AllocationPage({ctx, api, detail, onDetail, state, update, title
   const [comparedId, setComparedId] = useState<string | null | undefined>(undefined);
   const previous = selected ? list.find(item => item.number < selected.number && usable(item)) ?? null : null;
   const compared = (comparedId === undefined ? previous : list.find(item => item.id === comparedId && usable(item))) ?? null;
-  const comparePicker = <TxCompare run={compared ? `#${compared.number}` : null} items={[{id: "none", label: "No comparison", checked: compared === null, onSelect: () => setComparedId(null)},
+  const comparePicker = <TxCompare run={compared ? `#${compared.number}` : null} items={[{id: "none", label: t("No comparison"), checked: compared === null, onSelect: () => setComparedId(null)},
     ...list.filter(item => usable(item) && item.id !== selected?.id).map(item => ({id: item.id, label: `#${item.number}`, detail: when(item.createdAt), checked: compared?.id === item.id, onSelect: () => setComparedId(item.id)}))]} />;
   useEffect(() => {void loadPublished();}, [detail.id]);
   const [publishOpen, setPublishOpen] = useState(false);
   const [sweepOpen, setSweepOpen] = useState(false);
+  // A sweep expected to take more than ten minutes (its runs one after another, each as long as the newest backtest) waits for the user's word.
+  const [long, setLong] = useState<{count: number; seconds: number; go(): void} | null>(null);
+  const unlessLong = (count: number, go: () => void) => {
+    const seconds = sweepSeconds(list.filter(item => !item.sweep && item.runKind === "backtest"), count);
+    if (isLong(seconds)) setLong({count, seconds: seconds!, go}); else go();
+  };
   const [shocksAdded, setShocksAdded] = useState(0);
   const poolRows = prep?.pool ?? [];
   const shockTargets = Array.from(new Set([...poolRows.map(item => item.ticker), ...poolRows.map(item => item.group)]));
@@ -215,11 +224,11 @@ export function AllocationPage({ctx, api, detail, onDetail, state, update, title
     const shown = `${target} ${pct > 0 ? "+" : "−"}${Math.abs(pct)}%`;
     if (!selected || !usable(selected)) {
       edit("shocks", [...(Array.isArray(values.shocks) ? values.shocks : []), {target, pct}] as unknown as ParamValue);
-      toast({title: `${shown} added`, detail: "It shows in the table from the next run"});
+      toast({title: t("{shown} added", { shown }), detail: t("It shows in the table from the next run")});
       return;
     }
     void aapi.shock(selected.id, target, pct).then(() => api.read(detail.id)).then(onDetail).then(() => aapi.prep(detail.id)).then(found => {
-      setPrep(found); setValues({...found.values, __id: detail.id}); setShocksAdded(count => count + 1); toast({title: `${shown} added`});
+      setPrep(found); setValues({...found.values, __id: detail.id}); setShocksAdded(count => count + 1); toast({title: t("{shown} added", { shown })});
     }, fail);
   };
   const [links, setLinks] = useState<Awaited<ReturnType<typeof aapi.links>> | null>(null);
@@ -263,11 +272,9 @@ export function AllocationPage({ctx, api, detail, onDetail, state, update, title
     try {
       if (saving.current) {clearTimeout(saving.current); const {__id, ...params} = values; onDetail(await api.settings(detail.id, {params}));}
       if (sweepAxes.length > 0) {
-        if (sweepAxes.length > 2) {setError("A sweep takes one or two settings with several values"); return;}
-        const found = await aapi.sweep(detail.id, sweepAxes);
-        setLists({});
-        update({runId: found.runs[0].id, allocationView: undefined});
-        await loadRuns();
+        if (sweepAxes.length > 2) {setError(t("A sweep takes one or two settings with several values")); return;}
+        const axes = sweepAxes;
+        unlessLong(sweepCount, () => void aapi.sweep(detail.id, axes).then(found => {setLists({}); update({runId: found.runs[0].id, allocationView: undefined}); return loadRuns();}).catch(fail));
         return;
       }
       const row = await aapi.start(detail.id, {});
@@ -282,16 +289,16 @@ export function AllocationPage({ctx, api, detail, onDetail, state, update, title
   const analysisEnd = data.heldOutFrom ? new Date(Date.parse(data.heldOutFrom + "T00:00:00Z") - 86_400_000).toISOString().slice(0, 10) : data.until;
   const period = data.since && analysisEnd ? periodText(data.since, analysisEnd) : null;
   const dataTo = selected?.data?.dataTo ? Date.parse(selected.data.dataTo + "T00:00:00Z") : null;
-  const chip = <button type="button" className="tx-datachip" title="Data settings"><TxIcon name="list" />
-    <b data-priority={1}>{period ?? "Set data"}</b>
-    {heldYear !== null && <><span className="tx-sep" /><span data-priority={2} className="tx-lock"><TxIcon name="lock" />{heldYear} on</span></>}
-    {dataTo !== null && <><span className="tx-sep" /><span data-priority={3} className="fx-t3">data to {mdy(dataTo).replace(/, \d{4}$/, "")}</span></>}
+  const chip = <button type="button" className="tx-datachip" title={t("Data settings")}><TxIcon name="list" />
+    <b data-priority={1}>{period ?? t("Set data")}</b>
+    {heldYear !== null && <><span className="tx-sep" /><span data-priority={2} className="tx-lock"><TxIcon name="lock" />{t("{heldYear} on", { heldYear })}</span></>}
+    {dataTo !== null && <><span className="tx-sep" /><span data-priority={3} className="fx-t3">{t("data to {dataTo}", { dataTo: mdy(dataTo).replace(/, \d{4}$/, "") })}</span></>}
     <TxIcon name="chevron" style={{transform: "rotate(90deg)"}} /></button>;
   const progress = progressText(active !== null && run?.id === active.id ? run : active);
   const write = useMemo(() => changeWriter((prep?.groups ?? []).flatMap(group => group.settings)), [prep]);
   const goTab = (tab: Tab) => update({allocationView: "results", allocationResults: tab});
   const tab = (state.allocationResults as Tab | undefined) ?? "summary";
-  const lead = picked ? "Target" : trial.trial && trialOn && !forReview ? "Trial" : "Target";
+  const lead = picked ? t("Target") : trial.trial && trialOn && !forReview ? t("Trial") : t("Target");
   const showing: Row[] | null = withPublished(picked ? past : trialOn && trial.trial ? trial.trial.rows : periodWork?.thisPeriod ?? null);
   // The period under review is the newest one, not the run's last: until its trial answers, nothing stands in for it (showed 2024's weights first).
   const reviewWaits = !picked && forReview && !trial.trial && !trial.error;
@@ -301,92 +308,92 @@ export function AllocationPage({ctx, api, detail, onDetail, state, update, title
   /** The name the system gives an allocation: its objective, a minimum risk by its measure ("Minimum variance"). */
   const nameOf = (v: Record<string, any>) => {
     const say = (key: string) => optionLabels[key]?.[String(v[key])] ?? "";
-    return v.objective === "min_risk" && say("risk_measure") ? `Minimum ${say("risk_measure").toLowerCase()}` : say("objective");
+    return v.objective === "min_risk" && say("risk_measure") ? t("Minimum {measure}", { measure: say("risk_measure").toLowerCase() }) : say("objective");
   };
   const optionLabels = useMemo(() => Object.fromEntries((prep?.groups ?? []).flatMap(group => group.settings).filter(item => item.options)
     .map(item => [item.name, Object.fromEntries(item.options!.map(option => [String(option.value), option.label]))])), [prep]);
 
-  const strip = selected && <TxRunStrip picker={<>{view === "results" && <TxButton variant="quiet" size="sm" onClick={() => update({allocationView: undefined})}><TxIcon name="chevron" style={{transform: "rotate(180deg)"}} />Work</TxButton>}<TxRunPicker run={`#${selected.number}`} items={list.map(item => ({id: item.id, label: `#${item.number}`, detail: changePlain(item, write).slice(0, 60), checked: item.id === selected.id, onSelect: () => update({runId: item.id})}))} /></>}
-    when={when(selected.createdAt)} meta={[run?.data?.dataFrom ? `${dayText(run.data.dataFrom)} – ${dayText(run.data.dataTo)}` : "", sweepSummary(list, selected) ?? (selected.runKind === "heldout" && work?.holdout ? `held-out of #${list.find(item => item.id === selected.of)?.number ?? ""}, ${dayText(work.holdout.from)} – ${dayText(work.holdout.to)}, scored once` : "")].filter(Boolean)}
-    tags={<>{selected.sweep && <TxTag>Sweep</TxTag>}{selected.state === "failed" && <TxTag tone="fix">Failed</TxTag>}{(selected.state === "cancelled" || selected.state === "interrupted") && <TxTag tone="muted">Stopped</TxTag>}{selected.runKind === "heldout" && <TxTag icon="lock">Held-out</TxTag>}</>}
-    notes={view === "work" && selected.runKind !== "heldout" ? work?.notes.length : 0} onNotes={() => setNotesOpen(true)} compare={comparePicker}
+  const strip = selected && <TxRunStrip picker={<>{view === "results" && <TxButton variant="quiet" size="sm" onClick={() => update({allocationView: undefined})}><TxIcon name="chevron" style={{transform: "rotate(180deg)"}} />{t("Work")}</TxButton>}<TxRunPicker run={`#${selected.number}`} items={list.map(item => ({id: item.id, label: `#${item.number}`, detail: changePlain(item, write).slice(0, 60), checked: item.id === selected.id, onSelect: () => update({runId: item.id})}))} /></>}
+    when={when(selected.createdAt)} meta={[run?.data?.dataFrom ? `${dayText(run.data.dataFrom)} – ${dayText(run.data.dataTo)}` : "", sweepSummary(list, selected) ?? (selected.runKind === "heldout" && work?.holdout ? t("held-out of #{number}, {start} – {end}, scored once", { number: list.find(item => item.id === selected.of)?.number ?? "", start: dayText(work.holdout.from), end: dayText(work.holdout.to) }) : "")].filter(Boolean)}
+    tags={<>{selected.sweep && <TxTag>{t("Sweep")}</TxTag>}{selected.state === "failed" && <TxTag tone="fix">{t("Failed")}</TxTag>}{(selected.state === "cancelled" || selected.state === "interrupted") && <TxTag tone="muted">{t("Stopped")}</TxTag>}{selected.runKind === "heldout" && <TxTag icon="lock">{t("Held-out")}</TxTag>}{view === "work" && selected.runKind !== "heldout" && <DataNotes notes={work?.notes ?? []} />}</>}
+    compare={comparePicker}
     actions={<StripActions inResults={view === "results"} starred={selected.starred} onStar={() => void aapi.annotate(selected.id, {starred: !selected.starred}).then(() => loadRuns(), fail)}
       onResults={() => update({allocationView: view === "work" ? "results" : undefined})} onPublish={usable(selected) && selected.runKind === "backtest" ? () => setPublishOpen(true) : undefined}
       onNotebook={view === "results" && usable(selected) ? () => void aapi.notebook(selected.id).then(opened => update({objectId: opened.notebookId, runId: undefined}), fail) : undefined} />} />;
 
   const reviewing = published.versionId !== undefined && published.period !== undefined && !published.review && !picked;
-  const monthOf = (ms: number) => new Date(ms).toLocaleString("en-US", {month: "long", year: "numeric", timeZone: "UTC"});
+  const monthOf = (ms: number) => new Date(ms).toLocaleString(intlLocale(), {month: "long", year: "numeric", timeZone: "UTC"});
   const decide = (how: "accept" | "one_off") => {
     if (!published.versionId || published.period === undefined) return;
     const weights = how === "one_off" && trial.trial ? Object.fromEntries(trial.trial.rows.map(row => [row.asset, row.weight])) : undefined;
     void aapi.review(published.versionId, {period: published.period, how, weights, reason: how === "one_off" ? reason : undefined})
-      .then(() => {setReason(""); setPin(null); void loadPublished(); toast({title: `${monthOf(published.period!)} ${how === "accept" ? "accepted as computed" : "marked as a one-off in the library"}`});}, fail);
+      .then(() => {setReason(""); setPin(null); void loadPublished(); toast({title: `${monthOf(published.period!)} ${how === "accept" ? t("accepted as computed") : t("marked as a one-off in the library")}`});}, fail);
   };
-  const review = published.versionId !== undefined && published.period !== undefined ? <ReviewBox waiting={trial.busy || (edits.length > 0 || pin !== null) && !trial.trial} label={monthOf(published.period)} edits={reviewing ? [...edits, ...(pin ? [`${pin.asset} held at ${pct(pin.weight, 2)}`] : [])] : []} reason={reason}
-    decided={published.review ? (published.review.how === "accepted" ? `${monthOf(published.period)}: v${published.version} accepted as computed` : `${monthOf(published.period)}: one-off adjustment applied. ${published.review.reason ?? ""}`) : null}
-    computed={trial.trial && trialCase.reviewPending ? `v${published.version} computed at the ${dayText(trial.trial.period).replace(/, \d{4}$/, "")} close` : `v${published.version}, held from ${dayText(new Date(published.period).toISOString().slice(0, 10)).replace(/, \d{4}$/, "")}`}
-    since={trial.trial?.drift ? `Since v${published.version}: volatility ${pct(trial.trial.drift.publishedVol, 1)} against ${pct(trial.trial.drift.targetVol, 1)}; risk shares within ${nf(trial.trial.drift.riskShareGap * 100, 1)} pt` : null} onReason={setReason} onAccept={() => decide("accept")} onOneOff={() => decide("one_off")}
+  const review = published.versionId !== undefined && published.period !== undefined ? <ReviewBox waiting={trial.busy || (edits.length > 0 || pin !== null) && !trial.trial} label={monthOf(published.period)} edits={reviewing ? [...edits, ...(pin ? [t("{asset} held at {weight}", { asset: pin.asset, weight: pct(pin.weight, 2) })] : [])] : []} reason={reason}
+    decided={published.review ? (published.review.how === "accepted" ? t("{period}: v{version} accepted as computed", { period: monthOf(published.period), version: String(published.version) }) : t("{period}: one-off adjustment applied. {reason}", { period: monthOf(published.period), reason: published.review.reason ?? "" })) : null}
+    computed={trial.trial && trialCase.reviewPending ? t("v{version} computed at the {date} close", { version: String(published.version), date: dayText(trial.trial.period).replace(/, \d{4}$/, "") }) : t("v{version}, held from {date}", { version: String(published.version), date: dayText(new Date(published.period).toISOString().slice(0, 10)).replace(/, \d{4}$/, "") })}
+    since={trial.trial?.drift ? t("Since v{version}: volatility {volatility} against {target}; risk shares within {gap} pt", { version: String(published.version), volatility: pct(trial.trial.drift.publishedVol, 1), target: pct(trial.trial.drift.targetVol, 1), gap: nf(trial.trial.drift.riskShareGap * 100, 1) }) : null} onReason={setReason} onAccept={() => decide("accept")} onOneOff={() => decide("one_off")}
     onNewVersion={() => goTo("set:objective")} onDiscard={() => {revert(); setPin(null);}} /> : null;
   const groups = periodWork?.groups ?? Array.from(new Set((prep?.pool ?? []).map(item => item.group)));
   const costBps = Object.fromEntries((values.costs ?? []).map((row: {group: string; bps: number}) => [row.group, Number(row.bps) * Number(values.cost_multiple ?? 1)]));
   // What the data cannot give, from the run shown: prices, then each thing the run had to work around (missing closes, a shorter history, a proxy).
-  const dataLimits: [string, string][] = prep ? [["Prices", `${data.adjustment === "raw" ? "Raw" : "Adjusted"} closes`], ...(periodWork?.notes ?? []).map((note, index): [string, string] => [index === 0 && /missing closes/.test(note) ? "Missing" : "Note", note])] : [];
+  const dataLimits: [string, string][] = prep ? [[t("Prices"), t("{adjustment} closes", { adjustment: data.adjustment === "raw" ? t("Raw") : t("Adjusted") })], ...(periodWork?.notes ?? []).map((note, index): [string, string] => [index === 0 && /missing closes/.test(note) ? t("Missing") : t("Note"), note])] : [];
   const lastRebalance = periodWork?.periodDates?.[periodWork.periodDates.length - 1] ?? null;
   const runTrades = periodWork && periodWork.thisPeriod.some(row => row.drifted != null) ? withPublished(periodWork.thisPeriod) : null;
   const showLast = !picked && periodView === "trades" && lastTrades && runTrades !== null;
   const periodNav = <span className="al-nav"><b>{picked ? dayText(picked.date) : showLast && lastRebalance ? dayText(lastRebalance) : trialOn && trial.trial ? dayText(trial.trial.period) : periodWork ? dayText(periodWork.to) : ""}</b></span>;
   // The period in view has no holding before it (the run's last rebalance is earlier, or there is no run): its trades are not known, so the run's last ones are offered.
   const tradesFrom = (rows: Row[]) => rows.some(row => row.drifted != null) ? <TradesTable rows={rows} groups={groups} lead={lead} capital={Number(values.capital) > 0 ? Number(values.capital) : 1_000_000} costBps={costBps} />
-    : runTrades && lastRebalance && selected ? <TxEmpty title={`${dayText(trialOn && trial.trial ? trial.trial.period : periodWork!.to)} is after #${selected.number}'s last rebalance, ${dayText(lastRebalance)}`}
-      action={<TxButton size="sm" onClick={() => setLastTrades(true)}>Show {dayText(lastRebalance)} trades</TxButton>} />
-    : <TxEmpty title="Trades show after the first run" />;
+    : runTrades && lastRebalance && selected ? <TxEmpty title={t("{period} is after #{number}'s last rebalance, {lastRebalance}", { period: dayText(trialOn && trial.trial ? trial.trial.period : periodWork!.to), number: selected.number, lastRebalance: dayText(lastRebalance) })}
+      action={<TxButton size="sm" onClick={() => setLastTrades(true)}>{t("Show {lastRebalance} trades", { lastRebalance: dayText(lastRebalance) })}</TxButton>} />
+    : <TxEmpty title={t("Trades show after the first run")} />;
   const periodSection = showing ? <section className="al-periodsec">
     <div className="al-periodmain">
-      <TxRegionHead title={picked || showLast ? "Period" : "This period"}>{periodNav}
-        {!picked && <TxSegmented label="Show" value={periodView} onChange={setPeriodView} options={[{value: "weights", label: "Weights"}, {value: "trades", label: "Trades"}]} />}
-        {picked ? <span className="al-dim">turnover {pct(pickedTurnover ?? 0, 1)}</span> : showLast ? <span className="al-dim">rebalance at the {dayText(lastRebalance!)} close</span> : forReview ? (trial.trial ? <span className="al-dim">rebalance at the {dayText(trial.trial.period)} close</span> : null) : trialOn ? <><TxTag tone="watch" title={edits.length > 1 ? `Recomputed the newest period only: ${edits.join(", ")}` : "Recomputed the newest period only"}>Trial{edits.length === 1 ? `: ${edits[0]}` : edits.length ? `: ${edits.length} settings` : ""}</TxTag>
-          <span className="al-dim num">{trialStatus({busy: trial.busy, engineWarm: prep?.engineWarm, seconds: trial.trial?.wall}, Boolean(trial.trial))}</span></> : work ? <span className="al-dim">rebalance at the {dayText(work.periodDates?.[work.periodDates.length - 1] ?? work.to)} close</span> : null}
-        {(picked || showLast) && <TxButton variant="quiet" size="sm" onClick={() => {setPicked(null); setFocus(null); setLastTrades(false);}}>Back to this period</TxButton>}</TxRegionHead>
+      <TxRegionHead title={picked || showLast ? t("Period") : t("This period")}>{periodNav}
+        {!picked && <TxSegmented label={t("Show")} value={periodView} onChange={setPeriodView} options={[{value: "weights", label: t("Weights")}, {value: "trades", label: t("Trades")}]} />}
+        {picked ? <span className="al-dim">{t("turnover {pickedTurnover}", { pickedTurnover: pct(pickedTurnover ?? 0, 1) })}</span> : showLast ? <span className="al-dim">{t("rebalance at the {lastRebalance} close", { lastRebalance: dayText(lastRebalance!) })}</span> : forReview ? (trial.trial ? <span className="al-dim">{t("rebalance at the {period} close", { period: dayText(trial.trial.period) })}</span> : null) : trialOn ? <><TxTag tone="watch" title={edits.length > 1 ? t("Recomputed the newest period only: {edits}", { edits: edits.join(", ") }) : t("Recomputed the newest period only")}>{t("Trial{value}", { value: edits.length === 1 ? `: ${edits[0]}` : edits.length ? t(": {count} settings", { count: edits.length }) : "" })}</TxTag>
+          <span className="al-dim num">{trialStatus({busy: trial.busy, engineWarm: prep?.engineWarm, seconds: trial.trial?.wall}, Boolean(trial.trial))}</span></> : work ? <span className="al-dim">{t("rebalance at the {periodDates} close", { periodDates: dayText(work.periodDates?.[work.periodDates.length - 1] ?? work.to) })}</span> : null}
+        {(picked || showLast) && <TxButton variant="quiet" size="sm" onClick={() => {setPicked(null); setFocus(null); setLastTrades(false);}}>{t("Back to this period")}</TxButton>}</TxRegionHead>
       <div className="qv-pad">{trial.error && trialOn && !picked ? <p className="fx-why" role="alert">{trial.error}</p>
         : reviewWaits ? <TxSkeleton width="60%" />
-        : showLast ? <TradesTable rows={runTrades!} groups={groups} lead="Target" capital={Number(values.capital) > 0 ? Number(values.capital) : 1_000_000} costBps={costBps} />
+        : showLast ? <TradesTable rows={runTrades!} groups={groups} lead={t("Target")} capital={Number(values.capital) > 0 ? Number(values.capital) : 1_000_000} costBps={costBps} />
         : !picked && periodView === "trades" ? tradesFrom(showing)
-        : <PeriodTable proxied={picked ? proxiedAt(work?.spliced ?? [], picked.date) : undefined} lead={lead} rows={showing} groups={groups} reference={showing.some(row => row.published != null)} referenceLabel={published.version ? `v${published.version}` : "Published"} base={baseRows} baseLabel={selected ? `#${selected.number}` : ""}
+        : <PeriodTable proxied={picked ? proxiedAt(work?.spliced ?? [], picked.date) : undefined} lead={lead} rows={showing} groups={groups} reference={showing.some(row => row.published != null)} referenceLabel={published.version ? `v${published.version}` : t("Published")} base={baseRows} baseLabel={selected ? `#${selected.number}` : ""}
           held={pin?.asset ?? null} onHold={picked ? undefined : asset => setPin(current => current?.asset === asset ? null : {asset, weight: Math.round((showing.find(row => row.asset === asset)?.weight ?? 0) * 1000) / 1000})}
           onHeldWeight={pin ? weight => setPin({asset: pin.asset, weight}) : undefined} focus={picked ? focus : null} />}
-        {!picked && !showLast && trialOn && trial.trial && <div className="al-foot"><span>Effective assets <b>{nf(trial.trial.effectiveAssets, 1)}</b></span></div>}
-        {!picked && !trialOn && periodWork && <div className="al-foot"><span>Periods <b>{periodWork.periods}</b></span><span>Effective assets <b>{nf(1 / showing.reduce((s, r) => s + r.weight * r.weight, 0), 1)}</b></span></div>}</div>
+        {!picked && !showLast && trialOn && trial.trial && <div className="al-foot"><span>{t.rich("Effective assets {effectiveAssets}", { effectiveAssets: <b>{nf(trial.trial.effectiveAssets, 1)}</b> })}</span></div>}
+        {!picked && !trialOn && periodWork && <div className="al-foot"><span>{t.rich("Periods {periods}", { periods: <b>{periodWork.periods}</b> })}</span><span>{t.rich("Effective assets {count}", { count: <b>{nf(1 / showing.reduce((s, r) => s + r.weight * r.weight, 0), 1)}</b> })}</span></div>}</div>
     </div>
     {periodWork && <HistoryChart by={by} onBy={setBy} figures={{group: periodWork.periodsGroupFigure, asset: periodWork.periodsFigure}} onSelect={pickDate} />}
   </section> : null;
 
   const firstLines: FirstLine[] | null = prep === null ? null : [
-    {label: "Assets", value: prep.pool.length ? `${prep.pool.length} ${prep.pool.length === 1 ? "asset" : "assets"} in the pool` : "none yet", missing: prep.pool.length === 0, onClick: () => setPoolOpen(true)},
-    {label: "Period", value: period ? <>{period}{heldYear !== null && <span className="fx-t3">, then held out</span>}</> : "Set data", missing: period === null, onClick: () => setDataOpen(true)},
-    {label: "Objective", value: nameOf(values) || "—", onClick: () => goTo("set:objective")},
-    {label: "Rebalance", value: optionLabels.frequency?.[String(values.frequency)] ?? "—", onClick: () => goTo("set:rebalance")},
+    {label: t("Assets"), value: prep.pool.length ? (prep.pool.length === 1 ? t("{count} asset in the pool", { count: prep.pool.length }) : t("{count} assets in the pool", { count: prep.pool.length })) : t("none yet"), missing: prep.pool.length === 0, onClick: () => setPoolOpen(true)},
+    {label: t("Period"), value: period ? <>{period}{heldYear !== null && <span className="fx-t3">{t(", then held out")}</span>}</> : t("Set data"), missing: period === null, onClick: () => setDataOpen(true)},
+    {label: t("Objective"), value: values.objective === "min_risk" && optionLabels.risk_measure?.[String(values.risk_measure)] ? t("Minimum {measure}", {measure: t(optionLabels.risk_measure[String(values.risk_measure)]).toLowerCase()}) : t(nameOf(values)) || "—", onClick: () => goTo("set:objective")},
+    {label: t("Rebalance"), value: t(optionLabels.frequency?.[String(values.frequency)] ?? "—"), onClick: () => goTo("set:rebalance")},
   ];
 
   return <div className="qx-page fx-page">
     <div className="tx-panelhead fx-head">
-      {title}<span className="fx-kind">Allocation</span>
+      {title}<span className="fx-kind">{t("Allocation")}</span>
       <DataSettingsChip ctx={ctx} api={api} kind="allocation" alsoBuilt={null} data={data} defaults={defaults.value} defaultsError={defaults.error} boundary={null} open={dataOpen} onOpenChange={setDataOpen}
         onSave={async next => {onDetail(await api.settings(detail.id, {data: next}));}} trigger={chip} />
       <span className="tx-spacer" />
       {active !== null ? <TxRunProgress run={`#${active.number}`} stage={progress.stage} count={progress.count} value={progress.value} elapsed={elapsed((now - active.createdAt) / 1000)}
         onStop={() => void aapi.stop(active.id).then(() => loadRuns(), fail)} />
-        : pooled && <TxRunButton label={sweepCount > 1 ? `Sweep ${sweepCount}` : "Run backtest"} kinds={[{id: "run", label: "Run backtest"}, {id: "sweep", label: "Run a sweep…"}, {id: "heldout", label: "Validate on held-out…"}]} onRun={() => void start()} onKind={id => {if (id === "sweep") setSweepOpen(true); if (id === "heldout") void aapi.heldStatus(detail.id, usable(selected) ? selected!.id : undefined).then(status => setHeld(status), fail);}} title="Run backtest (Ctrl+Enter)" />}
-      <TxSegmented label="Work or Results" value={view} options={[{value: "work", label: "Work"}, {value: "results", label: "Results"}]} onChange={next => update({allocationView: next === "results" ? "results" : undefined})} />
-      {(ownCode || snapRun !== null) && <button type="button" className="tx-codetoggle" aria-pressed={codeShown} onClick={() => update({side: codeShown ? undefined : "code"})}><TxIcon name="code" /><span>{codeShown ? "Hide code" : "Show code"}</span></button>}
-      <TxMenu label="Allocation actions" align="end" items={[...(selected?.state === "completed" ? [{id: "apply", label: "Use this version", onSelect: () => void useVersion(selected.id).catch(fail)}] : []), ...menu]} trigger={<TxIconButton label="Allocation actions" icon="more" />} />
+        : pooled && <TxRunButton label={sweepCount > 1 ? t("Sweep {sweepCount}", { sweepCount }) : t("Run backtest")} kinds={[{id: "run", label: t("Run backtest")}, {id: "sweep", label: t("Run a sweep…")}, {id: "heldout", label: t("Validate on held-out…")}]} onRun={() => void start()} onKind={id => {if (id === "sweep") setSweepOpen(true); if (id === "heldout") void aapi.heldStatus(detail.id, usable(selected) ? selected!.id : undefined).then(status => setHeld(status), fail);}} title={t("Run backtest (Ctrl+Enter)")} />}
+      <TxSegmented label={t("Work or Results")} value={view} options={[{value: "work", label: t("Work")}, {value: "results", label: t("Results")}]} onChange={next => update({allocationView: next === "results" ? "results" : undefined})} />
+      {(ownCode || snapRun !== null) && <button type="button" className="tx-codetoggle" aria-pressed={codeShown} onClick={() => update({side: codeShown ? undefined : "code"})}><TxIcon name="code" /><span>{codeShown ? t("Hide code") : t("Show code")}</span></button>}
+      <TxMenu label={t("Allocation actions")} align="end" items={[...(selected?.state === "completed" ? [{id: "apply", label: t("Use this version"), onSelect: () => void useVersion(selected.id).catch(fail)}] : []), ...menu]} trigger={<TxIconButton label={t("Allocation actions")} icon="more" />} />
     </div>
     {restored?.note && restored.id === selected?.id && <div className="qx-note2" role="status">{restored.note}</div>}
-    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>Dismiss</TxButton></div>}
+    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>{t("Dismiss")}</TxButton></div>}
     <div className="fx-desk"><div className="fx-view">
       {view === "results" ? (selected && usable(selected) ? <div className="fx-main"><Results facts={{mode: run?.settings.mode, heldFrom: run?.settings.data.heldOutFrom, dataTo: run?.settings.data.until, adjustment: run?.settings.data.adjustment, options: optionLabels}} shock={{targets: shockTargets, added: shocksAdded, onAdd: addShock}} api={aapi} run={selected} compared={compared} tab={tab} onTab={goTab} onPeriod={date => {update({allocationView: undefined}); pickDate(date);}} onSetting={group => goTo(`set:${group}`)} strip={strip} onValidate={run?.settings.data.heldOutFrom ? () => void aapi.heldStatus(detail.id, selected!.id).then(status => setHeld(status), fail) : undefined} /></div>
-        : <div className="fx-main">{list.length === 0 && firstLines !== null ? <NoResultsYet lines={firstLines} toWork={() => update({allocationView: undefined})} /> : <p className="fx-empty">No finished run yet</p>}</div>)
+        : <div className="fx-main">{list.length === 0 && firstLines !== null ? <NoResultsYet lines={firstLines} toWork={() => update({allocationView: undefined})} /> : <p className="fx-empty">{t("No finished run yet")}</p>}</div>)
         : <>
-          {prep ? <Settings dataLimits={dataLimits} prep={prep} values={values} changed={changed} otherChanges={otherChanges} runLabel={selected ? `#${selected.number}` : null} bad={run?.failure?.fields ?? []} flash={flash} hasBenchmark={prep.pool.some(item => item.ticker === "SPY") && prep.pool.some(item => item.ticker === "IEF")}
+          {prep ? <Settings dataLimits={dataLimits} prep={prep} values={values} changed={changed} otherChanges={otherChanges} runLabel={selected ? `#${selected.number}` : null} bad={run?.failure?.fields ?? []} flash={flash}
             lists={lists} onList={setList} commonStart={work?.from ? dayText(work.from) : null} heldOutFrom={data.heldOutFrom ? dayText(data.heldOutFrom) : null} heldOut={data.heldOutFrom ?? null}
             onHeldOut={day => void api.settings(detail.id, {data: {...data, heldOutFrom: day}}).then(onDetail, fail)} onValue={edit} onRevert={revert} onRevertRow={revertRow} onEditPool={() => setPoolOpen(true)} /> : <div className="fx-pad"><TxSkeleton width="40%" /></div>}
           <div className="fx-main qx-wmain">
@@ -396,21 +403,21 @@ export function AllocationPage({ctx, api, detail, onDetail, state, update, title
                 held={selected?.runKind === "heldout" && work?.holdout ? <HeldView run={selected} work={work} base={list.find(item => item.id === selected.of) ?? null} baseWork={baseView?.id === selected.of ? baseView.work : null} onGo={goTo} /> : undefined}
                 onRow={id => update({runId: id})} onStar={item => void aapi.annotate(item.id, {starred: !item.starred}).then(() => loadRuns(), fail)} onGo={goTo} write={write} /></>}
           </div></>}
-      {codeShown && <section className="al-code" aria-label="Code">
-        {snapRun !== null ? <><div className="al-snaphead"><span>{`Standard flow as #${snapRun.number} ran it, read-only`}</span><span className="tx-spacer" />
-            <TxIconButton size="sm" label="Hide code" icon="close" onClick={() => update({side: undefined})} /></div>
+      {codeShown && <section className="al-code" aria-label={t("Code")}>
+        {snapRun !== null ? <><div className="al-snaphead"><span>{t("Standard flow as #{number} ran it, read-only", { number: snapRun.number })}</span><span className="tx-spacer" />
+            <TxIconButton size="sm" label={t("Hide code")} icon="close" onClick={() => update({side: undefined})} /></div>
           <pre className="al-snap">{snap && snap.id === snapRun.id ? snap.text : ""}</pre></>
         : <CodeArea ctx={ctx} projectId={detail.developer?.projectId ?? null} rootUri={detail.entryUri.slice(0, detail.entryUri.lastIndexOf("/"))} treeTitle={detail.name} entryUri={detail.entryUri} tree={tree} onTree={setTree} onHide={() => update({side: undefined})}
           onOpenDeveloper={() => void ctx.platform.panels.openTarget({module: "developer", panelType: "main", objectId: `file:${detail.entryUri}`}).catch(fail)} onChanged={change => {if (!change.dirty) void api.read(detail.id).then(onDetail, fail);}} />}
       </section>}
     </div></div>
-    <TxDialog open={notesOpen} title={`Notes on #${selected?.number ?? ""}`} onOpenChange={setNotesOpen} footer={<TxButton size="sm" onClick={() => setNotesOpen(false)}>Close</TxButton>}>
-      <div className="al-notes">{(work?.notes ?? []).map((note, index) => <p key={index}>{note}</p>)}</div></TxDialog>
     {selected && <PublishSheet api={aapi} runId={selected.id} runName={detail.name} open={publishOpen} onClose={() => setPublishOpen(false)} onPublished={() => void loadPublished()} />}
     <SweepDialog open={sweepOpen} names={["lookback", "covariance", "risk_measure", "objective", "max_weight", "min_weight", "max_turnover",
       ...Array.from(new Set((values.pool ?? []).map((row: {group?: string}) => row.group).filter(Boolean) as string[])).map(group => `group_max:${group}`)]} onCancel={() => setSweepOpen(false)}
-      onStart={axes => {setSweepOpen(false); void aapi.sweep(detail.id, axes).then(found => {update({runId: found.runs[0].id, allocationView: undefined}); return loadRuns();}, fail);}} />
-    <HeldOutConfirm open={held !== null} status={held} what="allocation" onCancel={() => setHeld(null)} onConfirm={() => {const status = held!; setHeld(null); void aapi.start(detail.id, {kind: "heldout", of: status.runId}).then(row => {update({runId: row.id, allocationView: undefined}); return loadRuns();}, fail);}} />
+      onStart={axes => {setSweepOpen(false); unlessLong(axes.reduce((total, axis) => total * axis.values.length, 1),
+        () => void aapi.sweep(detail.id, axes).then(found => {update({runId: found.runs[0].id, allocationView: undefined}); return loadRuns();}, fail));}} />
+    {long !== null && <LongRunConfirm title={t("Run {count} backtests?", { count: long.count })} seconds={long.seconds} label={t("Run {count} backtests", { count: long.count })} onCancel={() => setLong(null)} onConfirm={() => {const {go} = long; setLong(null); go();}} />}
+    <HeldOutConfirm open={held !== null} status={held} onCancel={() => setHeld(null)} onConfirm={() => {const status = held!; setHeld(null); void aapi.start(detail.id, {kind: "heldout", of: status.runId}).then(row => {update({runId: row.id, allocationView: undefined}); return loadRuns();}, fail);}} />
     {prep && <PoolSheet open={poolOpen} pool={prep.pool} rows={values.pool ?? []} align={String(values.align ?? "common")} currency={String(values.currency ?? "")} candidates={links}
       onClose={() => setPoolOpen(false)} onChange={rows => edit("pool", rows as unknown as ParamValue)} onSymbols={() => {setPoolOpen(false); setDataOpen(true);}}
       onAlign={value => edit("align", value)} onCurrency={value => edit("currency", value)} onOpenLinks={() => {void aapi.links(detail.id).then(setLinks, fail);}} />}

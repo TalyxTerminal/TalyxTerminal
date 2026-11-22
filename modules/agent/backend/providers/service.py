@@ -13,6 +13,7 @@ import time
 import httpx2
 from langchain_core.messages import HumanMessage
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.network import (
     await_network_route,
     system_http_proxy_url,
@@ -80,7 +81,7 @@ class ProviderService:
     async def discover(self, kind, *, base_url=None):
         """Finite probes only when settings opens or the user refreshes local models."""
         if kind not in {"ollama", "lmstudio"}:
-            raise ContractError("invalid_input", "Discovery requires Ollama or LM Studio")
+            raise ContractError("invalid_input", t("Discovery requires Ollama or LM Studio"))
         base = base_url or ("http://127.0.0.1:11434" if kind == "ollama" else "http://127.0.0.1:1234")
         try:
             async with httpx2.AsyncClient(base_url=base, trust_env=False, verify=ssl.create_default_context(), timeout=3) as client:
@@ -124,7 +125,7 @@ class ProviderService:
                     async for chunk in response.aiter_bytes():
                         content.extend(chunk)
                         if len(content) > 20 * 1024 * 1024:
-                            raise ContractError("invalid_output", "Model profile catalog exceeds the download limit")
+                            raise ContractError("invalid_output", t("Model profile catalog exceeds the download limit"))
             data = json.loads(content)
             version, refreshed = hashlib.sha256(content).hexdigest(), time.time()
             self.catalog.update_profiles(data, version=version, refreshed=refreshed)
@@ -134,7 +135,7 @@ class ProviderService:
     async def provider_search(self, model_id, query, objective="", *, _test=False, usage_context=None):
         resolved = self.catalog.resolve(model_id, billing=True)
         if not _test and resolved["searchMode"] != "provider":
-            raise ContractError("unsupported", "This model is configured to use TALYX search")
+            raise ContractError("unsupported", t("This model is configured to use TALYX search"))
         connection = self.catalog.connection(resolved["connectionId"])
         native_model = self.catalog.model(model_id)
         family = native_model.profileModel or native_model.model
@@ -151,7 +152,7 @@ class ProviderService:
             message = await lease.guard(request)
             projected = project_message(message)
             if not projected['sources'] or connection.protocol=='google' and projected['groundingMetadata'] is None:
-                raise ContractError("search_unconfirmed", "The provider returned no confirmed sources for this search")
+                raise ContractError("search_unconfirmed", t("The provider returned no confirmed sources for this search"))
             return projected
 
     async def test_connection(self, model_id, *, thinking=None, test_search=True):

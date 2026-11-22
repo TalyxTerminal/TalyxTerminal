@@ -13,7 +13,7 @@ from .object_routes import Input
 
 class Vary(Input):
     name: str
-    values: Annotated[list[Any], Field(max_length=20)]
+    values: Annotated[list[Any], Field(max_length=200)]   # the same bound as a sweep axis; the batch itself has no cap
 
 
 class ModelPrep(Input):

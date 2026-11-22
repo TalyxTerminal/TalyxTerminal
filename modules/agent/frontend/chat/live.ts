@@ -1,3 +1,5 @@
+import { language, translator } from "@talyx/sdk";
+import { t } from "../i18n";
 import type { AgentCard, AgentDefaults, AgentSettings, Conversation, ConversationSnapshot } from "../data/types";
 import type { Chat, ChatActivity, Choices, Item, ModelChoice, Step, SubAgent } from "./model";
 
@@ -25,10 +27,24 @@ export function activity(conversation: Conversation, failed = false): ChatActivi
   return conversation.activity.waitingApproval ? "approval" : conversation.activity.running ? "running" : failed ? "failed" : "idle";
 }
 
+const nativeActionLabels: Record<string, string> = {
+  write_file: t("Write file"), edit_file: t("Edit file"), delete: t("Delete"), run_python: t("Run Python"),
+  bot_manage: t("Manage bot"), bot_delete: t("Delete bot"), bot_read: t("Read bot"),
+};
+
+function approvalAction(action: string): string {
+  if (nativeActionLabels[action]) return nativeActionLabels[action];
+  const [owner, ...parts] = action.split(".");
+  const name = (parts.at(-1) ?? action).replaceAll("_", " ");
+  const source = name.charAt(0).toUpperCase() + name.slice(1);
+  const translated = translator(owner)(source);
+  return language() === "en" || translated !== source ? translated : action;
+}
+
 function describe(card: AgentCard, retryable = false): Item[] {
   const id = card.id;
   switch (card.type) {
-    case "plan": return [{kind:"plan", id:id+"_text", title:"Proposed plan", text:card.text},{kind:"plan-ask",id,state:card.state}];
+    case "plan": return [{kind:"plan", id:id+"_text", title:t("Proposed plan"), text:card.text},{kind:"plan-ask",id,state:card.state}];
     case "answer": {
       if (card.role === "user") return [{kind:"user", id, text:card.text, files:card.materials,
         view:card.view && typeof card.view==="object" && !Array.isArray(card.view) && typeof card.view.summary==="string" ? card.view.summary : undefined}];
@@ -37,10 +53,9 @@ function describe(card: AgentCard, retryable = false): Item[] {
         sources:card.sources.map((source, i) => ({n:i+1,title:source.title,site:new URL(source.url).hostname,published:"",url:source.url}))}];
     }
     case "approval": {
-      const name = card.action.split(".").at(-1)!.replaceAll("_"," ");
       const input = card.input && typeof card.input === "object" && !Array.isArray(card.input) ? card.input : {};
       const lines = Object.entries(input).map(([key,value]) => key.replaceAll("_"," ")+" · "+(typeof value === "string" ? value : JSON.stringify(value)));
-      return [{kind:"approval",id,action:name[0].toUpperCase()+name.slice(1),target:card.action.includes(".") ? card.action.split(".")[0] : "",
+      return [{kind:"approval",id,action:approvalAction(card.action),target:card.action.includes(".") ? card.action.split(".")[0] : "",
         lines,canAlwaysAllow:!card.proposal.risks.includes("delete"),state:card.state === "consumed" ? "allowed" : card.state === "interrupted" ? "expired" : card.state,
         expires:card.state === "waiting" && card.expiresAt !== null ? card.expiresAt : undefined}];
     }
@@ -51,10 +66,10 @@ function describe(card: AgentCard, retryable = false): Item[] {
     case "todos": return [{kind:"todo",id,items:card.items.map(item => ({text:item.content,state:item.status === "completed" ? "done" : item.status === "in_progress" ? "active" : "open"}))}];
     case "summary": return [{kind:"result",id,title:card.title,subtitle:card.subtitle,target:card.openTarget,numbers:card.keyNumbers.map(n => ({
       label:n.label,value:[n.value,n.unit].filter(Boolean).join(" "),tone:n.direction === "none" ? undefined : n.direction}))}];
-    case "error": return [{kind:"error",id,title:retryable ? "Run stopped" : "Error",text:card.message,retry:retryable}];
-    case "compaction": return [{kind:"notice",id,text:"Conversation compacted"}];
+    case "error": return [{kind:"error",id,title:retryable ? t("Run stopped") : t("Error"),text:card.message,retry:retryable}];
+    case "compaction": return [{kind:"notice",id,text:t("Conversation compacted")}];
     case "memory_saved": return card.changeId ? [{kind:"memory", id, text:card.memory.body, undone:card.memory.status !== "active"}]
-      : [{kind:"notice",id,text:(card.memory.status === "active" ? "Remembered: " : "Forgot: ")+card.memory.body}];
+      : [{kind:"notice",id,text:card.memory.status === "active" ? t("Remembered: {text}", { text: card.memory.body }) : t("Forgot: {text}", { text: card.memory.body })}];
     case "child_run": {
       const state: SubAgent["state"] = card.state === "completed" ? "done" : card.state === "queued" ? "queued" :
         ["failed","interrupted","cancelled"].includes(card.state) ? "failed" : "running";

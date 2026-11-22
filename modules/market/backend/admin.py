@@ -25,12 +25,14 @@ import json
 import time
 from typing import Any
 
+from talyx_sdk.i18n import mark, t
+
 from vocabulary.identity import timeframe_nanoseconds
 
 from . import bars
 from .common import DAY_NS, MarketError, now_ns
 from .routing import JOBS, PRIORITY, depth_start, in_worker, period_start
-from .sources.base import Target
+from .sources.base import MeteredSource, Target
 from .store import Spans
 
 PAGE = 40
@@ -83,11 +85,11 @@ def unreachable_of(exc: BaseException) -> tuple[str | None, int | None]:
 
 
 TEST_PROBLEMS = {
-    "timeout": ("source_unavailable", "No answer within 10 s"),
-    "http_error": ("source_unavailable", "The source refused the request"),
-    "key_rejected": ("unauthorized", "Key rejected"),
-    "local_program_off": ("source_unavailable", "The program on this computer is not running"),
-    "network_unreachable": ("network_unreachable", "No network"),
+    "timeout": ("source_unavailable", mark("No answer within 10 s")),
+    "http_error": ("source_unavailable", mark("The source refused the request")),
+    "key_rejected": ("unauthorized", mark("Key rejected")),
+    "local_program_off": ("source_unavailable", mark("The program on this computer is not running")),
+    "network_unreachable": ("network_unreachable", mark("No network")),
 }
 
 
@@ -112,16 +114,17 @@ class SourceAdmin:
         if entry.rejected == "unauthorized" or entry.coverage is None:
             return "failing", entry.problem
         if entry.gate.cool_until > now_ns():
-            return "rate_limited", {"code": "rate_limited", "message": entry.gate.cool_reason or "Rate limited",
+            return "rate_limited", {"code": "rate_limited", "message": entry.gate.cool_reason or t("Rate limited"),
                                     "sourceId": source_id, "status": None, "retryAt": str(entry.gate.cool_until)}
         # A last test that did not get through stands until the next test.
         last = (self.last_tests.get(source_id) or {"tests": [{}]})["tests"][0]
         if last.get("unreachable") in TEST_PROBLEMS:
             code, message = TEST_PROBLEMS[last["unreachable"]]
+            message = t(message)
             status = last["httpStatus"]
             if status in (403, 451):
-                code, message = "forbidden", "Blocked from your region"
-            return "failing", {"code": code, "message": f"{message} (HTTP {status})" if status else message,
+                code, message = "forbidden", t("Blocked from your region")
+            return "failing", {"code": code, "message": t("{message} (HTTP {status})", message=message, status=status) if status else message,
                                "sourceId": source_id, "status": status, "retryAt": None}
         return "working", None
 
@@ -144,7 +147,7 @@ class SourceAdmin:
                     ranked = self.registry.rank(probe, kind, timeframe, history=kind != "listings")
                     if not ranked and kind != "bars":
                         continue
-                    item = {"market": name, "kind": kind, "source": None, "reason": "No enabled source covers it"}
+                    item = {"market": name, "kind": kind, "source": None, "reason": t("No enabled source covers it")}
                     if ranked:
                         item.update(source=self.market.source_ref(ranked[0][0]),
                                     reason=self.reason(ranked, probe, kind, timeframe))
@@ -156,23 +159,20 @@ class SourceAdmin:
     def reason(self, ranked: list, probe: dict, kind: str, timeframe: str | None) -> str:
         first_id, first = ranked[0]
         if len(ranked) == 1:
-            return "The only enabled source that covers it"
+            return t("The only enabled source that covers it")
         second_id, second = ranked[1]
         now = now_ns()
 
         def earliest(item):
             return min((period_start(p, "last", now) for p in item.get("periods", [])), default=now)
 
-        if (first.get("delisted") or first.get("pointInTime")) and not (second.get("delisted")
-                                                                         or second.get("pointInTime")):
-            return f"Includes delisted listings (unlike {self.market.source_ref(second_id)['name']})"
         if earliest(first) < earliest(second):
-            return f"Deeper history than {self.market.source_ref(second_id)['name']}"
+            return t("Deeper history than {source}", source=self.market.source_ref(second_id)["name"])
         if first.get("live") != second.get("live") and first.get("live") == "realtime":
-            return "Realtime"
+            return t("Realtime")
         if "bulk" in self.registry.entry(first_id).descriptor["supports"]:
-            return "Answers many instruments per request"
-        return f"Ranks before {self.market.source_ref(second_id)['name']}"
+            return t("Answers many instruments per request")
+        return t("Ranks before {source}", source=self.market.source_ref(second_id)["name"])
 
     async def read(self, value: dict) -> dict:
         view = value["view"]
@@ -187,7 +187,7 @@ class SourceAdmin:
         else:
             source_id = value["source"]
             if source_id not in self.registry.entries:
-                raise MarketError("not_found", f"No data source {source_id}")
+                raise MarketError("not_found", t("No data source {source_id}", source_id=source_id))
             result["sources"] = [self.row(source_id)]
             result["details"] = self.details(source_id)
         return result
@@ -198,6 +198,8 @@ class SourceAdmin:
         secret = {item["name"] for item in declared if item["secret"]}
         settings = {"schema": declared,
                     "values": {k: v for k, v in entry.source.settings.items() if k not in secret}}
+        if isinstance(entry.source, MeteredSource):
+            settings["values"]["requestsPerMinute"] = entry.source.rpm
         coverage = entry.coverage or entry.descriptor.get("withKey") or {
             "rows": [], "concurrency": 1, "requestsPerMinute": None, "plan": None, "requestsPerDay": None,
             "subscriptionsPerConnection": None}
@@ -212,9 +214,11 @@ class SourceAdmin:
         operation = value["operation"]
         op = operation["op"]
         if op in ("enable", "disable"):
-            self.registry.entry(operation["source"])
+            entry = self.registry.entry(operation["source"])
             self.registry.set_enabled(operation["source"], op == "enable", call_ctx)
             await self.registry.refresh(operation["source"])
+            if op == "enable" and entry.source.supports("catalog"):
+                self.market.instruments.start_loading()
             self.start_switch()
             return {"tests": [], "changed": True}
         if op == "configure":
@@ -229,9 +233,10 @@ class SourceAdmin:
             entry = self.registry.entry(operation["source"])
             await entry.source.close()
             entry.rejected = None
+            entry.denied_kinds.clear()
             await self.registry.refresh(operation["source"])
             return {"tests": [], "changed": True}
-        raise MarketError("invalid_input", f"Unknown operation {op}")
+        raise MarketError("invalid_input", t("Unknown operation {op}", op=op))
 
     async def configure(self, source_id: str, values: dict, *, allow_secrets: bool, call=None) -> dict:
         """Settings checked against the source's declaration; secret fields only from the Market panel."""
@@ -240,23 +245,27 @@ class SourceAdmin:
         for name, item in values.items():
             spec = declared.get(name)
             if spec is None:
-                raise MarketError("invalid_input", f"{source_id} has no setting {name}")
+                raise MarketError("invalid_input", t("{source_id} has no setting {name}", source_id=source_id, name=name))
             if spec["secret"] and not allow_secrets:
-                raise MarketError("invalid_input", f"{name} is secret: enter it in the Market panel")
+                raise MarketError("invalid_input", t("{name} is secret: enter it in the Market panel", name=name))
             kind = spec["type"]
-            if item is not None and ((kind == "integer" and not isinstance(item, int))
+            if item is not None and ((kind == "integer" and type(item) is not int)
                                      or (kind == "boolean" and not isinstance(item, bool))
                                      or (kind in ("string", "choice") and not isinstance(item, str))
                                      or (kind == "choice" and item not in spec.get("choices", []))):
-                raise MarketError("invalid_input", f"{source_id}.{name} must be a {kind}")
+                raise MarketError("invalid_input", t("{source_id}.{name} must be a {kind}", source_id=source_id, name=name, kind=kind))
         result = await entry.source.configure(source_id, values)
         plain = {k: v for k, v in values.items() if not declared[k]["secret"]}
         if plain:
             self.registry.set_settings(source_id, plain, call)
         entry.rejected = None
+        entry.denied_kinds.clear()
         await self.registry.refresh(source_id)
-        if hasattr(entry.source, "code_history"):
-            self.market.track_task(asyncio.ensure_future(self.market.load_code_history(force=True)))
+        if any(declared[name]["secret"] for name in values):
+            if entry.source.supports("catalog"):
+                self.market.instruments.start_loading()
+            if hasattr(entry.source, "code_history"):
+                self.market.track_task(asyncio.ensure_future(self.market.load_code_history(force=True)))
         self.start_switch()
         return result
 
@@ -269,6 +278,7 @@ class SourceAdmin:
                 entry.source.settings.pop(key, None)
         self.registry.preferences.write(source, section, fields, values)
         entry.rejected = None
+        entry.denied_kinds.clear()
         await self.registry.refresh(source)
         self.start_switch()
 
@@ -450,10 +460,13 @@ class SourceAdmin:
             if record is None:
                 continue
             ranked = self.registry.rank(record, "bars", key.timeframe)
-            best = next((sid for sid, row in ranked
-                         if any(p["timeframe"] == key.timeframe for p in row.get("periods", []))), None)
-            if best is not None and best != pointer["source"]:
-                moves.append((key, record, pointer["source"], best))
+            best = next(((sid, period) for sid, row in ranked for period in row["periods"]
+                         if period["timeframe"] == key.timeframe), None)
+            if best is None:
+                continue
+            source, period = best
+            if source != pointer["source"] and period_start(period, key.price_basis, now_ns()) <= pointer["first"]:
+                moves.append((key, record, pointer["source"], source))
         return moves
 
     async def switch(self) -> list[dict]:
@@ -465,7 +478,7 @@ class SourceAdmin:
                 spans = [list(s) for s in pointer["spans"] if s[2] == "have"]
                 if not spans:
                     continue
-                target = self.market.data.target(record, key.environment)
+                target = self.market.data.target(record, key.environment, new)
                 collected, fetched = [], []
                 try:
                     for span_start, span_end, _state in spans:
@@ -486,7 +499,10 @@ class SourceAdmin:
                 merged: list = []
                 for span in fetched:
                     merged = Spans.add(merged, span[0], span[1], "have")
-                await in_worker(self.market.store.replace, key, columns, merged, new)
+                async with self.market.data.lock(key):
+                    changed = await in_worker(self.market.store.switch_source, key, columns, merged, new)
+                if not changed:
+                    continue
                 self.market.sessions.series_replaced(key)
                 done.append({"instrumentId": key.instrument_id, "from": old, "to": new, "problem": None})
         finally:

@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 /* Chart's own backend: private routes (POST /m/chart/<path>) and its two streams, each a WebSocket on a private route
    (/streams/chart/<chartId>, /streams/workspace) whose last message is {end: null | error}. Errors arrive in the
    platform's one format. */
@@ -9,7 +10,7 @@ export async function post<P extends keyof Routes>(ctx: ModuleContext, path: P, 
   const value = await response.json() as Routes[P][1] & { error?: ErrorValue };
   if (response.ok) return value;
   if (value.error) throw new ContractError(value.error);
-  throw failure("handler_error", `${path} answered ${response.status}`);
+  throw failure("handler_error", t("{path} answered {status}", { path, status: response.status }));
 }
 
 /** A stream of Chart's backend over its WebSocket; `onEnd` hears how it ended (an error, or none when closed here). */
@@ -25,11 +26,11 @@ function stream<T>(ctx: ModuleContext, path: string, onItem: (item: T) => void, 
     else onItem(value);
   };
   socket.onclose = event => {
-    if (!ended && event.code !== 1000) end({ code: "connection_lost", message: "Chart's stream closed", execution: "unknown", effects: "none" } as ErrorValue);
+    if (!ended && event.code !== 1000) end({ code: "connection_lost", message: t("Chart's stream closed"), execution: "unknown", effects: "none" } as ErrorValue);
   };
   return new Promise((resolve, reject) => {
     socket.onopen = () => resolve({ id: path, close: async () => { ended = true; socket.close(); } });
-    socket.onerror = () => reject(failure("connection_lost", `Chart's stream ${path} could not open`, undefined, "not_started"));
+    socket.onerror = () => reject(failure("connection_lost", t("Chart's stream {path} could not open", { path }), undefined, "not_started"));
   });
 }
 

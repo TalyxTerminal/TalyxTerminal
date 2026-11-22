@@ -8,6 +8,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.process import Context
 
 from . import sdk_sources, templates, vscode
@@ -45,7 +46,7 @@ class Developer:
 
     async def check_unsaved_project(self, project_id, mode):
         if any(item["context"]["projectId"] == project_id for item in self.documents.unsaved_records()):
-            raise ContractError("conflict", "Save or discard this project's unsaved files before removing it.")
+            raise ContractError("conflict", t("Save or discard this project's unsaved files before removing it."))
 
     async def start(self) -> None:
         for point in POINTS:
@@ -71,8 +72,8 @@ class Developer:
 
     def help(self) -> list[dict]:
         """What Help lists: the SDK references, then each support's guides and examples."""
-        return [{"name": "TALYX SDK", "documentation": sdk_sources.documentation()}] + [
-            {"name": item["descriptor"]["name"], "documentation": item["descriptor"].get("documentation", [])}
+        return [{"moduleId": "developer", "name": "TALYX SDK", "documentation": sdk_sources.documentation()}] + [
+            {"moduleId": item["moduleId"], "name": item["descriptor"]["name"], "documentation": item["descriptor"].get("documentation", [])}
             for item in self.implementations("development_support") if item["descriptor"].get("documentation")]
 
     # ── modules written here ─────────────────────────────────────────────
@@ -101,10 +102,10 @@ class Developer:
     async def debug_in_vscode(self, project_id: str) -> dict:
         module = self.module_of(project_id)
         if module is None:
-            raise ContractError("invalid_input", "Only a TALYX module's backend is debugged from here.")
+            raise ContractError("invalid_input", t("Only a TALYX module's backend is debugged from here."))
         state = await self.module_runtime(module["id"])
         if state is None or state["pid"] is None:
-            raise ContractError("unavailable", "Start this module in TALYX before debugging it.")
+            raise ContractError("unavailable", t("Start this module in TALYX before debugging it."))
         root = self.projects.path(project_id)
         path = vscode.write_launch(root, [vscode.module_attach(root, module["name"] or module["id"], state["pid"])])
         vscode.open_folder(root)
@@ -164,7 +165,7 @@ class Developer:
         raw = path.read_bytes() if path.is_file() else b""
         digest = hashlib.sha256(raw).hexdigest() if raw else None
         if expected is not None and expected != digest:
-            raise ContractError("conflict", "The project's instructions changed; read again from the first line")
+            raise ContractError("conflict", t("The project's instructions changed; read again from the first line"))
         lines = raw.decode("utf-8-sig").splitlines(keepends=True)
         selected = lines[start - 1:start - 1 + count]
         if selected and (char is not None or len(json.dumps(selected[0], ensure_ascii=False).encode()) > 16000):

@@ -5,6 +5,11 @@ import functools
 import json
 import sys
 
+if __package__:
+    from .native import i18n
+else:
+    from native import i18n
+
 _overrides = {}
 _used = {}
 _index = None
@@ -23,6 +28,9 @@ _run_settings = {}
 # Exit orders a stop decided inside the bar its position opened in: client order id -> (trigger price, that bar's ts_event in ns). The run's fill
 # model prices each at its trigger, at that bar (see Strategy._stop_in_entry_bar).
 _entry_bar_stops = {}
+# Sales of what is held in a name whose prices stopped before the run's (delisted, or the source has none after): client order id -> that
+# name's last bar's ts_event in ns. The fill model prices each at that bar's close (see Strategy._close_delisted).
+_delisted_exits = {}
 _plots = {}
 _built = {}  # bar types the code asked Nautilus to build from smaller bars: "4 hours" -> "1 hour"
 _stats = {}
@@ -314,6 +322,33 @@ def tradable_quantity(instrument, amount):
     return instrument.make_qty(amount, round_down=True)
 
 
+def _order_quantity(instrument, change, held=0.0):
+    """The Quantity of a market order changing what is held (`held`, base units, negative is short) by `change`, or None when there is nothing to
+    send. A stock with whole lots (China A shares: buy in steps of 100) is rounded down to them, as brokers and backtesters do (JoinQuant, RiceQuant):
+    what is added is whole lots of at least the minimum; what is taken off is whole lots, or all that is held once less than a lot would be left
+    (odd shares are sold together). Other instruments step by their size increment."""
+    from decimal import ROUND_FLOOR, Decimal
+    lots = _lots(instrument)
+    if not lots:
+        quantity = instrument.make_qty(abs(change))
+        return quantity if quantity.as_double() > 0 else None
+    step, least = (float(value) for value in lots)
+
+    def whole(amount, minimum):
+        units = float((Decimal(str(amount)) / Decimal(str(step))).to_integral_value(rounding=ROUND_FLOOR)) * step
+        return units if units >= minimum and units > 0 else 0.0
+
+    reducing = held != 0 and (change > 0) != (held > 0)
+    if not reducing:
+        amount = whole(abs(change), least)
+    else:
+        taken = min(abs(change), abs(held))
+        amount = abs(held) if abs(held) - taken < step - 1e-9 else whole(taken, 0)
+        if abs(change) > abs(held) and amount == abs(held):
+            amount += whole(abs(change) - abs(held), least)  # through to the other side: whole lots there too
+    return instrument.make_qty(amount, round_down=True) if amount > 0 else None
+
+
 def library_data_type():
     """What a strategy subscribes to (`self.subscribe_data(q.library_data_type())`) to receive library values in `on_data(data)`: `data.data` is
     the value, with `.instrument_id`, `.field`, `.value`, `.version` and `.ts_event` (the moment it is about); it arrives at `.ts_init` (when it became available)."""
@@ -361,7 +396,7 @@ def _bind_work(panel, invocation):
 class ResearchData:
     """The bars the object's data settings selected: one row per instrument and bar, and the same as tables of bars by instruments.
 
-    Besides prices: `industry` (each instrument's industry), `shares` and `size` (market value, or 30-day dollar volume where there is
+    Besides prices: `industry` (each instrument's industry on each date), `shares` and `size` (market value, or 30-day dollar volume where there is
     none), `amount` (dollar volume, close × volume) and `vwap` (the average of high, low and close). What these lack is listed in the
     run's data limits."""
 
@@ -384,7 +419,7 @@ class ResearchData:
             data._wide[name] = cls._named(pd.DataFrame(panel.derived(name), index=panel.dates, columns=panel.columns))
         if panel.shares is not None:
             data._wide["shares"] = cls._named(pd.DataFrame(panel.shares, index=panel.dates, columns=panel.columns))
-        data._extras["industry"] = panel.industry_series()
+        data._extras["industry"] = None if panel.industry is None else cls._named(panel.industry.copy())
         return data
 
     @staticmethod
@@ -394,7 +429,8 @@ class ResearchData:
 
     @property
     def industry(self):
-        """Each instrument's industry as a Series (None where the source has none); today's classification for every day with free sources."""
+        """Each instrument's industry on each date, a table of dates by instruments (None where the source has none): as known on that date
+        where Market keeps dated answers (A shares, read each quarter), else the source's current classification on every date."""
         found = self._extras.get("industry")
         if found is None:
             raise RuntimeError("These data settings have no industry: Market gives none for these instruments.")
@@ -463,7 +499,7 @@ def _load(path, info, cutoff):
     return ResearchData(bars, info)
 
 
-def data(symbols=None, timeframe=None, start=None, end=None, *, index=None, list=None, adjustment="split"):  # noqa: A002 - `list` is the argument's name in notebooks
+def data(symbols=None, timeframe=None, start=None, end=None, *, index=None, list=None, adjustment="split_dividend"):  # noqa: A002 - `list` is the argument's name in notebooks
     """The bars of this object's data settings; or, asked for by `symbols` (Market symbol text), `index` (a symbol and optional membership date) or `list` (a research
     list by name), with a timeframe and dates, any bars through the platform. Columns of what you ask for read AAPL; the native ids are in `frame.attrs["instruments"]`."""
     asked = [name for name, value in (("symbols", symbols), ("index", index), ("list", list)) if value is not None]
@@ -567,13 +603,13 @@ def index_members(index, at, *, as_of=None):
             instrument["venueId"] + ":" + instrument["symbol"]}
         if not same or (cutoff is not None and cutoff != selected.get("asOf", frozen["until"])) or not frozen["since"] <= stamp <= frozen["until"]:
             raise ValueError("The requested index, cutoff or instant differs from this run's frozen index range.")
-        members = next(item["members"] for item in frozen["intervals"] if item["since"] <= stamp <= item["until"])
-        rows = [{"symbol": (member["instrument"] or {}).get("instrumentId") or member["code"],
-                 "instrumentId": (member["instrument"] or {}).get("instrumentId"),
+        members = [frozen["members"][position] for position in next(item["members"] for item in frozen["intervals"] if item["since"] <= stamp <= item["until"])]
+        rows = [{"symbol": member["instrumentId"] or member["code"],
+                 "instrumentId": member["instrumentId"],
                  "start": pd.Timestamp(member["effectiveTime"], unit="ms", tz="UTC").date().isoformat(),
                  "end": pd.Timestamp(member["effectiveUntil"], unit="ms", tz="UTC").date().isoformat() if member["effectiveUntil"] is not None else None,
-                 "tradable":member["instrument"] is not None and not any(
-                    item["instrumentId"] == member["instrument"]["instrumentId"] and item["since"] <= stamp <= item["until"]
+                 "tradable":member["instrumentId"] is not None and not any(
+                    item["instrumentId"] == member["instrumentId"] and item["since"] <= stamp <= item["until"]
                     for item in frozen["exclusions"])} for member in members]
     else:
         rows, cursor = [], None
@@ -663,20 +699,23 @@ def _library_block(frame, include=None, exclude=None):
     item = getattr(frame, "library_item", None) or {}
     days = frame["date"].nunique() if "date" in frame else 0
     names = frame["instrumentId"].nunique() if "instrumentId" in frame else 0
-    span = ""
     if "date" in frame and len(frame):
-        first, last = (frame["date"].min(), frame["date"].max())
-        span = f", {first:%b} {first.day}, {first.year} \u2013 {last:%b} {last.day}, {last.year}"
+        first, last = frame["date"].min(), frame["date"].max()
+        dates = [i18n.t("{month} {day}, {year}", month=date.strftime(i18n.t("%b")), day=date.day, year=date.year) for date in (first, last)]
+        text = i18n.t("{days} days × {names} names, {start} – {end}, each value with its name and the time it became known",
+                      days=f"{days:,}", names=f"{names:,}", start=dates[0], end=dates[1])
+    else:
+        text = i18n.t("{days} days × {names} names, each value with its name and the time it became known", days=f"{days:,}", names=f"{names:,}")
     version = f" v{item['version']}" if item.get("version") else ""
     own = _name_of(frame) or "values"
-    rows = [{"name": own, "code": "DataFrame", "text": f"{days:,} days \u00d7 {names:,} names{span}, each value with its name and the time it became known"}]
+    rows = [{"name": own, "code": "DataFrame", "text": text}]
     # `.run` and `.published` under the name the cell gave the table (`v.run` after `v = q.library.read(...)`); the table's own `.values` is the DataFrame's array,
     # so the values stay in the table itself.
     if item.get("run_id"):
-        rows.append({"name": f"{own}.run", "code": "Run", "text": "frozen prices, settings and report tables, as published"})
+        rows.append({"name": f"{own}.run", "code": "Run", "text": i18n.t("frozen prices, settings and report tables, as published")})
     if item.get("published") is not None:
         rows.append({"name": f"{own}.published", "code": "str", "text": _day_text(item["published"])})
-    return {"application/vnd.talyx.runsummary+json": {"label": "Library item", "title": f"{item.get('name', '')}{version}", "meta": item.get("state") or "", "rows": rows}, "text/plain": f"{item.get('name', '')}{version}: {len(frame):,} rows"}
+    return {"application/vnd.talyx.runsummary+json": {"label": i18n.t("Library item"), "title": f"{item.get('name', '')}{version}", "meta": item.get("state") or "", "rows": rows}, "text/plain": f"{item.get('name', '')}{version}: {len(frame):,} rows"}
 
 
 def _instant_ms(value, *, whole_day=False):
@@ -831,12 +870,12 @@ class Run:
         for name in self.files:
             if name in numbered:
                 if name == min(numbered, key=lambda item: self.files.index(item)):
-                    rows.append({"name": f"{reach(numbered[0])} … {reach(numbered[-1])}", "code": "DataFrame", "text": f"{len(numbered)} report tables"})
+                    rows.append({"name": f"{reach(numbered[0])} … {reach(numbered[-1])}", "code": "DataFrame", "text": i18n.t("{count} report tables", count=len(numbered))})
                 continue
             if name in self._paths:
                 import pyarrow.parquet as pq
                 header = pq.ParquetFile(self._paths[name]).metadata   # a table the run wrote: one that cannot be read is an error, shown as one
-                rows.append({"name": reach(name), "code": "DataFrame", "text": f"{header.num_rows:,} rows × {header.num_columns} columns"})
+                rows.append({"name": reach(name), "code": "DataFrame", "text": i18n.t("{rows} rows × {columns} columns", rows=f'{header.num_rows:,}', columns=header.num_columns)})
             else:
                 rows.append({"name": reach(name), "code": "dict", "text": ""})
         if self.settings:
@@ -1033,7 +1072,7 @@ def _capture(name, kind, values=None, **details):
     research = _Run.invocation.get('research') if _Run.invocation is not None else None
     if values is not None and research is not None and 'index' in research['info']:
         source = data().bars
-        priced = source[source['isMember'] & source['close'].notna()][['label','column']].rename(columns={'label':'datetime','column':'instrument'})
+        priced = source[source['isMember'] & source['close'].notna()][['label','column']].rename(columns={'label':'datetime','column':'instrument'})  # i18n: ignore
         values = values.merge(priced, on=['datetime','instrument'], how='inner', validate='many_to_one')
     _Run.publications.append({"name": name, "kind": kind, "values": values, "details": details})
     if _Run.mode == "values":
@@ -1282,6 +1321,8 @@ def __getattr__(name):
             self._halted = None  # the run's (prices, ids of the closes sent for halted names), bound when it runs
             self._halted_checked = None  # the moment halted names were last looked for
             self._halted_closing = {}  # instrument -> the order closing it at its next price
+            self._delisted_checked = None  # the moment names whose prices stopped were last looked for
+            self._delisted_closing = {}  # instrument -> the order selling what is held of it at its last close
             self._ledger = None  # the run's cost ledger, bound when it runs: its funding and borrow entries change the balance
             self._balances = {}  # (venue, currency) -> (when it was read, the account's total balance)
             self._balance_changed = -1  # the moment a fill, funding or borrow last changed a balance
@@ -1411,6 +1452,7 @@ def __getattr__(name):
                         if name == "on_bar" and args:
                             self._stop_in_entry_bar(args[0])
                         self._sync_liquidation()
+                        self._close_delisted()
                         self._close_halted()
                         return result
                     return wrapped
@@ -1419,6 +1461,45 @@ def __getattr__(name):
         def on_order_filled(self, event):
             self._filled()
             self._sync_liquidation()
+
+        def on_bar(self, bar):
+            """A strategy without its own `on_bar` (one that trades on library values) still has the run's upkeep after each bar: a name
+            whose prices stopped is sold at its last close, and a halted name is closed at its next price when the run says so."""
+            self._close_delisted()
+            self._close_halted()
+
+        def _ended(self, name, moment):
+            """Whether `name`'s prices stopped before the run's (delisted, or the source has none after) and `moment` (ns) is past its last bar."""
+            if self._halted is None:
+                return False
+            prices = self._halted[0]
+            last = prices.ended(name)
+            return last is not None and moment > int(prices.by[name]["known"][last])
+
+        def _close_delisted(self):
+            """A name whose prices stop before the run's cannot be traded again: once its peers trade past its last bar, what is held of
+            it is sold at its last close with a market order (tag exit:delisted) the fill model prices at that bar. This is the usual
+            treatment of a delisting without a delisting price (CRSP's when it has none): the move up to the last close counts, the
+            money is free again, and nothing after is earned or lost."""
+            if self._halted is None:
+                return
+            now = self.clock.timestamp_ns()
+            if now == self._delisted_checked:
+                return
+            self._delisted_checked = now
+            from nautilus_trader.model import OrderSide
+            prices = self._halted[0]
+            for position in self.cache.positions_open():
+                name = str(position.instrument_id)
+                pending = self._delisted_closing.get(name)
+                if not self._ended(name, now) or (pending is not None and not self.cache.order(pending).is_closed):
+                    continue
+                size = float(str(position.signed_qty))
+                order = self.order_factory.market(position.instrument_id, OrderSide.SELL if size > 0 else OrderSide.BUY,
+                                                  self.cache.instrument(position.instrument_id).make_qty(abs(size)), reduce_only=True, tags=["exit:delisted"])
+                _delisted_exits[str(order.client_order_id)] = int(prices.by[name]["times"][prices.ended(name)])
+                self._delisted_closing[name] = order.client_order_id
+                self.submit_order(order, position_id=position.id)
 
         def _balance(self, instrument, currency=None):
             """The total balance of the instrument's venue account in `currency` (its settlement currency by default). Read from the account
@@ -1483,7 +1564,7 @@ def __getattr__(name):
             for position in self.cache.positions_open():
                 name = str(position.instrument_id)
                 pending = self._halted_closing.get(name)
-                if not prices.halted_at(name, now) or (pending is not None and not self.cache.order(pending).is_closed):
+                if not prices.halted_at(name, now) or self._ended(name, now) or (pending is not None and not self.cache.order(pending).is_closed):
                     continue
                 size = float(str(position.signed_qty))
                 order = self.order_factory.market(position.instrument_id, OrderSide.SELL if size > 0 else OrderSide.BUY,
@@ -1641,8 +1722,8 @@ def __getattr__(name):
             instrument = self.cache.instrument(instrument_id)
             step = float(instrument.size_increment) / 2
             if (_run_settings.get("exchange") or {}).get("positionMode") != "hedge":
-                quantity = instrument.make_qty(abs(change))
-                if quantity.as_double() <= 0:
+                quantity = _order_quantity(instrument, change, self.position_size(instrument_id))
+                if quantity is None:
                     return []
                 order = self.order_factory.market(instrument_id, OrderSide.BUY if change > 0 else OrderSide.SELL, quantity, tags=tags)
                 self.submit_order(order)
@@ -1652,8 +1733,8 @@ def __getattr__(name):
             orders = []
 
             def send(size, position=None, reduce=False):
-                quantity = instrument.make_qty(abs(size))
-                if quantity.as_double() <= 0:
+                quantity = _order_quantity(instrument, size, float(str(position.signed_qty)) if reduce and position is not None else 0.0)
+                if quantity is None:
                     return 0.0
                 order = self.order_factory.market(instrument_id, OrderSide.BUY if size > 0 else OrderSide.SELL, quantity, reduce_only=reduce, tags=tags)
                 self.submit_order(order, **({"position_id": position.id} if position is not None else {}))
@@ -1714,8 +1795,11 @@ def __getattr__(name):
             return list(self._universe_ids)
 
         def is_tradable(self, instrument_id, at=None):
-            """False before the name's first bar (listed during the run) and for the disclosed missing-price intervals of an index member."""
+            """False before the name's first bar (listed during the run), after its last one when its prices stop before the run's (delisted:
+            what was held was sold at that close), and for the disclosed missing-price intervals of an index member."""
             if self.last_close(instrument_id) is None:
+                return False
+            if self._ended(str(instrument_id), self.clock.timestamp_ns() if at is None else int(at) * 1_000_000):
                 return False
             if _index is None:
                 return True

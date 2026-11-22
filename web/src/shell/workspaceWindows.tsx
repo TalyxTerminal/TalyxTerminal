@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { TxToastProvider, useTxToast, type Json } from "@talyx/sdk";
 import type { Platform } from "@talyx/sdk";
@@ -47,7 +48,7 @@ function WorkspaceWindowsBody({ home }: { home: ReactNode }) {
   const [controller] = useState(() => new WorkspaceWindowController({
     show: setView, close: id => closeFlow.current!.close(id),
     fail: (message, retry) => toast({ id: "workspace-error", title: message, tone: "failed",
-      ...(retry ? { duration: Infinity, action: { label: "Retry", onClick: retry } } : {}) }),
+      ...(retry ? { duration: Infinity, action: { label: t("Retry"), onClick: retry } } : {}) }),
   }));
   useEffect(() => controller.start(), [controller]);
   return <>
@@ -57,7 +58,7 @@ function WorkspaceWindowsBody({ home }: { home: ReactNode }) {
     {view.owned.map(id => {
       const url = new URL(location.href); url.searchParams.set("workspaceId", id); url.searchParams.set("workspaceFrame", "1"); url.hash = "";
       return <iframe key={id} ref={frame => controller.frame(id, frame)}
-        data-workspace-id={id} title={"Workspace " + (view.opened.find(item => item.workspaceId === id)?.name ?? "Untitled")}
+        data-workspace-id={id} title={t("Workspace {name}", { name: view.opened.find(item => item.workspaceId === id)?.name ?? t("Untitled") })}
         src={url.href} style={{ display: view.active === id ? "block" : "none", width: "100%", height: "100dvh", border: 0 }} />;
     })}
   </>;

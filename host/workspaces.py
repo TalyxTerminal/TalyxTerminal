@@ -20,6 +20,7 @@ from uuid import uuid4
 
 import orjson
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.recycle import recycle_directory
 
 from .files import finish_before_cancel, write_atomic, write_json
@@ -59,7 +60,7 @@ class Workspaces:
 
     def require(self, workspace_id: str) -> dict:
         if workspace_id not in self.opened or workspace_id in self.closing:
-            raise ContractError("target_gone", f"Workspace {workspace_id} is not open")
+            raise ContractError("target_gone", t("Workspace {workspace_id} is not open", workspace_id=workspace_id))
         return self.opened[workspace_id]
 
     def is_open(self, workspace_id: str) -> bool:
@@ -113,7 +114,7 @@ class Workspaces:
                 args = {"name": saved["name"], "snapshotId": saved["snapshotId"], **args}
         workspace_id = workspace_id or uuid4().hex
         if workspace_id in self.closing:
-            raise ContractError("unavailable", "The workspace is closing")
+            raise ContractError("unavailable", t("The workspace is closing"))
         opened = workspace_id not in self.opened
         record = self.opened.setdefault(workspace_id, {"workspaceId": workspace_id, "name": None,
                                                       "snapshotId": None, "presentation": None})
@@ -230,12 +231,12 @@ class Workspaces:
             return await self.folder(workspace_id)
         path = Path(value)
         if not path.is_absolute() or not path.is_dir():
-            raise ContractError("invalid_input", "Choose an existing folder")
+            raise ContractError("invalid_input", t("Choose an existing folder"))
         path = path.resolve(strict=True)
         # The folders TALYX makes for workspaces are its own too: deleting their workspace recycles them.
         if any(path.is_relative_to(root) or root.is_relative_to(path)
                for root in (*self.private_roots, self.folders_root.resolve())):
-            raise ContractError("permission_denied", "TALYX's own data folders cannot be a workspace folder")
+            raise ContractError("permission_denied", t("TALYX's own data folders cannot be a workspace folder"))
         async with self.lock:
             self.folders[workspace_id] = str(path)
             await self.persist()
@@ -245,7 +246,7 @@ class Workspaces:
 
     def _snapshot_path(self, snapshot_id: str) -> Path:
         if not re.fullmatch(r"[0-9a-f]{32}", snapshot_id):
-            raise ContractError("not_found", f"No saved workspace {snapshot_id}")
+            raise ContractError("not_found", t("No saved workspace {snapshot_id}", snapshot_id=snapshot_id))
         return self.snapshots / f"{snapshot_id}.json"
 
     def _read(self, path: Path) -> dict:
@@ -256,9 +257,9 @@ class Workspaces:
                 raise ValueError("snapshot ID does not match its file")
             return record
         except FileNotFoundError as exc:
-            raise ContractError("not_found", f"No saved workspace {path.stem}") from exc
+            raise ContractError("not_found", t("No saved workspace {stem}", stem=path.stem)) from exc
         except (OSError, ValueError) as exc:
-            raise ContractError("workspace_corrupt", f"The saved workspace {path.stem} cannot be read: {exc}") from exc
+            raise ContractError("workspace_corrupt", t("The saved workspace {stem} cannot be read: {exc}", stem=path.stem, exc=exc)) from exc
 
     def _all(self, unreadable: list[str] | None = None) -> list[dict]:
         if not self.snapshots.exists():
@@ -288,28 +289,27 @@ class Workspaces:
         workspace has one saved state."""
         name = args["name"].strip()
         if len(orjson.dumps(args["workspace"])) > SNAPSHOT_BYTES:
-            raise ContractError("too_large", f"A saved workspace is at most {SNAPSHOT_BYTES // 1024 // 1024} MB")
+            raise ContractError("too_large", t("A saved workspace is at most {value} MB", value=SNAPSHOT_BYTES // 1024 // 1024))
         async with self.lock:
             saved = await asyncio.to_thread(self._all)
             snapshot_id = args.get("snapshotId")
             if snapshot_id is not None:
                 current = await self.load(snapshot_id)
                 if current["revision"] != args.get("expectedRevision"):
-                    raise ContractError("conflict", "The saved workspace changed since it was read")
+                    raise ContractError("conflict", t("The saved workspace changed since it was read"))
                 workspace_id = current["workspaceId"]
             elif workspace_id is None:
-                raise ContractError("invalid_target", "Save a workspace from its window")
+                raise ContractError("invalid_target", t("Save a workspace from its window"))
             elif any(item["workspaceId"] == workspace_id for item in saved):
-                raise ContractError("conflict", "This workspace is saved already: save over its snapshot, or copy the "
-                                    "workspace to save it under another name")
+                raise ContractError("conflict", t("This workspace is saved already: save over its snapshot, or copy the workspace to save it under another name"))
             if workspace_id in self.closing:
-                raise ContractError("unavailable", "The workspace is closing")
+                raise ContractError("unavailable", t("The workspace is closing"))
             same_name = [item for item in saved if item["name"].casefold() == name.casefold()
                          and item["snapshotId"] != snapshot_id]
             if name.casefold() in self.copy_names and self.copy_names[name.casefold()] != workspace_id:
-                raise ContractError("already_exists", f"A workspace is being copied as {name}")
+                raise ContractError("already_exists", t("A workspace is being copied as {name}", name=name))
             if same_name:
-                raise ContractError("already_exists", f"A saved workspace is already called {same_name[0]['name']}")
+                raise ContractError("already_exists", t("A saved workspace is already called {name}", name=same_name[0]['name']))
             record = {"snapshotId": snapshot_id or uuid4().hex, "workspaceId": workspace_id,
                       "name": name, "savedAt": datetime.now(UTC).isoformat(), "summary": args.get("summary"),
                       "workspace": args["workspace"]}
@@ -335,7 +335,7 @@ class Workspaces:
         """A workspace's saved state."""
         state = await self._saved_for(workspace_id)
         if state is None:
-            raise ContractError("not_found", "Save the workspace before copying it")
+            raise ContractError("not_found", t("Save the workspace before copying it"))
         return state
 
     @asynccontextmanager
@@ -348,7 +348,7 @@ class Workspaces:
                             not in taken)
             name = name.strip()
             if name.casefold() in taken:
-                raise ContractError("already_exists", f"A saved workspace is already called {name}")
+                raise ContractError("already_exists", t("A saved workspace is already called {name}", name=name))
             self.copy_names[name.casefold()] = copy_id
         try:
             yield name
@@ -361,10 +361,10 @@ class Workspaces:
             path = self._snapshot_path(snapshot_id)
             current = await asyncio.to_thread(self._read, path)
             if expected_revision is not None and current["revision"] != expected_revision:
-                raise ContractError("conflict", "The saved workspace changed since it was read")
+                raise ContractError("conflict", t("The saved workspace changed since it was read"))
             workspace_id = current["workspaceId"]
             if workspace_id in self.closing:
-                raise ContractError("unavailable", "The workspace is closing")
+                raise ContractError("unavailable", t("The workspace is closing"))
             self.closing.add(workspace_id)
         try:
             await cleanup(workspace_id)

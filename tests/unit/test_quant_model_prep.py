@@ -109,11 +109,11 @@ def test_no_window_blocks():
     assert not answer["estimates"]   # nothing would train: no time to estimate
 
 
-def test_memory_blocks_only_past_what_runs_ever_get_and_the_rest_only_flag():
-    """the check refused a run against the memory free at that moment; a run that fits the runs' budget waits in the queue instead."""
+def test_memory_estimate_never_blocks():
+    """An estimate over what runs get is shown, not refused: the run goes alone and fails with the numbers only if memory truly runs out."""
     answer = check_of(panel(names=40), budget=1)
     memory = by_name(answer)["Memory"]
-    assert memory["state"] == "block" and answer["blocked"] and "can never start" in memory["detail"]
+    assert memory["state"] == "watch" and not answer["blocked"]
     flagged = check_of(panel(names=40), budget=10 ** 13)
     assert by_name(flagged)["Memory"]["state"] == "ok" and not flagged["blocked"]
     assert by_name(flagged)["Names a day"]["state"] == "watch"
@@ -122,7 +122,7 @@ def test_memory_blocks_only_past_what_runs_ever_get_and_the_rest_only_flag():
 def test_memory_check_names_what_runs_on_this_computer_get():
     small, large = check_of(panel(names=40), budget=64 * 1024 ** 3), check_of(panel(names=40), budget=2 ** 20)
     assert "of the 64.0 GB runs get" in by_name(small)["Memory"]["value"]
-    assert by_name(large)["Memory"]["state"] == "block" and "runs get" in by_name(large)["Memory"]["value"]
+    assert by_name(large)["Memory"]["state"] == "watch" and "runs get" in by_name(large)["Memory"]["value"]
 
 
 def test_coverage_lists_every_input_under_the_need():
@@ -168,10 +168,10 @@ def test_batch_lists_only_the_cells_that_differ():
     assert all("lgb_lr" not in group["values"] for group in groups)
 
 
-def test_batch_over_twenty_is_refused():
+def test_a_batch_has_no_cap_on_its_groups():
     params = {"lgb_lr": 0.05, "lgb_leaves": 63, "seed": 42}
-    with pytest.raises(ContractError, match="A batch trains at most 20 groups; these values make 24."):
-        P.expand(params, [{"name": "lgb_leaves", "values": list(range(2, 8))}, {"name": "seed", "values": [1, 2, 3, 4]}])
+    groups = P.expand(params, [{"name": "lgb_leaves", "values": list(range(2, 12))}, {"name": "seed", "values": list(range(10))}, {"name": "lgb_lr", "values": [.01, .02, .03, .04, .05]}])
+    assert len(groups) == 500
 
 
 # ---------------------------------------------------------------------------------------------------------- inputs (#41, #52, M36-M39)

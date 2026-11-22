@@ -1,3 +1,4 @@
+import { intlLocale } from "@talyx/sdk";
 /* Display time zones. Everything in Chart keeps real UTC milliseconds; only labels and tick weights are worked out in a zone.
    Shifting timestamps into the zone instead would make the repeated hour of a DST fall-back collide. */
 
@@ -36,8 +37,9 @@ export function wallClock(zone: string, time: UtcMs): Date {
   return new Date(time + zoneOffset(zone, time));
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const month = new Intl.DateTimeFormat(intlLocale(), { month: "short", timeZone: "UTC" });
+const weekday = new Intl.DateTimeFormat(intlLocale(), { weekday: "short", timeZone: "UTC" });
+const chineseDate = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "short", day: "numeric", weekday: "short", timeZone: "UTC" });
 const two = (value: number) => (value < 10 ? "0" : "") + value;
 
 export function clockText(zone: string, time: UtcMs, seconds = false): string {
@@ -48,7 +50,8 @@ export function clockText(zone: string, time: UtcMs, seconds = false): string {
 /** TradingView's crosshair date: `Wed 11 Nov '26`. */
 export function dateText(zone: string, time: UtcMs): string {
   const wall = wallClock(zone, time);
-  return `${DAYS[wall.getUTCDay()]} ${two(wall.getUTCDate())} ${MONTHS[wall.getUTCMonth()]} '${String(wall.getUTCFullYear()).slice(2)}`;
+  if (intlLocale() === "zh-CN") return chineseDate.format(wall);
+  return `${weekday.format(wall)} ${two(wall.getUTCDate())} ${month.format(wall)} '${String(wall.getUTCFullYear()).slice(2)}`;
 }
 
 /** What one bar's time reads as in a zone: date only for daily and longer bars, date and clock otherwise. */
@@ -74,7 +77,7 @@ export function tickWeight(current: Date, previous: Date): number {
 export function tickText(zone: string, time: UtcMs, weight: number, dateOnly: boolean): string {
   const wall = wallClock(zone, time);
   if (weight >= Weight.Year) return String(wall.getUTCFullYear());
-  if (weight >= Weight.Month) return MONTHS[wall.getUTCMonth()];
+  if (weight >= Weight.Month) return month.format(wall);
   if (weight >= Weight.Day || dateOnly) return String(wall.getUTCDate());
   return `${two(wall.getUTCHours())}:${two(wall.getUTCMinutes())}`;
 }

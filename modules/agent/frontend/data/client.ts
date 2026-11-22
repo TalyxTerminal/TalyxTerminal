@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { ContractError, failure, type Json, type ModuleContext } from "@talyx/sdk";
 import type { FileChoice } from "../chat/model";
 import type { AgentMemory, AgentSettings, Attachment, ChildDetail, ChildRun, Conversation, ConversationEvent, ConversationListItem, ConversationSnapshot, MemoryStatus, PermissionRule, Reference, SearchSettings, Turn } from "./types";
@@ -88,16 +89,16 @@ export class AgentClient {
   }
   async openReference(referenceId: string): Promise<void> {
     const reference = await this.conversation<Reference>("reference", { referenceId });
-    if (reference.workspaceId !== this.ctx.workspace.identity.get()?.workspaceId) throw failure("invalid_target", "Open this reference in its original workspace");
+    if (reference.workspaceId !== this.ctx.workspace.identity.get()?.workspaceId) throw failure("invalid_target", t("Open this reference in its original workspace"));
     if (reference.kind === "panel") return this.openPanel(reference.target);
     if (reference.kind === "object") {
       const {module, panelType, objectId} = reference.target;
-      if (typeof module !== "string" || typeof panelType !== "string" || typeof objectId !== "string") throw failure("invalid_target", "Unavailable panel target");
+      if (typeof module !== "string" || typeof panelType !== "string" || typeof objectId !== "string") throw failure("invalid_target", t("Unavailable panel target"));
       await this.ctx.platform.panels.openTarget({module, panelType, objectId});
       return;
     }
     const url = new URL(String(reference.target.url));
-    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw failure("invalid_input", "Unsupported source URL");
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw failure("invalid_input", t("Unsupported source URL"));
     window.open(url.href, "_blank", "noopener,noreferrer");
   }
 }

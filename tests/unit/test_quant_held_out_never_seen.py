@@ -84,7 +84,7 @@ def test_an_allocation_backtest_fits_and_scores_only_returns_before_the_held_out
     monkeypatch.setattr(A.W, "check_feasible", lambda settings, pool: None)
     monkeypatch.setattr(A.W, "check_settings", lambda settings, pool, benchmark=None: None)   # builds the skfolio estimator, which this environment has not
     job = {"output": str(tmp_path / "out"), "kind": kind, "heldOutFrom": held, "data": {"barsPath": str(tmp_path / "bars.parquet"), "info": {"annualization": 252}}, "riskFree": {"basis": "zero"},
-           "settings": {"pool": [{"ticker": "SPY", "group": "Stocks"}, {"ticker": "IEF", "group": "Bonds"}], "lookback": 126, "frequency": "monthly"}}
+           "settings": {"pool": [{"ticker": "SPY", "group": "Stocks"}, {"ticker": "IEF", "group": "Bonds"}], "lookback": 126, "frequency": "monthly", "benchmarkColumns": {}}}
     with pytest.raises(Seen):
         A.run(job)
     assert (seen["last"] >= pd.Timestamp(held)) is sees_held_out

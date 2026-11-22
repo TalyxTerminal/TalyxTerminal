@@ -1,5 +1,6 @@
 /* The code area of every Quant object page: Developer's project view (file tree, tabs, editor) with Quant's marks on it. The text is Developer's;
    Quant keeps none of it. The tree is closed until asked for, and opening it widens the panel by its own width, so the code keeps its room. */
+import { t } from "../i18n";
 import "./codearea.css";
 import { useMemo, useRef, type ReactNode } from "react";
 import { ModuleView, TxButton, TxIcon, TxIconButton, type ModuleContext } from "@talyx/sdk";
@@ -32,13 +33,13 @@ export function CodeArea({ctx, projectId, rootUri, treeTitle, entryUri, marks = 
   // One `on` for the life of the area: a new object each render would remount the view (and close its tree) every time.
   const latest = useRef(onChanged); latest.current = onChanged;
   const listeners = useMemo(() => ({changed: (value: unknown) => latest.current?.(value as never)}), []);
-  return <section className="qx-codearea" aria-label="Code" data-tree={tree ? "" : undefined}>
+  return <section className="qx-codearea" aria-label={t("Code")} data-tree={tree ? "" : undefined}>
     <div className="qx-codearea-bar">
-      <TxIconButton size="sm" label={tree ? "Hide files" : "Show files"} icon="list" aria-pressed={tree} onClick={() => onTree(!tree)} />
-      {count > 0 && <span className="qx-codearea-count" role="status">{count} {count === 1 ? "error" : "errors"}</span>}
+      <TxIconButton size="sm" label={tree ? t("Hide files") : t("Show files")} icon="list" aria-pressed={tree} onClick={() => onTree(!tree)} />
+      {count > 0 && <span className="qx-codearea-count" role="status">{count} {count === 1 ? t("error") : t("errors")}</span>}
       <span className="tx-spacer" />
-      <TxButton size="sm" variant="quiet" onClick={onOpenDeveloper}><TxIcon name="external" />Open in Developer</TxButton>
-      {onHide && <TxIconButton size="sm" label="Hide code" icon="close" onClick={onHide} />}
+      <TxButton size="sm" variant="quiet" onClick={onOpenDeveloper}><TxIcon name="external" />{t("Open in Developer")}</TxButton>
+      {onHide && <TxIconButton size="sm" label={t("Hide code")} icon="close" onClick={onHide} />}
     </div>
     <div className="qx-codearea-view">
       <ModuleView id="developer.project_editor" context={ctx} props={{rootUri, ...(treeTitle ? {treeTitle} : {}), ...(projectId ? {projectId} : {}), file: entryUri, tree, ...(readOnly ? {readOnly} : {}),

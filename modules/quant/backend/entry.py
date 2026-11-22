@@ -14,11 +14,12 @@ from typing import Any
 
 from talyx_sdk import ContractError
 from talyx_sdk.declare import Module
+from talyx_sdk.i18n import t
 from talyx_sdk.process import Call, Context
 
 from vocabulary.python.types import TableFile, TablePage
 
-from . import changes
+from . import changes, data_formats
 from . import models as m
 from . import public_inputs as i
 from . import public_results as r
@@ -27,6 +28,7 @@ from .notifications import DECLARED
 from .runtime import CALL, WORKSPACE, Quant
 
 module = Module("quant")
+module.data_format(2, {2: data_formats.benchmarks_chosen})
 # Tasks that run as long as the process; held here so they are not collected.
 BACKGROUND: set[asyncio.Task] = set()
 quant: Quant | None = None      # the platform as Quant uses it, set when the process starts
@@ -41,7 +43,7 @@ for item in DECLARED:
 async def serve(name: str, input, call: Call) -> Any:
     """Run Quant's handler for a public action, for the caller's workspace."""
     if quant is None or name not in quant.handlers:
-        raise ContractError("unavailable", "Quant is starting")
+        raise ContractError("unavailable", t("Quant is starting"))
     WORKSPACE.set(call.workspace_id)
     CALL.set(call)
     with changes.recording(state["records"], call, name):
@@ -387,7 +389,7 @@ async def start_run(input: i.ObjectId, call: Call) -> r.RunReceipt:
 
 
 @module.action(effects=['code', 'write'],
-               errors=['case_over_budget', 'invalid_input', 'not_found', 'too_many_combinations', 'value_outside_declared'],
+               errors=['invalid_input', 'not_found', 'value_outside_declared'],
                examples=[{'objectId': '<objectId>', 'axes': [{'name': 'slow', 'values': [100, 150, 200]}]},
                          {'objectId': '<objectId>', 'axes': [{'name': 'fast', 'values': [10, 20]}, {'name': '@costMultiple', 'values': [1, 2]}], 'metric': 'cagr'},
                          {'objectId': '<objectId>', 'axes': [{'name': 'holding', 'values': [1, 5, 20]}]}])
@@ -396,19 +398,20 @@ async def start_sweep(input: i.Sweep, call: Call) -> r.RunReceipt:
     once; the result (each cell's state and numbers, the top 20 by the kind's main number, the best cell) comes when
     every cell has ended. Axes are the declared params (read_object part options); a strategy also takes @costMultiple
     (0-10), @fill (nextOpen or nextClose), @capital and @period ({start, end}); a factor holding, groups, costBps and
-    delay. At most: strategy 200 combinations, factor 48, allocation 25 (1 or 2 axes of 2+ values), model 20.
+    delay; an allocation one or two axes of two or more values. Any number of combinations: estimate_sweep says how long a
+    strategy's take.
     Strategy only: metric ranks the cells (sharpe default, cagr, totalReturn, maxDrawdown, trades, profitFactor,
     winRate); of starts from a completed backtest's code and values. Keep a cell with apply_run."""
     return await serve("start_sweep", input, call)
 
 
 @module.action(effects=['code', 'write'],
-               errors=['case_over_budget', 'not_found', 'too_few_windows', 'too_many_combinations', 'value_outside_declared'],
+               errors=['not_found', 'too_few_windows', 'value_outside_declared'],
                examples=[{'objectId': '<objectId>', 'axes': [{'name': 'lookback', 'values': [24, 48, 96]}], 'pickOn': 12, 'trade': 3}])
 async def start_walk_forward(input: m.StartStrategyWalkForwardInput, call: Call) -> r.RunReceipt:
     """Walk-forward validation of a strategy: each window picks the best combination of the axes over pickOn months
     (by pickBy, default sharpe) and trades it for the next trade months (defaults 12 and 3); at least 3 windows must
-    fit before the held-out start. Axes as in start_sweep, at most 200 combinations. Returns runId at once; the
+    fit before the held-out start. Axes as in start_sweep. Returns runId at once; the
     result (stitched out-of-sample numbers against fixed values, efficiency, the windows) comes when it ends."""
     return await serve("start_walk_forward", input, call)
 
@@ -530,7 +533,7 @@ async def read_run_materials(input: i.RunId, call: Call) -> out.Materials:
 @module.action(effects=['write'],
                errors=['not_found'],
                examples=[{'runId': '<runId>', 'starred': True},
-                         {'runId': '<runId>', 'note': 'Costs doubled: still positive'}])
+                         {'runId': '<runId>', 'note': 'Costs doubled: still positive'}])  # i18n: ignore
 async def update_run(input: m.AnnotateObjectRunInput, call: Call) -> out.RunAnnotation:
     """Star a run or write its note; only the given fields change. A starred run represents its object when none is
     published."""
@@ -638,7 +641,7 @@ async def read_library_values(input: i.LibraryValues, call: Call) -> r.LibraryPa
 
 
 @module.action(effects=['read'],
-               errors=['not_found', 'model_not_callable', 'input_retired'],
+               errors=['not_found', 'model_not_callable'],
                examples=[{'name': 'S&P 500 LightGBM'},
                          {'name': 'S&P 500 LightGBM', 'version': 2}])
 async def read_library_model(input: m.ReadLibraryModelInput, call: Call) -> out.PublishedModel:

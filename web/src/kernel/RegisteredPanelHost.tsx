@@ -1,3 +1,5 @@
+import { translator } from "@talyx/sdk";
+import { t } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { TxButton, TxEmpty, type Json } from "@talyx/sdk";
 import type { JsonValue } from "@talyx/sdk-ui";
@@ -31,7 +33,7 @@ export function RegisteredPanelHost(props: RegisteredPanelHostProps) {
   callbacks.current = props;
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [title, setTitle] = useState(kernel.definitions.get(props.owner)?.name ?? props.owner);
+  const [title, setTitle] = useState(translator(props.owner)(kernel.definitions.get(props.owner)?.name ?? props.owner));
   const live = kernel.modules.get(props.owner);
 
   useEffect(() => {
@@ -102,18 +104,18 @@ export function PanelFailure({ owner, reason, onRetry }: { owner: string; reason
   const [retrying, setRetrying] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   return <div role="alert" style={{ display: "grid", placeItems: "center", height: "100%", minHeight: 0, background: "var(--tx-panel)" }}>
-    <TxEmpty title={`${installed?.name ?? owner} couldn't open`} text={failed ?? reason}
+    <TxEmpty title={t("{value} couldn't open", { value: translator(owner)(installed?.name ?? owner) })} text={failed ?? reason}
       action={<TxButton size="sm" loading={retrying} onClick={() => {
         setRetrying(true); setFailed(null);
         void Promise.resolve(onRetry()).catch(error => setFailed(error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error)))
           .finally(() => setRetrying(false));
-      }}>Retry</TxButton>} />
+      }}>{t("Retry")}</TxButton>} />
   </div>;
 }
 
 /** A panel whose module isn't installed: it keeps its place and its content, which come back with the module. */
 function ModuleMissing({ title }: { title: string }) {
   return <div role="status" style={{ display: "grid", placeItems: "center", height: "100%", minHeight: 0, background: "var(--tx-panel)" }}>
-    <TxEmpty title={`${title} isn't installed`} text="This panel and its content stay in the workspace and come back when the module is installed again." />
+    <TxEmpty title={t("{title} isn't installed", { title })} text={t("This panel and its content stay in the workspace and come back when the module is installed again.")} />
   </div>;
 }

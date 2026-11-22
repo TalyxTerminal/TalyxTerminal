@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .document import ChartDocument
 
@@ -66,7 +67,7 @@ def revert(app, call_id, direction):
         f"SELECT workspace,kind,object_id,{column} FROM changes WHERE call_id=? ORDER BY rowid",
         (call_id,)).fetchall()
     if not rows:
-        raise ContractError("not_found", "Chart has no changes for that call")
+        raise ContractError("not_found", t("Chart has no changes for that call"))
     refresh = []
     with app.store.transaction():
         for ws, kind, key, snapshot in rows:

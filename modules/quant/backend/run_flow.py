@@ -1,8 +1,6 @@
 """Shared run history and queue rules."""
 from __future__ import annotations
 
-from talyx_sdk import ContractError
-
 RUN = "qrun"
 
 # The states, in order: made the moment it is asked for, its checks as the first step, waiting for room, running, and how it ended.
@@ -17,7 +15,6 @@ LABELS = {PREPARING: "Preparing", QUEUED: "In the queue", RUNNING: "Running", CA
 # What a run that was going when the application stopped says (startup marks it; nothing resumes it silently). What it had written by then
 # is read with it; a run whose process ended with the application has no part of its own to show, so this does not promise one.
 INTERRUPTED_MESSAGE = "The application stopped while this ran."
-GIB = 1024 ** 3
 
 
 def next_number(records, object_id):
@@ -25,14 +22,6 @@ def next_number(records, object_id):
     row = records.db.execute("SELECT MAX(json_extract(content,'$.number')) FROM records WHERE kind=? AND json_extract(content,'$.objectId')=?"
                              " AND COALESCE(json_extract(content,'$.runKind'),'') != 'publish'", (RUN, object_id)).fetchone()
     return int(row[0] or 0) + 1
-
-
-def check_fits(queue, memory):
-    """A run needing more memory than is free waits in the queue; one needing more than the machine gives runs at all can never
-    start, so it fails now with both numbers (not later, and not capped to what fits)."""
-    if memory > queue.budget:
-        raise ContractError("unavailable", f"This run needs about {memory / GIB:.1f} GB; runs on this computer get {queue.budget / GIB:.1f} GB in all, "
-                            "so it can never start. Use fewer names or a shorter period.", {"needs": int(memory), "budget": int(queue.budget)})
 
 
 # ---------------------------------------------------------------------------------------------------------------- what changed

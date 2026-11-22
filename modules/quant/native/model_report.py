@@ -15,6 +15,7 @@ import pandas as pd
 from native import model_algorithms as A
 
 from . import factor_work as W
+from . import i18n
 from . import metrics as M
 from . import model_data as D
 from . import model_figures as G
@@ -43,7 +44,7 @@ class OpenToOpen:
 
     def __init__(self, panel):
         self.panel, self.annualization = panel, panel.annualization
-        opens = D.held(pd.DataFrame(panel.fields["open"])).to_numpy(dtype=float)
+        opens = D.held(pd.DataFrame(panel.fields["open"]), pd.DataFrame(panel.fields["close"])).to_numpy(dtype=float)
         with np.errstate(invalid="ignore", divide="ignore"):
             self.returns = np.vstack([np.full((1, opens.shape[1]), np.nan), opens[1:] / opens[:-1] - 1])
 
@@ -158,7 +159,6 @@ class Report:
         found = self.key_numbers(ric, returns, base, groups, positive, windows, train_ics, like)
         found["trainTestGap"] = None if found["trainIc"] is None or ric is None else found["trainIc"] - ric
         found["testDays"] = found["days"]
-        found["shortSample"] = found["days"] < 250
         if found["lsGross"] is None or found["lsGross"] <= 0:
             found["breakeven"], found["breakevenNote"] = None, "Gross long–short is not positive"
         return found
@@ -260,14 +260,14 @@ class Report:
             {"type": "scatter", "mode": "markers+text", "x": [w["validIc"] for w in self.windows], "y": [w["testIc"] for w in self.windows],
              "text": [str(w["k"]) for w in self.windows], "textposition": "top center", "name": "Windows", "meta": {"role": "main", "key": "windows"},
              "hovertemplate": "Window %{text}<br>Validation Rank IC %{x:+.4f}<br>Test Rank IC %{y:+.4f}<extra></extra>"},
-            G.line(*_diagonal(self.windows), "Same", "benchmark", "same", hovertemplate="Test equals validation<extra></extra>")], xaxis={"title": {"text": "Validation rank IC"}}, yaxis={"title": {"text": "Test rank IC"}}) if validated else None)
+            G.line(*_diagonal(self.windows), "Same", "benchmark", "same", hovertemplate="Test equals validation<extra></extra>")], xaxis={"title": {"text": i18n.t("Validation rank IC")}}, yaxis={"title": {"text": i18n.t("Test rank IC")}}) if validated else None)
         if self.windows:
             names = [str(w["k"]) for w in self.windows]
             attempt("model.windows.each", lambda: G.figure("model.windows.each", [
                 *([{"type": "bar", "name": "Validation", "x": names, "y": [w["validIc"] for w in self.windows], "marker": {"color": "rgba(0,0,0,0)", "line": {"width": 1.2}},
                     "meta": {"role": "group", "key": "validation"}}] if validated else []),
                 {"type": "bar", "name": "Test", "x": names, "y": [w["testIc"] for w in self.windows], "meta": {"role": "updown", "key": "test"}}],
-                barmode="group", xaxis={"type": "category", "title": {"text": "Window"}}, yaxis={"tickformat": ".3f", "side": "right"},
+                barmode="group", xaxis={"type": "category", "title": {"text": i18n.t("Window")}}, yaxis={"tickformat": ".3f", "side": "right"},
                 shapes=[{"type": "line", "xref": "paper", "yref": "y", "x0": 0, "x1": 1, "y0": numbers["ric"] or 0, "y1": numbers["ric"] or 0, "meta": {"role": "benchmark", "key": "mean"}}]))
         neural = any(w.get("algorithm") in A.NEURAL_IDS for w in self.windows)
         if self.importance:
@@ -328,7 +328,7 @@ class Report:
             G.line([f"{cost:g}" for cost in COSTS], [item["lsNet"] for item in sections["returns"]["byCost"]], "Long–short, net", "main", "ls-net", mode="lines+markers"),
             {"type": "scatter", "mode": "markers", "x": [f"{self.cost:g}"], "y": [numbers["lsNet"]], "name": "Assumed", "meta": {"role": "benchmark", "key": "assumed"}}],
             # the assumed cost sits in its place among the others, not first because its point is a trace of its own
-            xaxis={"title": {"text": "Cost a trade, bps"}, "type": "category", "categoryorder": "array",
+            xaxis={"title": {"text": i18n.t("Cost a trade, bps")}, "type": "category", "categoryorder": "array",
                    "categoryarray": [f"{cost:g}" for cost in sorted({*COSTS, self.cost})]}, yaxis={"tickformat": ".0%", "side": "right"}))
         attempt("model.returns.top-excess", lambda: G.figure("model.returns.top-excess", [
             G.line(_iso(dates), comp(top["excess"]), "Before cost", "main", "top-before"), G.line(_iso(dates), comp(top_net), "After cost", "benchmark", "top-after")],
@@ -336,7 +336,7 @@ class Report:
         attempt("model.returns.top-rank", lambda: G.figure("model.returns.top-rank", [
             G.line(_iso(dates), _rolling(top["topRank"], 63), f"Top {self.top_n}", "main", "top"),
             G.line(_iso(dates), _rolling(top["bottomRank"], 63), f"Bottom {self.top_n}", "benchmark", "bottom")],
-            yaxis={"tickformat": ".0%", "side": "right", "title": {"text": "Rank of the later return"}}, xaxis={"type": "date"}))
+            yaxis={"tickformat": ".0%", "side": "right", "title": {"text": i18n.t("Rank of the later return")}}, xaxis={"type": "date"}))
 
         # Information
         ic_pearson = M.row_correlation(self.pred, self.label, W.WINDOW_NAMES)
@@ -425,7 +425,7 @@ class Report:
             G.line(_iso(dates), _cum(self.best_series), "Strongest single input", "benchmark", "best-input"),
             G.line(_iso(dates), _cum(self.equal_series), "Inputs ranked and averaged", "benchmark", "equal-weight", line={"dash": "dot"}),
             *([G.line(_iso(dates), _cum(daily_ic(self.ridge, self.label)), "Ridge each window", "benchmark", "ridge", line={"dash": "dash"})] if self.ridge is not None else [])],
-            yaxis={"side": "right", "title": {"text": "Cumulative rank IC"}}, xaxis={"type": "date"}))
+            yaxis={"side": "right", "title": {"text": i18n.t("Cumulative rank IC")}}, xaxis={"type": "date"}))
         measured = [row for row in sections["inputs"]["styles"]["exposure"] if isinstance(row["rho"], (int, float)) and np.isfinite(row["rho"])]
         if sections["inputs"]["styles"]["exposure"] and not measured:
             # a day's rank correlation needs 10 names with a prediction; with fewer every style is empty and the chart would be bare axes
@@ -456,7 +456,6 @@ class Report:
         attempt("model.robustness.coverage", lambda: G.figure("model.robustness.coverage", [
             G.line(_iso(dates[week]), self.data.rows.sum(axis=1)[week], "In the index", "benchmark", "index"),
             G.line(_iso(dates[week]), np.isfinite(self.pred).sum(axis=1)[week], "With a prediction", "main", "predicted")], yaxis={"side": "right"}, xaxis={"type": "date"}))
-        sections["robustness"]["shortSample"] = bool(numbers["days"] < 250)
         # B20: the three figures the draft had that the report did not yet draw
         library_rows = sections["inputs"]["library"]
         if library_rows:
@@ -533,17 +532,17 @@ class Report:
         return out
 
     def _industry_ic(self):
-        industry = self.panel.industry
-        if industry is None:
+        if self.panel.industry is None:
             return []
-        labels = pd.Series(industry)
+        codes, names = self.panel.industry_codes()
         out = []
-        for name, members in labels.groupby(labels).groups.items():
-            index = np.asarray(list(members))
-            if len(index) < 5:
+        for code, name in enumerate(names):
+            inside = codes == code  # each name's industry that day
+            count = int(inside.any(axis=0).sum())
+            if count < 5:
                 continue
-            value = M.mean(M.rank_correlation(self.pred[:, index], self.label[:, index], 3))
-            out.append({"industry": str(name), "names": int(len(index)), "rankIc": value})
+            value = M.mean(M.rank_correlation(np.where(inside, self.pred, np.nan), np.where(inside, self.label, np.nan), 3))
+            out.append({"industry": str(name), "names": count, "rankIc": value})
         return sorted(out, key=lambda row: -(row["rankIc"] or -9))
 
     def _inputs_table(self):
@@ -612,21 +611,22 @@ class Report:
         return {"exposure": exposure, "version": "price styles v1", "destyled": {"rankIc": M.mean(residual_ic), "of": M.mean(self.ic)}}
 
     def _industry_tilt(self):
-        industry = self.panel.industry
-        if industry is None:
+        if self.panel.industry is None:
             return []
-        labels = pd.Series(industry).fillna("No industry")
+        codes, names = self.panel.industry_codes("No industry")
         top = self.groups == GROUPS
         valued = np.isfinite(self.pred)
         ranks = D._pct_rank(self.pred)
         out = []
         days = valued.any(axis=1)
-        for name, members in labels.groupby(labels).groups.items():
-            index = np.asarray(list(members))
-            with np.errstate(invalid="ignore", divide="ignore"):
-                in_top = top[days][:, index].sum(axis=1) / np.maximum(top[days].sum(axis=1), 1)
-                in_all = valued[days][:, index].sum(axis=1) / np.maximum(valued[days].sum(axis=1), 1)
-            out.append({"industry": str(name), "tilt": M.mean(in_top - in_all), "share": M.mean(in_all), "percentile": M.mean(np.nanmean(ranks[:, index], axis=1) * 100 - 50) if len(index) else None})
+        for code, name in enumerate(names):
+            inside = codes == code  # each name's industry that day
+            with np.errstate(invalid="ignore", divide="ignore"), warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                in_top = (top & inside)[days].sum(axis=1) / np.maximum(top[days].sum(axis=1), 1)
+                in_all = (valued & inside)[days].sum(axis=1) / np.maximum(valued[days].sum(axis=1), 1)
+                percentile = M.mean(np.nanmean(np.where(inside, ranks, np.nan), axis=1) * 100 - 50)
+            out.append({"industry": str(name), "tilt": M.mean(in_top - in_all), "share": M.mean(in_all), "percentile": percentile})
         return sorted(out, key=lambda row: -(row["tilt"] or 0))
 
     def _library(self, library):
@@ -738,7 +738,7 @@ def _learning(curves, windows=None):
         best = int(min(max(best, 1), len(valid)))
         traces.append({"type": "scatter", "mode": "markers", "x": [best], "y": [float(relative[best - 1])], "name": f"Window {index + 1} stopped", "showlegend": False,
                        "marker": {"size": 6}, "meta": {"role": "group", "key": f"stop:{index + 1}", "index": place, "of": len(chosen)}})
-    return G.figure("model.windows.learning", traces, xaxis={"title": {"text": "Epoch" if any(c.get("unit") == "epoch" for c in curves if c) else "Round"}}, yaxis={"title": {"text": "Validation loss, against round 1"}, "side": "right"})
+    return G.figure("model.windows.learning", traces, xaxis={"title": {"text": i18n.t("Epoch") if any(c.get("unit") == "epoch" for c in curves if c) else i18n.t("Round")}}, yaxis={"title": {"text": i18n.t("Validation loss, against round 1")}, "side": "right"})
 
 
 def _alpha_beta(series, base, annualization):

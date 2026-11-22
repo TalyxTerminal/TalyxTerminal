@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { TxIcon, useTxToast } from "@talyx/sdk";
+import { intlLocale, language, TxIcon, useTxToast } from "@talyx/sdk";
 import { ExperienceShellStyles } from "./ExperienceShellStyles";
 import { HomeStone } from "./HomeStone";
 import { ModuleIcon } from "./ModuleIcon";
@@ -11,6 +11,7 @@ import { moduleLine, moduleName, savedWhen, type LayoutTile } from "./workspaceS
 import { freshPanel } from "./workspacePersistence";
 import type { WorkspaceState } from "./workspaceChanges";
 import { platformRuntime } from "../kernel/runtime";
+import { t } from "./i18n";
 import "./HomeScreen.css";
 
 const ManagerScreen = lazy(() => import("./ManagerScreen"));
@@ -22,7 +23,7 @@ type Screen = "home" | "manager" | "community";
 function moduleTiles(): { id: string; name: string }[] {
   return [...platformRuntime().kernel.definitions.values()]
     .filter(item => item.id !== "platform" && Object.values(item.manifest.panels ?? {}).some(panel => panel.launcher))
-    .map(item => ({ id: item.id, name: item.name })).sort((a, b) => a.name.localeCompare(b.name));
+    .map(item => ({ id: item.id, name: moduleName(item.id) })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** The saved layout drawn the way a workspace looks: 1px lines between panels, a tab with each panel's module. */
@@ -41,8 +42,13 @@ function Miniature({ tiles }: { tiles: LayoutTile[] | null }) {
   </span>;
 }
 
-const cities = [["New York", "America/New_York"], ["London", "Europe/London"], ["Frankfurt", "Europe/Berlin"],
-  ["Hong Kong", "Asia/Hong_Kong"], ["Tokyo", "Asia/Tokyo"], ["Sydney", "Australia/Sydney"]] as const;
+const cities = () => [[t("New York"), "America/New_York"], [t("London"), "Europe/London"], [t("Frankfurt"), "Europe/Berlin"],
+  [t("Hong Kong"), "Asia/Hong_Kong"], [t("Tokyo"), "Asia/Tokyo"], [t("Sydney"), "Australia/Sydney"]] as const;
+
+/** "Saturday, 21 November" (English) or the language's own long date. */
+const longDate = (date: Date) => language() === "en"
+  ? date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }).replace(" ", ", ")
+  : date.toLocaleDateString(intlLocale(), { weekday: "long", day: "numeric", month: "long" });
 
 /** Minutes the zone is ahead of UTC at this instant. */
 function offsetMinutes(zone: string, at: Date) {
@@ -68,15 +74,15 @@ function Clock() {
   const minute = new Date(Math.floor(now.getTime() / 60_000) * 60_000), here = offsetMinutes(local, minute);
   const [hours, minutes, seconds] = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(now).split(":");
   const today = now.toLocaleDateString("en-CA", { timeZone: local });
-  return <section className="talyx-home-clock" aria-label="Time">
+  return <section className="talyx-home-clock" aria-label={t("Time")}>
     <div className="talyx-home-now"><span className="talyx-home-hm">{hours}:{minutes}</span><span className="talyx-home-sec">{seconds}</span></div>
     <div className="talyx-home-today">
-      <span className="talyx-home-date">{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }).replace(" ", ", ")}</span>
+      <span className="talyx-home-date">{longDate(now)}</span>
       <span className="talyx-home-zone">{local.split("/").pop()!.replace(/_/g, " ")} · UTC{signed(here)}</span>
     </div>
-    <div className="talyx-home-zones">{cities.map(([name, zone]) => {
+    <div className="talyx-home-zones">{cities().map(([name, zone]) => {
       const day = now.toLocaleDateString("en-CA", { timeZone: zone }), ahead = offsetMinutes(zone, minute) - here;
-      const note = day !== today ? (day < today ? "Yesterday" : "Tomorrow") : ahead === 0 ? "Same time" : `${signed(ahead)}h`;
+      const note = day !== today ? (day < today ? t("Yesterday") : t("Tomorrow")) : ahead === 0 ? t("Same time") : t("{offset}h", { offset: signed(ahead) });
       return <div className="talyx-home-city" key={zone}>
         <span className="talyx-home-city-name">{name}</span>
         <span className="talyx-home-city-time">
@@ -98,13 +104,13 @@ function HomeScreen({ recent, onOpenRecent, onNew, onOpenLayouts, onOpenCommunit
     <HomeStone />
     <Clock />
     <div className="talyx-home-cards">
-      <section className="talyx-home-card" aria-label={recent ? "Recent workspace" : "Workspaces"}>
+      <section className="talyx-home-card" aria-label={recent ? t("Recent workspace") : t("Workspaces")}>
         <button type="button" className="talyx-home-head" onClick={onOpenLayouts}>
-          <span className="talyx-home-head-title">{recent ? "Recent workspace" : "Workspaces"}</span>
-          <span className="talyx-home-all">All workspaces<TxIcon name="chevron" /></span>
+          <span className="talyx-home-head-title">{recent ? t("Recent workspace") : t("Workspaces")}</span>
+          <span className="talyx-home-all">{t("All workspaces")}<TxIcon name="chevron" /></span>
         </button>
         {recent && saved
-          ? <button type="button" className="talyx-home-body" aria-label={`Open ${recent.name}`} onClick={onOpenRecent}>
+          ? <button type="button" className="talyx-home-body" aria-label={t("Open {name}", { name: recent.name })} onClick={onOpenRecent}>
             <Miniature tiles={tiles} />
             <span>
               <span className="talyx-home-foot"><span className="talyx-home-name">{recent.name}</span><span className="talyx-home-saved" title={saved.full}>{saved.label}</span></span>
@@ -114,18 +120,18 @@ function HomeScreen({ recent, onOpenRecent, onNew, onOpenLayouts, onOpenCommunit
           : <button type="button" className="talyx-home-body" data-new="" onClick={onNew}>
             <span className="talyx-home-new">
               <span className="talyx-home-plus"><TxIcon name="plus" /></span>
-              <b>New workspace</b><span>Start with an empty layout</span>
+              <b>{t("New workspace")}</b><span>{t("Start with an empty layout")}</span>
             </span>
           </button>}
       </section>
-      <button type="button" className="talyx-home-card talyx-home-community" aria-label="Open Community" onClick={onOpenCommunity}>
+      <button type="button" className="talyx-home-card talyx-home-community" aria-label={t("Open Community")} onClick={onOpenCommunity}>
         <span className="talyx-home-plane-clip" aria-hidden="true"><span className="talyx-home-plane">
           {modules.length > 0 && Array.from({ length: 80 }, (_, index) =>
             <span className="talyx-home-tile" key={index}><ModuleIcon module={modules[(index * 3 + Math.floor(index / 10)) % modules.length].id} /></span>)}
         </span></span>
         <span className="talyx-home-community-text">
-          <span className="talyx-home-community-title">Community<TxIcon name="arrow-up-right" /></span>
-          <span className="talyx-home-community-sub">Discover modules · {modules.length} installed</span>
+          <span className="talyx-home-community-title">{t("Community")}<TxIcon name="arrow-up-right" /></span>
+          <span className="talyx-home-community-sub">{t("Discover modules · {count} installed", { count: modules.length })}</span>
         </span>
       </button>
     </div>
@@ -171,8 +177,8 @@ export function HomeWindow() {
   const openModule = (id: string) => {
     try {
       const panel = freshPanel(id);
-      openNew(`${platformRuntime().kernel.definitions.get(id)!.name} workspace`, [panel]);
-    } catch (reason) { say(`Module not opened: ${reason instanceof Error ? reason.message : String(reason)}`, true); }
+      openNew(t("{module} workspace", { module: moduleName(id) }), [panel]);
+    } catch (reason) { say(t("Module not opened: {reason}", { reason: reason instanceof Error ? reason.message : String(reason) }), true); }
   };
   const openFault = (item: ShellAttention) => openCommunity(item.id);
   const navigate = (target: HomeBarTarget) => {
@@ -188,17 +194,17 @@ export function HomeWindow() {
         onNavigate={navigate} onFault={openFault} />
       <SavedWorkspaceDialogs rename={renaming} remove={deleting} say={say}
         onClose={() => { setRenaming(null); setDeleting(null); }}
-        onRenamed={() => { say("Workspace renamed."); void catalog.refresh(); }}
-        onDeleted={() => { say("Workspace deleted."); void catalog.refresh(); }} />
+        onRenamed={() => { say(t("Workspace renamed.")); void catalog.refresh(); }}
+        onDeleted={() => { say(t("Workspace deleted.")); void catalog.refresh(); }} />
       <main>
         <section className={`screen${screen === "home" ? " is-active" : ""}`}>
           <HomeScreen recent={catalog.saved[0] ?? null} onOpenLayouts={goManager} onOpenCommunity={goCommunity}
-            onOpenRecent={() => openSaved(catalog.saved[0])} onNew={() => openNew("Untitled")} />
+            onOpenRecent={() => openSaved(catalog.saved[0])} onNew={() => openNew(t("Untitled"))} />
         </section>
         <section className={`screen${screen === "manager" ? " is-active" : ""}`}>
           {screen === "manager" && <Suspense fallback={null}>
             <ManagerScreen saved={catalog.saved} phase={catalog.phase} error={catalog.error} onRetry={() => void catalog.refresh()}
-              onOpen={openSaved} onCreate={() => openNew("Untitled")} onRename={setRenaming} onDelete={setDeleting} />
+              onOpen={openSaved} onCreate={() => openNew(t("Untitled"))} onRename={setRenaming} onDelete={setDeleting} />
           </Suspense>}
         </section>
         <section className={`screen${screen === "community" ? " is-active" : ""}`}>

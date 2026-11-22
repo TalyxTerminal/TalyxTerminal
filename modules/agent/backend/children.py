@@ -9,6 +9,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.errors import GraphInterrupt
 from langgraph.types import Command
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .store import digest, encoded, stamp_card
 
@@ -69,11 +70,11 @@ class ChildRuns:
     def read(self, identity, workspace=None, conversation=None):
         row = self.store.db.execute("SELECT value FROM child_runs WHERE id=?", (identity,)).fetchone()
         if row is None:
-            raise ContractError("target_gone", "The child run is unavailable")
+            raise ContractError("target_gone", t("The child run is unavailable"))
         value = json.loads(row[0])
         self.store.conversation(value["conversationId"], workspace)
         if conversation is not None and value["conversationId"] != conversation:
-            raise ContractError("permission_denied", "Child run belongs to another conversation")
+            raise ContractError("permission_denied", t("Child run belongs to another conversation"))
         return value
 
     @staticmethod

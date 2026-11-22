@@ -6,6 +6,7 @@ import threading
 from concurrent.futures import Future
 from itertools import count
 
+from talyx_sdk.i18n import t
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect
 
@@ -50,7 +51,7 @@ class Bridge:
                 elif kind == "call":
                     # The Host asks a window to act on its panels; the desktop shows none itself.
                     self.send({"t": "error", "id": envelope["id"], "err": {
-                        "code": "not_found", "message": "The desktop has no panels", "execution": "not_started",
+                        "code": "not_found", "message": t("The desktop has no panels"), "execution": "not_started",
                         "effects": "none"}})
         except ConnectionClosed:
             pass  # the Host stopped (quitting, or it went away); calls still waiting fail below

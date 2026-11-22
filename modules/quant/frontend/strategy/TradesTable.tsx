@@ -1,4 +1,5 @@
 /* The trades of a run, a page at a time from the backend (the Work file carries the first 5,000). A click on a row picks the trade: the chart goes to it and the log shows it. */
+import { t } from "../i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { TxIcon, TxSegmented } from "@talyx/sdk";
 import { mdy, nf, pc, tone } from "../factor/format";
@@ -8,7 +9,16 @@ import { useVirtual } from "./useVirtual";
 export const TRADE_ROW = 26;
 
 const EXITS = ["any", "stop", "trail", "target", "channel", "signal", "liquidation", "open at the end"];
-export const exitLabel = (value: string) => value === "open at the end" ? "Open" : value[0].toUpperCase() + value.slice(1);
+const EXIT_LABELS: Record<string, string> = {
+  "stop": t.c("exit reason", "Stop"),
+  "trail": t.c("exit reason", "Trail"),
+  "target": t.c("exit reason", "Target"),
+  "channel": t.c("exit reason", "Channel"),
+  "signal": t.c("exit reason", "Signal"),
+  "liquidation": t.c("exit reason", "Liquidation"),
+  "open at the end": t.c("trade status", "Open")
+};
+export const exitLabel = (value: string) => EXIT_LABELS[value] ?? (value[0].toUpperCase() + value.slice(1));
 
 /** A trade's time in UTC as the draft writes it: "11-11 09:00", the year only in the hover. */
 export const utcStamp = (ms: number | null) => {
@@ -43,17 +53,17 @@ export function TradesTable({api, runId, picked, onPick, extra, during, onClearD
   const at = picked === null ? -1 : rows.findIndex(row => row.id === picked);
   useEffect(() => {if (at >= 0) view.scrollTo(at);}, [picked, at >= 0]);
   return <div className="qx-trades qx-blk">
-    <div className="qx-bh"><h3>Trades</h3><span className="qx-cnt">{total}</span>
-      <TxSegmented label="Side" value={side} options={[{value: "all", label: "All"}, {value: "Long", label: "Long"}, {value: "Short", label: "Short"}, {value: "losing", label: "Losing"}]} onChange={value => setSide(value as typeof side)} />
-      <select className="qx-chip" aria-label="Exit" value={exit} onChange={event => setExit(event.target.value)}>{EXITS.map(item => <option key={item} value={item}>{item === "any" ? "Any exit" : "Exit: " + exitLabel(item).toLowerCase()}</option>)}</select>
-      {during && <button type="button" className="qx-chip on" onClick={onClearDuring} aria-label={`Clear ${during.label ?? `drawdown ${during.n}`}`}>{during.label ?? `Drawdown ${during.n}`} <TxIcon name="close" /></button>}
+    <div className="qx-bh"><h3>{t("Trades")}</h3><span className="qx-cnt">{total}</span>
+      <TxSegmented label={t("Side")} value={side} options={[{value: "all", label: t("All")}, {value: "Long", label: t.c("position side", "Long")}, {value: "Short", label: t.c("position side", "Short")}, {value: "losing", label: t("Losing")}]} onChange={value => setSide(value as typeof side)} />
+      <select className="qx-chip" aria-label={t.c("trade", "Exit")} value={exit} onChange={event => setExit(event.target.value)}>{EXITS.map(item => <option key={item} value={item}>{item === "any" ? t("Any exit") : t("Exit: {reason}", { reason: exitLabel(item).toLowerCase() })}</option>)}</select>
+      {during && <button type="button" className="qx-chip on" onClick={onClearDuring} aria-label={t("Clear {label}", { label: during.label ?? t("drawdown {n}", { n: String(during.n) }) })}>{during.label ?? t("Drawdown {n}", { n: during.n ?? "" })} <TxIcon name="close" /></button>}
       <span className="tx-spacer" />{extra}</div>
     {error && <p className="fx-empty" role="alert">{error}</p>}
-    <div className="fx-rtable qx-scroll" ref={view.ref}><table className="fx-g" aria-label="Trades">
-      <thead><tr><th className="l">#</th><th className="l">Side</th><th className="l">Entry, UTC</th><th className="l">Exit, UTC</th><th className="l">Exit by</th><th>P&amp;L</th><th>Return</th><th>Bars</th><th>MAE</th><th>MFE</th><th>Fees</th><th>Funding</th></tr></thead>
+    <div className="fx-rtable qx-scroll" ref={view.ref}><table className="fx-g" aria-label={t("Trades")}>
+      <thead><tr><th className="l">#</th><th className="l">{t("Side")}</th><th className="l">{t("Entry, UTC")}</th><th className="l">{t("Exit, UTC")}</th><th className="l">{t("Exit by")}</th><th>{t("P&L")}</th><th>{t.c("performance", "Return")}</th><th>{t("Bars")}</th><th>{t("MAE")}</th><th>{t("MFE")}</th><th>{t("Fees")}</th><th>{t("Funding")}</th></tr></thead>
       <tbody>{view.before > 0 && <tr aria-hidden style={{height: view.before}} />}{rows.slice(view.start, view.end).map(row => <tr key={row.id} style={{height: TRADE_ROW}} data-selected={picked === row.id ? "" : undefined} onClick={() => onPick(row)}>
-        <td className="l fx-t2">{row.id}</td><td className="l fx-t2">{row.side}</td><td className="l" title={mdy(row.entry)}>{utcStamp(row.entry)}</td><td className="l">{row.exit === null || row.exitBy === "open at the end" ? "—" : utcStamp(row.exit)}</td>
-        <td className="l fx-t2">{row.exitBy === "open at the end" ? "open" : row.exitBy}</td><td className={tone(row.pnl)}>{signed(row.pnl)}</td><td className={tone(row.ret)}>{row.ret === null ? "—" : pc(row.ret, 2)}</td><td>{row.bars ?? ""}</td>
+        <td className="l fx-t2">{row.id}</td><td className="l fx-t2">{row.side === "Long" ? t.c("position side", "Long") : row.side === "Short" ? t.c("position side", "Short") : row.side}</td><td className="l" title={mdy(row.entry)}>{utcStamp(row.entry)}</td><td className="l">{row.exit === null || row.exitBy === "open at the end" ? "—" : utcStamp(row.exit)}</td>
+        <td className="l fx-t2">{EXIT_LABELS[row.exitBy]?.toLowerCase() ?? row.exitBy}</td><td className={tone(row.pnl)}>{signed(row.pnl)}</td><td className={tone(row.ret)}>{row.ret === null ? "—" : pc(row.ret, 2)}</td><td>{row.bars ?? ""}</td>
         <td>{row.mae === null ? "—" : pc(row.mae, 2)}</td><td>{row.mfe === null ? "—" : pc(row.mfe, 2)}</td>
         <td>{row.fees ? "−" + nf(Math.abs(row.fees), 2) : nf(0, 2)}</td><td className={tone(row.funding === null ? null : -row.funding)}>{signed(row.funding === null ? null : -row.funding)}</td></tr>)}{view.after > 0 && <tr aria-hidden style={{height: view.after}} />}</tbody>
     </table></div>

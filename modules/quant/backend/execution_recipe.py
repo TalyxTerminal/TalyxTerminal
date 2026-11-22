@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .native_environment import bundled_wheels
 
@@ -21,8 +22,8 @@ def write_recipe(directory, lock, origin, source, engine):
 
 def recipe_lock(recipe):
     if not recipe or not recipe.get("lockPath"):
-        raise ContractError("unavailable", "This result has no saved dependency lock. Run its step again to continue from it.")
+        raise ContractError("unavailable", t("This result has no saved dependency lock. Run its step again to continue from it."))
     lock = Path(recipe["lockPath"]).read_text(encoding="utf-8")
     if hashlib.sha256(lock.encode()).hexdigest() != recipe["lockDigest"]:
-        raise ContractError("conflict", "The dependency lock saved with this result changed.")
+        raise ContractError("conflict", t("The dependency lock saved with this result changed."))
     return bundled_wheels(lock, RUNTIME)

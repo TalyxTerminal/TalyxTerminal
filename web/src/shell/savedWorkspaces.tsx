@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Platform } from "@talyx/sdk";
 import { platformRuntime } from "../kernel/runtime";
@@ -63,12 +64,12 @@ export function SavedWorkspaceDialogs({ rename, remove, onClose, onRenamed, onDe
     setBusy(true);
     try {
       const loaded = await loadSaved(item.snapshotId);
-      if (loaded.revision !== item.revision) throw new Error("It changed since the list was read. Try again.");
+      if (loaded.revision !== item.revision) throw new Error(t("It changed since the list was read. Try again."));
       restoreWorkspace(loaded.workspace);
       const receipt = await writeSaved({ name: next, workspace: loaded.workspace as never, replace: { snapshotId: item.snapshotId, revision: loaded.revision } });
       onRenamed(item, receipt, next);
       onClose();
-    } catch (reason) { say(`Couldn't rename ${item.name}: ${detail(reason)}`, true); }
+    } catch (reason) { say(t("Couldn't rename {name}: {reason}", { name: item.name, reason: detail(reason) }), true); }
     finally { setBusy(false); }
   };
   const commitDelete = async () => {
@@ -78,16 +79,16 @@ export function SavedWorkspaceDialogs({ rename, remove, onClose, onRenamed, onDe
       await platformRuntime().platform["workspace.delete"]({ snapshotId: item.snapshotId, expectedRevision: item.revision });
       onDeleted(item);
       onClose();
-    } catch (reason) { say(`Couldn't delete ${item.name}: ${detail(reason)}`, true); }
+    } catch (reason) { say(t("Couldn't delete {name}: {reason}", { name: item.name, reason: detail(reason) }), true); }
     finally { setBusy(false); }
   };
   return <>
     <ShellNameDialog open={rename !== null} mode="rename" value={name} busy={busy}
       onValue={setName} onCancel={() => { if (!busy) onClose(); }} onCommit={() => void commitRename()} />
-    <ShellConfirm open={remove !== null} title={`Delete ${remove?.name ?? "workspace"}?`} confirm="Delete" busy={busy}
+    <ShellConfirm open={remove !== null} title={t("Delete {value}?", { value: remove?.name ?? "workspace" })} confirm={t("Delete")} busy={busy}
       disabled={preview?.item !== remove}
       onCancel={() => { if (!busy) onClose(); }} onConfirm={() => void commitDelete()}>
-      <p>{previewError || (preview?.item === remove ? "Deleting this workspace removes its saved layout and contents." : "Reading workspace contents…")}</p>
+      <p>{previewError || (preview?.item === remove ? t("Deleting this workspace removes its saved layout and contents.") : t("Reading workspace contents…"))}</p>
       {preview?.item === remove && preview.items.length > 0 &&
         <ul>{preview.items.map((label, index) => <li key={index}>{label}</li>)}</ul>}
     </ShellConfirm>

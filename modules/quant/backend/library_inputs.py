@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .object_data import PERIOD_MS
 
@@ -61,11 +62,13 @@ async def prepare(library, items, sources, since, until, timeframe, path, *, ver
                             "from": "a notebook"})
             continue
         if not item["fields"]:
-            raise ContractError("invalid_input", f"{name} holds no values (a trained model without predictions); a strategy reads the values of a factor, a model's predictions, an allocation or a data item.",
+            raise ContractError("invalid_input", t("{name} holds no values (a trained model without predictions); a strategy reads the values of a factor, a model's predictions, an allocation or a data item.", name=name),
                                 {"parameter": parameter})
         if item.get("archivedAt") is not None:
             newer = next((other for other in library.store.item_versions(item["itemId"]) if other["archivedAt"] is None and other["state"] in ("updating", "failed", "fixed")), None)
-            raise ContractError("not_found", f"{name} v{item['version']} was archived; its values are gone." + (f" Switch to v{newer['version']}." if newer else ""),
+            raise ContractError("not_found", (t("{name} v{version} was archived; its values are gone. Switch to v{next_version}.",
+                        name=name, version=item['version'], next_version=newer['version'])
+                    if newer else t("{name} v{version} was archived; its values are gone.", name=name, version=item['version'])),
                                 {"parameter": parameter, **({"switchTo": newer["versionId"]} if newer else {})})
         async with library.reading:
             rows = await asyncio.to_thread(library.store.read_values, item["versionId"])
@@ -128,7 +131,7 @@ def replacement(path, by_instrument, field, name, prices, version=0):
     table = table.assign(native=table["instrument"].map(known))
     table = table[table["native"].notna()]
     if table.empty:
-        raise ContractError("invalid_input", "None of the instruments in the data given to q.backtest are among this strategy's symbols.")
+        raise ContractError("invalid_input", t("None of the instruments in the data given to q.backtest are among this strategy's symbols."))
     moved = milliseconds(table["datetime"])
     available = pd.Series(pd.NA, index=table.index, dtype="Int64")
     if "availableAt" in table:
@@ -140,7 +143,7 @@ def replacement(path, by_instrument, field, name, prices, version=0):
         keys = pd.MultiIndex.from_arrays([table.loc[missing, "native"], moved.loc[missing]])
         available.loc[missing] = clocks["knownAt"].reindex(keys).to_numpy()
         if available.isna().any():
-            raise ContractError("invalid_input", "A signal without availableAt must name a bar in the frozen price history.")
+            raise ContractError("invalid_input", t("A signal without availableAt must name a bar in the frozen price history."))
     available = available.astype("int64")
     frame = pd.DataFrame({"name": name, "instrument": table["native"].to_numpy(), "field": field, "value": table["value"].astype(float).to_numpy(), "version": version,
                           "ts_event": (moved.clip(upper=available) * NS).to_numpy(), "ts_init": (available * NS).to_numpy()})

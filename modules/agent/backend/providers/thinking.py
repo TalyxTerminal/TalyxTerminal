@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 # Token budgets for models that only take a thinking budget, clamped into the model's own range.
 BUDGETS = {"low": 1024, "medium": 8192, "high": 24576}
@@ -108,7 +109,7 @@ def level(thinking, choice):
     if choice is None:
         return None
     if not isinstance(choice, dict) or set(choice) != {"effort"} or choice["effort"] not in thinking["levels"]:
-        raise ContractError("invalid_input", "Choose one of this model's thinking levels", {"levels": thinking["levels"]})
+        raise ContractError("invalid_input", t("Choose one of this model's thinking levels"), {"levels": thinking["levels"]})
     return choice["effort"]
 
 

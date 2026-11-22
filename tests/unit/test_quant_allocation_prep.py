@@ -9,7 +9,7 @@ POOL = [{"ticker": name, "group": group} for name, group in (("A", "Stocks"), ("
 
 def refused(params, pool=POOL):
     with pytest.raises(ContractError) as error:
-        P.check_values_before_run(params, pool)
+        P.check_values_before_run({"benchmark": P.DEFAULT_BENCHMARK, **params}, pool)
     return error.value
 
 
@@ -23,8 +23,8 @@ def test_infeasible_limits_before_first_period():
     assert "Limits can't add up to 100%" in error.message and "4 assets x 20% = 80%" in error.message and error.details["fields"] == ["max_weight"]
     error = refused({"group_limits": [{"group": "Stocks", "max": "30"}, {"group": "Bonds", "max": "30"}]})
     assert "the group limits allow 60% (Stocks 30%, Bonds 30%)" in error.message and "group_limits" in error.details["fields"]
-    assert P.check_values_before_run({"max_weight": "25"}, POOL)  # four at 25% is exactly 100%: it adds up
-    assert P.check_values_before_run({"max_weight": "20", "short_cap": 30}, POOL)  # with shorts the long side can reach past the cap
+    assert P.check_values_before_run({"max_weight": "25", "benchmark": "SPY"}, POOL)  # four at 25% is exactly 100%: it adds up
+    assert P.check_values_before_run({"max_weight": "20", "short_cap": 30, "benchmark": "SPY"}, POOL)  # with shorts the long side can reach past the cap
 
 
 def test_a_limit_that_is_not_a_number_is_named():
@@ -75,10 +75,18 @@ def test_the_costs_are_the_pools_groups_as_charged():
     assert P.costs_of({"costs": [{"group": "Stocks", "bps": 5}]}, pool) == [{"group": "Stocks", "bps": 5.0}, {"group": "Gold", "bps": 0.0}]
 
 
-def test_a_tracking_limit_or_objective_needs_the_60_40_in_the_pool():
-    error = refused({"max_tracking": "4"})
-    assert error.details["fields"] == ["max_tracking"] and "SPY and IEF" in error.message
-    error = refused({"objective": "benchmark_tracking"})
-    assert error.details["fields"] == ["objective"] and "SPY and IEF" in error.message
-    pool = POOL + [{"ticker": "SPY", "group": "Funds"}, {"ticker": "IEF", "group": "Funds"}]
-    assert P.check_values_before_run({"max_tracking": "4", "objective": "benchmark_tracking"}, pool)
+def test_the_benchmark_is_any_symbols_with_weights_and_need_not_be_in_the_pool():
+    assert P.benchmark_parts(P.DEFAULT_BENCHMARK) == [("SPY", 60.0), ("IEF", 40.0)]
+    assert P.benchmark_parts("CN:000300.SH") == [("CN:000300.SH", 100.0)]
+    assert P.benchmark_parts("QQQ 50%, US:TLT 30%, GLD 20%") == [("QQQ", 50.0), ("US:TLT", 30.0), ("GLD", 20.0)]
+    assert P.check_values_before_run({"max_tracking": "4", "objective": "benchmark_tracking", "benchmark": "QQQ"}, POOL)  # QQQ is not in the pool
+    for text in ("", "SPY 60%, IEF 30%", "SPY 60, IEF 40", "SPY, IEF", "SPY six%"):
+        assert refused({"objective": "benchmark_tracking", "benchmark": text}).details["fields"] == ["benchmark"], text
+
+
+def test_the_risk_free_rate_starts_by_what_the_pool_holds():
+    def pool(*instruments):
+        return {"settings": {"data": {"symbols": [{"instrument": item} for item in instruments]}}}
+    a_share, us, coin = {"venueId": "CN", "assetClass": "equity"}, {"venueId": "US", "assetClass": "fund"}, {"venueId": "okx", "assetClass": "crypto"}
+    assert P.default_risk_free(pool(a_share, a_share)) == "fixed"
+    assert P.default_risk_free(pool(us, a_share)) == "tbill" and P.default_risk_free(pool(coin)) == "zero"

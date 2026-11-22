@@ -1,5 +1,6 @@
 /* A factor's page: one row on top, the settings column, the formula box (or the code bar) over the selected run's Work, and under it
    the runs, the values of one day and the library factors most like it; for a factor in code, its code beside. Results come later. */
+import { t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ModuleView, TxButton, TxIcon, TxSkeleton, TxIconButton, TxDialog, TxMenu, TxRunButton, TxRunProgress, TxSegmented, useTxToast,
@@ -21,6 +22,7 @@ import { changedFields, runSettings, sweepAxes, sweepCount, type Draft } from ".
 import { SettingsColumn } from "./Settings";
 import { at, route } from "../types";
 import { PublishSheet } from "./PublishSheet";
+import { LongRunConfirm, isLong, sweepSeconds } from "../shared/LongRun";
 import "./factor.css";
 
 const RESULT_TAB_IDS = RESULT_TABS.map(item => item.value);
@@ -47,12 +49,12 @@ function useNow(on: boolean) {
 
 /** What the head's progress says about a run: the stage, a short count and the share done. */
 function progressOf(run: FactorRun): {stage: string; count?: string; value: number | null} {
-  if (run.state === "queued" || run.stage === "queued") return {stage: run.progress?.queue ? `Waiting in the queue (${run.progress.queue})` : "Waiting in the queue", value: null};
+  if (run.state === "queued" || run.stage === "queued") return {stage: run.progress?.queue ? t("Waiting in the queue ({queue})", { queue: run.progress.queue }) : t("Waiting in the queue"), value: null};
   const steps = run.progress?.steps ?? [];
   const now = [...steps].reverse().find(step => step.state === "running") ?? steps[steps.length - 1];
-  if (!now) return {stage: "Starting", value: null};
-  const words: Record<string, string> = {code: "Saving the code", data: "Fetching prices", facts: "Fetching industry and shares", environment: "Starting the research process",
-    compute: "Computing values", numbers: run.kind === "sweep" ? "Testing combinations" : "Groups, IC, checks", future: "Checking for future data"};
+  if (!now) return {stage: t("Starting"), value: null};
+  const words: Record<string, string> = {code: t("Saving the code"), data: t("Fetching prices"), facts: t("Fetching industry and shares"), environment: t("Starting the research process"),
+    compute: t("Computing values"), numbers: run.kind === "sweep" ? t("Testing combinations") : t("Groups, IC, checks"), future: t("Checking for future data")};
   const count = now.total ? `${now.done ?? 0} / ${now.total}` : undefined;
   return {stage: words[now.name] ?? now.name, count, value: now.total ? (now.done ?? 0) / now.total : null};
 }
@@ -243,7 +245,7 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
     if (!failed || !failedHere || !selected) return [];
     const message = failed.message.slice(0, 2000), [lead, ...rest] = message.split(":");
     const named = rest.length > 0 && /^[A-Za-z_][\w.]*$/.test(lead.trim());
-    return [{line: failed.line!, severity: "error", message, source: `run #${selected.number}`,
+    return [{line: failed.line!, severity: "error", message, source: t("run #{number}", { number: selected.number }),
       ...(named ? {title: lead.trim().slice(0, 200), detail: rest.join(":").trim() || message} : {detail: message})}];
   }, [failed, failedHere, selected?.number]);
   const editorProps = useMemo<Json>(() => document === null ? {} : {documentId: document.documentId, markers,
@@ -258,6 +260,7 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
   // ---------------------------------------------------------------- running
   const [chosenKind, setKind] = useState<"run" | "validate">("run");
   const [confirming, setConfirming] = useState(false);
+  const [long, setLong] = useState<number | null>(null);   // a sweep expected to take more than ten minutes waits for the user's word
   const count = sweepCount(draft);
   const heldOut = data.heldOutFrom ?? null;
   const validateTarget = selected?.kind === "heldout" ? list.find(item => item.id === selected.of) ?? null : usable(selected) ? selected : list.find(usable) ?? null;
@@ -266,8 +269,8 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
   // Validate is offered only when there is a completed run not yet scored on the held-out period; otherwise the button runs.
   const canValidate = heldOut !== null && validateTarget !== null && !validateTarget.heldOut;
   const kind = chosenKind === "validate" && canValidate ? "validate" : "run";
-  const blocked = mode === "formula" ? (formulaError !== null ? "Fix the formula first" : !draft.formula.trim() ? "Write a formula first" : null) : detail.errors.length ? "Fix the code settings first" : null;
-  const runLabel = kind === "validate" ? "Validate on held-out" : count > 1 ? `Sweep ${count}` : "Run";
+  const blocked = mode === "formula" ? (formulaError !== null ? t("Fix the formula first") : !draft.formula.trim() ? t("Write a formula first") : null) : detail.errors.length ? t("Fix the code settings first") : null;
+  const runLabel = kind === "validate" ? t("Validate on held-out") : count > 1 ? t("Sweep {count}", { count }) : t.c("action", "Run");
   const start = async (over: Partial<FactorRunSettings> = {}) => {
     setError(null);
     const params = mode === "code" ? Object.fromEntries(Object.entries(draft.params).filter(([name]) => detail.parameters.some(item => item.name === name))) : undefined;
@@ -283,6 +286,8 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
     if (active) return;
     if (blocked !== null) {setError(blocked); return;}   // Run is never greyed: pressed before the formula or settings can run, it says what to fix
     if (kind === "validate") {setConfirming(true); return;}
+    const seconds = count > 1 ? sweepSeconds(list.filter(item => item.kind === "run"), count) : null;
+    if (isLong(seconds)) {setLong(seconds); return;}
     void start().catch(fail);
   };
   const validate = async () => {
@@ -293,10 +298,10 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
     await loadRuns();
   };
   const kinds: TxRunKind[] = [
-    {id: "run", label: "Run", current: kind === "run" && count === 1},
-    {id: "sweep", label: count > 1 ? `Sweep ${count}` : "Sweep", hint: "a list in any setting", current: kind === "run" && count > 1},
+    {id: "run", label: t.c("action", "Run"), current: kind === "run" && count === 1},
+    {id: "sweep", label: count > 1 ? t("Sweep {count}", { count }) : t("Sweep"), hint: t("a list in any setting"), current: kind === "run" && count > 1},
     // Without a held-out period, a completed run, or with that run already scored, there is nothing to validate: the kind is not offered (the period is set in Run settings, Held out).
-    ...(canValidate ? [{id: "validate", label: "Validate on held-out", hint: `${heldPeriod}, once`, current: kind === "validate"}] : []),
+    ...(canValidate ? [{id: "validate", label: t("Validate on held-out"), hint: t("{heldPeriod}, once", { heldPeriod }), current: kind === "validate"}] : []),
   ];
   const pickKind = (id: string) => {
     if (id === "validate") {setKind("validate"); return;}
@@ -395,10 +400,10 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
       const note = restoreNotice(next);
       setRestored({id: target.id, note});
       onDetail(next); setDraftState(draftOf(next));
-      toast({title: "Settings of this combination set"});
+      toast({title: t("Settings of this combination set")});
     }, fail),
     create: (target, objectKind, cell) => void fapi.createFrom(target.id, objectKind, cell).then(created => {
-      toast({title: `New ${objectKind} with ${detail.name} #${target.number}`, detail: `Its input is this run's values; data settings follow #${target.number}.`});
+      toast({title: t("New {objectKind} with {name} #{number}", { objectKind, name: detail.name, number: target.number }), detail: t("Its input is this run's values; data settings follow #{number}.", { number: target.number })});
       onOpenObject(created.id);
     }, fail),
     compare: setCompareId,
@@ -416,7 +421,7 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
   // ---------------------------------------------------------------- the head
   const {items: lists} = useResearchLists(ctx, api);
   const indexes = useIndexMaterials(ctx);
-  const universe = universeText(data, lists, indexes.items) ?? "Set data";
+  const universe = universeText(data, lists, indexes.items) ?? t("Set data");
   const until = heldOut ? new Date(Date.parse(heldOut + "T00:00:00Z") - DAY).toISOString().slice(0, 10) : data.until;
   const period = data.since && until ? periodText(data.since, until) : null;
   const dataTo = (selected?.data?.dataTo ?? shownRun?.data?.dataTo) ?? null;
@@ -424,15 +429,15 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
   // The series beyond prices this data gives, by kind, with their start.
   const extra = extraSeries(fields?.fields ?? []);
   const sourceLabel = (sourceId: string) => fields?.sources.find(source => source.sourceId === sourceId)?.label ?? sourceId;
-  const chip = <button type="button" className="tx-datachip" title="Data settings">
+  const chip = <button type="button" className="tx-datachip" title={t("Data settings")}>
     <TxIcon name="list" /><b data-priority={1}>{universe}</b>
-    {period && <><span className="tx-sep" /><span data-priority={2}>{period}{heldOut && <span className="fx-t3">, then held out</span>}</span></>}
-    {dataTo !== null && <><span className="tx-sep" /><span data-priority={3} className="fx-t3">data to {mdy(dataTo).replace(/, \d{4}$/, "")}</span></>}
+    {period && <><span className="tx-sep" /><span data-priority={2}>{period}{heldOut && <span className="fx-t3">{t(", then held out")}</span>}</span></>}
+    {dataTo !== null && <><span className="tx-sep" /><span data-priority={3} className="fx-t3">{t("data to {dataTo}", { dataTo: mdy(dataTo).replace(/, \d{4}$/, "") })}</span></>}
     <TxIcon name="chevron" style={{transform: "rotate(90deg)"}} />
   </button>;
   const pageMenu: TxMenuItem[] = [
-    ...(mode === "code" ? [{id: "developer", label: "Open in Developer", icon: "external" as const, onSelect: () => void ctx.platform.panels.openTarget({module: "developer", panelType: "main", objectId: `file:${detail.entryUri}`}).catch(fail)}] : []),
-    {id: "common", label: "Open common code", icon: "folder", onSelect: () => void openCommonCode(ctx, api).catch(fail)},
+    ...(mode === "code" ? [{id: "developer", label: t("Open in Developer"), icon: "external" as const, onSelect: () => void ctx.platform.panels.openTarget({module: "developer", panelType: "main", objectId: `file:${detail.entryUri}`}).catch(fail)}] : []),
+    {id: "common", label: t("Open common code"), icon: "folder", onSelect: () => void openCommonCode(ctx, api).catch(fail)},
     ...menu,
   ];
   // While a divider is dragged the size lives here; the panel state is written once, on release.
@@ -467,61 +472,61 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
   const focusFormula = () => (window.document.querySelector(".fx-fcode textarea") as HTMLTextAreaElement | null)?.focus();
   const runLine = draft.run;
   const firstLines = [
-    {label: "Names", value: universe, missing: universe === "Set data", onClick: () => setDataOpen(true)},
-    {label: "Period", value: period ? <>{period}{heldOut && <span className="fx-t3">, then held out</span>}</> : "Set data", missing: !period, onClick: () => setDataOpen(true)},
-    ...(mode === "formula" ? [{label: "Formula", value: draft.formula.trim() ? <code className="fx-firstformula">{highlight(draft.formula, formulaError)}</code> : "none yet",
+    {label: t("Names"), value: universe, missing: universe === t("Set data"), onClick: () => setDataOpen(true)},
+    {label: t("Period"), value: period ? <>{period}{heldOut && <span className="fx-t3">{t(", then held out")}</span>}</> : t("Set data"), missing: !period, onClick: () => setDataOpen(true)},
+    ...(mode === "formula" ? [{label: t("Formula"), value: draft.formula.trim() ? <code className="fx-firstformula">{highlight(draft.formula, formulaError)}</code> : t("none yet"),
       missing: !draft.formula.trim() || formulaError !== null, onClick: focusFormula}] : []),
-    {label: "Test", value: `${runLine.holding}-day holding, ${runLine.grouping.method === "equal" ? `${runLine.grouping.count} equal groups` : runLine.grouping.method === "cuts" ? `cut at ${runLine.grouping.cuts}` : "by sign"}`,
-      onClick: () => flash("holding")},
-    {label: "Cost", value: `${runLine.costBps} bps a trade, borrow ${runLine.borrowPct}% a year`, onClick: () => flash("costBps")},
+    {label: t("Test"), value: t("{days}-day holding, {grouping}", { days: runLine.holding, grouping: runLine.grouping.method === "equal" ? t("{count} equal groups", { count: String(runLine.grouping.count) }) : runLine.grouping.method === "cuts" ? t("cut at {cuts}", { cuts: String(runLine.grouping.cuts) }) : t("by sign") }), onClick: () => flash("holding")},
+    {label: t("Cost"), value: t("{cost} bps a trade, borrow {borrow}% a year", { cost: runLine.costBps, borrow: runLine.borrowPct }), onClick: () => flash("costBps")},
   ];
 
   return <div className="qx-page fx-page" onKeyDownCapture={event => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {event.preventDefault(); event.stopPropagation(); run();}
   }}>
     <div className="tx-panelhead fx-head">
-      {title}<span className="fx-kind">Factor</span>
+      {title}<span className="fx-kind">{t("Factor")}</span>
       <DataSettingsChip ctx={ctx} api={api} kind="factor" data={data} defaults={null} defaultsError={null} boundary={null} open={dataOpen} onOpenChange={setDataOpen}
         onSave={async next => onDetail(await api.settings(detail.id, {data: next}))} trigger={chip}>
         <div className="fx-dpop">
-          <div className="fx-dr"><span>Held out</span><span className="fx-ro">{heldOut ? <><TxIcon name="lock" />from {dayText(heldOut)}</> : <span className="fx-t3">none</span>}</span></div>
-          <div className="fx-dr"><span>Data to</span><span className="fx-ro">{dataTo !== null ? mdy(dataTo) : <span className="fx-t3">known after a run</span>}</span></div>
-          {extra.length > 0 && <div className="fx-lim fx-extra"><h5>Extra series</h5>{extra.map(group => <div key={group.group} className="fx-xrow">
+          <div className="fx-dr"><span>{t("Held out")}</span><span className="fx-ro">{heldOut ? <><TxIcon name="lock" />{t("from {heldOut}", { heldOut: dayText(heldOut) })}</> : <span className="fx-t3">{t("none")}</span>}</span></div>
+          <div className="fx-dr"><span>{t("Data to")}</span><span className="fx-ro">{dataTo !== null ? mdy(dataTo) : <span className="fx-t3">{t("known after a run")}</span>}</span></div>
+          {extra.length > 0 && <div className="fx-lim fx-extra"><h5>{t("Extra series")}</h5>{extra.map(group => <div key={group.group} className="fx-xrow">
             <b>{group.group}</b>
-            {group.available.map(field => <span key={field.name} title={[field.label, field.note].filter(Boolean).join(". ")}><code>{field.name}</code>{field.from ? <span className="fx-t3"> from {fromText(field.from)}</span> : null}</span>)}
+            {group.available.map(field => <span key={field.name} title={[field.label, field.note].filter(Boolean).join(". ")}><code>{field.name}</code>{field.from ? <span className="fx-t3">{t(" from {from}", { from: fromText(field.from) })}</span> : null}</span>)}
           </div>)}</div>}
-          {fields !== null && fields.limits.length > 0 && <div className="fx-lim"><h5>Data limits {fields.limits.length}{fields.sources.length > 0 && <span className="fx-t4">{fields.sources.map(item => item.label).join(", ")}</span>}</h5>
+          {fields !== null && fields.limits.length > 0 && <div className="fx-lim"><h5>{t("Data limits {limitsCount}", { limitsCount: fields.limits.length })}{fields.sources.length > 0 && <span className="fx-t4">{fields.sources.map(item => item.label).join(", ")}</span>}</h5>
             {fields.limits.map((limit, index) => <div key={index} title={sourceLabel(limit.sourceId)}>{limit.text}</div>)}</div>}
         </div>
       </DataSettingsChip>
       <span className="tx-spacer" />
       {/* The selected run's own head carries its Results' progress (as in the draft); the page head only for another run's. */}
-      {building && !(pageView === "work" && building.id === selected?.id) && <TxRunProgress run={`#${building.number}`} stage="Results in the background" count={`${Math.round((building.resultsProgress ?? 0) * 100)}%`} value={building.resultsProgress} />}
+      {building && !(pageView === "work" && building.id === selected?.id) && <TxRunProgress run={`#${building.number}`} stage={t("Results in the background")} count={`${Math.round((building.resultsProgress ?? 0) * 100)}%`} value={building.resultsProgress} />}
       {active && progress ? <TxRunProgress run={`#${active.number}`} stage={progress.stage} count={progress.count} value={progress.value} elapsed={elapsed(Math.max(0, now - active.createdAt) / 1000)}
           steps={steps} onStop={() => void fapi.cancel(active.id).then(() => loadRuns(), fail)} />
         : <>
-          {changes > 0 && base && <span className="fx-chgl">{changes === 1 ? "1 change" : `${changes} changes`} since #{base.number}</span>}
+          {changes > 0 && base && <span className="fx-chgl">{(changes === 1 ? t("1 change since #{number}", { number: base.number }) : t("{changes} changes since #{number}", { changes, number: base.number }))}</span>}
           <TxRunButton label={runLabel} kinds={kinds} onRun={run} onKind={pickKind} locked={kind === "validate"}
-            title={blocked ?? (kind === "validate" && validateTarget ? `Validate #${validateTarget.number} on ${heldPeriod} (Ctrl+Enter)` : `${runLabel} (Ctrl+Enter)`)} />
-          <TxDialog open={confirming && validateTarget !== null} onOpenChange={setConfirming} title={`Validate #${validateTarget?.number} on held-out?`}
-            footer={<><TxButton size="sm" onClick={() => setConfirming(false)}>Cancel</TxButton>
-              <TxButton size="sm" variant="primary" data-autofocus="" onClick={() => void validate().catch(fail)}><TxIcon name="lock" />Validate #{validateTarget?.number}</TxButton></>}>
-            <div className="fx-cfm">{heldOutUsedLine(usedBefore) && <p className="fx-attn" role="status">{heldOutUsedLine(usedBefore)}</p>}<p>Scores #{validateTarget?.number} once on {heldPeriod} and tags the run Held-out. After you have seen it, choices made on it are no longer out of sample; checks keep using in-sample data only.</p></div>
+            title={blocked ?? (kind === "validate" && validateTarget ? t("Validate #{number} on {heldPeriod} (Ctrl+Enter)", { number: validateTarget.number, heldPeriod }) : t("{runLabel} (Ctrl+Enter)", { runLabel }))} />
+          <TxDialog open={confirming && validateTarget !== null} onOpenChange={setConfirming} title={t("Validate #{number} on held-out?", { number: validateTarget?.number ?? "" })}
+            footer={<><TxButton size="sm" onClick={() => setConfirming(false)}>{t("Cancel")}</TxButton>
+              <TxButton size="sm" variant="primary" data-autofocus="" onClick={() => void validate().catch(fail)}><TxIcon name="lock" />{t("Validate #{number}", { number: validateTarget?.number ?? "" })}</TxButton></>}>
+            <div className="fx-cfm">{heldOutUsedLine(usedBefore) && <p className="fx-attn" role="status">{heldOutUsedLine(usedBefore)}</p>}<p>{t("Scores #{number} once on {heldPeriod} and tags the run Held-out. After you have seen it, choices made on it are no longer out of sample; checks keep using in-sample data only.", { number: validateTarget?.number ?? "", heldPeriod })}</p></div>
           </TxDialog>
+          {long !== null && <LongRunConfirm title={t("Sweep {count} combinations?", { count })} seconds={long} label={runLabel} onCancel={() => setLong(null)} onConfirm={() => {setLong(null); void start().catch(fail);}} />}
         </>}
-      <TxSegmented label="Work or Results" value={pageView} options={[{value: "work", label: "Work"}, {value: "results", label: "Results"}]}
+      <TxSegmented label={t("Work or Results")} value={pageView} options={[{value: "work", label: t("Work")}, {value: "results", label: t("Results")}]}
         onChange={next => update({factorView: next === "results" ? "results" : undefined})} />
       {mode === "code" && <button type="button" className="tx-codetoggle" aria-pressed={codeShown} onClick={() => update({side: codeShown ? undefined : "code"})}>
-        <TxIcon name="code" /><span>{codeShown ? "Hide code" : "Show code"}</span></button>}
-      <TxMenu label="Actions" align="end" items={pageMenu} trigger={<TxIconButton label="Actions" icon="more" />} />
+        <TxIcon name="code" /><span>{codeShown ? t("Hide code") : t("Show code")}</span></button>}
+      <TxMenu label={t("Actions")} align="end" items={pageMenu} trigger={<TxIconButton label={t("Actions")} icon="more" />} />
     </div>
     {restored?.note && restored.id === selected?.id && <div className="qx-note" role="status">{restored.note}</div>}
-    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>Dismiss</TxButton></div>}
+    {error && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>{t("Dismiss")}</TxButton></div>}
     <div className="fx-desk" style={{["--fx-side" as string]: `${side * 100}%`}}>
       <div className="fx-view">
-        {pageView === "results" ? <div className="fx-main">{runs === null ? <ResultsSkeleton /> : noResults ? first ? <NoResultsYet lines={firstLines} toWork={() => update({factorView: undefined})} /> : <p className="fx-empty">No finished run yet</p> : <ResultsView fapi={fapi} run={resultsRun} selected={selected} runs={list} tab={resultsTab} cell={resultsRun?.kind === "sweep" ? cell : undefined}
+        {pageView === "results" ? <div className="fx-main">{runs === null ? <ResultsSkeleton /> : noResults ? first ? <NoResultsYet lines={firstLines} toWork={() => update({factorView: undefined})} /> : <p className="fx-empty">{t("No finished run yet")}</p> : <ResultsView fapi={fapi} run={resultsRun} selected={selected} runs={list} tab={resultsTab} cell={resultsRun?.kind === "sweep" ? cell : undefined}
           onTab={next => update({factorResults: next})} vs={state.factorVs ?? []} onVs={ids => update({factorVs: ids})}
-          universe={data => universeText(data, lists, indexes.items) ?? "Set data"} handlers={handlers} />}</div> : <>
+          universe={data => universeText(data, lists, indexes.items) ?? t("Set data")} handlers={handlers} />}</div> : <>
         <SettingsColumn mode={mode} parameters={detail.parameters} errors={detail.errors} draft={draft} changed={changed} library={library} heldOutFrom={heldOut}
           industries={fields?.industries ?? null} neutralizeDefault={fields?.neutralizeDefault ?? null} base={base} onRevert={() => {if (base) void select(base.id).catch(fail);}}
           onDraft={setDraft} onHeldOut={day => void api.settings(detail.id, {data: {...data, heldOutFrom: day}}).then(onDetail, fail)} onLine={(target, line) => goLine(target, line)} />
@@ -529,15 +534,15 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
           {mode === "formula"
             ? <FormulaBox value={draft.formula} error={formulaError} fields={fields} focusKey={firstEmpty} onChange={formula => setDraft({...draft, formula})} onRun={run}
               onToCode={() => void fapi.toCode(detail.id, draft.formula).then(next => {onDetail(next); update({side: "code"});}, fail)} />
-            : selected !== null && selected.mode === "formula" && selected.formula ? <div className="fx-fbox fx-codebar"><div className="fx-fline"><span className="fx-t3" data-priority={1}>Formula of #{selected.number}</span>
-              <code className="fx-oldformula" title={selected.formula}>{selected.formula}</code><span className="tx-spacer" /><span className="fx-t3" data-priority={3}>made before the factor became code</span></div></div>
-            : <div className="fx-fbox fx-codebar"><div className="fx-fline"><TxIcon name="code" className="fx-t3" /><span data-priority={1}>Code in Developer</span>
+            : selected !== null && selected.mode === "formula" && selected.formula ? <div className="fx-fbox fx-codebar"><div className="fx-fline"><span className="fx-t3" data-priority={1}>{t("Formula of #{number}", { number: selected.number })}</span>
+              <code className="fx-oldformula" title={selected.formula}>{selected.formula}</code><span className="tx-spacer" /><span className="fx-t3" data-priority={3}>{t("made before the factor became code")}</span></div></div>
+            : <div className="fx-fbox fx-codebar"><div className="fx-fline"><TxIcon name="code" className="fx-t3" /><span data-priority={1}>{t("Code in Developer")}</span>
               <span className="fx-files">{(files.length ? files : [detail.entry]).map(name => <button key={name} type="button" className="fx-ftag" data-on={codeShown && name === file ? "" : undefined}
                 onClick={() => {setFile(name); update({side: "code"});}}>{name}</button>)}</span>
-              <span className="fx-t3" data-priority={3}>{document?.dirty ? "unsaved changes" : document?.savedAt ? `saved ${when(document.savedAt)}` : ""}</span><span className="tx-spacer" />
-              {codeShown ? <span className="fx-t3" data-priority={2}>Ctrl+Enter runs</span> : <TxButton size="sm" variant="quiet" onClick={() => update({side: "code"})}>Show code</TxButton>}</div></div>}
+              <span className="fx-t3" data-priority={3}>{document?.dirty ? t("unsaved changes") : document?.savedAt ? t("saved {savedAt}", { savedAt: when(document.savedAt) }) : ""}</span><span className="tx-spacer" />
+              {codeShown ? <span className="fx-t3" data-priority={2}>{t("Ctrl+Enter runs")}</span> : <TxButton size="sm" variant="quiet" onClick={() => update({side: "code"})}>{t("Show code")}</TxButton>}</div></div>}
           {first ? <div className="fx-firstwrap"><FirstRun lines={firstLines}>
-            {mode === "formula" && <Starters title="Start from a price style" items={starters.filter(item => item.formula).map(item => ({id: item.id, name: item.label, title: item.description, body: highlight(item.formula!, null)}))}
+            {mode === "formula" && <Starters title={t("Start from a price style")} items={starters.filter(item => item.formula).map(item => ({id: item.id, name: item.label, title: item.description, body: highlight(item.formula!, null)}))}
               onPick={id => {const found = starters.find(item => item.id === id); if (found?.formula) {setDraft({...draft, formula: found.formula}); focusFormula();}}} />}
           </FirstRun></div> : <>
           <div className="fx-res" ref={resultBox} style={full ? {display: "none"} : resultHeight ? {flex: `0 0 ${resultHeight}px`} : undefined}>
@@ -545,18 +550,17 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
               editedHolding={base && draft.run.holding !== base.settings.run.holding ? draft.run.holding : null} valuesDate={tab === "values" && cross ? cross.date : null} handlers={handlers}
               fallback={shownRun !== null && shownWork ? {run: shownRun, work: shownWork} : null} />}</div>
           </div>
-          {!full && <div className="fx-hgut" role="separator" aria-label="Resize" onPointerDown={drag} onDoubleClick={() => update({factorHeight: undefined})} />}
+          {!full && <div className="fx-hgut" role="separator" aria-label={t("Resize")} onPointerDown={drag} onDoubleClick={() => update({factorHeight: undefined})} />}
           <div className="fx-bot" data-grow={resultHeight || full ? "" : undefined}>
             <div className="fx-btabs" role="tablist">
-              <button type="button" role="tab" className="fx-tab" aria-selected={tab === "runs"} onClick={() => update({factorTab: "runs"})}>Runs<span className="fx-cnt">{list.length}</span></button>
+              <button type="button" role="tab" className="fx-tab" aria-selected={tab === "runs"} onClick={() => update({factorTab: "runs"})}>{t("Runs")}<span className="fx-cnt">{list.length}</span></button>
               {shownRun !== null && <><button type="button" role="tab" className="fx-tab" aria-selected={tab === "values"} onClick={() => update({factorTab: "values"})}>
-                {cross ? `Values on ${mdy(cross.date)}` : "Values"}</button>
-              <button type="button" role="tab" className="fx-tab" aria-selected={tab === "similar"} onClick={() => update({factorTab: "similar"})}>
-                Similar in library<span className="fx-cnt">{shownWork?.similar?.filter(item => !item.style).length ?? 0}</span></button></>}
+                {cross ? t("Values on {date}", { date: mdy(cross.date) }) : t("Values")}</button>
+              <button type="button" role="tab" className="fx-tab" aria-selected={tab === "similar"} onClick={() => update({factorTab: "similar"})}>{t("Similar in library")}<span className="fx-cnt">{shownWork?.similar?.filter(item => !item.style).length ?? 0}</span></button></>}
               <span className="tx-spacer" />
               {tab === "runs" && compareLabel(ticked.size) !== null && <TxButton size="sm" variant="quiet" className="fx-cmp"
                 onClick={() => update({factorView: "results", factorResults: "returns", factorVs: [...ticked]})}>{compareLabel(ticked.size)}</TxButton>}
-              <TxIconButton size="sm" label={full ? "Back to the result" : "Fill the work area"} icon={full ? "restore" : "maximize"} onClick={() => update({factorFull: !full})} />
+              <TxIconButton size="sm" label={full ? t("Back to the result") : t("Fill the work area")} icon={full ? "restore" : "maximize"} onClick={() => update({factorFull: !full})} />
             </div>
             {tab === "values" && <ValuesBar cross={cross} order={order} query={query} flagged={flags.length ? flags.length : null} onOrder={setOrder} onQuery={setQuery}
               onDate={value => setDate(value)} onFlag={goFlag} />}
@@ -571,19 +575,19 @@ export function FactorPage({ctx, api, detail, onDetail, state, update, title, me
           </div></>}
         </div></>}
       </div>
-      {codeShown && <><div className="fx-vsplit" role="separator" aria-label="Resize the code" onPointerDown={dragSide} />
-        <section className="fx-code" aria-label="Code">
+      {codeShown && <><div className="fx-vsplit" role="separator" aria-label={t("Resize the code")} onPointerDown={dragSide} />
+        <section className="fx-code" aria-label={t("Code")}>
           <div className="fx-codetabs">{(files.length ? files : [detail.entry]).map(name => <button key={name} type="button" className="fx-ftab" aria-selected={name === file} onClick={() => setFile(name)}>{name}</button>)}
-            <span className="tx-spacer" /><TxIconButton size="sm" label="Hide code" icon="close" onClick={() => update({side: undefined})} /></div>
-          {oldCode !== null && snapText !== null && <div className="fx-snaphead"><span>Code of #{oldCode.number}, read-only</span><span className="tx-spacer" />
-            <TxButton size="sm" onClick={restoreCode}>Restore this code</TxButton></div>}
-          <div className="fx-editor">{oldCode !== null && snapText !== null ? <pre className="fx-snap" aria-label={`Code of #${oldCode.number}`}>{snapText}</pre>
-            : document === null ? <p className="fx-empty">Opening code…</p> : <ModuleView id="developer.editor" context={ctx} props={editorProps} />}</div>
-          <div className="fx-sb"><span>Factor</span>
-            {codeFailure ? <button type="button" className="fx-attn fx-sbline" role="alert" onClick={() => goLine(codeFailure.file, codeFailure.line!)}>Line {codeFailure.line}: {codeFailure.message.split(":")[0]}</button>
-              : selected ? <span>Code of #{oldCode !== null && snapText !== null ? oldCode.number : (latestRun ?? selected).number}</span> : null}
-            {paramOverrides.map(item => <span key={item.name} className="fx-attn">{item.name} = {String(draft.params[item.name])} from settings</span>)}
-            <span className="tx-spacer" /><span>{document?.dirty ? "Unsaved" : ""}</span><span>Ctrl+Enter runs</span></div>
+            <span className="tx-spacer" /><TxIconButton size="sm" label={t("Hide code")} icon="close" onClick={() => update({side: undefined})} /></div>
+          {oldCode !== null && snapText !== null && <div className="fx-snaphead"><span>{t("Code of #{number}, read-only", { number: oldCode.number })}</span><span className="tx-spacer" />
+            <TxButton size="sm" onClick={restoreCode}>{t("Restore this code")}</TxButton></div>}
+          <div className="fx-editor">{oldCode !== null && snapText !== null ? <pre className="fx-snap" aria-label={t("Code of #{number}", { number: oldCode.number })}>{snapText}</pre>
+            : document === null ? <p className="fx-empty">{t("Opening code…")}</p> : <ModuleView id="developer.editor" context={ctx} props={editorProps} />}</div>
+          <div className="fx-sb"><span>{t("Factor")}</span>
+            {codeFailure ? <button type="button" className="fx-attn fx-sbline" role="alert" onClick={() => goLine(codeFailure.file, codeFailure.line!)}>{t("Line {line}: {message}", { line: codeFailure.line ?? "", message: codeFailure.message.split(":")[0] })}</button>
+              : selected ? <span>{t("Code of #{number}", { number: oldCode !== null && snapText !== null ? oldCode.number : (latestRun ?? selected).number })}</span> : null}
+            {paramOverrides.map(item => <span key={item.name} className="fx-attn">{t("{name} = {params} from settings", { name: item.name, params: String(draft.params[item.name]) })}</span>)}
+            <span className="tx-spacer" /><span>{document?.dirty ? t("Unsaved") : ""}</span><span>{t("Ctrl+Enter runs")}</span></div>
         </section></>}
     </div>
     {publishing && <PublishSheet ctx={ctx} runId={publishing.id} runName={detail.name} open onClose={() => setPublishing(null)} onPublished={() => void loadRuns()} />}

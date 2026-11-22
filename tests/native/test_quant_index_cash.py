@@ -8,6 +8,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from tests.fixtures.quant_index import frozen_index
+from tests.fixtures.strategy.engine import sessions_file
 from tests.fixtures.strategy.instruments import stock_item
 from tests.native.test_nautilus_fees import interpreter
 
@@ -64,7 +66,7 @@ class BuyBoth(q.Strategy):
         for session in item['stock']['sessions'][:2]:
             rows.append({'instrument':item['id'],'barType':kind,
                 **dict(zip(('open','high','low','close'),session['adjustedOHLC'],strict=True)),
-                'volume':session['adjustedVolume'],'ts_event':str(session['closeAt']*1_000_000),'ts_init':str(session['closeAt']*1_000_000)})
+                'volume':session['adjustedVolume'],'ts_event':session['closeAt']*1_000_000,'ts_init':session['closeAt']*1_000_000})
     bars = tmp_path/'bars.parquet'
     pd.DataFrame(rows).to_parquet(bars,index=False)
     config = {'engine':'nautilus','task':'event','dataType':'bars','timezone':'UTC','priceBasis':'split_dividend',
@@ -74,14 +76,16 @@ class BuyBoth(q.Strategy):
         'output':str(output),'library':None,'materials':[{'role':'market_data','path':str(bars)}],'mode':'run','operation':'strategy.backtest',
         'options':{},'sourceRefs':[],'annualization':252,'barTypes':kinds,'params':{},'backtest':config,'recipeRef':None,
         'libraryValues':{'path':None,'items':[]},'models':[],'index':None}
+    invocation['stockSessions'] = sessions_file(tmp_path, instruments)
     if indexed:
         closes = sorted({int(row['ts_init'])//1_000_000 for row in rows})
         a, b = [{'instrumentId': item['id']} for item in instruments]
-        members = [{'assetId': item['instrumentId'], 'instrument': item} for item in [a, b]]
+        members = [{'assetId': item['instrumentId'], 'instrumentId': item['instrumentId'], 'symbol': item['instrumentId']} for item in [a, b]]
         invocation['index'] = {'selection': {}, 'since': 0, 'until': closes[-1], 'limitation': 'Free source', 'exclusions': [],
             'instruments': [a, b], 'nativeInstruments': {item['id']: item['id'] for item in instruments},
             'intervals': [{'since': 0, 'until': closes[0], 'members': members[:1]},
                           {'since': closes[0]+1, 'until': closes[-1], 'members': members}]}
+        invocation['index'] = frozen_index(invocation['index'])
     path = tmp_path/'invocation.json'
     path.write_text(json.dumps(invocation),encoding='utf8')
     done = subprocess.run([str(interpreter()),'-B',str(QUANT/'native/object_worker.py'),str(path)],cwd=source,

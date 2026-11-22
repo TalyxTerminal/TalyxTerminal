@@ -71,7 +71,7 @@ def test_same_day_new_revision_creates_new_frozen_data_and_keeps_old_prices(tmp_
     async def prepare(ctx, data, owner, directory, **kwargs):
         state["reads"] += 1
         path = directory / "bars.parquet"
-        pd.DataFrame({"label": [0], "close": [state["close"]]}).to_parquet(path)
+        pd.DataFrame({"label": [0], "column": ["A"], "close": [state["close"]]}).to_parquet(path)
         info = {"since": 0, "until": 1, "timeframe": "1d", "adjusted": True, "revisions": {"series": state["revision"]},
                 "instruments": [{"instrumentId": "a", "column": "A", "instrument": instrument,
                     "series": {"sessionScope": "continuous"}, "revision": state["revision"], "source": {"sourceId": "source"}}]}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import ai_views, library_inputs, public_settings, strategy_settings
 from .object_store import NO_PARAMETERS
@@ -75,7 +76,7 @@ async def summary(services, record):
             account.get("fee"),
             "account settings" if account.get("fee") else None,
             held_out=data.get("heldOutFrom"),
-            names=len(instruments) or 1,
+            market=strategy_settings.market_of({**data, "symbols": [{"instrument": item} for item in instruments]}),
         )
     history = services.home.runs_by_object(record["id"]).get(record["id"], [])
     _, chosen = services.home.representative(
@@ -140,7 +141,7 @@ def handle_objects(ctx, services):
         obj = store.read(args["objectId"])
         part = args.get("part", "summary")
         if "cursor" in args and part != "code":
-            raise ContractError("invalid_input", "cursor applies to part code.")
+            raise ContractError("invalid_input", t("cursor applies to part code."))
         if part == "notebook":
             found = await services.notebooks.files.read(obj["id"])
             document = await complete_json(ctx, {"version": found["version"], "notebook": found["notebook"]}, "notebook.json")
@@ -168,7 +169,6 @@ def handle_objects(ctx, services):
                 "params": settings_view(found["groups"], found["values"], {}),
                 "algorithm": found["algorithm"], "algorithms": found["algorithms"],
                 "inputsAvailable": found["offers"], "run": public_settings.run_out(obj, found["run"]),
-                "batchLimit": found["batchLimit"],
                 "concepts": services.models.concepts(identity)})}
         if kind == "allocation" and standard:
             found = ai_views.terse(ai_views.compact(await services.allocation.prep(identity)))
@@ -195,7 +195,7 @@ def handle_objects(ctx, services):
         store.check_version(obj, args.get("expectedVersion"))
         if "code" in args:
             if not isinstance(args["code"], str) or "formula" in args:
-                raise ContractError("invalid_input", "Supply a code file as text, or a formula.")
+                raise ContractError("invalid_input", t("Supply a code file as text, or a formula."))
             obj = store.code_target(obj)
         before = {k: obj[k] for k in ("name", "folder")}
         if "formula" in args:
@@ -209,10 +209,10 @@ def handle_objects(ctx, services):
             version = services.library.read_version(version_id)
             if version["name"] != name:
                 raise ContractError(
-                    "invalid_input", f"libraryInputs.{name} needs a version of {name}."
+                    "invalid_input", t("libraryInputs.{name} needs a version of {name}.", name=name)
                 )
             if version["state"] == "delisted" or version["archivedAt"] is not None:
-                raise ContractError("conflict", f"{name} no longer produces values.")
+                raise ContractError("conflict", t("{name} no longer produces values.", name=name))
         if pins and obj["kind"] == "strategy":
             updates = {**updates, "inputs": store.strategy_bindings(obj, updates, pins, args.get("code"))}
         store.check_version(store.read(obj["id"]), obj["version"])
@@ -243,12 +243,12 @@ def handle_objects(ctx, services):
         ]
         if len(sources) > 1 or "cell" in args and "fromRun" not in sources:
             raise ContractError(
-                "invalid_input", "Choose one object source. cell selects a combination of fromRun."
+                "invalid_input", t("Choose one object source. cell selects a combination of fromRun.")
             )
         kind, name = args["kind"], args.get("name")
         if "copyOf" in sources:
             if store.read(args["copyOf"])["kind"] != kind:
-                raise ContractError("invalid_input", "The source to copy has a different kind.")
+                raise ContractError("invalid_input", t("The source to copy has a different kind."))
             created = await store.copy(args["copyOf"], name)
         elif "fromVersion" in sources:
             if kind == "notebook":
@@ -266,7 +266,7 @@ def handle_objects(ctx, services):
             else:
                 raise ContractError(
                     "invalid_input",
-                    "A factor run can start a model or strategy. A model run can start a strategy.",
+                    t("A factor run can start a model or strategy. A model run can start a strategy."),
                 )
         elif "fromNotebook" in sources:
             extracted = {**args["fromNotebook"], "kind": kind, "name": name or "Untitled " + kind}
@@ -303,7 +303,7 @@ def handle_objects(ctx, services):
     async def write_as_code(args, call):
         obj = store.read(args["objectId"])
         if "formula" in args and obj["kind"] != "factor":
-            raise ContractError("invalid_input", "formula is used only by formula factors.")
+            raise ContractError("invalid_input", t("formula is used only by formula factors."))
         if obj["kind"] == "factor":
             await services.factors.to_code(
                 obj["id"], args.get("formula", obj["settings"].get("formula", ""))
@@ -315,7 +315,7 @@ def handle_objects(ctx, services):
         else:
             raise ContractError(
                 "invalid_input",
-                "write_as_code takes a standard model, allocation or formula factor.",
+                t("write_as_code takes a standard model, allocation or formula factor."),
             )
         return await summary(services, store.read(obj["id"]))
 

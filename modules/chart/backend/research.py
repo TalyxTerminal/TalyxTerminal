@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 from vocabulary.python.types import FileRef
@@ -24,24 +25,24 @@ def milliseconds(text: str) -> int:
         instant = datetime.fromisoformat(text)
         return int((instant if instant.tzinfo else instant.replace(tzinfo=UTC)).timestamp() * 1000)
     except (ValueError, OverflowError) as error:
-        raise ContractError("invalid_input", f"Invalid ISO-8601 time: {text}") from error
+        raise ContractError("invalid_input", t("Invalid ISO-8601 time: {text}", text=text)) from error
 
 
 def limit(item: str, count: int, maximum: int) -> None:
     if count > maximum:
-        raise ContractError("too_large", f"{item} contains {count:,} entries, {count - maximum:,} over the {maximum:,} limit")
+        raise ContractError("too_large", t("{item} contains {count} entries, {value} over the {maximum} limit", item=item, count=f'{count:,}', value=f'{count - maximum:,}', maximum=f'{maximum:,}'))
 
 
 def load_reference(ref: FileRef, module_data: Path) -> ResearchLayer:
     path = Path(ref.path).resolve()
     if not path.is_relative_to(module_data):
-        raise ContractError("invalid_input", "A research snapshot must come from module storage")
+        raise ContractError("invalid_input", t("A research snapshot must come from module storage"))
     try:
         data = path.read_bytes()
     except OSError as error:
-        raise ContractError("not_found", "The research snapshot file is unavailable") from error
+        raise ContractError("not_found", t("The research snapshot file is unavailable")) from error
     if len(data) != ref.bytes or hashlib.sha256(data).hexdigest() != ref.sha256:
-        raise ContractError("invalid_input", "The research snapshot differs from its file reference")
+        raise ContractError("invalid_input", t("The research snapshot differs from its file reference"))
     try:
         return ResearchLayer.model_validate_json(data)
     except ValidationError as error:
@@ -51,18 +52,18 @@ def load_reference(ref: FileRef, module_data: Path) -> ResearchLayer:
 def check_layer(layer: ResearchLayer) -> tuple[int, int, bool]:
     start, end = milliseconds(layer.window.start), milliseconds(layer.window.to)
     if end < start:
-        raise ContractError("invalid_input", "Research window ends before it starts")
+        raise ContractError("invalid_input", t("Research window ends before it starts"))
     try:
         step = timeframe_nanoseconds(layer.timeframe)
     except ValueError as error:
         raise ContractError("invalid_input", str(error)) from error
     panes = [pane.key for pane in layer.panes]
     if "price" in panes or len(panes) != len(set(panes)):
-        raise ContractError("invalid_input", "Research panes need unique keys distinct from price")
+        raise ContractError("invalid_input", t("Research panes need unique keys distinct from price"))
     for series in layer.series:
         limit(series.name, len(series.points), BAR_LIMIT)
         if series.pane != "price" and series.pane not in panes:
-            raise ContractError("invalid_input", f"{series.name} refers to unknown pane {series.pane}")
+            raise ContractError("invalid_input", t("{name} refers to unknown pane {pane}", name=series.name, pane=series.pane))
         for point in series.points:
             milliseconds(point.time)
     limit("Trade markers", len(layer.markers), MARKER_LIMIT)

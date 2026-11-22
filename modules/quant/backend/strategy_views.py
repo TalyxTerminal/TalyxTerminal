@@ -12,10 +12,11 @@ from pathlib import Path
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..native import figures as F
 from ..native import metrics as M
-from . import run_flow, strategy_settings, sweep_figures
+from . import object_data, run_flow, strategy_settings, sweep_figures
 from .object_history import parameter_diff
 from .strategy_checks import StrategyChecks
 
@@ -30,7 +31,7 @@ TOC = (("summary", "Summary"), ("equity", "Equity"), ("periods", "Periods"), ("r
 SECTIONS = tuple(name for name, _ in TOC)
 # What the strategy page reads of a run's Work (`page_run`): the numbers, checks, notes and the main figure, without the series the figure is drawn from,
 # the long tables it pages, or the code's own series and numbers (the chart and Results show those); the AI and other modules read `run`.
-PAGE_WORK = ("kind", "currency", "capital", "annualization", "riskFree", "benchmarkLabel", "stats", "shortSample", "costs", "notes", "dataNotes", "checks",
+PAGE_WORK = ("kind", "currency", "capital", "annualization", "riskFree", "benchmarkLabel", "stats", "costs", "notes", "dataNotes", "checks",
              "usedToPick", "heldOut", "partial", "stoppedAt", "figures", "tradesTotal", "logTotal")
 PAGE_MULTI = ("rebalancesTotal", "holdings", "holdingsTotal", "byInstrument", "contributions")
 # A rebalance's parts written as JSON text in rebalances.parquet.
@@ -103,9 +104,7 @@ def left_out(record):
     skipped = data.get("skipped") or []
     if not skipped:
         return []
-    total = len(skipped) + data["traded"]
-    shown = "; ".join(str(item.get("reason") or item.get("symbol")) for item in skipped[:3]) + (f"; and {len(skipped) - 3} more" if len(skipped) > 3 else "")
-    return [f"Left out {len(skipped)} of {total} names, so it traded {total - len(skipped)}: {shown}"]
+    return [object_data.left_out_text(skipped, len(skipped) + data["traded"])]
 
 
 def price_gaps(record):
@@ -117,6 +116,16 @@ def price_gaps(record):
             continue
         shown = ", ".join(days[:3]) + (f" and {len(days) - 3} more" if len(days) > 3 else "")
         out.append(f"{item['symbol']} has no prices on {shown}; the run went on through {'that day' if len(days) == 1 else 'those days'} without a bar for it")
+    return out
+
+
+def ended(record):
+    """Names whose prices stop before the run does (delisted, or the source has none after): the backtest sold what it held of them at their last close."""
+    out = []
+    for item in (record.get("data") or {}).get("ended") or []:
+        day = datetime.fromtimestamp(item["at"] / 1000, tz=UTC)
+        out.append(f"{item['symbol']}'s prices end on {day:%b} {day.day}, {day.year}, before the run does (delisted, or the source has none after): "
+                   "a position in it was sold at that day's close, and it could not be traded after")
     return out
 
 
@@ -203,7 +212,7 @@ class StrategyViews:
     def table(self, record, name):
         path = self.folder(record) / f"{name}.parquet"
         if not path.is_file():
-            raise ContractError("unavailable", f"This run has no {name} table.", {"state": record["state"]})
+            raise ContractError("unavailable", t("This run has no {name} table.", name=name), {"state": record["state"]})
         return pd.read_parquet(path)
 
     def shown(self, record):
@@ -280,7 +289,7 @@ class StrategyViews:
         """The second layer as set when the run started, over the defaults for `kind` (what it traded; a run stopped before its data was read has none)."""
         settings = record["settings"]
         return strategy_settings.effective(kind or (record["data"] or {}).get("tradedKind") or "perpetual", settings.get("run"), settings.get("account") or {},
-                                           held_out=settings["data"].get("heldOutFrom"))
+                                           held_out=settings["data"].get("heldOutFrom"), market=strategy_settings.market_of(settings["data"]))
 
     def changes(self, record, previous):
         """What changed against the run before: parameters, run settings, data settings and code, as [{what, from, to}]."""
@@ -321,7 +330,7 @@ class StrategyViews:
     def run(self, run_id, vs=None):
         record = self.object_runs.read(run_id)
         if record["objectKind"] != "strategy":
-            raise ContractError("invalid_input", "This is not a strategy run.")
+            raise ContractError("invalid_input", t("This is not a strategy run."))
         shown = self.shown(record)
         work = self.report(shown, "work")
         previous = self.before(record)
@@ -330,7 +339,7 @@ class StrategyViews:
         own = record["runKind"] not in ("sweep", "walk") or shown is not record  # a walk-forward, or a sweep with nothing picked, has no report of its own
         if work is None and record["state"] == "completed" and own:
             notes.append(OLD.format(number=number))
-        gaps = left_out(record) + price_gaps(record) + signal_gaps(record) + signal_coverage(record) + funding_gaps(work)
+        gaps = left_out(record) + price_gaps(record) + ended(record) + list((record.get("data") or {}).get("dataNotes") or []) + signal_gaps(record) + signal_coverage(record) + funding_gaps(work)
         notes += gaps
         inputs = record.get("inputs")
         if inputs is None:
@@ -521,9 +530,9 @@ class StrategyViews:
         record = self.shown(self.object_runs.read(run_id))
         report = self.report(record, "results")
         if report is None:
-            raise ContractError("unavailable", "This run has no Results yet.", {"state": record["state"]})
+            raise ContractError("unavailable", t("This run has no Results yet."), {"state": record["state"]})
         if section is not None and section not in SECTIONS:
-            raise ContractError("invalid_input", "Choose a section: " + ", ".join(SECTIONS) + ".")
+            raise ContractError("invalid_input", t("Choose a section: {sections}.", sections=', '.join(SECTIONS)))
         sections = {**report["sections"], "settings": self.settings_section(record)}
         work = self.report(record, "work")
         if isinstance(sections.get("trades"), dict):
@@ -677,7 +686,7 @@ class StrategyViews:
         obj = self.store.read(record["objectId"])
         used = self.run_settings_of(record)
         now = strategy_settings.effective((record["data"] or {}).get("tradedKind") or "perpetual", obj["settings"].get("run"), obj["settings"].get("account") or {},
-                                          held_out=obj["settings"]["data"].get("heldOutFrom"))
+                                          held_out=obj["settings"]["data"].get("heldOutFrom"), market=strategy_settings.market_of(record["settings"]["data"]))
         differs = {"param." + name: item for name, item in parameter_diff(record["params"], obj["settings"]["params"] | {key: value for key, value in record["params"].items()
                                                                                                                        if key not in obj["settings"]["params"]}).items()}
         data_then = dict(record["settings"]["data"])
@@ -703,7 +712,7 @@ class StrategyViews:
     @staticmethod
     def page(table, offset, limit):
         if limit > 500 or limit < 1:
-            raise ContractError("invalid_input", "A page is 1 to 500 rows.")
+            raise ContractError("invalid_input", t("A page is 1 to 500 rows."))
         rows = json.loads(table.iloc[offset:offset + limit].to_json(orient="records"))
         return {"rows": rows, "total": len(table), "offset": offset, "nextOffset": offset + limit if offset + limit < len(table) else None}
 
@@ -745,7 +754,7 @@ class StrategyViews:
 
     def log(self, run_id, offset=0, limit=1000, kind=None, trade=None, since=None):
         if limit > 1000 or limit < 1:
-            raise ContractError("invalid_input", "A log page is 1 to 1000 lines.")
+            raise ContractError("invalid_input", t("A log page is 1 to 1000 lines."))
         table = self.table(self.shown(self.object_runs.read(run_id)), "log")
         if table.empty:
             return {"rows": [], "total": 0, "offset": offset, "nextOffset": None}
@@ -762,7 +771,7 @@ class StrategyViews:
         """Every rebalance of a portfolio run, one a row, its parts as JSON text (`rebalance_rows` reads them)."""
         path = self.folder(record) / "rebalances.parquet"
         if not path.is_file():
-            raise ContractError("unavailable", "This run has no rebalances.")
+            raise ContractError("unavailable", t("This run has no rebalances."))
         return pd.read_parquet(path)
 
     @staticmethod
@@ -776,7 +785,7 @@ class StrategyViews:
     def rebalances(self, run_id, filter="changed", at=None, offset=0, limit=200, since=None, until=None):
         table = self.rebalance_table(self.shown(self.object_runs.read(run_id)))
         if limit > 200 or limit < 1:
-            raise ContractError("invalid_input", "A page of rebalances is 1 to 200 rows.")
+            raise ContractError("invalid_input", t("A page of rebalances is 1 to 200 rows."))
         if len(table):
             if since is not None:
                 table = table[table["at"] >= since]
@@ -797,7 +806,7 @@ class StrategyViews:
         from . import object_data
         record = self.store.read(object_id)
         if record["kind"] != "strategy":
-            raise ContractError("invalid_input", "Run settings of this kind belong to a strategy.")
+            raise ContractError("invalid_input", t("Run settings of this kind belong to a strategy."))
         data = record["settings"]["data"]
         if data.get("list"):
             data = {**data, "symbols": self.object_runs.lists.members(data["list"])}
@@ -812,9 +821,10 @@ class StrategyViews:
             except ContractError as error:
                 note = error.message
         stored = record["settings"].get("run") or {}
-        effective = strategy_settings.effective(kind, stored, account, fee, source, held_out=data.get("heldOutFrom"), names=names)
+        market = strategy_settings.market_of(data)
+        effective = strategy_settings.effective(kind, stored, account, fee, source, held_out=data.get("heldOutFrom"), market=market)
         built = self.also_built(object_id)
-        return {"objectId": object_id, "kind": kind, "effective": effective, "defaults": strategy_settings.defaults(kind, account, fee, source, names=names), "stored": stored,
+        return {"objectId": object_id, "kind": kind, "effective": effective, "defaults": strategy_settings.defaults(kind, account, fee, source, market=market), "stored": stored,
                 "applicable": {"exchange": strategy_settings.exchange_fields(kind), "margin": strategy_settings.margin_label(kind),
                                "benchmark": strategy_settings.benchmark_options(kind, names), "shorting": kind == "stock"},
                 **({"feeUnavailable": note} if note else {}), **({"alsoBuilt": built} if built else {})}
@@ -914,9 +924,9 @@ class StrategyViews:
                 if pin["name"] == name:
                     changed = (group, key, pin)
         if changed is None:
-            raise ContractError("not_found", f"The code does not read {name}, or no run has read it yet.", {"name": name})
+            raise ContractError("not_found", t("The code does not read {name}, or no run has read it yet.", name=name), {"name": name})
         if version["name"] != name or version["state"] == "delisted" or version.get("archivedAt") is not None:
-            raise ContractError("invalid_input", f"Choose an available version of {name}.")
+            raise ContractError("invalid_input", t("Choose an available version of {name}.", name=name))
         _, _, old = changed
         last = self.used_by(object_id, old["versionId"])
         last_run = self.object_runs.read(last) if last else None

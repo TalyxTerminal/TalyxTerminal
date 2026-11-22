@@ -12,6 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import research
 from .commands import CommandError, apply
@@ -61,12 +62,12 @@ class Charts:
         if entry is None:
             stored = self.store.chart(chart_id)
             if stored is None:
-                raise ContractError("not_found", f"No chart {chart_id}")
+                raise ContractError("not_found", t("No chart {chart_id}", chart_id=chart_id))
             entry = self.entries[chart_id] = Entry(chart_id, stored["workspace"], stored["revision"],
                                                    ChartDocument.model_validate(stored["document"]),
                                                    stored["savedRevision"])
         if entry.workspace != workspace:
-            raise ContractError("not_found", f"No chart {chart_id} in this workspace")
+            raise ContractError("not_found", t("No chart {chart_id} in this workspace", chart_id=chart_id))
         return entry
 
     @staticmethod
@@ -163,10 +164,10 @@ class Charts:
     async def commit(self, workspace: str, chart_id: str, base_revision: int, commands: list) -> dict:
         entry = self.entry(workspace, chart_id)
         if base_revision != entry.revision:
-            raise ContractError("conflict", "The chart changed meanwhile", {"revision": entry.revision})
+            raise ContractError("conflict", t("The chart changed meanwhile"), {"revision": entry.revision})
         resolved = await self.resolve(entry.document, commands)
         if base_revision != entry.revision:
-            raise ContractError("conflict", "The chart changed meanwhile", {"revision": entry.revision})
+            raise ContractError("conflict", t("The chart changed meanwhile"), {"revision": entry.revision})
         return self.commit_resolved(entry, resolved)
 
     def commit_resolved(self, entry: Entry, resolved: list[dict]) -> dict:
@@ -211,7 +212,7 @@ class Charts:
         for item in charts:
             entry = self.entry(workspace, item["chartId"])
             if item["revision"] != entry.revision:
-                raise ContractError("conflict", "The chart changed meanwhile", {"revision": entry.revision})
+                raise ContractError("conflict", t("The chart changed meanwhile"), {"revision": entry.revision})
             kept[entry.id] = entry
         removed = self.store.charts(workspace, saved_only=True) - kept.keys()
         with self.store.transaction():

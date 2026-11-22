@@ -19,6 +19,7 @@ from uuid import uuid4
 import pandas as pd
 import pyarrow.parquet as pq
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import allocation_prep as P
 from . import allocation_sweep as S
@@ -131,14 +132,15 @@ def group_caps(params, changes):
     return {**plain, "group_limits": limits}
 
 
-async def with_pool_market(ctx, data, params, pool, prepare, info_of=lambda ready: ready["info"]):
-    """`prepare(data)` with what the pool's rows ask of Market added to the frozen bars: each row's proxy, and the exchange rate of each currency that is not
-    the allocation's. Returns (ready, extras): the maps `proxyColumns` and `fxColumns` the worker's `daily_returns` reads, keyed by the pool's own columns.
+async def with_pool_market(ctx, data, params, pool, prepare, info_of=lambda ready: ready["info"], code=False):
+    """`prepare(data)` with what the pool's rows ask of Market added to the frozen bars: each row's proxy, the exchange rate of each currency that is not
+    the allocation's, and the benchmark's symbols (in the pool or not) when the settings track it or the allocation is code (its estimator may). Returns (ready, extras): the maps `proxyColumns` and `fxColumns` the worker's
+    `daily_returns` reads, keyed by the pool's own columns, and `benchmarkColumns` (column: percent) its `benchmark_daily` reads.
     A run, its publication and every update of the published version prepare their bars through this one function."""
     data = copy.deepcopy(data)
     base = P.money(params.get("currency") or "USD")
     symbols = data.get("symbols") or []
-    wanted = {}   # key -> (instrument, invert)
+    wanted = {}   # key -> (instrument, invert for a rate or the weight for a benchmark symbol)
     market = [row for row in pool if row.get("kind") not in ("run", "library") and row.get("instrumentId")]
     for row in market:
         proxy = (row.get("proxy") or "").strip()
@@ -146,6 +148,8 @@ async def with_pool_market(ctx, data, params, pool, prepare, info_of=lambda read
             wanted[("proxy", row["instrumentId"])] = (await resolve_text(ctx, proxy), False)
     for currency in sorted({P.money(row.get("currency")) for row in market if row.get("currency") and P.money(row["currency"]) != base}):
         wanted[("fx", currency)] = (await resolve_text(ctx, f"{currency}{base}=X"), False)
+    for symbol, weight in P.benchmark_parts(params["benchmark"]) if code or P.tracks(params) else ():
+        wanted[("benchmark", symbol)] = (await resolve_text(ctx, symbol), weight)
     have = {item["instrument"].get("instrumentId") for item in symbols}
     for instrument, _ in wanted.values():
         if instrument["instrumentId"] not in have:
@@ -154,17 +158,20 @@ async def with_pool_market(ctx, data, params, pool, prepare, info_of=lambda read
     data["symbols"] = symbols
     ready = await prepare(data)
     columns = {item.get("instrumentId"): item["column"] for item in info_of(ready).get("instruments", [])}
-    extras = {"proxyColumns": {}, "fxColumns": {}}
-    for (kind, key), (instrument, invert) in wanted.items():
+    extras = {"proxyColumns": {}, "fxColumns": {}, "benchmarkColumns": {}}
+    for (kind, key), (instrument, extra) in wanted.items():
         if instrument["instrumentId"] not in columns:
-            raise ContractError("invalid_input", f"Market has no prices for {instrument.get('displaySymbol') or instrument.get('symbol')}", {"fields": ["pool" if kind == "proxy" else "currency"]})
+            raise ContractError("invalid_input", t("Market has no prices for {displaySymbol}", displaySymbol=instrument.get('displaySymbol') or instrument.get('symbol')),
+                                {"fields": [{"proxy": "pool", "fx": "currency", "benchmark": "benchmark"}[kind]]})
         column = columns[instrument["instrumentId"]]
-        if kind == "proxy":
+        if kind == "benchmark":
+            extras["benchmarkColumns"][column] = extra
+        elif kind == "proxy":
             extras["proxyColumns"][columns.get(key, key)] = column
         else:
             for row in market:
                 if P.money(row.get("currency")) == key and row["instrumentId"] in columns:
-                    extras["fxColumns"][columns[row["instrumentId"]]] = {"column": column, "invert": invert}
+                    extras["fxColumns"][columns[row["instrumentId"]]] = {"column": column, "invert": extra}
     return ready, extras
 
 class AllocationRuns:
@@ -182,7 +189,7 @@ class AllocationRuns:
     def read(self, identity):
         record = self.records.find(RUN, identity)
         if record is None or not record.get("allocation"):
-            raise ContractError("not_found", "This allocation run does not exist.")
+            raise ContractError("not_found", t("This allocation run does not exist."))
         return record
 
     def owns(self, identity):
@@ -212,7 +219,7 @@ class AllocationRuns:
     def allocation(self, object_id):
         obj = self.store.read(object_id)
         if obj["kind"] != "allocation":
-            raise ContractError("invalid_input", "Only an allocation runs here.")
+            raise ContractError("invalid_input", t("Only an allocation runs here."))
         return obj
 
     # ------------------------------------------------------------------------------------------------------- strategy runs as assets (#21)
@@ -258,7 +265,7 @@ class AllocationRuns:
         for row in links:
             points = await asyncio.to_thread(self.library_equity, row["runId"]) if row["kind"] == "library" else await self.strategy_equity(row["runId"])
             if not points:
-                raise ContractError("invalid_input", f"{row['name']} has no daily equity to read; run it again.", {"fields": ["pool"]})
+                raise ContractError("invalid_input", t("{name} has no daily equity to read; run it again.", name=row['name']), {"fields": ["pool"]})
             series.append((row, points))
         return await asyncio.to_thread(self.write_linked_bars, ready, series, directory)
 
@@ -279,10 +286,10 @@ class AllocationRuns:
         pd.concat([bars, *added], ignore_index=True).to_parquet(path)
         return {**ready, "barsPath": str(path)}
 
-    async def prepare_data(self, data, params, pool):
+    async def prepare_data(self, data, params, pool, code):
         """`self.data.prepare(data)` with what the pool's rows ask of Market added to the frozen bars (`with_pool_market`)."""
         # An allocation's pool may span calendars (stocks and crypto, a rate on its own): each asset keeps its own.
-        return await with_pool_market(self.ctx, data, params, pool, lambda wanted: self.data.prepare(wanted, calendars="many"))
+        return await with_pool_market(self.ctx, data, params, pool, lambda wanted: self.data.prepare(wanted, calendars="many"), code=code)
 
     # ------------------------------------------------------------------------------------------------------- preparation
     async def prep(self, object_id):
@@ -308,7 +315,7 @@ class AllocationRuns:
         ticket = self.trials[object_id] = self.trials.get(object_id, 0) + 1
         data = copy.deepcopy(obj["settings"].get("data") or {})
         data = await resolve_until(self.ctx, data, instruments=await self.data.calendar_items(data))
-        ready, extras = await self.prepare_data(data, params, pool)
+        ready, extras = await self.prepare_data(data, params, pool, obj["settings"].get("mode") == "code")
         columns = {item.get("instrumentId"): item["column"] for item in ready["info"].get("instruments", [])}
         pool = P.pool_of(obj, params, columns)
         output = self.directory(f"trial-{object_id}-{ticket}")
@@ -337,7 +344,7 @@ class AllocationRuns:
         if self.trials.get(object_id) != ticket:
             return {"superseded": True}
         if not answer.get("ok"):
-            raise ContractError("invalid_input", (answer.get("failure") or {}).get("message") or answer.get("message") or "The trial failed.", {"code": answer.get("code"), "fields": answer.get("fields") or []})
+            raise ContractError("invalid_input", (answer.get("failure") or {}).get("message") or answer.get("message") or t("The trial failed."), {"code": answer.get("code"), "fields": answer.get("fields") or []})
         return {**answer, "computedAt": int(time.time() * 1000), "fullRun": False, "wall": round(time.perf_counter() - started, 3)}
 
     def compared_period(self, run_id):
@@ -358,11 +365,11 @@ class AllocationRuns:
         runs = self.of_object(object_id)
         source = next((item for item in runs if (run_id is None or item["id"] == run_id) and item["runKind"] == "backtest" and item["state"] == "completed"), None)
         if source is None:
-            raise ContractError("invalid_input", "Run a backtest first; the held-out period scores a finished run.")
+            raise ContractError("invalid_input", t("Run a backtest first; the held-out period scores a finished run."))
         data = source["settings"]["data"]
         start = data.get("heldOutFrom")
         if not start:
-            raise ContractError("invalid_input", "No held-out period is set on this run.")
+            raise ContractError("invalid_input", t("No held-out period is set on this run."))
         days = len(pd.bdate_range(start, data["until"]))
         seen = next((item for item in runs if item["runKind"] == "heldout" and item["state"] == "completed"), None)
         used = {"runId": seen["id"], "number": seen["number"], "same": seen["of"] == source["id"]} if seen else None
@@ -373,19 +380,18 @@ class AllocationRuns:
         """What publishing this run does, for the publish sheet: the next version, what changed from the last one, who uses it, the checks to look at. Nothing is computed."""
         run = self.read(run_id)
         if run["state"] != "completed" or run["runKind"] != "backtest":
-            raise ContractError("conflict", "Publish a completed backtest; a held-out check or a stopped run cannot be published.")
+            raise ContractError("conflict", t("Publish a completed backtest; a held-out check or a stopped run cannot be published."))
         store = self.library.store
         name = (name or run["name"]).strip()
         existing = store.find_item(name)
         # `field` says which row of the sheet the reason belongs to: the name, or the run as a whole
-        blocked = {"reason": f"{name} is already a {existing[0]['kind']} in the library; choose another name.", "field": "name"} if existing and existing[0]["kind"] != "allocation" else None
+        blocked = {"reason": t("{name} is already a {kind} in the library; choose another name.", name=name, kind=existing[0]['kind']), "field": "name"} if existing and existing[0]["kind"] != "allocation" else None
         pool = run["settings"].get("pool") or []
         linked = [row for row in pool if row.get("kind") in ("run", "library")]
         if blocked is None and linked:
             # Research takes these pools; publishing them (and producing their periods) waits until they can be fed each period
             what = lambda row: f"{row.get('ticker')} ({'a strategy run' if row.get('kind') == 'run' else 'a library item'})"  # noqa: E731
-            blocked = {"reason": f"{', '.join(what(row) for row in linked)}: a published allocation needs every asset to have new prices each period; "
-                                 "take it out of the pool to publish", "field": "run"}
+            blocked = {"reason": t("{value}: a published allocation needs every asset to have new prices each period; take it out of the pool to publish", value=', '.join(what(row) for row in linked)), "field": "run"}
         versions = store.item_versions(existing[0]["id"]) if existing and blocked is None else []
         last = versions[0] if versions else None
         before = (store.version(last["versionId"])["meta"].get("published") or {}) if last else {}
@@ -430,7 +436,7 @@ class AllocationRuns:
     @staticmethod
     def saved_environment(run):
         if not run.get("environment"):
-            raise ContractError("unavailable", "This backtest did not retain its environment. Run a new backtest to fix the method and environment together.")
+            raise ContractError("unavailable", t("This backtest did not retain its environment. Run a new backtest to fix the method and environment together."))
         return run["environment"]
 
     async def freeze(self, run_id):
@@ -510,7 +516,7 @@ class AllocationRuns:
             await asyncio.shield(task)
         ended = self.publisher.runs.read(record["id"])
         if ended["state"] != "completed" or not ended["publish"]["versions"]:
-            raise ContractError("conflict", ended.get("message") or f"Publishing {plan['name']} {ended['state']}.")
+            raise ContractError("conflict", ended.get("message") or t("Publishing {name} {state}.", name=plan['name'], state=ended['state']))
         version = self.library.store.version(ended["publish"]["versions"][0])
         return {"versionId": version["id"], "version": version["version"], "name": plan["name"]}
 
@@ -541,19 +547,19 @@ class AllocationRuns:
         store = self.library.store
         version = store.version(args["versionId"])
         if store.summary_kind(version["item_id"]) != "allocation":
-            raise ContractError("invalid_input", "Only an allocation's period is reviewed.")
+            raise ContractError("invalid_input", t("Only an allocation's period is reviewed."))
         if version["archived_at"] is not None or version["state"] == "delisted":
-            raise ContractError("invalid_input", "This version is retired; there is nothing to review.")
+            raise ContractError("invalid_input", t("This version is retired; there is nothing to review."))
         label, at = int(args["period"]), int(store.clock())
         instruments = set(store.frame(version["id"], field="weight", datetime=label, columns=["instrument"])["instrument"])
         if not instruments:
-            raise ContractError("invalid_input", "This period has no computed weights.")
+            raise ContractError("invalid_input", t("This period has no computed weights."))
         if args["how"] == "accept":
             store.accept_period(version["id"], label, at)
         else:
             reason = (args.get("reason") or "").strip()
             if not reason:
-                raise ContractError("invalid_input", "Write why this period differs.", {"fields": ["reason"]})
+                raise ContractError("invalid_input", t("Write why this period differs."), {"fields": ["reason"]})
             weights = self.adjusted_weights(version["meta"], instruments, args.get("weights") or {})
             store.add_adjustment(version["id"], label, weights, reason, at)
         return {"versionId": version["id"], "period": label, "review": store.version(version["id"])["meta"]["reviews"][str(label)]}
@@ -562,7 +568,7 @@ class AllocationRuns:
     def adjusted_weights(meta, instruments, weights):
         net = float(meta.get("net", 1.0))
         if not weights or abs(sum(float(value) for value in weights.values()) - net) > 1e-6:
-            raise ContractError("invalid_input", f"The weights must add up to {net * 100:g}%.", {"fields": ["weights"]})
+            raise ContractError("invalid_input", t("The weights must add up to {net}%.", net=f'{net * 100:g}'), {"fields": ["weights"]})
         aliases = {}
         for rows, field in (((meta.get("info") or {}).get("instruments", []), "column"),
                             ((meta.get("allocation") or {}).get("pool", []), "ticker")):
@@ -575,13 +581,13 @@ class AllocationRuns:
             if asset not in instruments:
                 matches = aliases.get(asset, set())
                 if len(matches) != 1:
-                    raise ContractError("invalid_input", f"Use a frozen pool instrument ID for {asset}.")
+                    raise ContractError("invalid_input", t("Use a frozen pool instrument ID for {asset}.", asset=asset))
                 identity, = matches
             if identity in resolved:
-                raise ContractError("invalid_input", f"Duplicate weight for {asset}.")
+                raise ContractError("invalid_input", t("Duplicate weight for {asset}.", asset=asset))
             resolved[identity] = float(value)
         if resolved.keys() != instruments:
-            raise ContractError("invalid_input", "Give every pool asset a weight, including zero.")
+            raise ContractError("invalid_input", t("Give every pool asset a weight, including zero."))
         return resolved
 
     # ------------------------------------------------------------------------------------------------------- code
@@ -589,7 +595,7 @@ class AllocationRuns:
         """"Write my own code": the standard file is copied into the allocation's project; the settings stay in the same places and the run reads the code."""
         obj = self.allocation(object_id)
         if obj["settings"].get("mode") == "code":
-            raise ContractError("conflict", "This allocation is already written as code.")
+            raise ContractError("conflict", t("This allocation is already written as code."))
         developer = await self.store.write_entry(obj, "allocation.py", P.STANDARD.read_text(encoding="utf-8"))
         record = self.store.save(obj, entry="allocation.py", settings={**obj["settings"], "mode": "code"}, developer=developer)
         return self.store.detail(record)
@@ -611,7 +617,7 @@ class AllocationRuns:
         obj = self.allocation(object_id)
         kind = args.get("kind", "backtest")
         if kind not in KINDS:
-            raise ContractError("invalid_input", "A run is a backtest or a held-out check.")
+            raise ContractError("invalid_input", t("A run is a backtest or a held-out check."))
         if kind == "heldout":
             status = await self.held_status(object_id, args.get("of"))
             source = self.read(status["runId"])
@@ -631,11 +637,8 @@ class AllocationRuns:
         obj = self.allocation(object_id)
         axes = [{"name": {"@costMultiple": "cost_multiple"}.get(axis["name"], axis["name"]), "values": list(axis["values"])} for axis in args.get("axes") or []]
         if not 1 <= len(axes) <= 2 or any(len(axis["values"]) < 2 for axis in axes) or len({axis["name"] for axis in axes}) != len(axes):
-            raise ContractError("invalid_input", "A sweep gives one or two settings, each with at least two values.")
+            raise ContractError("invalid_input", t("A sweep gives one or two settings, each with at least two values."))
         combos = list(itertools.product(*[axis["values"] for axis in axes]))
-        limit = 25
-        if len(combos) > limit:
-            raise ContractError("invalid_input", f"{len(combos)} runs is more than a sweep sends at once ({limit}); give fewer values.", {"runs": len(combos), "limit": limit})
         sweep_id = "sweep-" + uuid4().hex
         planned = []
         for index, combo in enumerate(combos):
@@ -711,10 +714,10 @@ class AllocationRuns:
     def saved_job(self, identity):
         path = self.directory(identity) / "engine" / "invocation.json"
         if not path.is_file():
-            raise ContractError("unavailable", "The frozen inputs of this allocation run are no longer available.")
+            raise ContractError("unavailable", t("The frozen inputs of this allocation run are no longer available."))
         job = json.loads(path.read_text(encoding="utf-8"))["job"]
         if not Path(job["data"]["barsPath"]).is_file():
-            raise ContractError("unavailable", "The price data used by this allocation run are no longer available.")
+            raise ContractError("unavailable", t("The price data used by this allocation run are no longer available."))
         return job
 
     async def execute(self, identity):
@@ -735,7 +738,7 @@ class AllocationRuns:
                     job = {**original, "output": str(output), "kind": record["runKind"]}
                     pool = job["settings"]["pool"]
                 else:
-                    ready, extras = await self.prepare_data(record["settings"]["data"], record["settings"]["params"], record["settings"]["pool"])
+                    ready, extras = await self.prepare_data(record["settings"]["data"], record["settings"]["params"], record["settings"]["pool"], bool(record.get("allocationCode")))
                     columns = {item.get("instrumentId"): item["column"] for item in ready["info"].get("instruments", [])}
                     pool = [{**row, "ticker": columns.get(row.get("instrumentId"), row["ticker"])} for row in record["settings"]["pool"]]
                     ready = await self.with_links(ready, pool, output)
@@ -762,9 +765,9 @@ class AllocationRuns:
                                                environment=environment, script=WORKER, prefix="qallocation-")
                 finally:
                     follower.cancel()
-            answer = json.loads((output / "answer.json").read_text(encoding="utf-8")) if (output / "answer.json").is_file() else {"ok": False, "failure": {"message": "The process stopped before it answered."}}
+            answer = json.loads((output / "answer.json").read_text(encoding="utf-8")) if (output / "answer.json").is_file() else {"ok": False, "failure": {"message": t("The process stopped before it answered.")}}
             if not answer.get("ok"):
-                failure = answer.get("failure") or {"message": "The run failed."}
+                failure = answer.get("failure") or {"message": t("The run failed.")}
                 ending = {"state": "failed", "message": failure["message"], "failure": {"stage": failure.get("stage", "compute"), "title": failure.get("title", "stopped"),
                                                                                          "message": failure["message"], "fields": failure.get("fields") or []}}
             else:
@@ -777,15 +780,15 @@ class AllocationRuns:
         except asyncio.CancelledError:
             by_hand = identity in self.stopping
             done = len(self.periods_done(identity))
-            ending = {"state": "cancelled" if by_hand else "interrupted", "message": f"Stopped at period {done + 1}{self.of_periods(identity)}; the periods so far are kept." if by_hand
-                      else "Quant stopped; the periods so far are kept.", "stopped": {"period": done, "at": int(time.time() * 1000), "auto": not by_hand}}
+            ending = {"state": "cancelled" if by_hand else "interrupted", "message": t("Stopped at period {done}{identity}; the periods so far are kept.", done=done + 1, identity=self.of_periods(identity)) if by_hand
+                      else t("Quant stopped; the periods so far are kept."), "stopped": {"period": done, "at": int(time.time() * 1000), "auto": not by_hand}}
         except ContractError as error:
-            ending = {"state": "failed", "message": error.message, "failure": {"stage": "data", "title": "stopped", "message": error.message, "fields": []}}
+            ending = {"state": "failed", "message": error.message, "failure": {"stage": "data", "title": t("stopped"), "message": error.message, "fields": []}}
         except Exception as error:  # noqa: BLE001 - a background run must end and say what broke
             import logging
             logging.getLogger(__name__).exception("Allocation run failed (%s)", identity)
             message = f"Quant hit an internal error ({type(error).__name__}) and stopped this run; the details are in Quant's log."
-            ending = {"state": "failed", "message": message, "failure": {"stage": "compute", "title": "stopped", "message": message, "fields": []}}
+            ending = {"state": "failed", "message": message, "failure": {"stage": "compute", "title": t("stopped"), "message": message, "fields": []}}
         finally:
             self.tasks.pop(identity, None)
             self.stopping.discard(identity)
@@ -900,13 +903,13 @@ class AllocationRuns:
 
     def results(self, identity, tab):
         if tab not in TABS:
-            raise ContractError("invalid_input", "A tab is one of " + ", ".join(TABS) + ".")
+            raise ContractError("invalid_input", t("A tab is one of {tabs}.", tabs=', '.join(TABS)))
         record = self.read(identity)
         path = self.directory(identity) / "output" / "results" / f"{tab}.json"
         if record["state"] != "completed" or not path.is_file():
             if tab == "style":
                 return {"tab": tab, "style": None}
-            raise ContractError("not_found", "This run has no Results yet.")
+            raise ContractError("not_found", t("This run has no Results yet."))
         body = json.loads(path.read_text(encoding="utf-8"))
         if tab == "robust":
             body["heldOut"] = self.held_out_of(record)
@@ -927,7 +930,7 @@ class AllocationRuns:
     def period(self, identity, index):
         rows = self.periods_done(identity)
         if not 0 <= index < len(rows):
-            raise ContractError("not_found", "There is no such period.")
+            raise ContractError("not_found", t("There is no such period."))
         return rows[index]
 
     def annotate(self, identity, args):
@@ -941,21 +944,21 @@ class AllocationRuns:
         from modules.quant.native.allocation_shock import shock_row
         record = self.read(identity)
         if record["state"] != "completed":
-            raise ContractError("conflict", "A shock is added to a finished run.")
+            raise ContractError("conflict", t("A shock is added to a finished run."))
         try:
             pct = float(pct)
         except (TypeError, ValueError):
-            raise ContractError("invalid_input", "A shock is a percent, like -20.", {"fields": ["pct"]}) from None
+            raise ContractError("invalid_input", t("A shock is a percent, like -20."), {"fields": ["pct"]}) from None
         if not -100 < pct or pct == 0:
-            raise ContractError("invalid_input", "A shock is a percent above -100 and not 0.", {"fields": ["pct"]})
+            raise ContractError("invalid_input", t("A shock is a percent above -100 and not 0."), {"fields": ["pct"]})
         directory = self.directory(identity) / "output"
         basis_path, risk_path = directory / "shock-basis.json", directory / "results" / "risk.json"
         if not basis_path.is_file() or not risk_path.is_file():
-            raise ContractError("not_found", "This run has no scenarios to add to; run it again.")
+            raise ContractError("not_found", t("This run has no scenarios to add to; run it again."))
         basis = json.loads(basis_path.read_text(encoding="utf-8"))
         row = shock_row(basis["names"], basis["weights"], basis["cov"], basis["groups"], target, pct)
         if row is None:
-            raise ContractError("invalid_input", f"{target} is not an asset or a group of the pool.", {"fields": ["target"]})
+            raise ContractError("invalid_input", t("{target} is not an asset or a group of the pool.", target=target), {"fields": ["target"]})
         risk = json.loads(risk_path.read_text(encoding="utf-8"))
         scenarios = risk.get("scenarios")
         if isinstance(scenarios, list):

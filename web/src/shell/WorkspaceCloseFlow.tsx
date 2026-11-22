@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
 import { platformRuntime } from "../kernel/runtime";
 import { WorkspaceCloseDialog } from "./WorkspaceDialogs";
@@ -46,7 +47,7 @@ export const WorkspaceCloseFlow = forwardRef<WorkspaceCloseHandle, {
   useImperativeHandle(ref, () => ({ close: async id => {
     const platform = platformRuntime().platform;
     const workspace = (await platform["workspace.list_open"]({})).find(record => record.workspaceId === id);
-    if (!workspace) throw new Error("This workspace is closed already.");
+    if (!workspace) throw new Error(t("This workspace is closed already."));
     const { activities } = await platform["activity.list"]({ workspaceId: id });
     const unsaved = await onWorkspaceAction(id, "status");
     const deletions = workspace.snapshotId === null ? await platform["workspace.delete_preview"]({ workspaceId: id }) : [];

@@ -25,7 +25,7 @@ Extra packages are installed by the user (Quant's Packages page); `%pip` in a ce
 - `q.data()`: the object's data settings as a `ResearchData`: `.open`, `.high`, `.low`, `.close`,
   `.volume`, `.amount` are tables of dates by instruments (columns are the symbols); `.industry`,
   `.size`, `.shares`; `.annualization` is bars per year; `.bars` the long table.
-- `q.data(["AAPL", "MSFT"], "1d", "2024-01-01", "2024-12-31", adjustment="split")`, or
+- `q.data(["AAPL", "MSFT"], "1d", "2024-01-01", "2024-12-31", adjustment="raw")`, or
   `q.data(index={"symbol": "^GSPC"}, timeframe="1d", start=...)` or `q.data(list="My list", ...)`:
   any bars, frozen through Market (an index's members only while they were members).
   `q.bars(symbol, timeframe, start, end)`: one symbol's OHLCV. Dates are inclusive.

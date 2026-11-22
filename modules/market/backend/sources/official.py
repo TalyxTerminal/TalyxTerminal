@@ -7,6 +7,7 @@ same objects on the extension point, converting columns to vocabulary text.
 from __future__ import annotations
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from .. import bars
 from ..common import MarketError, time_range
@@ -41,7 +42,7 @@ def from_wire_event(item: dict) -> dict | None:
             value = bar.get(name)
             row[name] = float("nan") if value in (None, "") else float(value)
         if not isinstance(item["closed"], bool):
-            raise MarketError("invalid_output", "A bar event requires a boolean closed flag")
+            raise MarketError("invalid_output", t("A bar event requires a boolean closed flag"))
         return {"type": "bar", "row": row, "closed": item["closed"]}
     if kind == "quote":
         return {"type": "ticker", "quote": item["quote"]}

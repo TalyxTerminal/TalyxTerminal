@@ -20,9 +20,10 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..native import factor_work, formula, metrics
-from . import run_flow
+from . import research_inputs, run_flow
 from .factor_data import FactorData
 from .factor_engine import MEMORY, FactorEngine
 from .materials import plain
@@ -34,7 +35,6 @@ from .work_records import digest
 RUN = "qrun"
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
 KEEP_CROSS_SECTIONS = 30
-SWEEP_LIMIT = 48
 READ_LIMIT = 200
 RESULT_TABS = ("returns", "ic", "industry", "style", "turnover", "costs", "event")
 RESULTS_MEMORY = 1536 * 1024 ** 2  # the Results process for 500 names over ten years, about
@@ -73,15 +73,15 @@ def results_of(record, cell=None):
     """Where a run's Results are: none (a held-out validation has none), notbuilt, queued, running, done, failed or interrupted, with
     the share done and each tab's state. Results that were queued or running when Quant closed read as interrupted."""
     if record.get("runKind") == "heldout":
-        return {"state": "none", "progress": 0, "tabs": {}, "message": "A held-out validation has no Results of its own: its numbers sit beside the run it scored."}
+        return {"state": "none", "progress": 0, "tabs": {}, "message": t("A held-out validation has no Results of its own: its numbers sit beside the run it scored.")}
     if record.get("state") != "completed":
-        return {"state": "none", "progress": 0, "tabs": {}, "message": "Results follow once the run has finished."}
+        return {"state": "none", "progress": 0, "tabs": {}, "message": t("Results follow once the run has finished.")}
     found = (record.get("sweepResults") or {}).get(str(cell)) if cell is not None else record.get("results")
     if not found:
         message = "Choose a combination's Results to build them." if record.get("runKind") == "sweep" else "Not built yet."
         return {"state": "notbuilt", "progress": 0, "tabs": {}, "message": message}
     if found["state"] in {"queued", "running"} and (record["id"], cell) not in BUILDING:
-        return {**found, "state": "interrupted", "message": "Quant closed before these Results were built; build them again."}
+        return {**found, "state": "interrupted", "message": t("Quant closed before these Results were built; build them again.")}
     return found
 
 
@@ -174,6 +174,14 @@ def code_diff(snapshot, files, previous):
     return out
 
 
+def reads_facts(record):
+    """Whether a factor run reads industry or shares: neutralizing, grouping inside an industry, demeaning by it, a formula that reads size or
+    shares, or code (which may read either). Without them the run's data are the prices alone, and Market fetches no industry or shares."""
+    run = record["settings"]["run"]
+    if record["mode"] == "code" or run["neutralize"] != "none" or run["grouping"]["withinIndustry"] or run["groupAdjust"]:
+        return True
+    return any(name in (record.get("formula") or "") for name in ("$size", "$shares"))
+
 class FactorRuns:
     def __init__(self, ctx, records, store, runs, lists, library, packages, common):
         self.ctx, self.records, self.store, self.runs, self.library, self.common = ctx, records, store, runs, library, common
@@ -246,7 +254,7 @@ class FactorRuns:
     def read(self, identity):
         record = self.records.find(RUN, identity)
         if record is None or record.get("objectKind") != "factor":
-            raise ContractError("not_found", "This factor run does not exist.")
+            raise ContractError("not_found", t("This factor run does not exist."))
         return record
 
     def save(self, record, **changes):
@@ -326,7 +334,7 @@ class FactorRuns:
                         **({"from": item["from"]} if item["from"] else {}), **({"note": item["note"]} if item["note"] else {}),
                         **({"unavailable": item["unavailable"]} if item["unavailable"] else {})})
         if not out:
-            out = [{"name": name, "label": label, "group": "Prices and volume"} for name, label in formula.PRICE_FIELDS.items()]
+            out = [{"name": name, "label": label, "group": "Prices and volume"} for name, label in research_inputs.price_labels().items()]
         for item in self.library.store.catalog():
             if item["kind"] == "factor" and item["state"] != "delisted" and item["name"].replace(" ", "_").isidentifier():
                 out.append({"name": "$lib." + item["name"].replace(" ", "_"), "label": f"{item['name']}, v{item['version']}", "group": "Library values"})
@@ -351,18 +359,18 @@ class FactorRuns:
     # ------------------------------------------------------------------------------------------------------------ start
     async def start(self, object_id, args):
         if self.closed:
-            raise ContractError("unavailable", "Quant is closing.")
+            raise ContractError("unavailable", t("Quant is closing."))
         obj = self.store.read(object_id)
         if obj["kind"] != "factor":
-            raise ContractError("invalid_input", "Only a factor has factor runs.")
+            raise ContractError("invalid_input", t("Only a factor has factor runs."))
         kind = args.get("kind", "run")
         if kind not in {"run", "sweep", "heldout"}:
-            raise ContractError("invalid_input", "A factor run is run, sweep or heldout.")
+            raise ContractError("invalid_input", t("A factor run is run, sweep or heldout."))
         source = None
         if kind == "heldout":
             source = self.read(args["of"]) if args.get("of") else None
             if source is None or source["state"] != "completed" or source["runKind"] != "run":
-                raise ContractError("invalid_input", "Validate a completed run on the held-out period.")
+                raise ContractError("invalid_input", t("Validate a completed run on the held-out period."))
             previous = self.records.held_out_for(source["id"])
             if previous is not None:
                 return summary(previous)
@@ -403,24 +411,22 @@ class FactorRuns:
             changes = {"run": kept, **({"formula": text} if mode == "formula" else {}), **({"params": params} if mode == "code" else {})}
             obj = self.store.save(obj, settings={**obj["settings"], **changes})
         if not all(settings["data"].get(key) for key in ("since", "until")) or not (settings["data"].get("symbols") or settings["data"].get("list") or settings["data"].get("index")):
-            raise ContractError("invalid_input", "Choose the names and the period in the data settings first.")
+            raise ContractError("invalid_input", t("Choose the names and the period in the data settings first."))
         held = settings["data"].get("heldOutFrom")
         if kind == "heldout" and not held:
-            raise ContractError("invalid_input", "Set where the held-out period starts in the run settings first.")
+            raise ContractError("invalid_input", t("Set where the held-out period starts in the run settings first."))
         axes = None
         if kind == "sweep":
             axes = [{"name": item["name"], "values": list(item["values"])} for item in args.get("sweep") or []]
             total = 1
             for axis in axes:
                 if axis["name"] not in {"holding", "groups", "costBps", "delay"} and axis["name"] not in settings["params"]:
-                    raise ContractError("invalid_input", f"A sweep can vary holding, groups, costBps, delay or a code setting, not {axis['name']}.")
+                    raise ContractError("invalid_input", t("A sweep can vary holding, groups, costBps, delay or a code setting, not {name}.", name=axis['name']))
                 if not axis["values"]:
-                    raise ContractError("invalid_input", f"{axis['name']} needs at least one value.")
+                    raise ContractError("invalid_input", t("{name} needs at least one value.", name=axis['name']))
                 total *= len(axis["values"])
             if not axes or total < 2:
-                raise ContractError("invalid_input", "A sweep needs a list of values in at least one setting.")
-            if total > SWEEP_LIMIT:
-                raise ContractError("invalid_input", f"A sweep tests at most {SWEEP_LIMIT} combinations; this one has {total}.")
+                raise ContractError("invalid_input", t("A sweep needs a list of values in at least one setting."))
         identity = "run-" + uuid4().hex
         number = self.next_number(obj["id"])
         now = int(time.time() * 1000)
@@ -446,9 +452,9 @@ class FactorRuns:
         """Run a run again that stopped while fetching prices: the names fetched are kept, only the rest are asked for."""
         record = self.read(identity)
         if record["state"] != "failed" or (record.get("failure") or {}).get("stage") != "data":
-            raise ContractError("invalid_input", "Only a run that stopped while fetching prices can be retried.")
+            raise ContractError("invalid_input", t("Only a run that stopped while fetching prices can be retried."))
         if identity in self.tasks:
-            raise ContractError("conflict", "This run is already running.")
+            raise ContractError("conflict", t("This run is already running."))
         from .runtime import call_attribution
         self.save(record, state="queued", stage="queued", failure=None, message=None, error=None, endedAt=None, **call_attribution(),
                   progress={"steps": [], "startedAt": int(time.time() * 1000)})
@@ -482,11 +488,11 @@ class FactorRuns:
                 return
             for document in page["documents"]:
                 if document["conflict"]:
-                    raise ContractError("conflict", f"{Path(document['uri']).name} changed on disk while it has unsaved edits. Resolve it in Developer, then run again.")
+                    raise ContractError("conflict", t("{name} changed on disk while it has unsaved edits. Resolve it in Developer, then run again.", name=Path(document['uri']).name))
                 if document["dirty"]:
                     saved = plain(await self.ctx.call("developer.documents.save", {"documentId": document["documentId"], "expectedVersion": document["version"]}))
                     if saved["status"] not in {"saved", "clean"}:
-                        raise ContractError("conflict", f"{Path(document['uri']).name} could not be saved before running: {saved.get('message') or saved['status']}.")
+                        raise ContractError("conflict", t("{name} could not be saved before running: {message}.", name=Path(document['uri']).name, message=saved.get('message') or saved['status']))
             cursor = page["nextCursor"]
             if not cursor:
                 return
@@ -522,7 +528,6 @@ class FactorRuns:
                                 codeDiff=code_diff(directory / "source", files, previous), changes=changes_between({**fresh, "code": code}, previous))
                 self.step(identity, "code", "done")
             interactive = self.read(identity)["runKind"] != "sweep"
-            run_flow.check_fits(self.queue, MEMORY)
             async with self.queue.slot(owner=identity, label=f"{obj['name']} #{record['number']}", interactive=interactive, memory=MEMORY,
                                        on_wait=lambda position: self.update(identity, state="queued", stage="queued", progress={**self.read(identity)["progress"], "queue": position})):
                 self.update(identity, state="running", stage="data")
@@ -534,11 +539,11 @@ class FactorRuns:
                 answer = await self.compute(identity, job, ready)
             ending = await self.finish(identity, answer, started)
         except asyncio.CancelledError:
-            ending = {"state": "interrupted" if self.closed else "cancelled", "message": "Stopped before the run finished."}
+            ending = {"state": "interrupted" if self.closed else "cancelled", "message": t("Stopped before the run finished.")}
         except ContractError as error:
             stage = self.read(identity)["stage"]
             failure = error.details.get("failure") if isinstance(error.details, dict) and isinstance(error.details.get("failure"), dict) else None
-            failure = failure or {"stage": "data" if stage == "data" else "compute", "title": "stopped while fetching prices" if stage == "data" else "stopped",
+            failure = failure or {"stage": "data" if stage == "data" else "compute", "title": t("stopped while fetching prices") if stage == "data" else t("stopped"),
                                   "message": error.message}
             ending = {"state": "failed", "message": failure["message"], "failure": failure, "error": {"stage": stage, **error.to_dict()}}
         except Exception as error:  # a background run must end, and say what broke
@@ -546,7 +551,7 @@ class FactorRuns:
             logging.getLogger(__name__).exception("Factor run failed (%s)", identity)
             # The message names what broke, never a folder or an internal id: those stay in Quant's log.
             message = f"Quant hit an internal error ({type(error).__name__}) and stopped this run; the details are in Quant's log."
-            ending = {"state": "failed", "message": message, "failure": {"stage": "compute", "title": "stopped", "message": message},
+            ending = {"state": "failed", "message": message, "failure": {"stage": "compute", "title": t("stopped"), "message": message},
                       "error": {"stage": "compute", "code": "internal_error", "message": message}}
         finally:
             self.tasks.pop(identity, None)
@@ -610,9 +615,10 @@ class FactorRuns:
                       total=progress["total"] if progress is not None else len(rows), counts=counts, detail=detail,
                       **({"phase": phase, "phaseStartedAt": last["phaseAt"]} if name == "data" and phase else {}))
 
-        key = self.data.key(record["settings"]["data"])
+        facts = reads_facts(record)
+        key = self.data.key(record["settings"]["data"], facts=facts)
         self.update(identity, data={"key": key})
-        ready = await self.data.prepare(record["settings"]["data"], report=report)
+        ready = await self.data.prepare(record["settings"]["data"], report=report, facts=facts)
         key = ready["key"]
         steps = {item["name"] for item in self.read(identity)["progress"]["steps"]}
         self.step(identity, "data", "done", detail="from the same Market revisions and research facts" if ready.get("how") == "unchanged" else None)
@@ -685,7 +691,7 @@ class FactorRuns:
             await follower
             self.data.in_use[held] = self.data.in_use.get(held, 1) - 1
         if not answer.get("ok"):
-            failure = answer.get("failure") or {"stage": "compute", "title": "stopped", "message": "The run failed."}
+            failure = answer.get("failure") or {"stage": "compute", "title": t("stopped"), "message": t("The run failed.")}
             raise ContractError("invalid_input" if failure.get("stage") == "code" else "unavailable", failure["message"], {"failure": failure})
         return answer
 
@@ -775,21 +781,21 @@ class FactorRuns:
         """Build a run's Results on request: an earlier run's that were put aside, ones that failed or stopped, or a sweep combination's."""
         record = self.read(identity)
         if record["runKind"] == "heldout":
-            raise ContractError("invalid_input", "A held-out validation has no Results of its own: open the run it scored.")
+            raise ContractError("invalid_input", t("A held-out validation has no Results of its own: open the run it scored."))
         if record["state"] != "completed":
-            raise ContractError("conflict", "Results follow once the run has finished.")
+            raise ContractError("conflict", t("Results follow once the run has finished."))
         if record["runKind"] == "sweep":
             if cell is None:
-                raise ContractError("invalid_input", "Choose which combination of the sweep to build Results for.")
+                raise ContractError("invalid_input", t("Choose which combination of the sweep to build Results for."))
             cells = self.sweep(identity)["cells"]
             if not 0 <= cell < len(cells):
-                raise ContractError("invalid_input", "No such combination in this sweep.")
+                raise ContractError("invalid_input", t("No such combination in this sweep."))
             if cells[cell]["settings"].get("params") and cells[cell]["settings"]["params"] != record["settings"]["params"]:
-                raise ContractError("invalid_input", "This combination changes the code's own settings, whose values were not kept. Use these settings and run them for Results.")
+                raise ContractError("invalid_input", t("This combination changes the code's own settings, whose values were not kept. Use these settings and run them for Results."))
         elif cell is not None:
-            raise ContractError("invalid_input", "Only a sweep has combinations.")
+            raise ContractError("invalid_input", t("Only a sweep has combinations."))
         if not (self.directory(identity) / "output" / "values.npy").is_file():
-            raise ContractError("not_found", "This run's values were not kept (only the newest runs and starred ones keep them); run it again for its Results.")
+            raise ContractError("not_found", t("This run's values were not kept (only the newest runs and starred ones keep them); run it again for its Results."))
         state = results_of(record, cell)
         if state["state"] in {"queued", "running", "done"}:
             return state
@@ -802,7 +808,7 @@ class FactorRuns:
         settings = record["settings"]["run"] if cell is None else {key: value for key, value in work["cells"][cell]["settings"].items() if key != "params"}
         directory = self.data.directory(record["data"]["key"])
         if not (directory / "bars.parquet").is_file():
-            raise ContractError("not_found", "The prices this run used are no longer kept; run it again for its Results.")
+            raise ContractError("not_found", t("The prices this run used are no longer kept; run it again for its Results."))
         info = json.loads((directory / "info.json").read_text(encoding="utf-8"))
         return {"output": str(self.results_directory(identity, cell)), "settings": settings, "values": str(self.directory(identity) / "output" / "values.npy"),
                 "data": {"key": record["data"]["key"], "barsPath": str(directory / "bars.parquet"), "info": info,
@@ -860,21 +866,21 @@ class FactorRuns:
                     stop.set()
                     await follower
             if not answer.get("ok"):
-                raise ContractError("unavailable", answer.get("message") or "The Results stopped.")
+                raise ContractError("unavailable", answer.get("message") or t("The Results stopped."))
             ending = {"state": "done", "progress": 1, "tabs": answer["tabs"], "seconds": round(time.perf_counter() - started, 2),
                       "computeSeconds": answer["seconds"], "endedAt": int(time.time() * 1000), "about": answer.get("about")}
             if any(value == "failed" for value in answer["tabs"].values()):
                 ending["message"] = "Some tabs could not be built; each says why."
         except asyncio.CancelledError:
             ending = {"state": "notbuilt" if not self.closed else "interrupted", "progress": 0, "tabs": {},
-                      "message": "Put aside for a newer run; open these Results to build them." if not self.closed else "Quant closed before these Results were built; build them again."}
+                      "message": t("Put aside for a newer run; open these Results to build them.") if not self.closed else t("Quant closed before these Results were built; build them again.")}
         except ContractError as error:
             ending = {"state": "failed", "progress": 0, "tabs": {}, "message": error.message, "endedAt": int(time.time() * 1000)}
         except Exception as error:  # a background job must end, and say what broke
             import logging
             logging.getLogger(__name__).exception("Factor Results failed (%s)", identity)
             ending = {"state": "failed", "progress": 0, "tabs": {}, "endedAt": int(time.time() * 1000),
-                      "message": f"Quant hit an internal error ({type(error).__name__}) while building the Results; the details are in Quant's log."}
+                      "message": t("Quant hit an internal error ({name}) while building the Results; the details are in Quant's log.", name=type(error).__name__)}
         finally:
             self.result_tasks.pop(key, None)
             BUILDING.discard(key)
@@ -893,12 +899,12 @@ class FactorRuns:
         `compare` draws other runs' long–short net beside this one in the groups chart, dashed. The files are read off the event loop."""
         record = self.read(identity)
         if cell is not None and record["runKind"] != "sweep":
-            raise ContractError("invalid_input", "Only a sweep has combinations.")
+            raise ContractError("invalid_input", t("Only a sweep has combinations."))
         state = results_of(record, cell)
         payload = None
         if tab is not None:
             if tab not in RESULT_TABS:
-                raise ContractError("invalid_input", f"Results have the tabs {', '.join(RESULT_TABS)}.")
+                raise ContractError("invalid_input", t("Results have the tabs {RESULT_TABS}.", RESULT_TABS=', '.join(RESULT_TABS)))
             path = self.results_directory(identity, cell) / f"{tab}.json"
             others = [self.read(other) for other in compare if other != identity]
 
@@ -985,7 +991,7 @@ class FactorRuns:
         record = record or self.read(identity)
         cross = self.directory(identity) / "output" / "cross"
         if not (cross / "meta.json").is_file():
-            raise ContractError("not_found", "This run's values by day were not kept (only the newest runs and starred ones keep them).")
+            raise ContractError("not_found", t("This run's values by day were not kept (only the newest runs and starred ones keep them)."))
         meta = json.loads((cross / "meta.json").read_text(encoding="utf-8"))
         labels = meta["labels"]
         if date is None:
@@ -995,7 +1001,9 @@ class FactorRuns:
         load = lambda name: np.load(cross / name, mmap_mode="r")[row]  # noqa: E731
         after, raw, group, missing, following = load("after.npy"), load("raw.npy"), load("group.npy"), load("missing.npy"), load("next.npy")
         inputs = [load(f"input-{index}.npy") for index in range(len(meta["inputs"]))]
-        industry = meta.get("industry") or [None] * len(meta["columns"])
+        names = meta.get("industries")
+        codes = np.load(cross / "industry.npy", mmap_mode="r")[row] if names is not None else None
+        industry = [names[code] if code >= 0 else None for code in codes] if codes is not None else [None] * len(meta["columns"])  # that day's
         valued = ~np.isnan(after)
         order = np.argsort(-np.where(valued, after, -np.inf), kind="stable")
         rank = np.zeros(len(after), dtype=int)
@@ -1031,7 +1039,7 @@ class FactorRuns:
         record = self.read(identity)
         path = self.directory(identity) / "output" / "work.json"
         if record["runKind"] != "sweep" or not path.is_file():
-            raise ContractError("not_found", "This run has no sweep results.")
+            raise ContractError("not_found", t("This run has no sweep results."))
         return {"run": summary(record), **json.loads(path.read_text(encoding="utf-8"))}
 
     # ------------------------------------------------------------------------------------------------------------ use this run
@@ -1044,7 +1052,7 @@ class FactorRuns:
         if sweep_index is not None:
             cells = self.sweep(identity)["cells"]
             if not 0 <= sweep_index < len(cells):
-                raise ContractError("invalid_input", "No such combination in this sweep.")
+                raise ContractError("invalid_input", t("No such combination in this sweep."))
             run = {key: value for key, value in cells[sweep_index]["settings"].items() if key not in {"heldOutFrom", "params"}}
         settings = {**obj["settings"], "run": run, "data": copy.deepcopy(record["settings"]["data"]), "mode": record["mode"]}
         if record["mode"] == "formula":
@@ -1065,17 +1073,17 @@ class FactorRuns:
         computed, a model takes this run as an input. Created through the target's own entry, the checks its settings always get."""
         record = self.read(identity)
         if record["state"] != "completed" or record["runKind"] not in {"run", "sweep"}:
-            raise ContractError("invalid_input", "Use a completed run.")
+            raise ContractError("invalid_input", t("Use a completed run."))
         if kind not in {"model", "strategy"}:
-            raise ContractError("invalid_input", "A run can start a model or a strategy.")
+            raise ContractError("invalid_input", t("A run can start a model or a strategy."))
         obj = self.store.read(record["objectId"])
         run = dict(record["settings"]["run"])
         if sweep_index is not None:
             cells = self.sweep(identity)["cells"]
             if not 0 <= sweep_index < len(cells):
-                raise ContractError("invalid_input", "No such combination in this sweep.")
+                raise ContractError("invalid_input", t("No such combination in this sweep."))
             if cells[sweep_index]["settings"].get("params") and cells[sweep_index]["settings"]["params"] != record["settings"]["params"]:
-                raise ContractError("invalid_input", "This combination changes the code's own settings, whose values were not kept. Use these settings and run them first.")
+                raise ContractError("invalid_input", t("This combination changes the code's own settings, whose values were not kept. Use these settings and run them first."))
             run.update({key: value for key, value in cells[sweep_index]["settings"].items() if key not in {"heldOutFrom", "params"}})
         label = f"#{record['number']}" + (f" ({sweep_index + 1})" if sweep_index is not None else "")
         name = f"{obj['name']} {label} {kind}"
@@ -1102,20 +1110,20 @@ class FactorRuns:
         output = self.directory(identity) / "output"
         cross = output / "cross"
         if not (cross / "meta.json").is_file():
-            raise ContractError("not_found", "This run's values were not kept (only the newest runs and starred ones keep them); run the factor again.")
+            raise ContractError("not_found", t("This run's values were not kept (only the newest runs and starred ones keep them); run the factor again."))
         meta = json.loads((cross / "meta.json").read_text(encoding="utf-8"))
         values = np.load(output / "values.npy") if (output / "values.npy").is_file() else np.load(cross / "raw.npy").astype(float)
         member = np.load(cross / "missing.npy") != 1
         info = json.loads((self.data.directory(record["data"]["key"]) / "info.json").read_text(encoding="utf-8"))
         instruments = {item["column"]: item["instrumentId"] for item in info["instruments"]}
-        t, i = np.nonzero(np.isfinite(values) & member)
-        if not len(t):
-            raise ContractError("invalid_input", "This run has no values to trade.")
+        dates, i = np.nonzero(np.isfinite(values) & member)
+        if not len(dates):
+            raise ContractError("invalid_input", t("This run has no values to trade."))
         labels, columns = np.asarray(meta["labels"], dtype="int64"), np.asarray(meta["columns"], dtype=object)
-        table = pd.DataFrame({"datetime": labels[t], "instrument": [instruments.get(name, name) for name in columns[i]], "value": values[t, i].astype(float)})
+        table = pd.DataFrame({"datetime": labels[dates], "instrument": [instruments.get(name, name) for name in columns[i]], "value": values[dates, i].astype(float)})
         destination.parent.mkdir(parents=True, exist_ok=True)
         table.to_parquet(destination, index=False)
-        return int(labels[t].max())
+        return int(labels[dates].max())
 
     async def cancel(self, identity):
         record = self.read(identity)
@@ -1123,7 +1131,7 @@ class FactorRuns:
             return summary(record)
         task = self.tasks.get(identity)
         if task is None:
-            raise ContractError("conflict", "This run is not running in this session.")
+            raise ContractError("conflict", t("This run is not running in this session."))
         self.save(record, state="cancel_requested")
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)

@@ -5,6 +5,7 @@ import json
 from langchain.agents.middleware import HumanInTheLoopMiddleware
 from langchain_core.messages import ToolMessage
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .children import CHILD
 from .permissions import proposal
@@ -63,17 +64,17 @@ class Reviews:
         if name != "talyx_call_action":
             return name, args, FILE_EFFECTS.get(name, ["read"]), args.get("file_path") or args.get("path") or args.get("id")
         if not isinstance(args.get("name"), str) or not isinstance(args.get("input"), dict):
-            raise ContractError("invalid_input", "Give talyx_call_action an action name and an input object")
+            raise ContractError("invalid_input", t("Give talyx_call_action an action name and an input object"))
         action, arguments = args["name"], args["input"]
         if action not in self.catalog:
-            raise ContractError("unknown_capability", f"Read the catalog to find {action}")
+            raise ContractError("unknown_capability", t("Read the catalog to find {action}", action=action))
         item = self.catalog[action]
         rule = item.get("effectBranches")
         if rule is None:
             return action, arguments, item["effects"], field(arguments, item["target"]) if item["target"] else None
         branch = rule["branches"].get(field(arguments, rule["path"]))
         if branch is None:
-            raise ContractError("invalid_input", f"Choose a declared operation in {rule['path']}")
+            raise ContractError("invalid_input", t("Choose a declared operation in {path}", path=rule['path']))
         target = field(arguments, branch["target"]) if branch.get("target") else None
         return action, arguments, branch["effects"], target
 

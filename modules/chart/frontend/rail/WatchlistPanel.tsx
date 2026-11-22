@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* The watchlist panel (TradingView): the list picker and add symbol on top, sections of rows with Last, Chg and Chg%
    (columns can be turned off), a details card for the row picked below. A click on a row shows it on the chart. */
 import { useState } from "react";
@@ -10,12 +11,26 @@ import type { Watchlist } from "../wire";
 import { editWatchlist, removeFromWatchlist, useQuotes, type QuoteRow } from "./watchlists";
 
 type Column = "last" | "change" | "changePercent";
-const COLUMNS: { id: Column; label: string }[] = [{ id: "last", label: "Last" }, { id: "change", label: "Chg" }, { id: "changePercent", label: "Chg%" }];
+const COLUMNS: { id: Column; label: string }[] = [{ id: "last", label: t("Last") }, { id: "change", label: t("Chg") }, { id: "changePercent", label: t("Chg%") }];
 
-const PRODUCTS: Record<string, string> = { spot: "Spot", swap: "Perpetual", future: "Futures", option: "Option", margin: "Margin" };
+const ASSETS = {
+  crypto: t.c("asset", "Crypto"),
+  equity: t.c("asset", "Equity"),
+  tokenized_equity: t.c("asset", "Tokenized equity"),
+  fund: t.c("asset", "Fund"),
+  index: t.c("asset", "Index"),
+  fixed_income: t.c("asset", "Fixed income"),
+  warrant: t.c("asset", "Warrant"),
+  fx: t.c("asset", "FX"),
+  precious_metal: t.c("asset", "Precious metal"),
+  commodity: t.c("asset", "Commodity"),
+  rate: t.c("asset", "Rate"),
+  unknown: t.c("asset", "Unknown"),
+};
+const PRODUCTS: Record<string, string> = { spot: t("Spot"), swap: t("Perpetual"), future: t("Futures"), option: t("Option"), margin: t("Margin") };
 /** The kind of instrument as a word: crypto products by their market type, listings by their asset class. */
 const kindOf = (instrument: Instrument) => {
-  const kind = instrument.identityVersion === 2 ? instrument.assetClass : PRODUCTS[instrument.marketType] ?? instrument.marketType;
+  const kind = instrument.identityVersion === 2 ? ASSETS[instrument.assetClass] : PRODUCTS[instrument.marketType] ?? instrument.marketType;
   return kind ? kind[0].toUpperCase() + kind.slice(1) : "";
 };
 const direction = (row: QuoteRow | undefined) => { const change = Number(row?.quote?.change ?? 0); return change > 0 ? "up" : change < 0 ? "down" : undefined; };
@@ -61,24 +76,24 @@ export function WatchlistPanel({ ctx, panelId }: { ctx: ModuleContext; panelId: 
   };
   if (naming) return <div className="chart-rail-panel">
     <div className="chart-rail-head">
-      <TxInput aria-label="List name" placeholder="List name" autoFocus value={naming.name} onChange={event => setNaming({ ...naming, name: event.target.value })}
+      <TxInput aria-label={t("List name")} placeholder={t("List name")} autoFocus value={naming.name} onChange={event => setNaming({ ...naming, name: event.target.value })}
         onKeyDown={event => { if (event.key === "Enter") saveName(); if (event.key === "Escape") setNaming(null); }} />
-      <TxButton size="sm" variant="primary" disabled={!naming.name.trim()} onClick={saveName}>{naming.mode === "create" ? "Create" : "Rename"}</TxButton>
-      <TxButton size="sm" onClick={() => setNaming(null)}>Cancel</TxButton>
+      <TxButton size="sm" variant="primary" disabled={!naming.name.trim()} onClick={saveName}>{naming.mode === "create" ? t("Create") : t("Rename")}</TxButton>
+      <TxButton size="sm" onClick={() => setNaming(null)}>{t("Cancel")}</TxButton>
     </div>
     {error && <p className="chart-alert-error" role="alert">{error}</p>}
   </div>;
 
   if (!list) return <div className="chart-rail-panel">
-    <TxEmpty title="No watchlist" />
-    <div className="chart-rail-center"><TxButton size="sm" variant="primary" onClick={() => setNaming({ mode: "create", name: "Watchlist" })}>Create watchlist</TxButton></div>
+    <TxEmpty title={t("No watchlist")} />
+    <div className="chart-rail-center"><TxButton size="sm" variant="primary" onClick={() => setNaming({ mode: "create", name: t("Watchlist") })}>{t("Create watchlist")}</TxButton></div>
   </div>;
 
   const menu: TxMenuItem[] = [
     ...lists.map(item => ({ id: item.id, label: item.name, checked: item.id === list.id, onSelect: () => setChosen(item.id) })),
-    { id: "create", label: "Create new list…", icon: "plus", separated: true, onSelect: () => setNaming({ mode: "create", name: "" }) },
-    { id: "rename", label: "Rename…", icon: "edit", onSelect: () => setNaming({ mode: "rename", name: list.name }) },
-    { id: "delete", label: "Delete list", icon: "trash", onSelect: () => post(ctx, "/watchlists/delete", { watchlistId: list.id }).then(() => setChosen(null), fail) },
+    { id: "create", label: t("Create new list…"), icon: "plus", separated: true, onSelect: () => setNaming({ mode: "create", name: "" }) },
+    { id: "rename", label: t("Rename…"), icon: "edit", onSelect: () => setNaming({ mode: "rename", name: list.name }) },
+    { id: "delete", label: t("Delete list"), icon: "trash", onSelect: () => post(ctx, "/watchlists/delete", { watchlistId: list.id }).then(() => setChosen(null), fail) },
   ];
   const columnMenu: TxMenuItem[] = COLUMNS.map(column => ({ id: column.id, label: column.label, checked: columns.includes(column.id),
     onSelect: () => setColumns(value => value.includes(column.id) ? value.filter(item => item !== column.id) : COLUMNS.map(item => item.id).filter(id => id === column.id || value.includes(id))) }));
@@ -86,10 +101,10 @@ export function WatchlistPanel({ ctx, panelId }: { ctx: ModuleContext; panelId: 
   const pickedInstrument = members.find(item => item.instrumentId === picked) ?? members.find(item => item.instrumentId === current?.instrumentId);
   return <div className="chart-rail-panel">
     <div className="chart-rail-head">
-      <TxMenu label="Watchlists" items={menu} trigger={<TxButton variant="quiet" size="sm" className="chart-rail-title">{list.name}<TxIcon name="chevron-down" /></TxButton>} />
+      <TxMenu label={t("Watchlists")} items={menu} trigger={<TxButton variant="quiet" size="sm" className="chart-rail-title">{list.name}<TxIcon name="chevron-down" /></TxButton>} />
       <span className="chart-tb-spacer" />
-      <TxIconButton size="sm" icon="plus" label="Add symbol" onClick={() => openOverlay(panelId, { kind: "symbol", mode: "watchlist", query: "", watchlistId: list.id })} />
-      <TxMenu label="Columns" align="end" items={columnMenu} trigger={<TxIconButton size="sm" icon="columns" label="Columns" />} />
+      <TxIconButton size="sm" icon="plus" label={t("Add symbol")} onClick={() => openOverlay(panelId, { kind: "symbol", mode: "watchlist", query: "", watchlistId: list.id })} />
+      <TxMenu label={t("Columns")} align="end" items={columnMenu} trigger={<TxIconButton size="sm" icon="columns" label={t("Columns")} />} />
     </div>
     {(error || quoteError) && <p className="chart-alert-error chart-rail-note" role="alert">{error ?? quoteError}</p>}
     {/* One grid for the header and every row (rows are subgrids). The symbol column is at least as wide as a common
@@ -98,9 +113,9 @@ export function WatchlistPanel({ ctx, panelId }: { ctx: ModuleContext; panelId: 
         there is room (tiny prices are compact, 0.0₅38766), and on a narrow rail only the longest are cut. */}
     <div className="chart-rail-list chart-watch-list" role="list" style={{ gridTemplateColumns: ["minmax(10ch, 1fr)", ...shown.map(column => column.id === "changePercent" ? "max-content" : "minmax(0, max-content)")].join(" ") }}>
       <div className="chart-watch-row chart-watch-columns" role="presentation">
-        <span>Symbol</span>{shown.map(column => <span key={column.id}>{column.label}</span>)}
+        <span>{t("Symbol")}</span>{shown.map(column => <span key={column.id}>{column.label}</span>)}
       </div>
-      {members.length === 0 && <TxEmpty title="Empty list" />}
+      {members.length === 0 && <TxEmpty title={t("Empty list")} />}
       {list.sections.map(section => <div key={section.id} role="group" aria-label={section.name || list.name}>
         {section.name && <TxButton variant="row" size="sm" className="chart-watch-section" aria-expanded={!collapsed[section.id]} onClick={() => setCollapsed(value => ({ ...value, [section.id]: !value[section.id] }))}>
           <TxIcon name={collapsed[section.id] ? "chevron" : "chevron-down"} />{section.name}
@@ -123,14 +138,14 @@ function Row({ instrument, row, columns, current, onPick, onRemove }: { instrume
       <span className="chart-watch-symbol" title={instrument.displaySymbol}>{instrument.displaySymbol}</span>
       {COLUMNS.filter(column => columns.includes(column.id)).map(column => <span key={column.id} className="chart-watch-value" data-direction={column.id === "last" ? undefined : direction(row)}>{compactZeros(cells[column.id])}</span>)}
     </TxButton>
-    <TxIconButton size="sm" icon="close" label={`Remove ${instrument.displaySymbol}`} onClick={onRemove} />
+    <TxIconButton size="sm" icon="close" label={t("Remove {displaySymbol}", { displaySymbol: instrument.displaySymbol })} onClick={onRemove} />
   </div>;
 }
 
 /** TradingView's card under the list: the picked symbol's name, price and change, exchange and type. */
 function Details({ instrument, row }: { instrument: Instrument; row: QuoteRow | undefined }) {
   const quote = row?.quote;
-  return <section className="chart-watch-details" aria-label={`${instrument.displaySymbol} details`}>
+  return <section className="chart-watch-details" aria-label={t("{displaySymbol} details", { displaySymbol: instrument.displaySymbol })}>
     <div className="chart-watch-details-head"><strong>{instrument.displaySymbol}</strong><span className="chart-muted">{instrument.name ?? instrument.base ?? instrument.symbol}</span></div>
     <div className="chart-watch-details-price">
       <span className="chart-watch-big">{trim(quote?.last ?? quote?.price) ?? "—"}</span>
@@ -139,7 +154,7 @@ function Details({ instrument, row }: { instrument: Instrument; row: QuoteRow | 
     <div className="chart-watch-details-meta">
       <span>{instrument.venueName ?? instrument.venueId}</span>
       <TxTag tone="muted">{kindOf(instrument)}</TxTag>
-      {quote?.delayed && <TxTag tone="muted">Delayed</TxTag>}
+      {quote?.delayed && <TxTag tone="muted">{t("Delayed")}</TxTag>}
       {row?.problem && <span className="chart-alert-error">{row.problem.message}</span>}
     </div>
   </section>;

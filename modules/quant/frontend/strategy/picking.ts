@@ -15,7 +15,8 @@ export function withPicking(figure: PlotFigure, picking: Picking[] | undefined):
   return {...figure, layout: {...layout,
     shapes: [...((layout.shapes as object[]) ?? []), {type: "rect", xref: "x", yref: "paper", x0: first, x1: to, y0: 0, y1: 1, layer: "below", line: {width: 0}, fillcolor: "rgba(128,128,128,0.12)", meta: {role: "detail"}}],
     annotations: [...((layout.annotations as object[]) ?? []), {xref: "x", yref: "paper", x: first, y: 1, xanchor: "left", yanchor: "top", showarrow: false,
-      text: "Used to pick " + picking.map(item => item.name).join(", "), name: "picking", font: {size: 11}}]}};
+      text: t("Used to pick {names}", { names: picking.map(item => item.name).join(", ") }), name: "picking", font: {size: 11}}]}};
 }
 
+import { t } from "../i18n";
 import type { PlotFigure } from "../chart/Plot";

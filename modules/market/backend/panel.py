@@ -10,6 +10,7 @@ from __future__ import annotations
 import shutil
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.instruments import MarketInstrument, MarketSeries, market_data_series, ohlcv_series
 
@@ -31,7 +32,7 @@ class Panel:
         op = value["op"]
         handler = getattr(self, "_" + op, None)
         if handler is None:
-            raise MarketError("invalid_input", f"Unknown panel operation {op}")
+            raise MarketError("invalid_input", t("Unknown panel operation {op}", op=op))
         return await handler(value, workspace_id)
 
     # ── library ─────────────────────────────────────────────────────────────
@@ -83,14 +84,14 @@ class Panel:
         record = self.market.instrument_record({"instrumentId": value["instrumentId"]}) \
             if "instrumentId" in value else None
         if record is None:
-            raise MarketError("not_found", "No such instrument")
+            raise MarketError("not_found", t("No such instrument"))
         key = SeriesKey(record["instrumentId"], value.get("capability", "ohlcv"), value.get("priceBasis", "last"),
                         value.get("sessionScope", "continuous" if record["identityVersion"] == 1 else "regular"),
                         value.get("timeframe"), value.get("importId"))
         store = self.market.store
         pointer = store.pointer(key)
         if pointer is None:
-            raise MarketError("not_found", "Nothing stored for this series")
+            raise MarketError("not_found", t("Nothing stored for this series"))
         calendar = record.get("calendarId", "24_7")
         first, last = pointer["first"], pointer["last"]
         gaps = [{"from": time_text(calendar, key.timeframe, int(start)), "to": time_text(calendar, key.timeframe,

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+from talyx_sdk.i18n import mark, t
 
 from .. import bars
 from ..common import MarketError
@@ -71,6 +72,7 @@ class Source:
     """Base for official sources. Subclasses set ``id``, ``descriptor`` and implement methods."""
 
     id: str = ""
+    catalog_family = "listings"
     descriptor: dict[str, Any] = {}
     secret_settings: tuple[str, ...] = ()
 
@@ -91,28 +93,28 @@ class Source:
         raise NotImplementedError
 
     async def search(self, source_id: str, query: str, scope: dict, limit: int) -> list[dict]:
-        raise MarketError("unsupported", f"{source_id} has no search", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no search", source_id=source_id), source_id=source_id)
 
     async def catalog(self, source_id: str, scope: dict, environment: str, cursor: str | None
                       ) -> tuple[list[dict], str | None]:
-        raise MarketError("unsupported", f"{source_id} has no catalog", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no catalog", source_id=source_id), source_id=source_id)
 
     async def history(self, source_id: str, target: Target, kind: str, timeframe: str | None, price_basis: str,
                       start: int, end: int,
                       archive: tuple[str, int] | None = None) -> History:
-        raise MarketError("unsupported", f"{source_id} has no history", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no history", source_id=source_id), source_id=source_id)
 
     async def bulk(self, source_id: str, kind: str, timeframe: str | None, scope: dict, codes: list[str],
                    start: int, end: int) -> History:
-        raise MarketError("unsupported", f"{source_id} has no bulk", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no bulk", source_id=source_id), source_id=source_id)
 
     async def bulk_artifact(self, value: dict) -> dict:
-        raise MarketError("unsupported", f"{value['sourceId']} has no bulk files", source_id=value["sourceId"])
+        raise MarketError("unsupported", t("{sourceId} has no bulk files", sourceId=value['sourceId']), source_id=value["sourceId"])
 
     def live(self, source_id: str, target: Target, kind: str, timeframe: str | None, price_basis: str = "last",
              depth: int | None = None) -> AsyncIterator[dict]:
         """Live events: subscribed, bar (row, closed), ticker (quote), gap. Market fills gaps by history."""
-        raise MarketError("unsupported", f"{source_id} has no live data", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no live data", source_id=source_id), source_id=source_id)
 
     async def configure(self, source_id: str, values: dict) -> dict:
         """Store settings; secrets go to Market's platform secrets, never to disk."""
@@ -136,7 +138,7 @@ class Source:
 
     async def research(self, source_id: str, target: Target, kind: str) -> list[dict]:
         """Research rows of one instrument (or, for members, one index); every row carries knownAt."""
-        raise MarketError("unsupported", f"{source_id} has no {kind}", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no {kind}", source_id=source_id, kind=kind), source_id=source_id)
 
     def note(self, source_id: str, kind: str) -> str | None:
         """A limitation of this source's rows in words (e.g. survivorship bias of a member list)."""
@@ -149,10 +151,41 @@ class Source:
 
     async def quotes(self, source_id: str, targets: list[Target], basis: str) -> dict[str, dict]:
         """Current quotes by instrument id: {"quote": Quote} or {"problem": Problem}."""
-        raise MarketError("unsupported", f"{source_id} has no quotes", source_id=source_id)
+        raise MarketError("unsupported", t("{source_id} has no quotes", source_id=source_id), source_id=source_id)
 
     async def close(self) -> None:
         pass
+
+
+RPM_SETTING = {"name": "requestsPerMinute", "label": mark("Requests per minute"), "type": "integer",
+               "secret": False, "required": False}
+
+
+class MeteredSource(Source):
+    """Charge each upstream HTTP request, including continuation pages, at the source gate."""
+
+    default_rpm: int
+
+    @property
+    def rpm(self):
+        return self.settings.get("requestsPerMinute") or self.default_rpm
+
+    async def configure(self, source_id, values):
+        if "requestsPerMinute" in values and values["requestsPerMinute"] is not None:
+            rpm = values["requestsPerMinute"]
+            if rpm < 1:
+                raise MarketError("invalid_input", t("Requests per minute must be a positive integer"))
+        return await super().configure(source_id, values)
+
+    async def request(self, send, url, **options):
+        from ..routing import PRIORITY
+
+        gate = self.market.registry.entry(self.id).gate
+        await gate.acquire(PRIORITY.get())
+        try:
+            return await send(self.id, url, **options)
+        finally:
+            gate.release()
 
 
 def empty_history(reason: str) -> History:

@@ -1,5 +1,6 @@
 /* A notebook as its panel holds it: the .ipynb's cells (backend/notebook_file.py), what the kernel socket says about them
    (backend/notebook_routes.py) and the cells this panel has asked to run. */
+import { t } from "./i18n";
 import type { Json, ModuleContext } from "@talyx/sdk";
 import { carriage } from "./ansi";
 import { at, route } from "./types";
@@ -261,7 +262,7 @@ export class KernelSocket {
     };
   }
   send(message: PanelMessage) {
-    if (this.socket === null || this.socket.readyState !== WebSocket.OPEN) throw new Error("The kernel connection is not open.");
+    if (this.socket === null || this.socket.readyState !== WebSocket.OPEN) throw new Error(t("The kernel connection is not open."));
     this.socket.send(JSON.stringify(message));
   }
   close() {

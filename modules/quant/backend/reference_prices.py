@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import market_inputs as M
 from . import object_data
@@ -34,7 +35,7 @@ def project(sources, frame, selections):
         chosen = result["instrument"] == source["nativeInstrument"]
         needed = result.loc[chosen, "ts_event"].astype("int64")
         if not needed.isin(raw.index).all():
-            raise ContractError("history_gap", f"{source['marketInstrument']['displaySymbol']}: missing {basis.upper()} reference candles.")
+            raise ContractError("history_gap", t("{displaySymbol}: missing {upper} reference candles.", displaySymbol=source['marketInstrument']['displaySymbol'], upper=basis.upper()))
         values = M.decimal_columns(raw.loc[needed].reset_index(drop=True), fields=FIELDS)
         for field in FIELDS:
             result.loc[chosen, basis + "_" + field] = values[field].to_numpy()

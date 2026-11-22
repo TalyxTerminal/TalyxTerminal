@@ -142,7 +142,7 @@ describe("the publish sheet's comparison", () => {
   it("sets where the held-out part starts in the run settings, as the factor, model and strategy pages do", () => {
     const settings = readFileSync(new URL("./Settings.tsx", import.meta.url), "utf8");
     const page = readFileSync(new URL("./AllocationPage.tsx", import.meta.url), "utf8");
-    expect(settings).toMatch(/<DayInput label="Held out from" value=\{value\} empty onChange=\{onChange\} \/>/);  // typed as the app writes days, not the browser's date box
+    expect(settings).toMatch(/<DayInput label=\{t\("Held out from"\)\} value=\{value\} empty onChange=\{onChange\} \/>/);  // typed as the app writes days, not the browser's date box
     expect(page).toMatch(/onHeldOut=\{day => void api\.settings\(detail\.id, \{data: \{\.\.\.data, heldOutFrom: day\}\}\)/);
   });
 
@@ -152,16 +152,9 @@ describe("the publish sheet's comparison", () => {
     expect(shell).toContain('else if (created.hasCode === true) update({side: "code"});');
   });
 
-  it("the held-out confirmation names the allocation, not a strategy", () => {
-    const page = readFileSync(new URL("./AllocationPage.tsx", import.meta.url), "utf8");
-    const confirm = readFileSync(new URL("../strategy/validation/HeldOutConfirm.tsx", import.meta.url), "utf8");
-    expect(page).toContain('<HeldOutConfirm open={held !== null} status={held} what="allocation"');
-    expect(confirm).toContain("Do this once, when the {what} is settled.");
-  });
-
   it("the review says when the published period was computed, not where the shown run ends", () => {
     const page = readFileSync(new URL("./AllocationPage.tsx", import.meta.url), "utf8");
-    expect(page).toContain("computed at the ${dayText(trial.trial.period)");
+    expect(page).toContain("computed at the {date} close\", { version: String(published.version), date: dayText(trial.trial.period)");
     expect(page).toContain("trialCase.reviewPending ? published.period : undefined");
     expect(page).not.toMatch(/computed=\{work\?\.to/);
   });

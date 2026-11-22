@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from talyx_sdk.i18n import t
+
 from ..common import MarketError
 from .base import Source, coverage, row
 
@@ -60,7 +62,7 @@ class NasdaqListings(Source):
         """One symbol directory file; anything else (an error page) is the source failing, not an empty market."""
         text = (await self.egress.bytes(self.id, NASDAQ + name, timeout=60)).decode("utf-8", "replace")
         if not text.startswith(header):
-            raise MarketError("source_unavailable", f"nasdaqtrader returned no symbol directory for {name}",
+            raise MarketError("source_unavailable", t("nasdaqtrader returned no symbol directory for {name}", name=name),
                               source_id=self.id)
         return text
 

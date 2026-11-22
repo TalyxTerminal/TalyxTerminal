@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import library_summary
 from .changes import library_pins
@@ -99,8 +100,8 @@ class QuantHome:
                 versions = published.get(found["id"], [])
                 return found, {"run": found["id"], "number": found.get("number"), "how": how, "version": f"v{versions[0]['version']}" if versions else None}
         failed = next((run for run in runs if run["state"] == "failed"), None)
-        note = f"#{failed['number']} failed: {failed.get('message') or failed.get('error') or ''}".strip() if failed and failed.get("number") else \
-            ("The newest run failed" if failed else None)
+        note = t("#{number} failed: {reason}", number=failed["number"], reason=failed.get("message") or failed.get("error") or "").strip() if failed and failed.get("number") else \
+            (t("The newest run failed") if failed else None)
         return None, {"run": None, "number": None, "how": "none", "note": note}
 
     def objects(self, args):
@@ -165,11 +166,11 @@ class QuantHome:
         """A new model, strategy or allocation that reads one library version: the item's data settings are copied and the version is pinned."""
         from talyx_sdk import ContractError
         if kind not in ("model", "strategy", "allocation"):
-            raise ContractError("invalid_input", "A library version can start a model, a strategy or an allocation.")
+            raise ContractError("invalid_input", t("A library version can start a model, a strategy or an allocation."))
         library = self.services.library
         version = library.read_version(version_id)
         if version["state"] == "delisted" or version["archivedAt"] is not None:
-            raise ContractError("conflict", "Start from a producing version; this one was stopped.")
+            raise ContractError("conflict", t("Start from a producing version; this one was stopped."))
         store = self.services.store
         # A strategy reads a library item through a ready-made strategy's signal: Top N for a factor, a model or data, Rebalance for an allocation's
         # weights; the item is its signal and the version is pinned the way a run pins it (the empty skeleton read nothing).
@@ -206,7 +207,7 @@ class QuantHome:
         library, store = self.services.library, self.services.store
         version = library.read_version(version_id)
         if version["state"] == "delisted" or version["archivedAt"] is not None:
-            raise ContractError("conflict", "Switch to a producing version; this one was stopped.")
+            raise ContractError("conflict", t("Switch to a producing version; this one was stopped."))
         target = store.read(object_id)
         settings = target["settings"]
         if target["kind"] == "strategy":
@@ -249,11 +250,11 @@ class QuantHome:
                     if not user["owner_id"].startswith("qobject:"):
                         continue
                     newer = producing[0] if producing else None
-                    out.append({"tone": "watch", "label": "On a stopped version", "state": "pinned_stopped",
+                    out.append({"tone": "watch", "label": t("On a stopped version"), "state": "pinned_stopped",
                                 "subject": {"kind": user["kind"] or "object", "id": user["owner_id"].removeprefix("qobject:"), "name": user["name"]},
                                 "why": f"reads {row['name']} v{version['version']}, stopped {library_summary_day(version['stoppedAt'])}; its values end that day."
                                        + (f" v{newer['version']} is producing" if newer else ""),
-                                "since": version["stoppedAt"], "action": {"id": "switch_version", "label": f"Switch to v{newer['version']}" if newer else "Open the library item",
+                                "since": version["stoppedAt"], "action": {"id": "switch_version", "label": t("Switch to v{version}", version=newer['version']) if newer else t("Open the library item"),
                                                                           "versionId": newer["versionId"] if newer else None, "itemId": row["itemId"]}})
         return out
 
@@ -262,6 +263,15 @@ class QuantHome:
         """GET /quant/queue: every heavy job Quant runs or waits to run (factor runs, sweeps, publications, training, library updates and the next round)."""
         services = self.services
         jobs = []
+        stages = {
+            "code": t("code"), "data": t("data"), "environment": t("environment"),
+            "facts": t("facts"), "compute": t("compute"), "numbers": t("numbers"),
+            "future": t("future"), "fetch": t("fetch"), "values": t("values"),
+            "commit": t("commit"), "library": t("library"), "settings": t("settings"),
+            "benchmark": t("benchmark"), "backtest": t("backtest"), "training": t("training"),
+            "run": t("run"), "sweep": t("sweep"), "validate": t("validate"),
+            "publish": t("publish"),
+        }
         queue = services.factors.queue.view()
         for entry in [*queue["running"], *queue["waiting"]]:
             if entry["owner"].startswith("library:"):
@@ -271,7 +281,7 @@ class QuantHome:
             progress = (run or {}).get("progress") or {}
             steps = progress.get("steps") or []
             done = sum(1 for step in steps if step.get("state") == "done")
-            jobs.append({"subject": subject, "what": entry["label"] + (f", {progress.get('stage')}" if progress.get("stage") else ""),
+            jobs.append({"subject": subject, "what": t("{label}, {stage}", label=entry["label"], stage=stages.get(progress["stage"], progress["stage"])) if progress.get("stage") else entry["label"],
                          "progress": round(done / 7, 2) if entry["state"] == "running" and steps else None, "elapsed": entry.get("started"),
                          "state": "running" if entry["state"] == "running" else "queued", "can_stop": run is not None})
         for identity in list(services.runs.tasks):
@@ -279,28 +289,28 @@ class QuantHome:
             if run is None or any(job["subject"].get("runId") == identity for job in jobs):
                 continue
             progress = run.get("progress") or {}
-            what = ("Publishing " + run["publish"]["name"]) if run["runKind"] == "publish" else f"#{run.get('number') or ''} {run['runKind']}".strip()
+            what = t("Publishing {name}", name=run["publish"]["name"]) if run["runKind"] == "publish" else t("#{number} {kind}", number=run.get("number") or "", kind=stages.get(run["runKind"], run["runKind"])).strip()
             if progress.get("of"):
-                what += f", check {progress.get('step')} of {progress['of']}"
+                what = t("{task}, check {step} of {total}", task=what, step=progress.get("step"), total=progress["of"])
             elif run.get("stage"):
-                what += f", {run['stage']}"
+                what = t("{label}, {stage}", label=what, stage=stages.get(run["stage"], run["stage"]))
             jobs.append({"subject": {"kind": run["objectKind"], "id": run["objectId"], "name": run["name"], "runId": identity}, "what": what,
                          "progress": round(progress["step"] / progress["of"], 2) if progress.get("of") else None, "elapsed": run["createdAt"],
                          "state": "running", "can_stop": True})
         production = services.loop.view()
         for entry in production["running"]:
             jobs.append({"subject": {"kind": "library", "id": entry["itemId"], "name": f"{entry['name']} v{entry['version']}", "versionId": entry["versionId"]},
-                         "what": "Library update", "progress": None, "elapsed": entry["startedAt"], "state": "running", "can_stop": True})
+                         "what": t("Library update"), "progress": None, "elapsed": entry["startedAt"], "state": "running", "can_stop": True})
         for entry in production["queued"]:
             jobs.append({"subject": {"kind": "library", "id": entry["itemId"], "name": f"{entry['name']} v{entry['version']}", "versionId": entry["versionId"]},
-                         "what": "Library update, waiting for its inputs or a free slot", "state": "queued", "can_stop": True})
+                         "what": t("Library update, waiting for its inputs or a free slot"), "state": "queued", "can_stop": True})
         for entry in production["retries"]:
             jobs.append({"subject": {"kind": "library", "id": entry["itemId"], "name": f"{entry['name']} v{entry['version']}", "versionId": entry["versionId"]},
-                         "what": f"Retry at {library_summary_clock(entry['at'])}" + (f", try {entry['tries'] + 1}" if entry.get("tries") else ""), "at": entry["at"],
+                         "what": t("Retry at {time}, try {attempt}", time=library_summary_clock(entry["at"]), attempt=entry["tries"] + 1) if entry.get("tries") else t("Retry at {time}", time=library_summary_clock(entry["at"])), "at": entry["at"],
                          "state": "queued", "can_stop": False})
         for entry in production["waiting"]:
             jobs.append({"subject": {"kind": "library", "id": entry["itemId"], "name": f"{entry['name']} v{entry['version']}", "versionId": entry["versionId"]},
-                         "what": f"Waiting for its bar, next look {library_summary_clock(entry['at'])}", "at": entry["at"], "state": "queued", "can_stop": False})
+                         "what": t("Waiting for its bar, next look {time}", time=library_summary_clock(entry["at"])), "at": entry["at"], "state": "queued", "can_stop": False})
         return {"jobs": jobs, "production": production}
 
 

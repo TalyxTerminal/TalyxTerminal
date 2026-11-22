@@ -18,6 +18,7 @@ from typing import Any
 from uuid import uuid4
 
 from talyx_sdk.errors import ContractError, provider_restarted
+from talyx_sdk.i18n import t
 
 log = logging.getLogger("talyx.router")
 # Calls to a module that is still starting wait this long, at most this many at a time.
@@ -118,12 +119,12 @@ class Router:
         if self.ready.get(module) is endpoint:
             del self.ready[module]
         self.endpoint_closed(endpoint, provider_error=None if not stopped else ContractError(
-            "unavailable", f"{module} was stopped", execution="unknown", effects="may_have_occurred"))
+            "unavailable", t("{module} was stopped", module=module), execution="unknown", effects="may_have_occurred"))
         if stopped:
             keep = []
             for item in self.waiting:
                 if item.module == module:
-                    item.fail(ContractError("unavailable", f"{module} was stopped"))
+                    item.fail(ContractError("unavailable", t("{module} was stopped", module=module)))
                 else:
                     keep.append(item)
             self.waiting = keep
@@ -147,7 +148,7 @@ class Router:
             elif call.origin is endpoint:
                 del self.calls[host_id]
                 call.provider.deliver({"t": "cancel", "id": host_id})
-                self._ended(call, None, ContractError("cancelled", "Caller disconnected", execution="unknown",
+                self._ended(call, None, ContractError("cancelled", t("Caller disconnected"), execution="unknown",
                                                        effects="may_have_occurred").to_dict())
         for host_id, subscription in list(self.subscriptions.items()):
             if subscription.provider is endpoint and not subscription.event:
@@ -178,14 +179,14 @@ class Router:
                     self._drop_subscription(host_id)
         elif kind == "cancel":
             for item in self._unwait(endpoint, envelope["id"], "call"):
-                item.fail(ContractError("cancelled", "Cancelled before it was sent", execution="not_started"))
+                item.fail(ContractError("cancelled", t("Cancelled before it was sent"), execution="not_started"))
             for host_id, call in list(self.calls.items()):
                 if call.origin is endpoint and call.origin_id == envelope["id"]:
                     call.provider.deliver({"t": "cancel", "id": host_id})
         elif kind == "event":
             self.publish(endpoint.caller(envelope), envelope["cap"], body)
         else:
-            raise ContractError("invalid_input", f"Unknown frame type {kind!r}")
+            raise ContractError("invalid_input", t("Unknown frame type {kind}", kind=f'{kind!r}'))
 
     def call(self, origin: Endpoint, envelope: dict, body: bytes, *, on_end: Callable | None = None,
              route: Route | None = None, host_id: str | None = None) -> None:
@@ -222,7 +223,7 @@ class Router:
             action(route.endpoint)
             return
         if len(self.waiting) >= QUEUE_LIMIT:
-            fail(ContractError("unavailable", f"{route.module} is starting and too many calls are waiting for it"))
+            fail(ContractError("unavailable", t("{module} is starting and too many calls are waiting for it", module=route.module)))
             return
         loop = asyncio.get_running_loop()
         item = _Waiting(route.module, lambda: action(self.ready[route.module]), loop.time() + QUEUE_SECONDS, fail,
@@ -232,7 +233,7 @@ class Router:
         def expire():
             if item in self.waiting:
                 self.waiting.remove(item)
-                fail(ContractError("unavailable", f"{route.module} did not start in time"))
+                fail(ContractError("unavailable", t("{module} did not start in time", module=route.module)))
 
         loop.call_later(QUEUE_SECONDS, expire)
 
@@ -319,7 +320,7 @@ class Router:
         """An event: only its owner publishes it, every current subscriber gets it, nothing is kept."""
         owner = capability.split(".", 1)[0]
         if caller.get("module") != owner:
-            raise ContractError("permission_denied", f"Only {owner} publishes {capability}")
+            raise ContractError("permission_denied", t("Only {owner} publishes {capability}", owner=owner, capability=capability))
         for host_id in list(self.events.get(capability, ())):
             subscription = self.subscriptions[host_id]
             subscription.origin.deliver({"t": "item", "sub": subscription.origin_id}, body)

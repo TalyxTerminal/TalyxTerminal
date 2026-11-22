@@ -9,11 +9,12 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset as ds
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 def read_result_table(path, args):
     if path.suffix != ".parquet":
-        raise ContractError("invalid_input", "This result is not a table.")
+        raise ContractError("invalid_input", t("This result is not a table."))
     columns = args.get("columns")
     observation = args.get("observation")
     read_columns = list(dict.fromkeys(["date", *columns])) if columns and observation else columns
@@ -23,15 +24,15 @@ def read_result_table(path, args):
     if selected_filter:
         column, value = selected_filter["column"], selected_filter["equals"]
         if column not in dataset.schema.names or not isinstance(value, (str, bool, int, float, type(None))) or isinstance(value, float) and not math.isfinite(value):
-            raise ContractError("invalid_input", "Choose a real column and one finite scalar value for this table filter.")
+            raise ContractError("invalid_input", t("Choose a real column and one finite scalar value for this table filter."))
         predicate = ds.field(column).is_null() if value is None else ds.field(column) == value
     for condition in args.get("filters", []):
         column, operator, value = condition["column"], condition["operator"], condition["value"]
         if column not in dataset.schema.names or operator not in {"eq", "gte", "lte", "in"}:
-            raise ContractError("invalid_input", "Choose an available column and supported table filter.")
+            raise ContractError("invalid_input", t("Choose an available column and supported table filter."))
         values = value if operator == "in" and isinstance(value, list) else [value]
         if any(not isinstance(item, (str, bool, int, float, type(None))) or isinstance(item, float) and not math.isfinite(item) for item in values):
-            raise ContractError("invalid_input", "Table filters need finite values.")
+            raise ContractError("invalid_input", t("Table filters need finite values."))
         field = ds.field(column)
         kind = dataset.schema.field(column).type
         try:
@@ -44,15 +45,15 @@ def read_result_table(path, args):
             elif operator == "gte": selected = field >= values[0]
             else: selected = field <= values[0]
         except (ValueError, TypeError, pa.ArrowException) as error:
-            raise ContractError("invalid_input", "This filter does not match the column's data type.") from error
+            raise ContractError("invalid_input", t("This filter does not match the column's data type.")) from error
         predicate = selected if predicate is None else predicate & selected
     if observation:
         if "date" not in dataset.schema.names:
-            raise ContractError("invalid_input", "This result has no observation timestamps.")
+            raise ContractError("invalid_input", t("This result has no observation timestamps."))
         try:
             selected = pd.Timestamp(observation)
             if selected.tzinfo is None:
-                raise ValueError("An exact timestamp must include its UTC offset.")
+                raise ValueError(t("An exact timestamp must include its UTC offset."))
             timestamp = pa.scalar(selected.tz_convert("UTC"), type=pa.timestamp("ns", tz="UTC"))
             date_predicate = ds.field("date").cast(pa.timestamp("ns", tz="UTC")) == timestamp
             predicate = date_predicate if predicate is None else predicate & date_predicate
@@ -64,7 +65,7 @@ def read_result_table(path, args):
         sorting = args.get("sort")
         if sorting:
             if sorting["column"] not in dataset.schema.names:
-                raise ContractError("invalid_input", "Choose an available sort column.")
+                raise ContractError("invalid_input", t("Choose an available sort column."))
             selected_columns = list(dict.fromkeys([*read_columns, sorting["column"]])) if read_columns else None
             ordinal = "__quant_query_order"
             while ordinal in dataset.schema.names: ordinal += "_"
@@ -100,7 +101,7 @@ def read_result_table(path, args):
         if frame is None:
             frame = pa.Table.from_batches(batches, schema=schema).to_pandas()
     except (pa.ArrowException, TypeError, ValueError) as error:
-        raise ContractError("invalid_input", "This table selection cannot be read: " + str(error)) from error
+        raise ContractError("invalid_input", t("This table selection cannot be read: {error}", error=str(error))) from error
     if columns:
         frame = frame[columns]
     rows = json.loads(frame.to_json(orient="records", date_format="iso", date_unit="ns"))

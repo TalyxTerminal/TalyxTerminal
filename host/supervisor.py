@@ -18,9 +18,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from talyx_sdk import wire
+from talyx_sdk import i18n, wire
 from talyx_sdk.contract import check_ready
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 from talyx_sdk.jobs import Job, spawn
 
 from kernel.router import Endpoint, Router
@@ -47,7 +48,7 @@ class ModuleEndpoint(Endpoint):
 
     def caller(self, envelope: dict) -> dict:
         if "from" in envelope:
-            raise ContractError("permission_denied", "A module cannot say who is calling; the Host does")
+            raise ContractError("permission_denied", t("A module cannot say who is calling; the Host does"))
         workspace = envelope.get("ws")
         if workspace is not None:
             self.process.supervisor.check_workspace(workspace)
@@ -92,7 +93,8 @@ class ModuleProcess:
                "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8",
                "TALYX_HOST": f"127.0.0.1:{self.supervisor.port}", "TALYX_TOKEN": self.token,
                "TALYX_MODULE": self.module_id, "TALYX_PACKAGE": self.package, "TALYX_ENTRY": self.entry,
-               **self.supervisor.environment}
+               "TALYX_MODULE_DATA": str(self.supervisor.module_data / self.module_id),
+               i18n.LANGUAGE_ENV: i18n.language(), **self.supervisor.environment}
         self.started_at = time.monotonic()
         self.process, self.job = await spawn(
             [self.python, "-B", "-X", "utf8", "-m", "talyx_sdk.process"], env=env, cwd=str(root),
@@ -247,6 +249,8 @@ class Supervisor:
         self.tokens: dict[str, ModuleProcess] = {}
         self.environment: dict[str, str] = {}
         """Set for every module process (the platform's shared folder)."""
+        self.module_data = Path()
+        """Where each module's data folder is (``<this>/<module id>``, as ``platform.storage.directories`` gives it)."""
         self.server: asyncio.Server | None = None
         self.port = 0
 

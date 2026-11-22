@@ -240,3 +240,23 @@
   .talyx-ws-mark[data-status="running"] { animation-duration: calc(var(--tx-spin-time) * 3); }
   .talyx-ws-track { transition: none; }
 }
+
+/* A newer TALYX is out: a quiet capsule beside Settings, orange text because it is the user's to act on. */
+.talyx-update-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tx-space-1);
+  height: var(--tx-button-sm);
+  margin-right: var(--tx-space-2);
+  padding: 0 var(--tx-space-2-half);
+  border: var(--tx-hairline) solid var(--tx-ember-30);
+  border-radius: var(--tx-radius-pill);
+  background: var(--tx-ember-14);
+  color: var(--tx-ember-text);
+  font: inherit;
+  font-size: var(--tx-size-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.talyx-update-mark:hover { background: var(--tx-ember-20); }
+.talyx-update-mark svg { width: var(--tx-icon-sm); height: var(--tx-icon-sm); }

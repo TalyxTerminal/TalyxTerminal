@@ -1,8 +1,11 @@
+import { translator } from "../i18n";
 /* Workbench layout parts: one toolbar row, a resizable inspector beside the
    main view and property-row sections. Modules compose these instead of hand-building layout. */
 import { useRef, useState, type ReactNode } from "react";
 import { TxIcon } from "./icons";
 import { TxFieldLayout, type TxDensity } from "./components";
+
+const t = translator("platform");
 
 function join(...values: (string | undefined | false)[]): string {
   return values.filter(Boolean).join(" ");
@@ -39,7 +42,7 @@ export function TxSplit({ side, children, width, onWidth, min = 280, max = 840, 
     {!sideHidden && <>
       <aside className="tx-split-side" aria-label={sideLabel} style={{ width }}>{side}</aside>
       <div
-        className="tx-split-divider" role="separator" tabIndex={0} aria-label={`${sideLabel} width`} aria-orientation="vertical"
+        className="tx-split-divider" role="separator" tabIndex={0} aria-label={t("{sideLabel} width", { sideLabel })} aria-orientation="vertical"
         aria-valuemin={min} aria-valuemax={max} aria-valuenow={width}
         onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); }}
         onPointerMove={event => {

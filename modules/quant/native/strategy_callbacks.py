@@ -9,6 +9,8 @@ import traceback
 from contextlib import nullcontext
 from pathlib import Path
 
+from . import i18n
+
 
 class NativeCallbackObserver:
     def __init__(self, source, publisher):
@@ -211,7 +213,7 @@ class NativeCallbackObserver:
         path.write_text(json.dumps(rows, indent=2), encoding="utf8")
         artifact = self.publisher.artifact(path, "Original Python callback failures", "file")
         self.publisher.section("native-callback-failures", "Original Python callback failures", [artifact])
-        self.publisher.index["units"].append({"id": "native-callback-failures", "title": "Original Python callback failures", "state": "failed", "callbackErrors": rows})
+        self.publisher.index["units"].append({"id": "native-callback-failures", "title": i18n.t("Original Python callback failures"), "state": "failed", "callbackErrors": rows})
         self.publisher.write()
 
     def check(self):

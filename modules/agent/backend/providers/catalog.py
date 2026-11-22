@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..model_settings import ConnectionFields, ModelConfig
 from ..usage import Price
@@ -61,7 +62,7 @@ def validate(model, value):
         return model.model_validate(value)
     except (ValidationError, ValueError) as error:
         fields = [".".join(map(str, item["loc"])) for item in error.errors()] if isinstance(error, ValidationError) else []
-        raise ContractError("invalid_input", "Invalid Agent settings", {"fields": fields}) from error
+        raise ContractError("invalid_input", t("Invalid Agent settings"), {"fields": fields}) from error
 
 
 class ProviderCatalog:
@@ -84,13 +85,13 @@ class ProviderCatalog:
     def connection(self, connection_id):
         row = self.db.execute("SELECT config FROM connections WHERE id=?", (connection_id,)).fetchone()
         if row is None:
-            raise ContractError("target_gone", "Model connection no longer exists")
+            raise ContractError("target_gone", t("Model connection no longer exists"))
         return ConnectionConfig.model_validate_json(row[0])
 
     def model(self, model_id):
         row = self.db.execute("SELECT config FROM models WHERE id=?", (model_id,)).fetchone()
         if row is None:
-            raise ContractError("target_gone", "Model no longer exists")
+            raise ContractError("target_gone", t("Model no longer exists"))
         return ModelConfig.model_validate_json(row[0])
 
     def put_connection(self, value):
@@ -99,7 +100,7 @@ class ProviderCatalog:
         if previous is not None:
             old = ConnectionConfig.model_validate_json(previous[0])
             if old.site != connection.site or old.site is not None and old.providerId != connection.providerId:
-                raise ContractError("conflict", "Changing provider site requires a new connection and credential")
+                raise ContractError("conflict", t("Changing provider site requires a new connection and credential"))
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO connections VALUES (?,?)", (connection.id, connection.model_dump_json()))
         return connection.model_dump()
@@ -113,15 +114,14 @@ class ProviderCatalog:
                 price = Price(**model.price)
                 price.estimate({"input_tokens": 1, "output_tokens": 1}, {})
             except (TypeError, ValueError, ArithmeticError) as error:
-                raise ContractError("invalid_input", "Invalid model price", {"field": "price"}) from error
+                raise ContractError("invalid_input", t("Invalid model price"), {"field": "price"}) from error
         if model.maxOutputTokens is not None and profile["contextWindow"] is not None and model.maxOutputTokens > profile["maxOutputTokens"]:
             raise ContractError("invalid_input",
-                f"Context window {profile['contextWindow']} tokens, requested output {model.maxOutputTokens} tokens. "
-                f"Choose an output of at most {profile['maxOutputTokens']} tokens (provider limit or one quarter of the window).")
+                t("Context window {contextWindow} tokens, requested output {maxOutputTokens} tokens. Choose an output of at most {maxOutputTokens2} tokens (provider limit or one quarter of the window).", contextWindow=profile['contextWindow'], maxOutputTokens=model.maxOutputTokens, maxOutputTokens2=profile['maxOutputTokens']))
         if profile["contextWindow"] == 1:
-            raise ContractError("invalid_input", "Context window 1 token, output reserve 1 token: no room for input.")
+            raise ContractError("invalid_input", t("Context window 1 token, output reserve 1 token: no room for input."))
         if not profile["contextWindow"]:
-            raise ContractError("invalid_input", "A model requires a context window", {"missingFields": ["contextWindow"]})
+            raise ContractError("invalid_input", t("A model requires a context window"), {"missingFields": ["contextWindow"]})
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO models VALUES (?,?)", (model.id, model.model_dump_json()))
         return profile
@@ -136,7 +136,7 @@ class ProviderCatalog:
         self.connection(connection_id)
         models = [self.model(row[0]) for row in self.db.execute("SELECT id FROM models")]
         if any(model.connectionId == connection_id for model in models):
-            raise ContractError("conflict", "Remove this connection's models before removing the connection")
+            raise ContractError("conflict", t("Remove this connection's models before removing the connection"))
         with self.db:
             self.db.execute("DELETE FROM connections WHERE id=?", (connection_id,))
 
@@ -233,7 +233,7 @@ class ProviderCatalog:
 
     def save_test(self, model_id, fingerprint, result):
         if self.fingerprint(model_id) != fingerprint:
-            raise ContractError("conflict", "Model settings changed during the connection test")
+            raise ContractError("conflict", t("Model settings changed during the connection test"))
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO tests VALUES (?,?,?)", (model_id, self.test_fingerprint(model_id), json.dumps(result)))
 

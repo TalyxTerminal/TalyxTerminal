@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .materials import plain
 from .project_paths import EXCLUDED, filesystem_path, source_identity
@@ -39,6 +40,6 @@ class CommonCode:
             shutil.copytree(filesystem_path(self.root), filesystem_path(staging), dirs_exist_ok=True, ignore=shutil.ignore_patterns(*EXCLUDED, "*.pyc"))
             captured = await asyncio.to_thread(snapshot_project, self.ctx.data_dir, str(staging))
         if before != {item["path"]: item["sha256"] for item in captured["files"]}:
-            raise ContractError("conflict", "The common code changed while it was being fixed for the run. Run again.")
+            raise ContractError("conflict", t("The common code changed while it was being fixed for the run. Run again."))
         shutil.copytree(filesystem_path(captured["snapshotPath"]), filesystem_path(destination))
         return captured

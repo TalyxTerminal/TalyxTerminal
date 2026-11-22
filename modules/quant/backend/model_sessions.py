@@ -8,6 +8,7 @@ import traceback
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .materials import plain
 from .project_paths import MODULE
@@ -42,7 +43,7 @@ class Session:
         output.mkdir()
         state = plain(self.ctx.environments.get(self.binding['environment']['preparationId']))
         if state['state'] != 'completed':
-            raise ContractError('unavailable', 'The frozen model environment is no longer available.')
+            raise ContractError('unavailable', t("The frozen model environment is no longer available."))
         self.environment_owner = f"qmodel:{self.run_id}:{self.generation}:{self.binding['versionId']}"
         self.ctx.environments.hold(self.binding['environment']['preparationId'], self.environment_owner)
         config = {'runId': self.run_id, 'generation': self.generation, 'versionId': self.binding['versionId'], 'model': self.binding['model'],
@@ -66,7 +67,7 @@ class Session:
 
     def check(self, message):
         if (message['runId'], message['generation'], message['versionId']) != (self.run_id, self.generation, self.binding['versionId']):
-            raise ContractError('model_protocol', 'The model response belongs to a different run, generation or version.')
+            raise ContractError('model_protocol', t("The model response belongs to a different run, generation or version."))
 
     async def receive(self):
         while True:
@@ -74,13 +75,13 @@ class Session:
             if event['state'] == 'message':
                 return event['message']
             if event['state'] == 'closed':
-                raise ContractError('model_failed', 'The model process ended before answering.')
+                raise ContractError('model_failed', t("The model process ended before answering."))
 
     async def predict(self, request):
         try:
             return await self._predict(request)
         except TimeoutError as error:
-            failure = ContractError('model_timeout', 'The model did not answer within 30 seconds.')
+            failure = ContractError('model_timeout', t("The model did not answer within 30 seconds."))
             failure.__cause__ = error
             await cleanup(self.close, original=failure)
 
@@ -89,7 +90,7 @@ class Session:
         async with asyncio.timeout(TIMEOUT):
             async with self.serial:
                 if self.closed:
-                    raise ContractError('cancelled', 'The model session has ended.')
+                    raise ContractError('cancelled', t("The model session has ended."))
                 await self.ctx.processes.send(self.lease, request)
                 while True:
                     response = await self.receive()
@@ -97,7 +98,7 @@ class Session:
                     if response['requestId'] == request['requestId']:
                         break
                 if response['decisionAt'] != request['decisionAt']:
-                    raise ContractError('model_protocol', 'The model response belongs to another decision.')
+                    raise ContractError('model_protocol', t("The model response belongs to another decision."))
                 return response
 
     async def close(self):
@@ -151,9 +152,9 @@ class Sessions:
     async def predict(self, request):
         binding = next((item for item in self.bindings if item['name'] == request['name']), None)
         if binding is None or binding['versionId'] != request['versionId']:
-            raise ContractError('permission_denied', 'This model version is not frozen for this strategy run.')
+            raise ContractError('permission_denied', t("This model version is not frozen for this strategy run."))
         if int(request['decisionAt']) < binding['trainingCutoff'] * 1_000_000:
-            raise ContractError('model_training_overlap', 'This decision predates the model training cutoff.')
+            raise ContractError('model_training_overlap', t("This decision predates the model training cutoff."))
         return await self.sessions[binding['versionId']].predict(request)
 
     async def close(self):
@@ -177,7 +178,7 @@ class Router:
         sessions = Sessions(self.ctx, bindings, run_id, generation, directory)
         key = (run_id, generation)
         if key in self.active:
-            raise ContractError('conflict', 'This model run is already active.')
+            raise ContractError('conflict', t("This model run is already active."))
         self.active[key] = sessions
         started = False
         try:
@@ -191,10 +192,10 @@ class Router:
     async def predict(self, request, *, bound=None):
         key = (request['runId'], request['generation'])
         if bound is not None and (bound['modelRunId'], bound['generation']) != key:
-            raise ContractError('permission_denied', 'This request belongs to a different strategy execution.')
+            raise ContractError('permission_denied', t("This request belongs to a different strategy execution."))
         sessions = self.active.get(key)
         if sessions is None:
-            raise ContractError('cancelled', 'This strategy model run has ended.')
+            raise ContractError('cancelled', t("This strategy model run has ended."))
         try:
             return await sessions.predict(request)
         except (ContractError, TimeoutError, OSError, ValueError, ExceptionGroup) as error:

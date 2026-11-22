@@ -107,6 +107,8 @@ class ReplayEgress(Egress):
 
     async def request(self, source_id, url, *, method="GET", params=None, headers=None, data=None, json_body=None,
                       timeout=20.0, cookies=None, accept_status=()):
+        if isinstance(data, dict):
+            params = {**(params or {}), **data}
         if isinstance(json_body, dict):
             # JSON-RPC style sources (Tushare): match on the call's name and parameters, never the token.
             params = {**(params or {}), **{k: v for k, v in json_body.items() if k not in ("token", "params", "fields")},

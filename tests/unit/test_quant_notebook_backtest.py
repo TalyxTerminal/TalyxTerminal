@@ -124,18 +124,6 @@ def test_the_equity_so_far_is_a_figure_that_reads_out_like_the_draft(monkeypatch
     assert q._equity_figure(None) is None and q._equity_figure([[1, 0]]) is None
 
 
-def test_over_machine_budget_reported_in_cell():
-    item = services()
-
-    async def refuse(object_id, args):
-        raise ContractError("over_machine_budget", "This run needs about 9.2 GB; this machine gives runs 7.8 GB (half of 15.6 GB).", {"need": 1})
-
-    item.runs.start = refuse
-    with pytest.raises(ContractError) as error:
-        asyncio.run(item.start_backtest({"strategy": "Reversal long–short"}))
-    assert error.value.message == "This backtest needs about 9.2 GB; this machine gives runs 7.8 GB (half of 15.6 GB)." and error.value.code == "over_machine_budget"
-
-
 def test_a_failed_backtest_block_says_why(monkeypatch):
     shown = []
 

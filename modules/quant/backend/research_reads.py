@@ -5,6 +5,7 @@ import codecs
 import json
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 def token(identity, offset):
@@ -17,13 +18,13 @@ def offset(args, identity):
     try:
         value = json.loads(base64.b64decode(args["cursor"], altchars=b"-_", validate=True))
         if value["identity"] != identity:
-            raise ContractError("conflict", "This cursor belongs to another result or query; restart the read.")
+            raise ContractError("conflict", t("This cursor belongs to another result or query; restart the read."))
         position = value["offset"]
         if type(position) is not int or position < 0:
-            raise ValueError("Invalid offset")
+            raise ValueError(t("Invalid offset"))
         return position
     except (ValueError, KeyError, TypeError, UnicodeError) as error:
-        raise ContractError("invalid_input", "Invalid result cursor") from error
+        raise ContractError("invalid_input", t("Invalid result cursor")) from error
 
 
 def log_segment(path, position, limit=12000, *, final=True):

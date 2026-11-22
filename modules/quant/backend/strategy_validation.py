@@ -7,6 +7,7 @@ import time
 from datetime import date
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .object_store import OBJECT
 
@@ -20,7 +21,7 @@ class Validation:
     def source(self, run_id):
         run = self.runs.read(run_id)
         if run["objectKind"] != "strategy":
-            raise ContractError("invalid_input", "Only a strategy run is validated on the held-out part.")
+            raise ContractError("invalid_input", t("Only a strategy run is validated on the held-out part."))
         return run
 
     async def status(self, run_id):
@@ -31,10 +32,10 @@ class Validation:
         data = run["settings"]["data"]
         held = data.get("heldOutFrom")
         if not held:
-            raise ContractError("no_held_out_period", "Set where the held-out part starts in the run settings first.")
+            raise ContractError("no_held_out_period", t("Set where the held-out part starts in the run settings first."))
         last = data["until"]
         if last == "latest":
-            raise ContractError("unavailable", "This run did not retain its resolved held-out end date.")
+            raise ContractError("unavailable", t("This run did not retain its resolved held-out end date."))
         calendar = (date.fromisoformat(last) - date.fromisoformat(held)).days + 1
         work = self.runs.directory(run["id"]) / "output" / "strategy" / "work.json"
         year = 365

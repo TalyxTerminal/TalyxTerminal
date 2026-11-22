@@ -5,6 +5,9 @@
 .qx-price-body { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .qx-price-body > [data-module-view] { flex: 1; min-width: 0; height: 100%; }
 .qx-price-body > aside { flex: 0 0 max-content; max-width: 50%; overflow: auto; padding-inline-start: var(--tx-space-2); }
+/* The body takes the height it is given and the contributions list scrolls in it: a long list (an index's hundreds of names) must not
+   become the body's own height, or a parent that keeps its content's height (the strategy chart above the trades) grows the chart with it. */
+.qx-runprice[data-portfolio] .qx-price-body { contain: size; }
 .qx-contribution-table { width: 100%; font-variant-numeric: tabular-nums; }
 .qx-contribution-table :is(th, td):not(:first-child) { text-align: right; }
 .qx-sector-total { display: flex; align-items: baseline; justify-content: space-between; gap: var(--tx-space-2); }

@@ -16,6 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..derived import PRICE_SUFFIXES, PointsFeed, derived_of
 from ..feeds import Feed, Hub, ProjectedFeed
@@ -63,17 +64,17 @@ class Catalog:
         if ref["source"] == "builtin":
             path = BUILTIN / f"{ref['id']}.py"
             if not path.is_file() or path.parent != BUILTIN:
-                raise ContractError("not_found", f"No built-in indicator {ref['id']}")
+                raise ContractError("not_found", t("No built-in indicator {id}", id=ref['id']))
             return Definition(digest=digest_of([path], BUILTIN), path=path)
         path = (self.user_dir / ref["id"]).resolve()
         if not path.is_relative_to(self.user_dir.resolve()):
-            raise ContractError("not_found", f"No indicator {ref['id']}")
+            raise ContractError("not_found", t("No indicator {id}", id=ref['id']))
         if path.is_dir():
             files = [item for item in path.rglob("*.py") if "__pycache__" not in item.parts]
             return Definition(digest=digest_of(files, path), path=path / "main.py", root=path)
         if path.suffix == ".py" and path.is_file():
             return Definition(digest=digest_of([path], path.parent), path=path)
-        raise ContractError("not_found", f"No indicator {ref['id']}")
+        raise ContractError("not_found", t("No indicator {id}", id=ref['id']))
 
     @staticmethod
     def reads_view(definition: Definition) -> bool:
@@ -222,7 +223,7 @@ class Pins:
     def pin(self, ref: dict) -> str:
         definition = self.catalog.definition(ref)
         if self.catalog.reads_view(definition):
-            raise ContractError("unsupported", f"{ref['id']} reads the chart's visible range, so it runs on charts only")
+            raise ContractError("unsupported", t("{id} reads the chart's visible range, so it runs on charts only", id=ref['id']))
         copy = self.directory / definition.digest
         if not copy.exists():
             sources = [definition.path] if definition.root is None else \
@@ -281,7 +282,7 @@ class Indicators:
                 instrument, = await market.records([f"{venue.lower()}:{code}"])
                 series_timeframe = market_timeframe(timeframe)
                 if derived and derived[1] in PRICE_SUFFIXES and instrument["marketType"] not in ("swap", "future"):
-                    raise ContractError("unsupported", "mark and index prices are for futures and perpetual contracts")
+                    raise ContractError("unsupported", t("mark and index prices are for futures and perpetual contracts"))
                 if points:  # Market's open interest or funding as bars (derived.py); it fails through ``failed``
                     feed = PointsFeed(market, instrument, derived[1], series_timeframe, failed)
                     await feed.open()

@@ -1,3 +1,5 @@
+import { thinkingLabel } from "../settings/modelInfo";
+import { t } from "../i18n";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { TxButton, TxIcon, TxIconButton, TxMenu, TxPopover, TxSegmented, TxSwitch, TxTooltip, useTxToast } from "@talyx/sdk";
 import type { Choices, Command, FileChoice, ModelChoice, Permission } from "./model";
@@ -7,9 +9,9 @@ import type { Choices, Command, FileChoice, ModelChoice, Permission } from "./mo
    it works, Enter adds to the running task and Tab queues for after). */
 
 const PERMISSIONS: { id: Permission; label: string; detail: string }[] = [
-  { id: "read_only", label: "Read only", detail: "Asks before changing, deleting, running code or sending anything" },
-  { id: "auto", label: "Auto", detail: "Asks before deleting something you own" },
-  { id: "full", label: "Full access", detail: "Never asks" },
+  { id: "read_only", label: t("Read only"), detail: t("Asks before changing, deleting, running code or sending anything") },
+  { id: "auto", label: t("Auto"), detail: t("Asks before deleting something you own") },
+  { id: "full", label: t("Full access"), detail: t("Never asks") },
 ];
 
 /** Someone "@" can name instead of a file: a bot in a group. */
@@ -91,11 +93,11 @@ export function Composer(props: ComposerProps) {
   // the chat panel's slash menu: an icon per row, commands then skills under their own headings.
   const suggestions: { key: string; label: string; detail: string; icon: Parameters<typeof TxIcon>[0]["name"] | null; lead?: ReactNode; group?: string; apply: () => void }[] = slash
     ? (["command", "skill"] as const).flatMap(kind => props.commands.filter(command => command.kind === kind && command.name.startsWith(slash[1])).map((command, index) => ({
-      key: command.name, label: command.name, detail: command.detail, icon: command.icon, group: index === 0 ? (kind === "command" ? "Commands" : "Skills") : undefined,
+      key: command.name, label: command.name, detail: command.detail, icon: command.icon, group: index === 0 ? (kind === "command" ? t("Commands") : t("Skills")) : undefined,
       apply: () => { if (command.name === "plan") { props.onChoices({ plan: true }); setText(""); } else setText(`/${command.name} `); } })))
     : at && props.mentions ? props.mentions.filter(mention => mention.name.toLowerCase().includes(at[1].toLowerCase())).map(mention => ({ key: mention.id, label: mention.name, detail: mention.detail,
       icon: null, lead: mention.lead, apply: () => setText(`${text.slice(0, text.length - at[1].length)}${mention.name} `) }))
-    : at ? fileChoices.filter(file => file.path.toLowerCase().includes(at[1].toLowerCase())).map(file => ({ key: file.path, label: file.path, detail: file.place === "knowledge" ? "Knowledge" : "Workspace",
+    : at ? fileChoices.filter(file => file.path.toLowerCase().includes(at[1].toLowerCase())).map(file => ({ key: file.path, label: file.path, detail: file.place === "knowledge" ? t("Knowledge") : t("Workspace"),
       icon: (file.place === "knowledge" ? "book" : "file") as "book" | "file", apply: () => { setText(text.slice(0, text.length - at[1].length - 1)); setFiles(current => [...current, file.path]); } }))
     : [];
   useEffect(() => setPick(0), [slash?.[1], at?.[1]]);
@@ -121,20 +123,20 @@ export function Composer(props: ComposerProps) {
       <span className="chat-queued-text">{item}</span>
       {/* the chat panel's Steer: into the running turn now instead of after it */}
       {props.onSteer && <TxButton size="sm" variant="quiet" className="chat-steer" onClick={() => { props.onSteer!(item); props.onQueued(queued.filter((_, at) => at !== index)); }}>
-        <TxIcon name="arrow-up" />Send now</TxButton>}
-      <TxIconButton size="sm" icon="edit" label="Edit" onClick={() => { setText(item); props.onQueued(queued.filter((_, at) => at !== index)); input.current!.focus(); }} />
-      <TxIconButton size="sm" icon="trash" label="Remove" onClick={() => props.onQueued(queued.filter((_, at) => at !== index))} />
+        <TxIcon name="arrow-up" />{t("Send now")}</TxButton>}
+      <TxIconButton size="sm" icon="edit" label={t("Edit")} onClick={() => { setText(item); props.onQueued(queued.filter((_, at) => at !== index)); input.current!.focus(); }} />
+      <TxIconButton size="sm" icon="trash" label={t("Remove")} onClick={() => props.onQueued(queued.filter((_, at) => at !== index))} />
     </div>)}</div>}
     {(props.view || files.length > 0 || uploads.length > 0 || props.extra) && <div className="chat-strip">
       {props.extra}
       {uploads.map((file,index) => <span key={index} className="chat-strip-item"><TxIcon name="file"/>{file.name}
-        <TxIconButton size="sm" icon="close" label="Remove attachment" onClick={()=>setUploads(items=>items.filter((_,i)=>i!==index))}/></span>)}
+        <TxIconButton size="sm" icon="close" label={t("Remove attachment")} onClick={()=>setUploads(items=>items.filter((_,i)=>i!==index))}/></span>)}
       {props.view && <span className="chat-strip-item" data-off={!viewOn || undefined}>
         <TxIcon name="chart" /><span>{props.view}</span>
-        <TxIconButton size="sm" icon={viewOn ? "close" : "plus"} label={viewOn ? "Don't send with this message" : "Send with this message"} onClick={() => setViewOn(!viewOn)} />
+        <TxIconButton size="sm" icon={viewOn ? "close" : "plus"} label={viewOn ? t("Don't send with this message") : t("Send with this message")} onClick={() => setViewOn(!viewOn)} />
       </span>}
       {files.map(file => <span key={file} className="chat-strip-item"><TxIcon name="file" />{file}
-        <TxIconButton size="sm" icon="close" label="Remove" onClick={() => setFiles(files.filter(item => item !== file))} /></span>)}
+        <TxIconButton size="sm" icon="close" label={t("Remove")} onClick={() => setFiles(files.filter(item => item !== file))} /></span>)}
     </div>}
     <div className="chat-box" onPointerDown={event => { if (event.target === event.currentTarget) input.current!.focus(); }}>
       {suggestions.length > 0 && <div className="chat-suggest" role="listbox">{suggestions.slice(0, 9).map((item, index) => <Fragment key={item.key}>
@@ -143,8 +145,8 @@ export function Composer(props: ComposerProps) {
           onMouseDown={event => event.preventDefault()} onClick={item.apply}>
           {item.lead}{item.icon && <TxIcon name={item.icon} />}<span className="chat-suggestion-label">{item.label}</span><span className="chat-meta">{item.detail}</span>
         </TxButton></Fragment>)}</div>}
-      <textarea ref={input} className="chat-input" rows={1} value={text} aria-label="Message"
-        placeholder={props.notice ?? (running ? "Add to this task" : props.placeholder ?? "Ask anything · @ files · / commands")}
+      <textarea ref={input} className="chat-input" rows={1} value={text} aria-label={t("Message")}
+        placeholder={props.notice ?? (running ? t("Add to this task") : props.placeholder ?? t("Ask anything · @ files · / commands"))}
         onChange={event => setText(event.target.value)}
         onKeyDown={event => {
           if (suggestions.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) { event.preventDefault(); setPick(index => (index + (event.key === "ArrowDown" ? 1 : suggestions.length - 1)) % suggestions.length); return; }
@@ -153,20 +155,20 @@ export function Composer(props: ComposerProps) {
           if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); }
         }} />
       <div className="chat-tools">
-        <TxMenu label="Add" items={[
-          { id: "files", label: "Files or images…", icon: "paperclip", onSelect: () => upload.current?.click() },
-          ...props.bare ? [] : [{ id: "plan", label: "Plan mode", icon: "list" as const, checked: choices.plan, onSelect: () => props.onChoices({ plan: !choices.plan }) }],
-        ]} trigger={<TxIconButton size="sm" variant="tool" icon="plus" label="Add" />} />
+        <TxMenu label={t("Add")} items={[
+          { id: "files", label: t("Files or images…"), icon: "paperclip", onSelect: () => upload.current?.click() },
+          ...props.bare ? [] : [{ id: "plan", label: t("Plan mode"), icon: "list" as const, checked: choices.plan, onSelect: () => props.onChoices({ plan: !choices.plan }) }],
+        ]} trigger={<TxIconButton size="sm" variant="tool" icon="plus" label={t("Add")} />} />
         {!props.bare && <PermissionButton value={choices.permission} onChange={permission => props.onChoices({ permission })}
-          allowed={props.onAllowed ? { label: "Always allowed in this chat…", count: props.allowedCount, open: props.onAllowed } : undefined} />}
-        {choices.plan && !props.bare && <TxButton size="sm" variant="tool" aria-pressed="true" className="chat-tool" onClick={() => props.onChoices({ plan: false })}><TxIcon name="list" />Plan</TxButton>}
+          allowed={props.onAllowed ? { label: t("Always allowed in this chat…"), count: props.allowedCount, open: props.onAllowed } : undefined} />}
+        {choices.plan && !props.bare && <TxButton size="sm" variant="tool" aria-pressed="true" className="chat-tool" onClick={() => props.onChoices({ plan: false })}><TxIcon name="list" />{t("Plan")}</TxButton>}
         <span className="chat-spacer" />
         {props.context && !props.bare && <ContextRing used={props.context.used} window={props.context.window} />}
         {/* Model and thinking in one button "GPT-5.6 Sol Medium ⌄": the models, the levels and the subagent switch in one popover. */}
         {!props.bare && <ModelButton models={models} choices={choices} onChoices={props.onChoices} onManageModels={props.onManageModels} />}
         {running && !ready
-          ? <TxIconButton size="sm" variant="outline" icon="stop" label="Stop" onClick={props.onStop} />
-          : <TxButton size="sm" variant="primary" className="chat-send" disabled={!ready} aria-label="Send" onClick={send}><TxIcon name="arrow-up" /></TxButton>}
+          ? <TxIconButton size="sm" variant="outline" icon="stop" label={t("Stop")} onClick={props.onStop} />
+          : <TxButton size="sm" variant="primary" className="chat-send" disabled={!ready} aria-label={t("Send")} onClick={send}><TxIcon name="arrow-up" /></TxButton>}
       </div>
     </div>
   </div>;
@@ -176,7 +178,7 @@ export function Composer(props: ComposerProps) {
     of things always allowed, at the menu's foot. */
 export function PermissionButton({ value, onChange, allowed }: { value: Permission; onChange(permission: Permission): void; allowed?: { label: string; count: number; open(): void } }) {
   const permission = PERMISSIONS.find(item => item.id === value)!;
-  return <TxMenu label="Permissions" items={[
+  return <TxMenu label={t("Permissions")} items={[
     ...PERMISSIONS.map(item => ({ id: item.id, label: item.label, detail: item.detail, checked: item.id === value, onSelect: () => onChange(item.id) })),
     ...allowed ? [{ id: "allowed", label: allowed.label, hint: allowed.count ? String(allowed.count) : undefined, separated: true, onSelect: allowed.open }] : [],
   ]} trigger={<TxButton size="sm" variant="tool" className="chat-tool" data-tone={value === "full" ? "warn" : undefined}><TxIcon name="shield" />{permission.label}<TxIcon name="chevron-down" /></TxButton>} />;
@@ -190,10 +192,10 @@ export function ModelButton({ models, choices, onChoices, onManageModels, subage
 }) {
   const [open, setOpen] = useState(false);
   const model = models.find(item => item.id === choices.model) ?? models[0];
-  if (!model) return <TxButton size="sm" variant="tool" className="chat-tool chat-model" onClick={onManageModels}>Connect a model</TxButton>;
-  return <TxPopover open={open} onOpenChange={setOpen} label="Model and thinking" align={align} className="chat-model-pop"
-    trigger={<TxButton size="sm" variant="tool" className="chat-tool chat-model"><span className="chat-model-name">{model.name}</span><span className="chat-model-level">{choices.thinking}</span><TxIcon name="chevron-down" /></TxButton>}>
-    <div className="chat-pop-label">Model</div>
+  if (!model) return <TxButton size="sm" variant="tool" className="chat-tool chat-model" onClick={onManageModels}>{t("Connect a model")}</TxButton>;
+  return <TxPopover open={open} onOpenChange={setOpen} label={t("Model and thinking")} align={align} className="chat-model-pop"
+    trigger={<TxButton size="sm" variant="tool" className="chat-tool chat-model"><span className="chat-model-name">{model.name}</span><span className="chat-model-level">{thinkingLabel(choices.thinking)}</span><TxIcon name="chevron-down" /></TxButton>}>
+    <div className="chat-pop-label">{t("Model")}</div>
     <div className="chat-pop-models">{models.map((item, index) => <div key={item.id} className="chat-pop-model">
       {(index === 0 || models[index - 1].connection !== item.connection) && <div className="chat-pop-group">{item.connection}</div>}
       <TxButton variant="row" size="sm" className="chat-level" aria-checked={item.id === choices.model}
@@ -203,19 +205,19 @@ export function ModelButton({ models, choices, onChoices, onManageModels, subage
       </TxButton>
     </div>)}</div>
     <div className="chat-pop-section">
-      <div className="chat-pop-label">Thinking</div>
-      <TxSegmented label="Thinking" size="sm" value={choices.thinking} onChange={thinking => onChoices({ thinking })} options={model.levels.map(level => ({ value: level, label: level }))} />
+      <div className="chat-pop-label">{t("Thinking")}</div>
+      <TxSegmented label={t("Thinking")} size="sm" value={choices.thinking} onChange={thinking => onChoices({ thinking })} options={model.levels.map(level => ({ value: level, label: thinkingLabel(level) }))} />
     </div>
-    {subagents && <div className="chat-pop-section chat-pop-switch"><TxSwitch label="Subagents" checked={choices.subagents} onCheckedChange={value => onChoices({ subagents: value })} /></div>}
+    {subagents && <div className="chat-pop-section chat-pop-switch"><TxSwitch label={t("Subagents")} checked={choices.subagents} onCheckedChange={value => onChoices({ subagents: value })} /></div>}
     <div className="chat-pop-section"><TxButton variant="row" size="sm" className="chat-level" onClick={() => { setOpen(false); onManageModels(); }}>
-      <span className="chat-level-label">Add or manage models…</span></TxButton></div>
+      <span className="chat-level-label">{t("Add or manage models…")}</span></TxButton></div>
   </TxPopover>;
 }
 
 /** How full the context is, as the ring chat clients put in the message box; the numbers on hover. */
 function ContextRing({ used, window }: { used: number; window: number }) {
   const share = Math.min(used / window, 1), circumference = 2 * Math.PI * 7;
-  const label = `${Math.max(1, Math.round(share * 100))}% of context used · ${compact(used)} of ${compact(window)}`;
+  const label = t("{percent}% of context used · {used} of {window}", { percent: Math.max(1, Math.round(share * 100)), used: compact(used), window: compact(window) });
   return <TxTooltip label={label}>
     <TxButton size="sm" variant="tool" className="chat-ring" data-level={share > 0.8 ? "high" : undefined} aria-label={label}>
       <svg viewBox="0 0 20 20" aria-hidden="true">

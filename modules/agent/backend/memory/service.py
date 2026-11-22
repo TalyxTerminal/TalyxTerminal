@@ -11,6 +11,7 @@ from uuid import uuid4
 from langchain_core.messages import HumanMessage
 from langchain_core.messages.utils import count_tokens_approximately
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..store import encoded
 
@@ -39,14 +40,14 @@ class MemoryService:
         """The bot whose line the conversation is (None for a chat); memory must be on there."""
         value = self.store.conversation(conversation, workspace)
         if not self.enabled(conversation):
-            raise ContractError("memory_disabled", "Memory is switched off for this conversation")
+            raise ContractError("memory_disabled", t("Memory is switched off for this conversation"))
         return value["botId"]
 
     def _read(self, identity, workspace):
         row = self.db.execute("SELECT value FROM agent_memories WHERE id=? AND (workspace IS NULL OR workspace=?)",
                               (identity, workspace)).fetchone()
         if row is None:
-            raise ContractError("target_gone", "Memory is unavailable in this workspace")
+            raise ContractError("target_gone", t("Memory is unavailable in this workspace"))
         return json.loads(row["value"])
 
     def _save(self, value):
@@ -69,9 +70,9 @@ class MemoryService:
         if scope not in {"global", "workspace", "bot"} or scope == "bot" and bot is None:
             raise ContractError("invalid_input", "Choose global or workspace memory" + (", or bot" if bot else ""))
         if not isinstance(body, str) or not body.strip() or len(body) > 8000:
-            raise ContractError("invalid_input", "A memory needs text of at most 8000 characters")
+            raise ContractError("invalid_input", t("A memory needs text of at most 8000 characters"))
         if type(frequent) is not bool:
-            raise ContractError("invalid_input", "Frequent memory selection must be a boolean")
+            raise ContractError("invalid_input", t("Frequent memory selection must be a boolean"))
         value = {"id": "memory_" + uuid4().hex, "scope": scope, "workspaceId": None if scope == "global" else workspace,
                  "botId": bot if scope == "bot" else None, "body": body, "frequent": frequent, "sourceKind": "inference",
                  "createdAt": time.time(), "revision": 1, "status": "active"}
@@ -83,7 +84,7 @@ class MemoryService:
     def search(self, workspace, conversation, query, *, limit=20):
         bot = self._owner(workspace, conversation)
         if not query.strip() or not 1 <= limit <= 50:
-            raise ContractError("invalid_input", "Memory search requires a query and bounded limit")
+            raise ContractError("invalid_input", t("Memory search requires a query and bounded limit"))
         if len(query) >= 3:
             clause, argument = "id IN (SELECT id FROM agent_memory_search WHERE agent_memory_search MATCH ?)", '"' + query.replace('"', '""') + '"'
         else:
@@ -94,7 +95,7 @@ class MemoryService:
     def list(self, workspace, *, bot=None, status=None, offset=0):
         """The settings pages' list: about you and this workspace's, or one bot's own."""
         if status is not None and status not in {"active", "deleted"} or offset < 0:
-            raise ContractError("invalid_input", "Invalid memory listing")
+            raise ContractError("invalid_input", t("Invalid memory listing"))
         rows = self.db.execute("SELECT value FROM agent_memories WHERE (workspace IS NULL OR workspace=?) AND bot IS ? "
                                "AND (? IS NULL OR status=?) ORDER BY rowid DESC LIMIT 51 OFFSET ?",
                                (workspace, bot, status, status, offset)).fetchall()
@@ -103,11 +104,11 @@ class MemoryService:
     def edit(self, workspace, identity, expected_revision, body, *, delete=False, source="user"):
         """Edit the revision seen by the caller and retain who last wrote it."""
         if not isinstance(body, str) or len(body) > 8000:
-            raise ContractError("invalid_input", "Memory text exceeds its limit")
+            raise ContractError("invalid_input", t("Memory text exceeds its limit"))
         with self.store.transaction():
             previous = self._read(identity, workspace)
             if previous["revision"] != expected_revision:
-                raise ContractError("conflict", "Memory changed since it was displayed")
+                raise ContractError("conflict", t("Memory changed since it was displayed"))
             updated = {**previous, "body": previous["body"] if delete else body, "revision": expected_revision + 1,
                        "status": "deleted" if delete else previous["status"], "sourceKind": source}
             self._save(updated)
@@ -117,7 +118,7 @@ class MemoryService:
         self.store.conversation(conversation, workspace)
         row = self.db.execute("SELECT * FROM agent_memory_changes WHERE id=? AND conversation=?", (change_id, conversation)).fetchone()
         if row is None or bool(row["undone"]) != redo:
-            raise ContractError("conflict", "Memory change is missing or already undone")
+            raise ContractError("conflict", t("Memory change is missing or already undone"))
         before, after = json.loads(row["before_image"]), json.loads(row["after_image"])
         with self.store.transaction():
             originals = {item["id"]: item for item in before}

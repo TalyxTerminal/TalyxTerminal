@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* The project view other modules embed: the project's file tree (closed until asked for), tabs of the files opened in it and one editor.
    It shares Developer's document model with the full editor; the embedding module caches no text, it only hears `changed`. */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -94,19 +95,19 @@ function ProjectEditor({ ctx, props, onEmit }: { ctx: ModuleContext; props: Prop
       style={{ paddingInlineStart: `calc(var(--tx-space-2) + ${depth} * var(--tx-space-3))` }} disabled={entry.kind === "unavailable"}
       onClick={() => directory ? toggle(entry.path) : void show(entry.uri).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)))}>
       <TxIcon name={directory ? "chevron" : "code"} className={directory && expanded ? "developer-tree-icon developer-tree-open" : "developer-tree-icon"} /><span>{baseName(entry.path)}</span>
-      {!directory && count(entry.uri) > 0 && <b className="developer-tree-marks" aria-label={`${count(entry.uri)} marks`}>{count(entry.uri)}</b>}
+      {!directory && count(entry.uri) > 0 && <b className="developer-tree-marks" aria-label={t("{count} marks", { count: count(entry.uri) })}>{count(entry.uri)}</b>}
     </TxButton>;
     return directory && expanded ? [row, ...rows(entry.path, depth + 1)] : [row];
   });
   return <div className="developer-project-editor" data-tree={tree ? "" : undefined}>
-    {tree && <nav className="developer-tree developer-project-tree" aria-label="Project files">
-      <header className="developer-tree-head"><span title={props.rootUri}>{props.treeTitle ?? baseName(props.rootUri.replace(/\/+$/, ""))}</span><TxIconButton size="sm" label="Refresh files" icon="refresh" onClick={() => void Promise.all(["", ...open].map(load)).catch(() => undefined)} /></header>
+    {tree && <nav className="developer-tree developer-project-tree" aria-label={t("Project files")}>
+      <header className="developer-tree-head"><span title={props.rootUri}>{props.treeTitle ?? baseName(props.rootUri.replace(/\/+$/, ""))}</span><TxIconButton size="sm" label={t("Refresh files")} icon="refresh" onClick={() => void Promise.all(["", ...open].map(load)).catch(() => undefined)} /></header>
       <div className="developer-tree-rows">{rows("", 0)}</div>
     </nav>}
     <div className="developer-editor-pane">
       <div className="developer-tabs">
-        <TxTabs label="Open files" value={active ?? ""} onChange={setActive} options={tabs.map(tab => ({
-          value: tab.documentId, label: tab.name, title: tab.uri, dirty: documents.isDirty(tab.documentId), marked: count(tab.uri) > 0 ? "Has marks" : undefined,
+        <TxTabs label={t("Open files")} value={active ?? ""} onChange={setActive} options={tabs.map(tab => ({
+          value: tab.documentId, label: tab.name, title: tab.uri, dirty: documents.isDirty(tab.documentId), marked: count(tab.uri) > 0 ? t("Has marks") : undefined,
         }))} />
       </div>
       {error && <div className="developer-editor-notice" role="alert">{error}</div>}

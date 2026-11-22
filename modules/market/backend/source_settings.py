@@ -3,6 +3,8 @@ import json
 import sqlite3
 from contextlib import closing
 
+from talyx_sdk.i18n import t
+
 from .common import MarketError
 
 
@@ -37,7 +39,7 @@ class SourceSettings:
         with closing(sqlite3.connect(self.path)) as db:
             rows = db.execute("""SELECT call_id,source FROM changes WHERE call_id IN
                 (SELECT value FROM json_each(?)) AND (? IS NULL OR run_id=?)""", (json.dumps(call_ids), run_id, run_id))
-            return [{"callId": identity, "objectId": source, "label": f"{source} source settings", "kind": "updated",
+            return [{"callId": identity, "objectId": source, "label": t("{source} source settings", source=source), "kind": "updated",
                      "openTarget": {"module":"market","panelType":"main","objectId":"source:"+source}}
                     for identity, source in rows]
 
@@ -45,7 +47,7 @@ class SourceSettings:
         with closing(sqlite3.connect(self.path)) as db:
             row = db.execute("SELECT source,section,original,changed FROM changes WHERE call_id=?", (call_id,)).fetchone()
         if not row:
-            raise MarketError("not_found", "No source settings were changed by this call.")
+            raise MarketError("not_found", t("No source settings were changed by this call."))
         before, after = json.loads(row[2]), json.loads(row[3])
         return row[0], row[1], before.keys() | after.keys(), before if direction == "undo" else after
 

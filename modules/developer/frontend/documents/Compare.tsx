@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { TxAlert, TxButton, TxDialog } from "@talyx/sdk";
 import { documents } from "./service";
@@ -17,8 +18,8 @@ export function CompareDialog({ request, onClose }: { request: CompareRequest | 
     }).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
     return () => { disposed = true; view?.dispose(); };
   }, [request]);
-  return <TxDialog open={!!request} onOpenChange={open => { if (!open) onClose(); }} size="wide" title={request ? `${request.name} ↔ current` : "Compare"} footer={<TxButton onClick={onClose}>Close</TxButton>}>
-    {error && <TxAlert title="Comparison unavailable">{error}</TxAlert>}
+  return <TxDialog open={!!request} onOpenChange={open => { if (!open) onClose(); }} size="wide" title={request ? t("{name} ↔ current", { name: request.name }) : t("Compare")} footer={<TxButton onClick={onClose}>{t("Close")}</TxButton>}>
+    {error && <TxAlert title={t("Comparison unavailable")}>{error}</TxAlert>}
     <div ref={host} className="developer-compare" />
   </TxDialog>;
 }

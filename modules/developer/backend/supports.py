@@ -5,6 +5,7 @@ from __future__ import annotations
 import fnmatch
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 class DevelopmentSupports:
@@ -34,7 +35,7 @@ class DevelopmentSupports:
 
     async def ask(self, item: dict, capability: str, command: str, document_id: str) -> dict:
         if capability not in item["descriptor"].get("capabilities", []):
-            raise ContractError("invalid_input", f"{item['moduleId']}:{item['id']} does not provide {capability}.")
+            raise ContractError("invalid_input", t("{moduleId}:{id} does not provide {capability}.", moduleId=item['moduleId'], id=item['id'], capability=capability))
         document = self.documents.snapshot(self.documents.record(document_id))
         project_id = document["context"]["projectId"]
         payload = {"capability": capability, "command": command, "target": None, "document": document,

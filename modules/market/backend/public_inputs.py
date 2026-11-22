@@ -4,6 +4,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, model_validator
 from talyx_sdk.declare import Model
+from talyx_sdk.i18n import t
 
 from vocabulary.python.types import Symbol
 
@@ -53,11 +54,11 @@ class Get(Page):
     @model_validator(mode="after")
     def check_lookup(self) -> Self:
         if (self.symbols is None) == (self.records is None):
-            raise ValueError("Supply either symbols or records")
+            raise ValueError(t("Supply either symbols or records"))
         if self.records and (
             "at" in self.model_fields_set or "environment" in self.model_fields_set
         ):
-            raise ValueError("at and environment apply only to symbols")
+            raise ValueError(t("at and environment apply only to symbols"))
         return self
 
 
@@ -75,7 +76,7 @@ class ExactSeries(Model):
     @model_validator(mode="after")
     def same_instrument(self) -> Self:
         if self.instrumentId != self.series.instrumentId:
-            raise ValueError("series.instrumentId must match instrumentId")
+            raise ValueError(t("series.instrumentId must match instrumentId"))
         return self
 
 
@@ -181,7 +182,7 @@ class Coverage(Page):
         inventory_filters = {"group", "market", "venue", "query", "status"} & self.model_fields_set
         if self.symbols and inventory_filters:
             raise ValueError(
-                f"{', '.join(sorted(inventory_filters))} filters the local inventory; omit symbols"
+                t("{inventory_filters} filters the local inventory; omit symbols", inventory_filters=', '.join(sorted(inventory_filters)))
             )
         return self
 
@@ -194,7 +195,7 @@ class Terms(Window, Page):
     @model_validator(mode="after")
     def one_target(self) -> Self:
         if bool(self.symbols) == bool(self.series):
-            raise ValueError("Supply either symbols or series")
+            raise ValueError(t("Supply either symbols or series"))
         return self
 
 

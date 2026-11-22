@@ -5,23 +5,24 @@ import hashlib
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t
 
 from .projects.service import canonical_uri
 
 _ROOT = Path(__file__).resolve().parents[3]
 SOURCES = {
-    "declare": ("sdk/talyx_sdk/declare.py", "python", "Declaring a module (Python)"),
-    "process": ("sdk/talyx_sdk/process.py", "python", "A module's process: Context and Call (Python)"),
-    "typescript": ("sdk/ui/src/linkage.tsx", "typescript", "Frontend context and components (TypeScript)"),
-    "manifest": ("contracts/manifest_v5.schema.json", "json", "The manifest, talyx.module.json"),
-    "platform": ("host/public/contract.json", "json", "The platform's actions"),
+    "declare": ("sdk/talyx_sdk/declare.py", "python", mark("Declaring a module (Python)")),
+    "process": ("sdk/talyx_sdk/process.py", "python", mark("A module's process: Context and Call (Python)")),
+    "typescript": ("sdk/ui/src/linkage.tsx", "typescript", mark("Frontend context and components (TypeScript)")),
+    "manifest": ("contracts/manifest_v5.schema.json", "json", mark("The manifest, talyx.module.json")),
+    "platform": ("host/public/contract.json", "json", mark("The platform's actions")),
 }
 
 
 async def read(input: dict, call=None) -> dict:
     key = input["sourceKey"]
     if key not in SOURCES:
-        raise ContractError("not_found", "Choose a known SDK reference.")
+        raise ContractError("not_found", t("Choose a known SDK reference."))
     relative, language, _ = SOURCES[key]
     path = _ROOT / relative
     raw = path.read_bytes()
@@ -32,7 +33,7 @@ async def read(input: dict, call=None) -> dict:
 
 
 async def write(input: dict, call=None):
-    raise ContractError("permission_denied", "SDK reference files are read-only.")
+    raise ContractError("permission_denied", t("SDK reference files are read-only."))
 
 
 def documentation() -> list[dict]:

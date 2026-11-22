@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useState } from "react";
 import { TxRoot, TxSegmented, TxToastProvider, TxTooltipProvider } from "@talyx/sdk";
 import { useModules } from "./communityData";
@@ -19,9 +20,9 @@ export default function CommunityScreen({ onOpenModule, initialFocus }: { onOpen
       <TxTooltipProvider>
         <div className="cm-shell">
           <header className="cm-head">
-            <Glass><TxSegmented label="Community" value={half} onChange={setHalf} options={[
-              { value: "discover", label: "Discover" },
-              { value: "installed", label: "Installed" },
+            <Glass><TxSegmented label={t("Community")} value={half} onChange={setHalf} options={[
+              { value: "discover", label: t("Discover") },
+              { value: "installed", label: t("Installed") },
             ]} /></Glass>
           </header>
           <div className="cm-body" hidden={half !== "discover"}>

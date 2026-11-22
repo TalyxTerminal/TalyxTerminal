@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* A Chart panel is one TradingView layout: one top bar, the drawing toolbar on the left, the charts edge to edge, the
    right rail, the bottom bar; separators are 1px lines. The one overlay a panel has open is rendered here. */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -65,7 +66,7 @@ export function ChartPanel({ ctx, panelId }: { ctx: ModuleContext; panelId: stri
         facts: visible,
         // The chart on screen, as the open target (the manifest's) that leads here.
         openTargets: [{ kind: "instrument", key: `instrument:${document.instrument.instrumentId}/${document.series.timeframe!}`, label: document.instrument.displaySymbol },
-          ...layout.charts.map(id => ({ kind: "chart", key: `chart:${id}`, label: chartEntry(id)?.chart?.document.instrument.displaySymbol ?? "Chart" }))],
+          ...layout.charts.map(id => ({ kind: "chart", key: `chart:${id}`, label: chartEntry(id)?.chart?.document.instrument.displaySymbol ?? t("Chart") }))],
       });
     };
     report();
@@ -92,7 +93,7 @@ export function ChartPanel({ ctx, panelId }: { ctx: ModuleContext; panelId: stri
   };
   return <div className="chart-panel" onKeyDown={onKey}>
     <TopBar ctx={ctx} panelId={panelId} chartId={layout.active} binding={() => bindings.get(current.current.active)} />
-    {workspaceError && <p className="chart-alert-error chart-panel-note" role="alert">Watchlists, alerts and indicators are unavailable: {workspaceError}</p>}
+    {workspaceError && <p className="chart-alert-error chart-panel-note" role="alert">{t("Watchlists, alerts and indicators are unavailable:")} {workspaceError}</p>}
     <div className="chart-body">
       <RightPanelSplit ctx={ctx} panelId={panelId}>
         <div className="chart-main">

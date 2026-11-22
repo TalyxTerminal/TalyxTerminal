@@ -17,6 +17,7 @@ from uuid import uuid4
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import (
     index_universe,
@@ -97,7 +98,7 @@ class ObjectRuns:
     def read(self, identity):
         record = self.records.find(RUN, identity)
         if record is None:
-            raise ContractError("not_found", "This run does not exist.")
+            raise ContractError("not_found", t("This run does not exist."))
         return record
 
     @staticmethod
@@ -125,20 +126,20 @@ class ObjectRuns:
 
     async def start(self, object_id, args=None):
         if self.closed:
-            raise ContractError("unavailable", "Quant is closing.")
+            raise ContractError("unavailable", t("Quant is closing."))
         args = args or {}
         obj = self.store.read(object_id)
         if obj["kind"] not in RUNNABLE:
-            raise ContractError("unavailable", f"A {obj['kind']} cannot be run yet.")
+            raise ContractError("unavailable", t("A {kind} cannot be run yet.", kind=obj['kind']))
         if args.get("quick") and obj["kind"] != "factor":
-            raise ContractError("invalid_input", "Only a factor has a quick check.")
+            raise ContractError("invalid_input", t("Only a factor has a quick check."))
         held_out = self.held_out_of(obj, args.get("of")) if args.get("kind") == "heldout" else None
         if args.get("kind") not in (None, "run", "heldout"):
-            raise ContractError("invalid_input", "A strategy run is a backtest or a held-out validation.")
+            raise ContractError("invalid_input", t("A strategy run is a backtest or a held-out validation."))
         source_run = held_out or (self.read(args["of"]) if args.get("of") else None)
         if source_run:
             if source_run["objectId"] != object_id or source_run["state"] != "completed" or source_run["runKind"] not in ("run", "case", "heldout"):
-                raise ContractError("invalid_input", "Select a completed run of this strategy.")
+                raise ContractError("invalid_input", t("Select a completed run of this strategy."))
             obj = self.source_object(obj, source_run)
             saved = (Path(obj["directory"]) / obj["entry"]).read_text(encoding="utf-8")
             values = dict(source_run["params"])
@@ -168,8 +169,7 @@ class ObjectRuns:
         if held_out and held and held.get("lastValueAt") is not None and settings["data"].get("heldOutFrom") \
                 and held["lastValueAt"] < object_data.day_ms(settings["data"]["heldOutFrom"], False):
             # The run the signal comes from held the same stretch out, so it has no values there to trade.
-            raise ContractError("invalid_input", f"{held['model']} #{held['number']} held out the same stretch, so it has no values to trade in it. "
-                                "Publish the factor and choose its library version as the signal to validate on the held-out stretch.", {"parameter": held["param"]})
+            raise ContractError("invalid_input", t("{model} #{number} held out the same stretch, so it has no values to trade in it. Publish the factor and choose its library version as the signal to validate on the held-out stretch.", model=held['model'], number=held['number']), {"parameter": held["param"]})
         identity = "run-" + uuid4().hex
         with new_run_directory(self.directory(identity)) as directory:
             code, common = await finish_copy(self.fix_project(obj, directory, source_run))
@@ -188,7 +188,7 @@ class ObjectRuns:
                 try:
                     await finish_copy(asyncio.to_thread(shutil.copyfile, material["path"], kept))
                 except FileNotFoundError as error:
-                    raise ContractError("unavailable", "The signal values of this run are no longer available.") from error
+                    raise ContractError("unavailable", t("The signal values of this run are no longer available.")) from error
                 signals[key] = {**material, "path": str(kept)}
             record = self.records.put(RUN, {"id": identity, "objectId": obj["id"], "objectKind": obj["kind"], "name": obj["name"], "runKind": "heldout" if held_out else "run", "number": self.next_number(obj["id"]) if obj["kind"] == "strategy" else None,
                 **lineage, **signals,
@@ -213,38 +213,29 @@ class ObjectRuns:
                 if not any(part in EXCLUDED for part in path.relative_to(root).parts)}
 
     async def preflight(self, obj, source, values, settings):
-        """A strategy run's first step, before anything is fetched: what ends it at once with the reason: a library item to choose, an input that was
-        retired, a model the backtest start would overlap, a route Market has not verified, a series Market lacks, accounts that cannot be
-        added up, and a run the machine cannot hold."""
+        """A strategy run's first step, before anything is fetched: what ends it at once with the reason: a library item to choose, a model the
+        backtest start would overlap, a route Market has not verified, a series Market lacks, and accounts that cannot be added up. A stopped
+        library version runs as it is: its values end where it stopped."""
         data = settings["data"]
         files = self.project_texts(obj)
         held = obj["settings"].get("signalRun")
         if held and not Path(held["path"]).is_file():
-            raise ContractError("not_found", f"{held['model']} #{held['number']}'s predictions are gone; use the run again, or choose a library signal.", {"parameter": held["param"]})
+            raise ContractError("not_found", t("{model} #{number}'s predictions are gone; use the run again, or choose a library signal.", model=held['model'], number=held['number']), {"parameter": held["param"]})
         definitions = self.store.parameters(source)["parameters"]
         for item in definitions:
             if item["type"] == "library" and not values.get(item["name"]) and item["name"] != (obj["settings"].get("signalRun") or {}).get("param"):
-                raise ContractError("invalid_input", "Choose the signal this strategy ranks by (a library item)." if item["name"] == "signal"
-                                    else f"Choose the library item for {item['label'] or item['name']}.", {"parameter": item["name"]})
+                raise ContractError("invalid_input", t("Choose the signal this strategy ranks by (a library item).") if item["name"] == "signal"
+                                    else t("Choose the library item for {label}.", label=item['label'] or item['name']), {"parameter": item["name"]})
         pins = obj["settings"].get("inputs") or {}
         if isinstance(pins, list):
             pins = self.store.strategy_bindings(obj, obj["settings"], {})
-        for group in ("library", "models"):
-            for pin in (pins.get(group) or {}).values():
-                try:
-                    version = self.library.read_version(pin["versionId"])
-                except ContractError:
-                    continue
-                if version.get("retired") or version.get("state") in ("retired", "delisted"):
-                    raise ContractError("input_retired", f"v{version['version']} is retired; switch to a live version", {"name": pin["name"], "versionId": pin["versionId"]})
         since = object_data.day_ms(data["since"], False) if data.get("since") else None
         for name in sorted({name for text in files.values() for name in model_inputs.declarations(text)}):
             pin = (pins.get("models") or {}).get(name)
             found = await asyncio.to_thread(model_inputs.binding, self.library, name, version_id=pin["versionId"] if pin else None)
             if since is not None and since < found["trainingCutoff"]:
                 trained = datetime.fromtimestamp(found["trainingCutoff"] / 1000, tz=UTC).date().isoformat()
-                raise ContractError("model_training_overlap", f"Model '{name}' v{found['version']} was trained on data to {trained}. Start after that date, or read its published "
-                                    "values, which cover earlier dates.", {"name": name, "versionId": found["versionId"], "trainingCutoff": found["trainingCutoff"], "requestedStart": since})
+                raise ContractError("model_training_overlap", t("Model '{name}' v{version} was trained on data to {trained}. Start after that date, or read its published values, which cover earlier dates.", name=name, version=found['version'], trained=trained), {"name": name, "versionId": found["versionId"], "trainingCutoff": found["trainingCutoff"], "requestedStart": since})
         symbols = [item["instrument"] for item in data.get("symbols", [])]
         if symbols and data.get("timeframe"):
             await object_data.check_routes(self.ctx, symbols, data["timeframe"], *([data["fillBars"]] if data.get("fillBars") else []))
@@ -254,7 +245,7 @@ class ObjectRuns:
             for instrument in symbols:
                 rows = await object_data.M.coverage(self.ctx, [instrument], name)
                 if not any(row["capability"] == name for row in rows):
-                    raise ContractError("series_missing", f"{instrument['displaySymbol']} has no {name} history in Market", {"series": name, "instrumentId": instrument["instrumentId"]})
+                    raise ContractError("series_missing", t("{displaySymbol} has no {name} history in Market", displaySymbol=instrument['displaySymbol'], name=name), {"series": name, "instrumentId": instrument["instrumentId"]})
         run = settings.get("run") or {}
         accounts = run.get("accounts")
         if accounts and len(accounts) > 1:
@@ -263,28 +254,34 @@ class ObjectRuns:
                 pair = await object_data.resolve_text(self.ctx, f"{currency}/{report}")
                 found = pair.get("base") == currency and pair.get("quote") == report
                 if not found:
-                    raise ContractError("no_conversion", f"No {report} price for {currency} in Market; the two accounts can't be added up", {"currency": currency, "report": report})
-        need = await self.memory_need(settings)
-        if need is not None and need > self.queue.budget:
-            raise ContractError("over_machine_budget", f"This run needs about {need / GB:.1f} GB; this machine gives runs {self.queue.budget / GB:.1f} GB (half of {self.queue.total / GB:.1f} GB)",
-                                {"needGb": round(need / GB, 1), "canGiveGb": round(self.queue.budget / GB, 1)})
+                    raise ContractError("no_conversion", t("No {report} price for {currency} in Market; the two accounts can't be added up", report=report, currency=currency), {"currency": currency, "report": report})
 
     async def memory_need(self, settings):
-        """Bytes one run of these settings is expected to need (names and bars from the data settings; see `strategy_settings.memory_estimate`), or None when
-        there is no queue to hold it to or the settings do not say enough."""
+        """Bytes one run of these settings is expected to need before its data is fetched: the names times the bars of the period (trading days
+        for stocks; the finer fill bars when there are any; see `strategy_settings.memory_estimate`). None when the settings do not say enough
+        (an index's members are known once it is frozen)."""
         data = settings["data"]
         symbols = [item["instrument"] for item in data.get("symbols", [])]
-        if self.queue is None or not symbols or not data.get("since"):
+        if not symbols or not data.get("since"):
             return None
         resolved = await object_data.resolve_until(self.ctx, data)
-        until = date.fromisoformat(resolved["until"])
-        days = max(1, (until - date.fromisoformat(data["since"])).days)
-        minutes = {"m": 1, "h": 60, "d": 1440}[data["timeframe"][-1]] * int(data["timeframe"][:-1])
+        days = max(1, (date.fromisoformat(resolved["until"]) - date.fromisoformat(data["since"])).days)
+        step = data.get("fillBars") or data["timeframe"]
+        minutes = {"m": 1, "h": 60, "d": 1440}[step[-1]] * int(step[:-1])
         stock = any(item["assetClass"] in {"equity", "fund"} for item in symbols)
-        per_day = (1 if minutes >= 1440 else 6.5 * 60 / minutes) if stock else 1440 / minutes
-        fine = data.get("fillBars")
-        fine_minutes = {"m": 1, "h": 60}[fine[-1]] * int(fine[:-1]) if fine else None
-        return strategy_settings.memory_estimate(len(symbols), int(days * per_day), int(days * 1440 / fine_minutes) if fine_minutes else 0)
+        per_day = (252 / 365 * (1 if minutes >= 1440 else 6.5 * 60 / minutes)) if stock else 1440 / minutes
+        return strategy_settings.memory_estimate(len(symbols), int(len(symbols) * days * per_day))
+
+    def measured_need(self, record, names, rows):
+        """What the queue holds for a backtest whose data is ready: the peak the newest completed run of the same object and data settings
+        measured (a tenth over), else the estimate from the bars actually prepared."""
+        for (content,) in self.records.db.execute(
+                "SELECT content FROM records WHERE kind='qrun' AND json_extract(content,'$.objectId')=? AND json_extract(content,'$.state')='completed' "
+                "AND json_extract(content,'$.peakMemory') IS NOT NULL ORDER BY json_extract(content,'$.createdAt') DESC LIMIT 20", (record["objectId"],)):
+            found = json.loads(content)
+            if found["settings"]["data"] == record["settings"]["data"]:
+                return int(found["peakMemory"] * 1.1)
+        return strategy_settings.memory_estimate(names, rows)
 
     @staticmethod
     def source_settings(source):
@@ -292,7 +289,7 @@ class ObjectRuns:
         data = source.get("data") or {}
         if settings["data"].get("until") == "latest":
             if not data.get("until") or settings["data"].get("heldOutFrom"):
-                raise ContractError("unavailable", "This run did not retain the resolved end of its full data range.")
+                raise ContractError("unavailable", t("This run did not retain the resolved end of its full data range."))
             settings["data"]["until"] = datetime.fromtimestamp(data["until"] / 1000, UTC).date().isoformat()
         if source.get("runSettings"):
             overrides = source["overrides"]
@@ -334,14 +331,14 @@ class ObjectRuns:
     def held_out_of(self, obj, of):
         """The run a held-out validation scores: a completed backtest of this strategy, validated once; the object must keep a held-out end."""
         if obj["kind"] != "strategy":
-            raise ContractError("invalid_input", "Only a strategy run is validated on the held-out end here.")
+            raise ContractError("invalid_input", t("Only a strategy run is validated on the held-out end here."))
         if not of:
-            raise ContractError("invalid_input", "Say which run to validate (of).")
+            raise ContractError("invalid_input", t("Say which run to validate (of)."))
         run = self.read(of)
         if run["objectId"] != obj["id"] or run["runKind"] not in ("run", "case") or run["state"] != "completed":
-            raise ContractError("invalid_input", "Validate a completed backtest of this strategy.")
+            raise ContractError("invalid_input", t("Validate a completed backtest of this strategy."))
         if not run["settings"]["data"].get("heldOutFrom"):
-            raise ContractError("no_held_out_period", "This run has no held-out period.")
+            raise ContractError("no_held_out_period", t("This run has no held-out period."))
         return run
 
     async def settings_for(self, obj):
@@ -366,7 +363,7 @@ class ObjectRuns:
         if opened is None:   # no Developer: the file on disk is the code
             return path.read_text(encoding="utf-8")
         if opened["conflict"]:
-            raise ContractError("conflict", f"{obj['entry']} changed on disk while it has unsaved edits. Resolve it in Developer, then run again.")
+            raise ContractError("conflict", t("{entry} changed on disk while it has unsaved edits. Resolve it in Developer, then run again.", entry=obj['entry']))
         root = Path(obj["directory"]).resolve().as_uri().rstrip("/") + "/"
         documents, cursor = [], None
         while True:
@@ -383,7 +380,7 @@ class ObjectRuns:
             saved = plain(await self.ctx.call("developer.documents.save", {"documentId": document["documentId"], "expectedVersion": document["version"]}))
             if saved["status"] not in {"saved", "clean"}:
                 name = unquote(document["uri"]).rsplit("/", 1)[-1]
-                raise ContractError("conflict", f"{name} could not be saved before running: {saved['message'] or saved['status']}.", {"file": name})
+                raise ContractError("conflict", t("{name} could not be saved before running: {message}.", name=name, message=saved['message'] or saved['status']), {"file": name})
         return path.read_text(encoding="utf-8")
 
     async def capture_code(self, obj, directory):
@@ -396,7 +393,7 @@ class ObjectRuns:
             await asyncio.to_thread(shutil.copytree, filesystem_path(root), filesystem_path(staging), dirs_exist_ok=True, ignore=shutil.ignore_patterns(*EXCLUDED, "*.pyc"))
             captured = await asyncio.to_thread(snapshot_project, self.ctx.data_dir, staging)
         if before != {item["path"]: item["sha256"] for item in captured["files"]}:
-            raise ContractError("conflict", "The strategy changed while it was being fixed for the run. Run again.")
+            raise ContractError("conflict", t("The strategy changed while it was being fixed for the run. Run again."))
         await asyncio.to_thread(shutil.copytree, filesystem_path(captured["snapshotPath"]), filesystem_path(directory / "source"))
         return captured
 
@@ -415,7 +412,7 @@ class ObjectRuns:
                 shutil.copyfile(recipe["lockPath"], lock)
             state = plain(self.ctx.environments.get(environment["preparationId"]))
             if state["state"] != "completed":
-                raise ContractError("unavailable", "The environment of the source run is no longer available.")
+                raise ContractError("unavailable", t("The environment of the source run is no longer available."))
             self.ctx.environments.hold(environment["preparationId"], "qrun:" + identity)
             self.update(identity, recipe={**recipe, "lockPath": str(lock)}, environment=environment)
             return state
@@ -460,19 +457,19 @@ class ObjectRuns:
             else:
                 # A backtest takes its place in Quant's one queue: it waits while what already runs leaves too little of the machine's budget.
                 record = self.read(identity)
-                need = await self.memory_need(record["settings"])
-                async with self.queue.slot(owner=identity, label=f"{record['name']} #{record['number']}", interactive=True, memory=need or GB,
+                need = self.measured_need(record, prepared["summary"]["traded"], prepared["summary"]["rows"])
+                async with self.queue.slot(owner=identity, label=f"{record['name']} #{record['number']}", interactive=True, memory=need,
                                            on_wait=lambda position: self.update(identity, state="queued")):
                     process = await self.launch(identity, obj, directory, prepared, state)
                     await self.finish(identity, process, directory, research)
             ending = self.ending(identity, directory)
         except asyncio.CancelledError:
-            ending = {"state": "interrupted" if self.closed else "cancelled", "message": "Stopped before the run finished."}
+            ending = {"state": "interrupted" if self.closed else "cancelled", "message": t("Stopped before the run finished.")}
             if process:
                 with contextlib.suppress(ContractError):
                     await asyncio.shield(self.ctx.processes.cancel(process))
         except ContractError as error:
-            ending = {"state": "interrupted" if self.closed else "cancelled", "message": "Stopped before the run finished."} if error.code == "cancelled" else {
+            ending = {"state": "interrupted" if self.closed else "cancelled", "message": t("Stopped before the run finished.")} if error.code == "cancelled" else {
                 "state": "failed", "message": error.message, "error": self.failure(identity, error)}
         except Exception as error:  # A background run must reach a terminal state even when backend preparation itself breaks.
             logging.getLogger(__name__).exception('Quant run failed (%s)', identity)
@@ -504,7 +501,7 @@ class ObjectRuns:
         """Reopen the source worker's market, signal and model materials for an unchanged date range."""
         path = self.directory(source["id"]) / "invocation.json"
         if not path.is_file():
-            raise ContractError("unavailable", "This run's frozen backtest inputs are no longer available.")
+            raise ContractError("unavailable", t("This run's frozen backtest inputs are no longer available."))
         invocation = json.loads(path.read_text(encoding="utf-8"))
         config = invocation["backtest"]
         summary = source["data"]
@@ -527,8 +524,7 @@ class ObjectRuns:
         kind = "stock" if data.get("index") else strategy_settings.traded([item["instrument"] for item in data["symbols"]]) if data.get("symbols") else "perpetual"
         stored = settings.get("run") or {}
         held = data.get("heldOutFrom")
-        names = len(data.get("symbols") or []) or 1
-        first = strategy_settings.effective(kind, stored, settings["account"], held_out=held, names=names)
+        first = strategy_settings.effective(kind, stored, settings["account"], held_out=held, market=strategy_settings.market_of(data))
         # Every run but a held-out validation stops before the held-out end; the checks never see it.
         if data.get("until") == "latest":
             data = await object_data.resolve_until(self.ctx, data)
@@ -586,17 +582,20 @@ class ObjectRuns:
         if not record.get("of"):
             self.pin_inputs(obj["id"], fixed_pins)
         # The run settings as this run uses them: Market's fee (or the account's) is known once the venue is built.
-        venue = prepared["venues"][0]
-        fee = {"maker": venue["fees"]["maker"], "taker": venue["fees"]["taker"]} if venue["fees"].get("type") == "maker_taker" else None
+        charged = [{"maker": item["makerFee"], "taker": item["takerFee"]} for item in prepared["instruments"] if "makerFee" in item]
+        fee = object_data.one_fee(charged)
         source = "set here" if "feePct" in (stored.get("costs") or {}) or "commissionBps" in (stored.get("costs") or {}) else \
             "account settings" if settings["account"].get("fee") or settings["account"].get("stockCommission") else \
+            "assumed: the standard tier of " + ", ".join(summary["feeAssumed"]) if summary.get("feeAssumed") else \
             "from Market (" + ", ".join(sorted({item["marketInstrument"]["venueId"] for item in prepared["sources"]})) + ")"
+        if charged and fee is None:
+            source += ", each symbol its own fee"
         commission = next((item.get("stockCommission") for item in prepared["instruments"] if item["type"] == "equity"), None)
         def venue_kind(venue):
             types = {row["type"] for row in prepared["instruments"] if row["id"].endswith("." + venue["name"])}
             return "stock" if "equity" in types else "perpetual" if "perpetual" in types else "spot"
         venue_kinds = [{"name": item["name"], "kind": venue_kind(item)} for item in prepared["venues"]]
-        run = strategy_settings.effective(kind, stored, account, fee, source, commission, held_out=held, venues=venue_kinds if len(prepared["venues"]) > 1 else None, names=names)
+        run = strategy_settings.effective(kind, stored, account, fee, source, commission, held_out=held, venues=venue_kinds if len(prepared["venues"]) > 1 else None, market=strategy_settings.market_of(data))
         prepared["venues"] = [strategy_settings.native_venue(item, run, kind) for item in prepared["venues"]]
         prepared["instruments"] = [strategy_settings.native_instrument(item, run, kind) for item in prepared["instruments"]]
         step("modelsAndSessions")
@@ -612,14 +611,17 @@ class ObjectRuns:
         report("extras", 0, 0, left)
         extras = await strategy_inputs.extras(self.ctx, wanted - strategy_inputs.OPTIONAL_SERIES, prepared["sources"], since, until, directory,
                                               progress=lambda value: report("extras", value["done"], value["total"], left))
+        notes = []
         for name in wanted & strategy_inputs.OPTIONAL_SERIES:
             try:
-                extras.update(await strategy_inputs.extras(self.ctx, {name}, prepared["sources"], since, until, directory))
+                extras.update(await strategy_inputs.extras(self.ctx, {name}, prepared["sources"], since, until, directory, notes=notes))
             except ContractError:
                 pass  # a name Market has none for is left to the code to cope with
-        industry = {}
+        summary["dataNotes"] = notes
+        industry = {}  # each name's industry at the end of the run, for grouping the report's names
         for native, path in (extras.get("industry") or {}).items():
             table = await asyncio.to_thread(pd.read_parquet, path)
+            table = table[table["time"] <= until]
             if len(table):
                 industry[native] = str(table.sort_values("time")["value"].iloc[-1])
         accounts = None
@@ -740,7 +742,7 @@ class ObjectRuns:
                 json.dump(invocation, stream, separators=(",", ":"))
         await asyncio.to_thread(write_invocation)
         self.update(identity, materialsSeconds=round(time.time() - record["createdAt"] / 1000, 3))
-        env = {key: os.environ[key] for key in ("SystemRoot", "WINDIR", "TEMP", "TMP", "PATH", "COMSPEC", "PATHEXT", "USERPROFILE", "APPDATA", "LOCALAPPDATA") if key in os.environ}
+        env = {key: os.environ[key] for key in ("SystemRoot", "WINDIR", "TEMP", "TMP", "PATH", "COMSPEC", "PATHEXT", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TALYX_LANGUAGE", "TALYX_LOCALES") if key in os.environ}
         env.update(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1", NUMEXPR_NUM_THREADS="1", MPLBACKEND="Agg",
                    PYTHONUNBUFFERED="1", PYTHONUTF8="1", PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1", GIT_CEILING_DIRECTORIES=str(directory))
         # The frozen models answer the backtest over its standard input and output.
@@ -801,8 +803,8 @@ class ObjectRuns:
                     **{key: result[key] for key in ("peakMemory", "timings") if key in result}}
         if result is not None and result.get("status") == "cancelled":
             if self.closed:
-                return {"state": "interrupted", "message": "The application stopped while this ran; the part up to that moment is kept.", "metrics": {}}
-            return {"state": "cancelled", "message": "Stopped by the user", "metrics": {}}
+                return {"state": "interrupted", "message": t("The application stopped while this ran; the part up to that moment is kept."), "metrics": {}}
+            return {"state": "cancelled", "message": t("Stopped by the user"), "metrics": {}}
         stderr = directory / "output" / "stderr.log"
         failure = describe_failure(result, record["code"]["directory"], stderr.read_text(encoding="utf-8", errors="replace") if stderr.is_file() else "", record["exitCode"])
         # Where the run stopped stays in the record: reading a run never loads its (possibly large) result.
@@ -815,7 +817,7 @@ class ObjectRuns:
             return record
         task = self.tasks.get(identity)
         if task is None:
-            raise ContractError("conflict", "This run is not running in this session.")
+            raise ContractError("conflict", t("This run is not running in this session."))
         self.update(identity, state="cancel_requested")
         environment = self.read(identity)["environment"]
         if environment is not None and environment["state"] in {"queued", "running", "cancel_requested"}:
@@ -878,7 +880,7 @@ class ObjectRuns:
         """Put this run's code and parameter values back as the object's current ones; Developer keeps the code it replaces in file history."""
         run = self.read(identity)
         if run["code"] is None:
-            raise ContractError("unavailable", "This run never fixed its code.")
+            raise ContractError("unavailable", t("This run never fixed its code."))
         obj = self.store.read(run["objectId"])
         self.store.check_version(obj, expected_version)
         from .run_restore import restore_files

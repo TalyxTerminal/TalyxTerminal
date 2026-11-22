@@ -19,6 +19,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .flows import ChartFlow
 from .pine.indicators import ALERT_CONDITION
@@ -30,7 +31,7 @@ MEDIA = {"csv": "text/csv", "json": "application/json", "parquet": "application/
 def table(flow: ChartFlow) -> dict[str, list]:
     feed = flow.shown
     if not flow.current or feed is None or not feed.ready.is_set():
-        raise ContractError("unavailable", "The chart has no bars yet")
+        raise ContractError("unavailable", t("The chart has no bars yet"))
     columns = {name: list(feed.columns[name]) for name in BAR_COLUMNS}
     row_of = {time: index for index, time in enumerate(columns["time"])}
     bindings = flow.replay_bindings if flow.replay else flow.bindings

@@ -24,6 +24,7 @@ from typing import Any
 
 import numpy as np
 import orjson
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import normalize_timeframe
 from vocabulary.instruments import MarketInstrument, market_data_series, ohlcv_series
@@ -125,7 +126,7 @@ class Jobs:
     def get(self, job_id: str) -> Job:
         job = self.jobs.get(job_id)
         if job is None:
-            raise MarketError("not_found", f"No fetch job {job_id}")
+            raise MarketError("not_found", t("No fetch job {job_id}", job_id=job_id))
         return job
 
     # ── the fetch action ────────────────────────────────────────────────────
@@ -241,7 +242,7 @@ class Jobs:
         estimated, free = space["estimatedBytes"], space["freeBytes"]
         if estimated > free:
             raise MarketError("insufficient_space",
-                              f"This download needs about {estimated:,} bytes but only {free:,} are free",
+                              t("This download needs about {estimated} bytes but only {free} are free", estimated=f'{estimated:,}', free=f'{free:,}'),
                               details=space)
 
     # ── running ─────────────────────────────────────────────────────────────
@@ -340,7 +341,8 @@ class Jobs:
             days = _trading_days(calendar, start, end)
             if len(members) < 2 or len(days) > len(members):
                 continue  # one request per instrument is fewer
-            targets = {id(item): data.target(item["instrument"], job.record["environment"]) for item, _p in members}
+            targets = {id(item): data.target(item["instrument"], job.record["environment"], source_id)
+                       for item, _p in members}
             for day_start, day_end in days:
                 wanted = [(item, plan) for item, plan in members if data.missing(plan, day_start, day_end)]
                 if not wanted:
@@ -368,7 +370,11 @@ class Jobs:
                     mask = columns["code"] == code
                     rows = {name: values[mask] for name, values in columns.items() if name != "code"}
                     one = History(rows) if bars.length(rows) else History(bars.empty(), None, "source_has_none")
-                    await data.commit(plan, one, day_start, day_end)
+                    async with data.lock(plan.key):
+                        pointer = data.store.pointer(plan.key)
+                        if pointer and pointer["parts"] and pointer["source"] != source_id:
+                            continue
+                        await data.commit(plan, one, day_start, day_end)
             for item, plan in members:
                 if id(item) in handled:
                     continue
@@ -408,7 +414,7 @@ class Jobs:
                 return plan, self.window(job, plan) if plan.source_id is not None else None
             plan, window = await in_worker(planned)
             if plan.source_id is None:
-                raise MarketError("unsupported", f"No source gives {item['name']} for {item['instrument']['symbol']}")
+                raise MarketError("unsupported", t("No source gives {name} for {symbol}", name=item['name'], symbol=item['instrument']['symbol']))
             start, end = window
             fill = await data.fill(plan, start, end, limit=None,
                                    retry_unavailable=True)
@@ -487,7 +493,7 @@ class Jobs:
     async def control(self, op: str, job_id: str, workspace_id: str | None) -> dict:
         job = self.get(job_id)
         if job.record["workspaceId"] != workspace_id:
-            raise MarketError("not_found", f"No fetch job {job_id} in this workspace")
+            raise MarketError("not_found", t("No fetch job {job_id} in this workspace", job_id=job_id))
         if op == "cancel":
             await self.cancel(job_id)
         else:
@@ -507,13 +513,13 @@ class Jobs:
     def resume(self, job_id: str) -> None:
         job = self.get(job_id)
         if job.record["state"] != "interrupted":
-            raise MarketError("conflict", "Only interrupted downloads can be resumed")
+            raise MarketError("conflict", t("Only interrupted downloads can be resumed"))
         self.start(job)
 
     async def cancel(self, job_id: str) -> None:
         job = self.get(job_id)
         if job.record["state"] in ("completed", "failed"):
-            raise MarketError("conflict", f"Download already {job.record['state']}")
+            raise MarketError("conflict", t("Download already {state}", state=job.record['state']))
         if job.task is not None and not job.task.done():
             job.record["state"] = "cancelled"
             job.task.cancel()

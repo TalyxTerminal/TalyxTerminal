@@ -17,10 +17,13 @@ from uuid import uuid4
 import pystray
 import webview
 from PIL import Image
+from talyx_sdk import i18n
 from talyx_sdk.jobs import Job
 
-from host.files import default_data_dir
+from host.files import default_data_dir, platform_locale_files
+from host.updates import update_folder
 
+from . import install
 from .bridge import Bridge
 from .frame import ICON, Frame
 from .instance import DesktopActivation
@@ -116,6 +119,12 @@ class WindowAPI:
         with self._desktop.lock:
             self._desktop.check_confirmation(self._state, request_id)
             self._desktop.pending_exit = None
+            self._desktop.pending_update = None
+
+    def install_update(self):
+        """Quit (the same exit, previewing what stops), then install the downloaded update and open TALYX again."""
+        self._trusted()
+        self._desktop.install_update()
 
     def confirm_exit(self, request_id):
         self._trusted()
@@ -157,6 +166,7 @@ class Desktop:
         self.last_active = None
         self.hiding = False
         self.pending_exit = None
+        self.pending_update = None   # (installer, version) to run once quit
         self.previewing = False
         self.quitting = False
         self.exit_code = 0
@@ -211,6 +221,11 @@ class Desktop:
         if launches.get(timeout=600) is None:
             raise RuntimeError(f"Backend exited before launch handoff: {self.backend.wait()}")
         self.bridge = Bridge(f"ws://127.0.0.1:{self.backend_port}/ws/bridge", self.data_root)
+
+    def read_language(self):
+        """The tray's words, in the language set when the desktop starts (the platform's dictionary)."""
+        read = self.bridge.call("platform.settings.read", {"module": "platform", "workspaceId": "global", "keys": ["language"]})
+        i18n.configure(platform_locale_files(), read["values"]["language"]["value"])
 
     def _activated(self, state):
         if not self.hiding:
@@ -373,6 +388,16 @@ class Desktop:
         finally:
             self.previewing = False
 
+    def install_update(self):
+        download = self.bridge.call("platform.updates.read").get("download") or {}
+        folder = update_folder(self.data_root).resolve()
+        installer = Path(download.get("path") or "").resolve()
+        if download.get("state") != "ready" or installer.parent != folder or not installer.is_file():
+            raise ValueError(i18n.t("No downloaded update is ready to install."))
+        with self.lock:
+            self.pending_update = (installer, download["version"])
+        self.request_exit()
+
     def exit_preview(self):
         """What quitting stops: each open workspace with the work running for it (the same the platform lists when
         one workspace closes)."""
@@ -412,6 +437,9 @@ class Desktop:
     def run(self, workspace_id=None, started=None):
         # Its own taskbar group, so Windows shows TALYX's icon rather than the Python interpreter's.
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("TALYX.Desktop")
+        # Held while the desktop runs, so the installer can tell TALYX is open and ask to quit it before an upgrade
+        # (installer/setup.iss, AppMutex). Windows releases it when the process ends.
+        self.running_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "TALYX.Desktop")
         # Native menus (the tray's) in the dark, like the app: uxtheme's SetPreferredAppMode(ForceDark), ordinal 135, and
         # FlushMenuThemes, ordinal 136 (Windows 10 1903 and later; not in the headers).
         uxtheme = ctypes.WinDLL("uxtheme")
@@ -419,6 +447,7 @@ class Desktop:
         uxtheme[136]()
         try:
             self.start_backend()
+            self.read_language()
             self.open_window(workspace_id)
             self.activation = DesktopActivation(self.data_root, self.open_interface)
             self.tray = pystray.Icon(
@@ -426,8 +455,8 @@ class Desktop:
                 Image.open(ICON),
                 "TALYX",
                 menu=pystray.Menu(
-                    pystray.MenuItem("Open TALYX", self.open_interface, default=True),
-                    pystray.MenuItem("Quit", self.request_exit),
+                    pystray.MenuItem(i18n.t("Open TALYX"), self.open_interface, default=True),
+                    pystray.MenuItem(i18n.t("Quit"), self.request_exit),
                 ),
             )
             tray_thread = threading.Thread(target=self.tray.run, name="TALYX-tray")
@@ -449,4 +478,7 @@ class Desktop:
             if self.backend:
                 self.backend.wait(timeout=30)
                 self.stdout_thread.join(10)
+        if self.quitting and self.pending_update is not None:
+            installer, version = self.pending_update
+            install.start(installer, version, update_folder(self.data_root))
         return self.exit_code

@@ -79,6 +79,14 @@ class Prices:
         index = int(np.searchsorted(times, after, side="right"))
         return int(times[index]) if index < len(times) else None
 
+    def ended(self, instrument):
+        """The index of this name's last bar when its prices stop before its peers' do (delisted, or the source has none after), else None."""
+        found, times = self.by.get(instrument), self.calendar.get(instrument)
+        if found is None or not len(found["known"]) or times is None:
+            return None
+        last = len(found["known"]) - 1
+        return last if found["known"][last] < times[-1] else None
+
     def after_last(self, instrument, sent):
         """Whether an order sent at `sent` came after the last moment this name's peers trade: the run's data ends before any bar it could fill on."""
         return self.next_moment(instrument, sent) is None
@@ -148,6 +156,21 @@ def _stopped_in_entry_bar(identity):
     return getattr(quant, "_entry_bar_stops", {}).get(identity) if quant is not None else None
 
 
+def _delisted_exit(identity):
+    """The ts_event of the last bar of a name whose prices stopped, for the order selling what was held of it there
+    (talyx_quant._delisted_exits), else None."""
+    import sys
+    quant = sys.modules.get("talyx_quant")
+    return getattr(quant, "_delisted_exits", {}).get(identity) if quant is not None else None
+
+
+def on_step(instrument, value):
+    """`value` at the nearest multiple of the instrument's price step. `make_price` only rounds to the step's decimal places, so with a step
+    like Hong Kong's 0.05 or 0.2 it gives 85.03 or 330.9; the venue skips a fill off the step and the order stays open for the rest of the run."""
+    step = Decimal(str(instrument.price_increment))
+    return instrument.make_price(float(max((Decimal(repr(float(value))) / step).to_integral_value(), Decimal(1)) * step))
+
+
 def fill_model(costs, fill, prices, ledger, clock, through_ticks=0, guard=None, halted="keep"):
     """A Nautilus fill model for this run's cost settings; `clock()` is the simulation time in nanoseconds. A limit order fills when the bar touches
     its price, or (`through_ticks` above zero) only when the bar trades that many price steps through it; the order then stays open. `guard`
@@ -190,10 +213,13 @@ def fill_model(costs, fill, prices, ledger, clock, through_ticks=0, guard=None, 
                     ledger.moments[(identity, now)] = int(prices.by[name]["opened"][index])  # filled inside the bar: stamped with its open
                 return None  # a resting limit fills at its own price
             book = OrderBook(instrument.id, BookType.L2_MBP)
-            expected = prices.next_moment(name, int(order.ts_init)) if kind == "MARKET" else None
+            delisted = _delisted_exit(identity) if kind == "MARKET" else None
+            if delisted is not None:
+                index = prices.last(name, delisted)  # its last bar: sold at that close
+            expected = prices.next_moment(name, int(order.ts_init)) if kind == "MARKET" and delisted is None else None
             if index is not None and expected is not None and expected < now and prices.at(name, expected) is None and identity not in ledger.closing:
                 index = None  # it could have filled when its peers traded; it had no bar then: halted
-            if kind == "MARKET" and prices.after_last(name, int(order.ts_init)):
+            if kind == "MARKET" and delisted is None and prices.after_last(name, int(order.ts_init)):
                 # Sent on the run's last bar: the data ends before the bar it would fill on. Not a halt, and never filled on the bar it was sent at.
                 ledger.at_end.add(identity)
                 ledger.unfilled[identity] = "Sent on the run's last bar: the data ends before a bar it could fill on."
@@ -208,6 +234,8 @@ def fill_model(costs, fill, prices, ledger, clock, through_ticks=0, guard=None, 
                 # The stop of a position that went through it in the bar the position opened in: at the stop, in that bar.
                 index = prices.at(name, stopped[1])
                 base = stopped[0]
+            elif delisted is not None:
+                base = float(bars["close"][index])
             elif kind == "MARKET":
                 base = float(bars["open"][index] if fill == "nextOpen" else bars["close"][index])
             elif kind == "STOP_MARKET" and getattr(order, "trigger_price", None) is not None:
@@ -220,7 +248,7 @@ def fill_model(costs, fill, prices, ledger, clock, through_ticks=0, guard=None, 
             participation = quantity * base / bars["dailyValue"][index] if bars["dailyValue"][index] > 0 else 0.0
             impact = coefficient * float(bars["volatility"][index]) * math.sqrt(max(participation, 0.0))
             move = half_spread + impact
-            price = instrument.make_price(base * (1 + move) if buy else base * (1 - move))
+            price = on_step(instrument, base * (1 + move) if buy else base * (1 - move))
             size = order.leaves_qty
             if guard is not None and (why := guard(instrument, order, price.as_double(), float(size.as_double()))):
                 ledger.unfilled[identity] = why
@@ -234,7 +262,7 @@ def fill_model(costs, fill, prices, ledger, clock, through_ticks=0, guard=None, 
                         return book
             ledger.orders[identity] = {"base": base, "spread": half_spread, "impact": impact, "instrument": name, "time": now, "side": "BUY" if buy else "SELL"}
             # A fill's time is the moment of its price: a market order at the close it fills at, any other at the open of the bar it filled in.
-            ledger.moments[(identity, now)] = int(bars["times"][index] if kind == "MARKET" and fill == "nextClose" else bars["opened"][index])
+            ledger.moments[(identity, now)] = int(bars["times"][index] if kind == "MARKET" and (fill == "nextClose" or delisted is not None) else bars["opened"][index])
             book.add(BookOrder(OrderSide.SELL if buy else OrderSide.BUY, price, Quantity.from_str(str(size)), 1), 0, 0, now)
             return book
 

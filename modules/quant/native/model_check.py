@@ -15,6 +15,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from . import i18n
 from . import model_algorithms as A
 from . import model_data as D
 from . import model_figures as MF
@@ -34,7 +35,7 @@ BASE = 0.7 * GB
 
 def _day(label):
     moment = pd.Timestamp(int(label), unit="ms", tz="UTC")
-    return f"{moment.strftime('%b')} {moment.day}, {moment.year}"
+    return i18n.t("{month} {day}, {year}", month=moment.strftime(i18n.t("%b")), day=moment.day, year=moment.year)
 
 
 def _missing_part(daily, labels):
@@ -348,7 +349,7 @@ class Check:
                 entry["note"] = "; ".join(part for part in (item.note, _missing_part(np.mean(shares, axis=0) if shares else np.zeros(0), panel.labels[warm:])) if part)
             input_rows.append(entry)
             if first is not None and len(panel.labels) > warm and first > int(panel.labels[warm]) + 20 * D.DAY:
-                axis_inputs.append({"name": item.name, "missingTo": first, "note": f"No values before {_month(first)}"})
+                axis_inputs.append({"name": item.name, "missingTo": first, "note": i18n.t("No values before {month}", month=_month(first))})
             if late:
                 axis_inputs.append({"name": item.name, "peek": True, "note": entry["note"]})
             if not any(row["name"] == item.name for row in axis_inputs):
@@ -405,7 +406,7 @@ class Check:
         if distinct is not None and distinct < int(label_settings.get("objectiveParam") or 5):
             need = int(label_settings.get("objectiveParam") or 5)
             add("Label", f"{distinct} distinct values a day; {need} groups need at least {need}", f"≥ {need}", "fix", "label", f"{distinct} distinct values a day; {need} groups need at least {need}")
-            self.label_error = {"kind": "syntax", "at": 0, "length": 0, "message": f"{distinct} distinct values a day; {need} groups need at least {need}"}
+            self.label_error = {"kind": "syntax", "at": 0, "length": 0, "message": i18n.t("{distinct} distinct values a day; {need} groups need at least {need}", distinct=distinct, need=need)}
         elif self.label_error:
             add("Label", self.label_error["message"], "reads a later bar", "fix", "label", self.label_error["message"])
         else:
@@ -496,19 +497,15 @@ class Check:
             found = estimate(algorithm=group.get("algorithm") or algorithm or "lightgbm", params=group.get("params") or {}, rows=rows_max,
                              features=int(group.get("features") or features or 1), bars=len(panel.labels), names=len(panel.columns), windows=len(windows),
                              threads=int(self.job.get("threads") or 1), calibration=self.job.get("calibration"))
-            estimates.append({"group": index + 1, **found, "blocked": bool(budget and found["memory"] > budget)})
+            estimates.append({"group": index + 1, **found})
         if not windows:
             estimates = []   # nothing would train: no time or memory to estimate
         if estimates and algorithm:
             worst = max(estimates, key=lambda item: item["memory"])
             if budget and worst["memory"] > budget:
+                # An estimate is no reason to refuse: the run goes alone and, if the machine truly runs out, fails saying how much it used.
                 label_group = f"group {worst['group']}" if len(estimates) > 1 else "this run"
-                detail = (f"{label_group.capitalize()} needs about {worst['memory'] / GB:.1f} GB; runs on this computer get {budget / GB:.1f} GB in all, so it can never start. "
-                          "Use fewer names or a shorter period.")
-                if algorithm in A.NEURAL_IDS and worst.get("features"):
-                    detail = (f"Look back {worst['look']:.0f} days × {worst['features']} features × {_k(worst['rows'])} rows a window: about {worst['memory'] / GB:.1f} GB, "
-                              f"over the {budget / GB:.1f} GB runs here get. Choose fewer features or a shorter look back.")
-                add("Memory", f"{label_group} needs about {worst['memory'] / GB:.1f} GB; runs get {budget / GB:.1f} GB", "fits", "block", "batch", detail)
+                add("Memory", f"{label_group} needs about {worst['memory'] / GB:.1f} GB; runs get {budget / GB:.1f} GB", "fits", "watch", "batch")
             else:
                 add("Memory", f"{worst['memory'] / GB:.1f} GB of the {budget / GB:.1f} GB runs get" if budget else f"{worst['memory'] / GB:.1f} GB", "fits", "ok", "batch")
         if algorithm in A.NEURAL_IDS and estimates:
@@ -557,9 +554,9 @@ class Check:
         inputs, tables, failed = self.tables()
         item = next((entry for entry in inputs if entry.id == input_id), None)
         if item is None:
-            return {"ok": False, "failure": {"stage": "inputs", "title": "no such input", "message": "This input is not in the preparation."}}
+            return {"ok": False, "failure": {"stage": "inputs", "title": i18n.t("no such input"), "message": i18n.t("This input is not in the preparation.")}}
         if any(found["input"] is item for found in failed):
-            return {"ok": False, "failure": {"stage": "inputs", "title": "cannot be computed", "message": next(found["message"] for found in failed if found["input"] is item)}}
+            return {"ok": False, "failure": {"stage": "inputs", "title": i18n.t("cannot be computed"), "message": next(found["message"] for found in failed if found["input"] is item)}}
         name = feature if feature in item.features else item.features[0]
         warm = max([D.WARMUP.get(entry.ref, 0) for entry in inputs if entry.source == "builtin"] + [0])
         windows = D.layout(self.panel.labels, self.settings["split"], self.ahead, warmup=warm)
@@ -590,11 +587,11 @@ class Check:
             if value is None:
                 return "—"
             return f"{value * 100:.1f}%" if kind == "share" else f"{value:+.3f}" if kind == "signed" else f"{value:.3f}"
-        stats = [{"label": "Mean", "before": fmt(sb["mean"], "signed"), "after": fmt(sa["mean"], "signed")},
-                 {"label": "Std", "before": fmt(sb["std"]), "after": fmt(sa["std"])},
-                 {"label": "Skew", "before": fmt(sb["skew"], "signed"), "after": fmt(sa["skew"], "signed")},
-                 {"label": "Beyond 3 MAD", "before": fmt(sb["beyond"], "share"), "after": fmt(sa["beyond"], "share")},
-                 {"label": "Missing", "before": fmt(missing_share, "share"), "after": "dropped" if policy == "drop" else "left" if policy == "model" else "filled"}]
+        stats = [{"label": i18n.t("Mean"), "before": fmt(sb["mean"], "signed"), "after": fmt(sa["mean"], "signed")},
+                 {"label": i18n.t("Std"), "before": fmt(sb["std"]), "after": fmt(sa["std"])},
+                 {"label": i18n.t("Skew"), "before": fmt(sb["skew"], "signed"), "after": fmt(sa["skew"], "signed")},
+                 {"label": i18n.t("Beyond 3 MAD"), "before": fmt(sb["beyond"], "share"), "after": fmt(sa["beyond"], "share")},
+                 {"label": i18n.t("Missing"), "before": fmt(missing_share, "share"), "after": i18n.t("dropped") if policy == "drop" else i18n.t("left") if policy == "model" else i18n.t("filled")}]
         note = (f"Missing {missing_share * 100:.0f}% of the training rows" if missing_share else "No missing values on the training rows") + (
             "; rows with a missing input are dropped, so those days train on fewer names." if policy == "drop" and missing_share else ".")
         after_edges = (float(np.nanmin(a)), float(np.nanmax(a))) if np.isfinite(a).any() else (0.0, 1.0)

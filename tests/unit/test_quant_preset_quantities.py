@@ -150,3 +150,19 @@ def test_a_stock_order_carries_whole_lots_from_its_execution_terms():
     assert talyx_quant.tradable_quantity(stock, 99.0) is None
     plain = SimpleNamespace(id="BTCUSDT-PERP.BINANCE", info={}, size_increment=SimpleNamespace(as_double=lambda: 0.001), make_qty=lambda amount, *, round_down: amount)
     assert talyx_quant.tradable_quantity(plain, 0.5) == 0.5 and talyx_quant.tradable_quantity(plain, 0.0004) is None
+
+
+def test_orders_from_users_code_are_rounded_to_whole_lots_and_odd_shares_go_with_the_rest():
+    """rebalance_to and order_target_weight send these: an A share buys whole lots of 100, sells whole lots, and once less than a lot would
+    be left sells all it holds (odd shares go together), as JoinQuant and RiceQuant do; an order under one lot sends nothing."""
+    import json
+    talyx_quant._lot_rules.pop("600000.XSHG", None)
+    stock = SimpleNamespace(id="600000.XSHG", info={"execution_conditions": json.dumps({"rules": {"minimum": "100", "increment": "100"}})},
+                            make_qty=lambda amount, *, round_down=False: amount)
+    assert talyx_quant._order_quantity(stock, 1234.0, 0.0) == 1200
+    assert talyx_quant._order_quantity(stock, 99.0, 0.0) is None
+    assert talyx_quant._order_quantity(stock, -730.0, 1250.0) == 700  # 550 left: whole lots taken
+    assert talyx_quant._order_quantity(stock, -1200.0, 1250.0) == 1250  # 50 would be left: the odd shares go too
+    assert talyx_quant._order_quantity(stock, -1250.0, 1250.0) == 1250
+    plain = SimpleNamespace(id="BTCUSDT-PERP.BINANCE", info={}, make_qty=lambda amount, **_kw: SimpleNamespace(as_double=lambda: amount, value=amount))
+    assert talyx_quant._order_quantity(plain, 0.5).value == 0.5

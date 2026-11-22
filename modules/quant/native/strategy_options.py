@@ -46,7 +46,7 @@ def validate(config):
     if len(set(venue_names)) != len(venue_names) or len(set(ids)) != len(ids):
         raise ValueError("Native venues and instrument identities must be unique.")
     for item in config["instruments"]:
-        fields(item, {"id", "type", "symbol", "currency", "baseCurrency", "pricePrecision", "sizePrecision", "priceIncrement", "sizeIncrement", "settlementCurrency", "inverse", "marginInit", "marginMaint", "takerFee", "stock", "stockCommission", "executionRaw", "executionState", "rebuildOrders", "rebuildSeed"}, {"id", "type", "currency", "pricePrecision", "priceIncrement"}, "Native instrument")
+        fields(item, {"id", "type", "symbol", "currency", "baseCurrency", "pricePrecision", "sizePrecision", "priceIncrement", "sizeIncrement", "settlementCurrency", "inverse", "marginInit", "marginMaint", "makerFee", "takerFee", "stock", "stockCommission", "executionRaw", "executionState", "rebuildOrders", "rebuildSeed"}, {"id", "type", "currency", "pricePrecision", "priceIncrement"}, "Native instrument")
         if item["id"].rsplit(".", 1)[-1] not in venue_names:
             raise ValueError("Each exact instrument needs its declared venue.")
     for item in config["venues"]:
@@ -58,8 +58,10 @@ def validate(config):
         for key, value in item.get("latency", {}).items():
             latency_ns(value, "Native " + key + " latency")
         fields(item.get("fees", {}), {"type", "amount", "maker", "taker"}, set(), "Native fee model")
-        if item.get("fees", {}).get("type", "fixed") not in {"fixed", "maker_taker", "instrument_conditions"}:
-            raise ValueError("Choose fixed, maker_taker or frozen instrument conditions for commission.")
+        if item.get("fees", {}).get("type", "fixed") not in {"fixed", "maker_taker", "per_instrument", "instrument_conditions"}:
+            raise ValueError("Choose fixed, maker_taker, per_instrument or frozen instrument conditions for commission.")
+        if item.get("fees", {}).get("type") == "per_instrument" and any(not {"makerFee", "takerFee"} <= set(instrument) for instrument in config["instruments"] if instrument["id"].rsplit(".", 1)[-1] == item["name"]):
+            raise ValueError("Per-instrument commission needs makerFee and takerFee on every venue instrument.")
         if item.get('fees', {}).get('type') == 'instrument_conditions' and any('stock' not in instrument for instrument in config['instruments'] if instrument['id'].rsplit('.', 1)[-1] == item['name']):
             raise ValueError('Instrument-condition commission requires frozen stock terms for every venue instrument.')
         if item.get("marginModel", "standard") not in {"standard", "leveraged"}:

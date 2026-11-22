@@ -12,6 +12,8 @@ import math
 import re
 from dataclasses import dataclass, field
 
+from .i18n import mark
+
 
 # ---------------------------------------------------------------------------------------------------------------- declarations
 # kind: "ts" over time (Qlib Rolling or Ref), "elem" element by element (Qlib), "cs" across names (TALYX), "series" other series.
@@ -72,8 +74,8 @@ def _ops():
 
 OPERATORS = _ops()
 OPERATOR_GROUPS = ("Over time", "Across names", "Math and logic", "Other series")
-PRICE_FIELDS = {"$open": "Open", "$high": "High", "$low": "Low", "$close": "Close", "$volume": "Volume",
-                "$vwap": "Average price, (H + L + C) / 3", "$amount": "Dollar volume, close × volume"}
+PRICE_FIELDS = {"$open": "Open", "$high": "High", "$low": "Low", "$close": "Close", "$volume": mark("Volume"),
+                "$vwap": mark("Average price, (H + L + C) / 3"), "$amount": mark("Dollar volume, close × volume")}
 CLASSIFICATION = {"$industry"}
 
 
@@ -526,7 +528,8 @@ def _qlib():
 
 
 class Context:
-    """What a formula is evaluated on: wide tables (bar labels × instruments) by field name, and the industry of each instrument."""
+    """What a formula is evaluated on: wide tables (bar labels × instruments) by field name, and each instrument's industry (a table of
+    labels on the same bars, or one label per instrument)."""
 
     def __init__(self, tables, industry=None, extra=None):
         import pandas as pd
@@ -572,24 +575,48 @@ def _cross(name, args, context):
         return x.sub(x.mean(axis=1), axis=0).div(x.std(axis=1, ddof=1), axis=0)
     if name == "CSDemean":
         return x.sub(x.mean(axis=1), axis=0)
-    industry = context.industry
-    if industry is None or industry.reindex(x.columns).isna().all():
+    industry = next((arg for arg in args[1:] if is_labels(arg)), context.industry)
+    codes = None if industry is None else industry_codes(industry, x)
+    if codes is None or (codes < 0).all():
         raise FormulaError("field", 0, 0, "$industry is not in this run's data")
-    codes = industry.reindex(x.columns)
     if name == "IndRank":
-        out = pd.DataFrame(np.nan, index=x.index, columns=x.columns)
-        for _, members in codes.groupby(codes):
-            cols = list(members.index)
-            out[cols] = x[cols].rank(axis=1, pct=True)
-        return out
+        # Each day inside each industry of that day; a name without one has no rank.
+        rows = x.shape[0]
+        key = (codes + np.arange(rows)[:, None] * (int(codes.max()) + 1)).ravel()
+        flat = pd.Series(np.where(codes >= 0, x.to_numpy(dtype=float), np.nan).ravel())
+        return pd.DataFrame(flat.groupby(key).rank(pct=True).to_numpy().reshape(x.shape), index=x.index, columns=x.columns)
     # Neutralize(x, [$industry], [size]): the residual of x on industry dummies and log size, each day (Frisch–Waugh, exact).
-    groups = codes if len(args) >= 2 and isinstance(args[1], pd.Series) else None
-    size = next((arg for arg in args[1:] if isinstance(arg, pd.DataFrame)), None)
+    groups = industry if any(is_labels(arg) for arg in args[1:]) else None
+    size = next((arg for arg in args[1:] if isinstance(arg, pd.DataFrame) and not is_labels(arg)), None)
     return neutralize(x, groups, None if size is None else np.log(size.where(size > 0)))
 
 
+def is_labels(value):
+    """Whether an argument is an industry (labels: one per instrument, or a table of them) rather than numbers."""
+    import pandas as pd
+    if isinstance(value, pd.Series):
+        return True
+    return isinstance(value, pd.DataFrame) and len(value.columns) > 0 and not any(pd.api.types.is_numeric_dtype(kind) for kind in value.dtypes)
+
+
+def industry_codes(industry, values):
+    """Each cell's industry as an integer, -1 where it has none, on the bars and instruments of `values`: `industry` is a table of labels
+    (each day's industry) or one label per instrument (the same every day)."""
+    import numpy as np
+    import pandas as pd
+    if isinstance(industry, np.ndarray) and np.issubdtype(industry.dtype, np.integer):
+        return np.broadcast_to(industry, values.shape)  # already coded (one table for many calls)
+    if isinstance(industry, pd.Series):
+        cells = np.broadcast_to(industry.reindex(values.columns).to_numpy(dtype=object), values.shape)
+    else:
+        cells = industry.reindex(index=values.index, columns=values.columns).to_numpy(dtype=object)
+    codes, _ = pd.factorize(np.asarray(cells, dtype=object).ravel())
+    return codes.reshape(values.shape)
+
+
 def neutralize(values, industry=None, size=None):
-    """Each day, the residual of `values` after industry dummies (`industry`: instrument → label) and a numeric exposure (`size`, same shape)."""
+    """Each day, the residual of `values` after that day's industry dummies (`industry`: a table of labels on the same bars, or one label
+    per instrument) and a numeric exposure (`size`, same shape)."""
     import numpy as np
     import pandas as pd
     y = values.to_numpy(dtype=float)
@@ -599,16 +626,16 @@ def neutralize(values, industry=None, size=None):
         x = size.reindex_like(values).to_numpy(dtype=float)
         ok &= ~np.isnan(x)
     if industry is not None:
-        labels = industry.reindex(values.columns)
-        ok &= labels.notna().to_numpy()[None, :]
-        codes, _ = pd.factorize(labels.fillna("__none__"))
-        onehot = np.zeros((len(values.columns), codes.max() + 1))
-        onehot[np.arange(len(codes)), codes] = 1.0
-        count = ok.astype(float) @ onehot
+        codes = industry_codes(industry, values)
+        ok &= codes >= 0
+        width = int(codes.max()) + 1 if (codes >= 0).any() else 1
+        cell = np.where(ok, codes + np.arange(len(values.index))[:, None] * width, 0).ravel()
+        cells = len(values.index) * width
+        count = np.bincount(cell, weights=ok.ravel().astype(float), minlength=cells)
         def demean(array):
             filled = np.where(ok, array, 0.0)
-            means = (filled @ onehot) / np.maximum(count, 1)
-            return np.where(ok, array - means[:, codes], 0.0)
+            means = np.bincount(cell, weights=filled.ravel(), minlength=cells) / np.maximum(count, 1)
+            return np.where(ok, array - means[cell].reshape(array.shape), 0.0)
     else:
         def demean(array):
             filled = np.where(ok, array, 0.0)
@@ -700,7 +727,7 @@ class _Builder:
                     args.append(self.context.industry)
                 else:
                     args.append(self.table_of(arg))
-            if node.value == "Neutralize" and len(args) == 2 and isinstance(args[1], pd.DataFrame):
+            if node.value == "Neutralize" and len(args) == 2 and isinstance(args[1], pd.DataFrame) and not is_labels(args[1]):
                 args = [args[0], None, args[1]]
                 return self.leaf(neutralize(args[0], None, _log_size(args[2])))
             return self.leaf(_cross(node.value, [a for a in args if a is not None], self.context))
@@ -791,7 +818,7 @@ def _forget(context):
 
 def apply(name, *args, industry=None):
     """One operator on wide tables (dates × instruments), for factors written in code (`talyx_quant.ops`): the formula's own implementation.
-    `industry` (instrument → label) is what IndRank ranks within when no industry is passed."""
+    `industry` (a table of labels or one per instrument) is what IndRank ranks within when no industry is passed."""
     import pandas as pd
     operator = OPERATORS.get(name)
     if operator is None:
@@ -800,14 +827,14 @@ def apply(name, *args, industry=None):
     if not tables:
         raise TypeError(f"ops.{name} needs a table of dates by instruments")
     base = tables[0]
-    given = next((arg for arg in args[1:] if isinstance(arg, pd.Series)), None)
+    given = next((arg for arg in args[1:] if is_labels(arg)), None)
     context = Context({"$x": base}, given if given is not None else industry)
     ops, feature = _qlib()
     builder = _Builder(context, ops, feature)
     try:
         if operator.kind == "cs":
             if name == "Neutralize":
-                size = next((arg for arg in args[1:] if isinstance(arg, pd.DataFrame)), None)
+                size = next((arg for arg in args[1:] if isinstance(arg, pd.DataFrame) and not is_labels(arg)), None)
                 return neutralize(args[0], given, None if size is None else _log_size(size.reindex_like(args[0])))
             return _cross(name, [args[0]], context)
         if name == "TResample":

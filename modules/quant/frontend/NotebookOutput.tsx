@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { Fragment, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import MarkdownIt from "markdown-it";
 import { TxButton, TxIcon, type Json } from "@talyx/sdk";
@@ -48,8 +49,8 @@ export const AnsiText = memo(function AnsiText({text, tone}: {text: string; tone
   const parts = long ? [lines.slice(0, HEAD_LINES).join("\n"), lines.slice(-TAIL_LINES).join("\n")] : [shown];
   return <div className="qx-nb-text" data-tone={tone}>
     <pre>{colored(parts[0])}</pre>
-    {long && <><div className="qx-nb-more"><TxButton size="sm" variant="quiet" onClick={() => setFull(true)}>Show all {lines.length.toLocaleString("en-US")} lines</TxButton>
-      <span className="qx-muted">{(lines.length - HEAD_LINES - TAIL_LINES).toLocaleString("en-US")} lines hidden</span></div>
+    {long && <><div className="qx-nb-more"><TxButton size="sm" variant="quiet" onClick={() => setFull(true)}>{t("Show all {linesCount} lines", { linesCount: lines.length.toLocaleString("en-US") })}</TxButton>
+      <span className="qx-muted">{t("{linesCount} lines hidden", { linesCount: (lines.length - HEAD_LINES - TAIL_LINES).toLocaleString("en-US") })}</span></div>
       <pre>{colored(parts[1])}</pre></>}
   </div>;
 });
@@ -69,7 +70,7 @@ export const NotebookOutput = memo(function NotebookOutput({output, onStop, live
   if (output.output_type === "error")
     return <AnsiText text={output.traceback.length ? output.traceback.join("\n") : `${output.ename}: ${output.evalue}`} tone="error" />;
   const mime = chooseMime(output.data);
-  if (mime === null) return <p className="qx-muted">Output of type {Object.keys(output.data).join(", ")} is not shown here.</p>;
+  if (mime === null) return <p className="qx-muted">{t("Output of type {type} is not shown here.", { type: Object.keys(output.data).join(", ") })}</p>;
   const value = output.data[mime];
   const text = (item: Json) => Array.isArray(item) ? item.join("") : String(item);
   // A progress line the kernel emptied when its work ended (q.data's "Reading bars: 2 of 3 names") leaves nothing behind.
@@ -84,8 +85,8 @@ export const NotebookOutput = memo(function NotebookOutput({output, onStop, live
   case "application/vnd.plotly.v1+json": return <PlotlyOutput figure={value as unknown as PlotFigure} />;
   case "text/html": return <HtmlFrame html={text(value)} />;
   case "image/png": case "image/jpeg":
-    return <img className="qx-nb-image" alt="Output" src={`data:${mime};base64,${text(value).replace(/\s/g, "")}`} width={size.width} height={size.height} />;
-  case "image/svg+xml": return <img className="qx-nb-image" alt="Output" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(text(value))}`} />;
+    return <img className="qx-nb-image" alt={t("Output")} src={`data:${mime};base64,${text(value).replace(/\s/g, "")}`} width={size.width} height={size.height} />;
+  case "image/svg+xml": return <img className="qx-nb-image" alt={t("Output")} src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(text(value))}`} />;
   case "text/markdown": return <div className="qx-nb-markdown" dangerouslySetInnerHTML={{__html: renderMarkdown(text(value))}} />;
   case "application/json": return <JsonTree value={value} />;
   default: return <AnsiText text={text(value)} />;
@@ -97,9 +98,9 @@ interface RunSummaryData {label?: string; title: string; meta: string; rows: {na
 /** What `q.run` shows: which run, then each attribute with what it holds. */
 function RunSummary({summary}: {summary: RunSummaryData}) {
   return <div className="qv-notebook-objsum">
-    <span>{summary.label ?? "Run"}</span><span><b>{summary.title}</b> <span className="qv-notebook-dim">{summary.meta}</span></span>
+    <span>{summary.label ?? t.c("run record", "Run")}</span><span><b>{summary.title}</b> <span className="qv-notebook-dim">{summary.meta}</span></span>
     {summary.rows.map(row => <Fragment key={row.name}><span>{row.name}</span><span>{row.code !== "" && <code>{row.code}</code>} {row.text}</span></Fragment>)}
-    {summary.failure !== undefined && <><span>Failure</span><span>{summary.failure}</span></>}
+    {summary.failure !== undefined && <><span>{t("Failure")}</span><span>{summary.failure}</span></>}
   </div>;
 }
 
@@ -115,9 +116,9 @@ const percent = (value: number, digits = 1) => `${value < 0 ? "−" : ""}${Math.
 function backtestStats(stats: Record<string, number>): {label: string; value: string; tone?: "up" | "down"}[] {
   const found: {label: string; value: string; tone?: "up" | "down"}[] = [];
   if (stats.cagr !== undefined) found.push({label: "CAGR", value: percent(stats.cagr), tone: stats.cagr < 0 ? "down" : "up"});
-  if (stats.sharpe !== undefined) found.push({label: "Sharpe", value: plain(stats.sharpe)});
-  if (stats.maxDrawdown !== undefined) found.push({label: "Max drawdown", value: percent(-Math.abs(stats.maxDrawdown)), tone: "down"});
-  if (stats.costsAYear !== undefined) found.push({label: "Costs a year", value: percent(-Math.abs(stats.costsAYear)), tone: "down"});
+  if (stats.sharpe !== undefined) found.push({label: t("Sharpe"), value: plain(stats.sharpe)});
+  if (stats.maxDrawdown !== undefined) found.push({label: t("Max drawdown"), value: percent(-Math.abs(stats.maxDrawdown)), tone: "down"});
+  if (stats.costsAYear !== undefined) found.push({label: t("Costs a year"), value: percent(-Math.abs(stats.costsAYear)), tone: "down"});
   return found;
 }
 
@@ -136,29 +137,34 @@ export function BacktestProgress({run, onStop, live = true}: {run: BacktestRun; 
     void readRun(run.runId).then(found => { if (!gone && ["completed", "failed", "cancelled", "stopped", "interrupted"].includes(found.state)) setEnded(found); }, reason => { if (!gone) setUnread(reason instanceof Error ? reason.message : String(reason)); });
     return () => { gone = true; };
   }, [left, readRun, run.runId]);
-  if (left && unread !== null) return <div className="qv-notebook-meta"><span>How run <b>#{run.number}</b> of <b>{run.strategy}</b> ended could not be read: {unread}</span>
-    {open !== null && run.objectId && <TxButton variant="quiet" size="sm" onClick={() => open(run.objectId!, run.runId)}>Open</TxButton>}</div>;
-  if (left && ended !== null) return <div className="qv-notebook-meta"><span>The backtest {ended.state === "completed" ? <>finished as run <b>#{run.number}</b> of <b>{run.strategy}</b></> : <>was {ended.state} (run <b>#{run.number}</b> of <b>{run.strategy}</b>)</>}</span>
-    {open !== null && <TxButton variant="quiet" size="sm" onClick={() => open(ended.objectId, run.runId)}>Open</TxButton>}</div>;
+  if (left && unread !== null) return <div className="qv-notebook-meta"><span>{t.rich("How run {number} of {strategy} ended could not be read: {unread}", { number: <b>#{run.number}</b>, strategy: <b>{run.strategy}</b>, unread: unread })}</span>
+    {open !== null && run.objectId && <TxButton variant="quiet" size="sm" onClick={() => open(run.objectId!, run.runId)}>{t.c("action", "Open")}</TxButton>}</div>;
+  if (left && ended !== null) return <div className="qv-notebook-meta"><span>{ended.state === "completed"
+    ? t.rich("The backtest finished as run {number} of {strategy}", { number: <b>#{run.number}</b>, strategy: <b>{run.strategy}</b> })
+    : t.rich("The backtest was {state} (run {number} of {strategy})", { state: t(ended.state), number: <b>#{run.number}</b>, strategy: <b>{run.strategy}</b> })}</span>
+    {open !== null && <TxButton variant="quiet" size="sm" onClick={() => open(ended.objectId, run.runId)}>{t.c("action", "Open")}</TxButton>}</div>;
   const stats = run.state === "completed" && run.stats !== undefined ? backtestStats(run.stats) : [];
   const finished = run.state === "completed";
   // The draft's second span: the data's first month and its last day, "Jan 2016 – Nov 3, 2026 · data to Nov 3".
   const day = (value: string | number | null | undefined) => { if (value === null || value === undefined || value === "") return null; const date = typeof value === "number" ? new Date(value) : new Date(`${value.slice(0, 10)}T00:00:00Z`); return Number.isNaN(date.getTime()) ? null : date; };
   const first = day(run.since), last = day(run.until);
-  const span = first === null || last === null ? null : `${mdy(first).replace(/ \d+,/, "")} – ${mdy(last)} · data to ${mdy(last).replace(/, \d+$/, "")}`;
+  const span = first === null || last === null ? null : t("{start} – {end} · data to {last}", { start: mdy(first).replace(/ \d+,/, ""), end: mdy(last), last: mdy(last).replace(/, \d+$/, "") });
   return <div className="qv-notebook-bt">
     <div className="qv-notebook-meta">{running && <span className="tx-spin" />}{finished
-      ? <><span>{run.strategy}{run.signal !== undefined && <> with <code>{run.signal}</code> as its signal</>}</span>{span !== null && <span>{span}</span>}</>
-      : <span>Backtest of <b>{run.strategy}</b>{run.signal !== undefined && <> with <code>{run.signal}</code> as its signal</>}, in the strategy environment{!running && run.number !== null ? <>, run <b>#{run.number}</b></> : null}</span>}<span className="tx-spacer" />
-      {run.state === "completed" && run.ranFor !== undefined && <span>ran {run.ranFor} s</span>}
-      {run.state === "completed" && open !== null && run.objectId && <TxButton variant="quiet" size="sm" onClick={() => open(run.objectId!, run.runId)}>Open as a run of the strategy</TxButton>}
-      {running && onStop && <TxButton variant="quiet" size="sm" onClick={onStop}><TxIcon name="stop" />Stop</TxButton>}</div>
+      ? <><span>{run.signal !== undefined ? t.rich("{strategy} with {signal} as its signal", { strategy: run.strategy, signal: <code>{run.signal}</code> }) : run.strategy}</span>{span !== null && <span>{span}</span>}</>
+      : <span>{run.signal !== undefined
+          ? t.rich("Backtest of {strategy} with {signal} as its signal, in the strategy environment", { strategy: <b>{run.strategy}</b>, signal: <code>{run.signal}</code> })
+          : t.rich("Backtest of {strategy}, in the strategy environment", { strategy: <b>{run.strategy}</b> })}
+          {!running && run.number !== null && t.rich(", run {number}", { number: <b>#{run.number}</b> })}</span>}<span className="tx-spacer" />
+      {run.state === "completed" && run.ranFor !== undefined && <span>{t("ran {ranFor} s", { ranFor: run.ranFor })}</span>}
+      {run.state === "completed" && open !== null && run.objectId && <TxButton variant="quiet" size="sm" onClick={() => open(run.objectId!, run.runId)}>{t("Open as a run of the strategy")}</TxButton>}
+      {running && onStop && <TxButton variant="quiet" size="sm" onClick={onStop}><TxIcon name="stop" />{t.c("action", "Stop")}</TxButton>}</div>
     {stats.length > 0 && <div className="qv-notebook-stats">{stats.map(item => <div key={item.label}><div className="qv-notebook-statl">{item.label}</div><div className="qv-notebook-statv" data-tone={item.tone}>{item.value}</div></div>)}</div>}
     {run.failure !== undefined && <div className="qv-notebook-failure" role="alert">{run.failure}</div>}
     {!finished && <div className="qv-notebook-steps">{run.steps.map(step => <span key={step.name} data-done={step.done ? "" : undefined} data-now={step.now && !step.done ? "" : undefined}>{step.done && <TxIcon name="check" />}{step.name}</span>)}</div>}
     {running && <div className="qv-notebook-progress"><span className="qv-notebook-bar2"><i style={{width: `${Math.round((run.value ?? 0) * 100)}%`}} /></span><b>{Math.round((run.value ?? 0) * 100)}%</b>
-      <span className="qv-notebook-dim">{run.elapsed} s{run.left === null ? "" : `, about ${run.left} s left`}</span></div>}
-    {run.equity !== undefined && <><div className="qv-notebook-meta"><span>Equity so far</span></div><PlotlyOutput figure={run.equity as unknown as PlotFigure} /></>}
+      <span className="qv-notebook-dim">{run.elapsed} s{run.left === null ? "" : t(", about {left} s left", { left: run.left })}</span></div>}
+    {run.equity !== undefined && <><div className="qv-notebook-meta"><span>{t("Equity so far")}</span></div><PlotlyOutput figure={run.equity as unknown as PlotFigure} /></>}
   </div>;
 }
 
@@ -177,13 +183,13 @@ export function ReportOutput({report}: {report: Report}) {
       <tbody>{table.rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{typeof cell === "number" ? Number(cell.toPrecision(5)) : String(cell ?? "")}</td>)}</tr>)}</tbody></table>)}
     {report.figures.map((item, index) => <PlotlyOutput key={index} figure={item.figure as unknown as PlotFigure} />)}
     {report.dropped !== undefined && <p className="qx-muted">{report.dropped}</p>}
-    {more > 0 && <p className="qx-muted">{more} more sections</p>}
+    {more > 0 && <p className="qx-muted">{t("{more} more sections", { more })}</p>}
   </div>;
 }
 
 function PlotlyOutput({figure}: {figure: PlotFigure}) {
   const title = figure.layout === undefined ? undefined : figure.layout.title;
-  const label = typeof title === "string" ? title : title !== null && typeof title === "object" && "text" in title ? String((title as {text: unknown}).text) : "Plot";
+  const label = typeof title === "string" ? title : title !== null && typeof title === "object" && "text" in title ? String((title as {text: unknown}).text) : t("Plot");
   return <div className="qx-nb-plot"><Plot figure={figure} ariaLabel={label} keepTitle /></div>;
 }
 
@@ -221,5 +227,5 @@ a{color:${token("--tx-ember-text")}}pre,code{font-family:${token("--tx-font-mono
     return () => window.removeEventListener("message", receive);
   }, []);
   return <div ref={host} className="qx-nb-html">{content !== null &&
-    <iframe ref={frame} title="Output" srcDoc={content} sandbox="allow-scripts allow-downloads" style={{height}} />}</div>;
+    <iframe ref={frame} title={t("Output")} srcDoc={content} sandbox="allow-scripts allow-downloads" style={{height}} />}</div>;
 }

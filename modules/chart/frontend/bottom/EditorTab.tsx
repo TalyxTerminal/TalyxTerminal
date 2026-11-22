@@ -1,3 +1,5 @@
+import { displayIndicator } from "../indicatorText";
+import { t } from "../i18n";
 /* The editor tab (TradingView's script editor): one of the user's indicators in Developer's project editor, a picker of
    them and New indicator on top, Add to chart. Developer owns the text, saving and Python editing; Chart marks where its
    own run of the script failed (loading it in the catalog, or an instance on the active chart). A built-in's code opens
@@ -47,7 +49,7 @@ export function EditorTab({ ctx, panelId }: { ctx: ModuleContext; panelId: strin
 
   useEffect(() => {
     if (!folder) return;
-    developer["projects.open"]({ directory: folder, name: "Indicators" })
+    developer["projects.open"]({ directory: folder, name: t("Indicators") })
       .then(opened => setProject({ projectId: opened.projectId, rootUri: opened.rootUri }), error => setProblem(message(error)));
   }, [developer, folder]);
   // One `on` for the life of the tab (a new object each render would remount the view). A save shows in the catalog.
@@ -65,9 +67,9 @@ export function EditorTab({ ctx, panelId }: { ctx: ModuleContext; panelId: strin
 
   // Where Chart's run of this script failed: loading it, and its instances on the active chart.
   const failures = script ? [
-    ...(script.error ? [{ message: script.error, line: script.line ?? null, source: "Load" }] : []),
+    ...(script.error ? [{ message: script.error, line: script.line ?? null, source: t("Load") }] : []),
     ...(chart?.chart?.document.indicators ?? []).filter(item => item.definition.source === "user" && item.definition.id === script.id)
-      .flatMap(item => chart!.indicatorErrors[item.id] ? [{ message: chart!.indicatorErrors[item.id].message, line: chart!.indicatorErrors[item.id].line ?? null, source: "Chart" }] : []),
+      .flatMap(item => chart!.indicatorErrors[item.id] ? [{ message: chart!.indicatorErrors[item.id].message, line: chart!.indicatorErrors[item.id].line ?? null, source: t("Chart") }] : []),
   ] : [];
   const markers: Mark[] = file ? failures.flatMap(failure => failure.line ? [{ uri: file, line: failure.line, severity: "error" as const, message: failure.message, source: failure.source }] : []) : [];
   const unplaced = failures.find(failure => !failure.line);
@@ -104,7 +106,7 @@ export function EditorTab({ ctx, panelId }: { ctx: ModuleContext; panelId: strin
       const change = changes.current.get(file!);
       if (change?.dirty) {
         const saved = await developer["documents.save"]({ documentId: change.documentId, expectedVersion: change.version });
-        if (saved.status !== "saved" && saved.status !== "clean") throw new Error(saved.message ?? `Not saved (${saved.status})`);
+        if (saved.status !== "saved" && saved.status !== "clean") throw new Error(saved.message ?? t("Not saved ({status})", { status: saved.status }));
       }
       await refreshCatalog(ctx);
       const entry = store.getState().catalog!.find(item => item.source === "user" && item.id === script!.id)!;
@@ -113,29 +115,29 @@ export function EditorTab({ ctx, panelId }: { ctx: ModuleContext; panelId: strin
     setBusy(false);
   };
 
-  const picker = <TxMenu label="Indicators" items={[
+  const picker = <TxMenu label={t("Indicators")} items={[
     ...scripts.map(entry => ({ id: entry.id, label: entry.title, checked: entry.id === script?.id, onSelect: () => setUi(panelId, { script: { source: "user", id: entry.id } }) })),
-    { id: "new", label: "New indicator…", icon: "plus" as const, separated: scripts.length > 0, onSelect: () => setNaming("") },
-  ]} trigger={<TxButton variant="tool" size="sm" className="chart-bottom-title">{builtin?.title ?? script?.title ?? "Indicators"}<TxIcon name="chevron-down" /></TxButton>} />;
+    { id: "new", label: t("New indicator…"), icon: "plus" as const, separated: scripts.length > 0, onSelect: () => setNaming("") },
+  ]} trigger={<TxButton variant="tool" size="sm" className="chart-bottom-title">{builtin ? displayIndicator(builtin).title : script?.title ?? t("Indicators")}<TxIcon name="chevron-down" /></TxButton>} />;
 
   return <div className="chart-bottom-body">
-    <div className="chart-bottom-toolbar" role="toolbar" aria-label="Editor">
+    <div className="chart-bottom-toolbar" role="toolbar" aria-label={t("Editor")}>
       {picker}
       {(problem || unplaced) && <span className="chart-alert-error" role="alert">{problem ?? unplaced!.message}</span>}
       <span className="chart-tb-spacer" />
-      {builtin && <TxButton size="sm" loading={busy} disabled={!project} onClick={() => void makeCopy()}>Make a copy</TxButton>}
-      {script && <TxButton size="sm" loading={busy} disabled={!file} onClick={() => void addToChart()}>Add to chart</TxButton>}
+      {builtin && <TxButton size="sm" loading={busy} disabled={!project} onClick={() => void makeCopy()}>{t("Make a copy")}</TxButton>}
+      {script && <TxButton size="sm" loading={busy} disabled={!file} onClick={() => void addToChart()}>{t("Add to chart")}</TxButton>}
     </div>
     {builtinProps
       ? <div className="chart-bottom-view"><ModuleView id="developer.editor" context={ctx} props={builtinProps as unknown as Json} /></div>
       : project && file
       ? <div className="chart-bottom-view"><ModuleView id="developer.project_editor" context={ctx} on={listeners}
-          props={{ rootUri: project.rootUri, projectId: project.projectId, treeTitle: "My indicators", file, tree: false, markers } as unknown as Json} /></div>
-      : catalog !== null && !scripts.length && <TxEmpty title="No indicators of your own yet" action={<TxButton size="sm" onClick={() => setNaming("")}><TxIcon name="plus" />New indicator</TxButton>} />}
-    {naming !== null && <TxDialog open onOpenChange={value => { if (!value) setNaming(null); }} title="New indicator"
-      footer={<><span className="chart-tb-spacer" /><TxButton size="sm" onClick={() => setNaming(null)}>Cancel</TxButton>
-        <TxButton size="sm" variant="primary" loading={busy} disabled={!naming.trim() || !project} onClick={() => void create()}>Create</TxButton></>}>
-      <TxInput aria-label="Indicator name" placeholder="Indicator name" autoFocus value={naming} onChange={event => setNaming(event.target.value)}
+          props={{ rootUri: project.rootUri, projectId: project.projectId, treeTitle: t("My indicators"), file, tree: false, markers } as unknown as Json} /></div>
+      : catalog !== null && !scripts.length && <TxEmpty title={t("No indicators of your own yet")} action={<TxButton size="sm" onClick={() => setNaming("")}><TxIcon name="plus" />{t("New indicator")}</TxButton>} />}
+    {naming !== null && <TxDialog open onOpenChange={value => { if (!value) setNaming(null); }} title={t("New indicator")}
+      footer={<><span className="chart-tb-spacer" /><TxButton size="sm" onClick={() => setNaming(null)}>{t("Cancel")}</TxButton>
+        <TxButton size="sm" variant="primary" loading={busy} disabled={!naming.trim() || !project} onClick={() => void create()}>{t("Create")}</TxButton></>}>
+      <TxInput aria-label={t("Indicator name")} placeholder={t("Indicator name")} autoFocus value={naming} onChange={event => setNaming(event.target.value)}
         onKeyDown={event => { if (event.key === "Enter" && naming.trim() && project) void create(); }} />
     </TxDialog>}
   </div>;

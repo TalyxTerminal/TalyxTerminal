@@ -45,9 +45,9 @@ describe("A strategy's settings column", () => {
     expect(html({view: view("perpetual")})).not.toContain('aria-label="Ticks"');
   });
   it("measure against: the benchmark kinds of what is traded, the risk-free choices, and the average of the shown run", () => {
-    const stock = html({view: view("stock", {benchmark: {kind: "beta"}}), riskFreeMean: 4.12});
-    for (const word of ["Cash + β × S&amp;P 500", "S&amp;P 500 equal weight", "None", "T-bill (^IRX)", "Zero", "Fixed…", "avg 4.12%"]) expect(stock).toContain(word);
-    expect(html({view: view("perpetual")})).toContain("BTC buy and hold");
+    const stock = html({view: view("stock", {benchmark: {kind: "symbol", symbol: "CN:000300.SH"}}), riskFreeMean: 4.12});
+    for (const word of ["Symbol", "CN:000300.SH", "Members, equal weight", "None", "T-bill (^IRX)", "Zero", "Fixed…", "avg 4.12%"]) expect(stock).toContain(word);
+    expect(html({view: view("perpetual")})).toContain("Buy and hold");
     expect(html({view: view("perpetual", {riskFree: {basis: "fixed", pct: 3}})})).toContain("% a year");
   });
   it("several venues become a small table of balances and the currency it is reported in", () => {

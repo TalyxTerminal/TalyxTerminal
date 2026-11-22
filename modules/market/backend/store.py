@@ -26,6 +26,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -286,8 +287,10 @@ class SeriesStore:
             old = self.pointer(key) or {"revision": 0, "source": None, "spans": [], "parts": {}, "rows": 0,
                                         "bytes": 0, "first": None, "last": None}
             if source is not None and old["source"] is not None and old["source"] != source and old["parts"]:
-                raise MarketError("invalid_input", "A series holds one source's rows; switch sources by replacing it")
+                raise MarketError("invalid_input", t("A series holds one source's rows; switch sources by replacing it"))
             pointer = json.loads(json.dumps(old))
+            if source is not None and old["source"] != source and not old["parts"]:
+                pointer.update(spans=[], unavailable=[])
             changed = False
             stale = []
             if columns and bars.length(columns):
@@ -328,6 +331,15 @@ class SeriesStore:
             if changed and self.on_commit:
                 self.on_commit(key, pointer)
             return pointer
+
+    def switch_source(self, key: SeriesKey, columns: bars.Columns, spans: list[list], source: str) -> bool:
+        """Keep the current series unless every stored timestamp has a replacement."""
+        with self.lock(key):
+            held = self.read(key)["time"]
+            if not np.isin(held, columns["time"], assume_unique=True).all():
+                return False
+            self.replace(key, columns, spans, source)
+            return True
 
     def replace(self, key: SeriesKey, columns: bars.Columns, spans: list[list], source: str) -> dict:
         """Swap the whole series to another source's rows in one pointer replace."""
@@ -440,7 +452,7 @@ class SeriesStore:
             pq.write_table(table, path, compression="zstd")
         except OSError as exc:
             if getattr(exc, "errno", None) == 28 or "No space" in str(exc) or "not enough space" in str(exc):
-                raise MarketError("disk_full", "The disk is full; Market stopped writing") from exc
+                raise MarketError("disk_full", t("The disk is full; Market stopped writing")) from exc
             raise
 
 

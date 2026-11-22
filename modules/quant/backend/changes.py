@@ -10,6 +10,7 @@ from contextvars import ContextVar
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .workspace import directories
 
@@ -148,7 +149,7 @@ async def revert(app, call_id, direction):
     children = records.db.execute("SELECT workspace,child FROM child_changes WHERE parent=? ORDER BY rowid",
                                   (call_id,)).fetchall()
     if not rows and not children:
-        raise ContractError("not_found", "Quant has no restorable change for this call.")
+        raise ContractError("not_found", t("Quant has no restorable change for this call."))
 
     async def child_changes():
         for ws, child in reversed(children) if undo else children:

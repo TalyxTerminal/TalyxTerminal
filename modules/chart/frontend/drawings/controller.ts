@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* The pointer on one chart's drawings: hover, select, make, drag.
    It listens on the chart element in the capture phase: a press on a drawing (or with a tool armed) is stopped so the engine
    does not pan; moves are never stopped, so the crosshair keeps following. A drag is a local preview; only the release
@@ -42,7 +43,7 @@ export interface DrawingOptions { magnet: Magnet; keepDrawing: boolean }
 type Drag = { layer: DrawingLayer; pane: number; id: string; handle: number | null; x0: number; y0: number; original: Drawing; pixels: { x: number; y: number }[]; moved: boolean };
 type Making = { layer: DrawingLayer; pane: PaneHit; drawing: Drawing; placed: number; pressed: boolean };
 
-const DEFAULT_TEXT = "Text";
+const DEFAULT_TEXT = t("Text");
 let sequence = 0;
 const newId = () => `d${Date.now().toString(36)}${(sequence++).toString(36)}`;
 
@@ -149,7 +150,7 @@ export class DrawingController {
       }
       const drawing: Drawing = {
         id: newId(), tool, points, paneId: hit.paneId,
-        text: contract.text === "required" ? DEFAULT_TEXT : null, style: {}, settings: {}, visibility: {}, locked: false, visible: true,
+        text: contract.textMode === "required" ? DEFAULT_TEXT : null, style: {}, settings: {}, visibility: {}, locked: false, visible: true,
       };
       this.making = { layer, pane: hit, drawing, placed: 1, pressed };
       if (count === 1 || position) { this.finish(); return; }
@@ -195,7 +196,7 @@ export class DrawingController {
     making.layer.setPreview(drawing);
     const added = this.events.commit([{ type: "drawing.add", value: drawing }]);
     // TradingView: a text tool is typed into as soon as it is down.
-    if (overlayTool(drawing.tool).text === "required") void added.then(done => { if (done) this.events.open(drawing.id, "text"); });
+    if (overlayTool(drawing.tool).textMode === "required") void added.then(done => { if (done) this.events.open(drawing.id, "text"); });
     this.events.select(drawing.id);
     if (!this.options.keepDrawing) { this.tool = null; this.surface.element.style.cursor = ""; }
     this.events.toolDone();

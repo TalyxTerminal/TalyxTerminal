@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TxButton, TxEmpty, TxStatus, TxTabs } from "@talyx/sdk";
 import type * as Monaco from "monaco-editor";
@@ -45,12 +46,12 @@ export function EditorPane({ onReviewChanges, onError }: { onReviewChanges(): vo
   const snapshot = active ? documents.snapshot(active) : null, review = active ? documents.review(active) : null;
   return <div className="developer-editor-pane">
     {documents.tabs.length > 0 && <div className="developer-tabs">
-      <TxTabs closable label="Open files" value={active ?? ""} onChange={id => documents.show(id)} onClose={id => documents.requestCloseTab(id)}
+      <TxTabs closable label={t("Open files")} value={active ?? ""} onChange={id => documents.show(id)} onClose={id => documents.requestCloseTab(id)}
         options={documents.tabs.map(id => ({ value: id, label: label(id), title: documents.snapshot(id).uri, dirty: documents.isDirty(id) }))} />
     </div>}
-    {review && <div className="developer-editor-notice"><TxStatus tone="review" label={review} /><span>{active && documents.entries.get(active)?.other ? "Your edits and the other version are both kept." : "Your unsaved edits and the disk version are both kept."}</span><TxButton size="sm" onClick={onReviewChanges}>Review</TxButton></div>}
-    {snapshot?.readOnly && <div className="developer-editor-notice"><TxStatus tone="off" label="Read only" /></div>}
+    {review && <div className="developer-editor-notice"><TxStatus tone="review" label={review} /><span>{active && documents.entries.get(active)?.other ? t("Your edits and the other version are both kept.") : t("Your unsaved edits and the disk version are both kept.")}</span><TxButton size="sm" onClick={onReviewChanges}>{t("Review")}</TxButton></div>}
+    {snapshot?.readOnly && <div className="developer-editor-notice"><TxStatus tone="off" label={t("Read only")} /></div>}
     <div ref={host} className="developer-editor-host" hidden={!active} />
-    {!active && <TxEmpty title="No file open" text="Choose a file in the project tree, or open the project in VS Code." />}
+    {!active && <TxEmpty title={t("No file open")} text={t("Choose a file in the project tree, or open the project in VS Code.")} />}
   </div>;
 }

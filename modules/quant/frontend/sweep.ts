@@ -1,8 +1,7 @@
 /* A parameter sweep as the parameter row sets it up: which number parameters vary, over which from / to / step, and how many backtests that makes. */
+import { t } from "./i18n";
 import { plain, type Parameter, type ParamValue, type SweepRange } from "./objects";
 
-/** Mirrors backend/object_sweeps.py: a sweep runs at most this many combinations. */
-export const MAX_CASES = 200;
 export interface SweepField extends SweepRange { on: boolean }
 export type SweepFields = Record<string, SweepField>;
 
@@ -15,10 +14,10 @@ const decimals = (value: number) => {
 
 /** How many values one range gives, counted as the backend does (from, from + step, … up to `to`, decimal steps exact), or why it gives none. */
 export function rangeCount(name: string, type: "int" | "float", range: SweepRange): {count: number} | {error: string} {
-  if (![range.from, range.to, range.step].every(Number.isFinite)) return {error: `${name}: enter numbers`};
-  if (range.step <= 0) return {error: `${name}: the step must be above zero`};
-  if (range.to < range.from) return {error: `${name}: "to" is below "from"`};
-  if (type === "int" && !(Number.isInteger(range.from) && Number.isInteger(range.step))) return {error: `${name}: from and step must be whole numbers`};
+  if (![range.from, range.to, range.step].every(Number.isFinite)) return {error: t("{label}: enter numbers", { label: name })};
+  if (range.step <= 0) return {error: t("{label}: the step must be above zero", { label: name })};
+  if (range.to < range.from) return {error: t("{label}: \"to\" is below \"from\"", { label: name })};
+  if (type === "int" && !(Number.isInteger(range.from) && Number.isInteger(range.step))) return {error: t("{label}: from and step must be whole numbers", { label: name })};
   const scale = 10 ** Math.max(decimals(range.from), decimals(range.to), decimals(range.step));
   const [first, last, step] = [range.from, range.to, range.step].map(value => Math.round(value * scale));
   return {count: Math.floor((last - first) / step) + 1};
@@ -42,12 +41,11 @@ export function sweepPlan(parameters: Parameter[], fields: SweepFields): {ranges
     const {from, to, step} = fields[parameter.name];
     const counted = rangeCount(parameter.label, parameter.type as "int" | "float", {from, to, step});
     if ("error" in counted) return {ranges, total: 0, error: counted.error};
-    if (parameter.min !== null && from < parameter.min) return {ranges, total: 0, error: `${parameter.label}: at least ${plain(parameter.min)}`};
-    if (parameter.max !== null && from + (counted.count - 1) * step > parameter.max + 1e-9) return {ranges, total: 0, error: `${parameter.label}: at most ${plain(parameter.max)}`};
+    if (parameter.min !== null && from < parameter.min) return {ranges, total: 0, error: t("{label}: at least {min}", { label: parameter.label, min: plain(parameter.min) })};
+    if (parameter.max !== null && from + (counted.count - 1) * step > parameter.max + 1e-9) return {ranges, total: 0, error: t("{label}: at most {max}", { label: parameter.label, max: plain(parameter.max) })};
     ranges[parameter.name] = {from, to, step};
     total *= counted.count;
   }
-  if (!ticked.length) return {ranges, total, error: "Tick at least one parameter to sweep"};
-  if (total > MAX_CASES) return {ranges, total, error: `${total} backtests; at most ${MAX_CASES}`};
+  if (!ticked.length) return {ranges, total, error: t("Tick at least one parameter to sweep")};
   return {ranges, total, error: null};
 }

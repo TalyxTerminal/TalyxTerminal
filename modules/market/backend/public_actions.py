@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from talyx_sdk.i18n import t
+
 from . import calendars, library
 from .common import MarketError
 from .public_data import PublicData, columns, iso, local_day, make_series
@@ -41,7 +43,7 @@ def table_page(entries, request):
         if not fits({**result, "nextCursor": str(start + len(result["rows"]))}):
             result["rows"].pop()
             if not result["rows"]:
-                raise MarketError("too_large", "The first row does not fit a page")
+                raise MarketError("too_large", t("The first row does not fit a page"))
             break
     end = start + len(result["rows"])
     result["nextCursor"] = str(end) if end < len(entries) else None
@@ -77,7 +79,7 @@ class PublicActions(PublicData):
         params = {"limit": 48, **request}
         identity = params.pop("instrumentId")
         if params["series"]["instrumentId"] != identity:
-            raise MarketError("invalid_input", "series.instrumentId must match instrumentId")
+            raise MarketError("invalid_input", t("series.instrumentId must match instrumentId"))
         params["instrument"] = {"instrumentId": identity}
         if params.get("end") is not None:
             params["end"] = str(int(params["end"]) + 1)
@@ -99,7 +101,7 @@ class PublicActions(PublicData):
             if request.get("start") or request.get("end"):
                 if not (request.get("start") and request.get("end")):
                     raise MarketError(
-                        "invalid_input", "Stock execution materials require start and end"
+                        "invalid_input", t("Stock execution materials require start and end")
                     )
                 value.update(
                     series=[entry.get("series") or make_series(record, {}).to_dict()],
@@ -172,8 +174,8 @@ class PublicActions(PublicData):
                         "symbol": self.spelling(record),
                         "name": record.get("name"),
                         "source": index["source"],
-                        "start": local_day(index["start"], "24_7"),
-                        "end": local_day(index["end"], "24_7"),
+                        "start": local_day(index["start"], record["calendarId"]),
+                        "end": local_day(index["end"], record["calendarId"]),
                         "pointInTime": index["pointInTime"],
                         "note": index["note"],
                     }
@@ -192,7 +194,7 @@ class PublicActions(PublicData):
         }
         params["kind"] = request["data"]
         if ("metrics" in request or "periodKinds" in request) and request["data"] != "financials":
-            raise MarketError("invalid_input", "metrics and periodKinds apply only to financials")
+            raise MarketError("invalid_input", t("metrics and periodKinds apply only to financials"))
         records = [await self.record(s) for s in request.get("symbols", [])]
         if request.get("index"):
             index = await self.record(request["index"]["symbol"])
@@ -240,7 +242,7 @@ class PublicActions(PublicData):
             for key in ("exDate", "recordDate", "payDate", "periodEnd", "date", "from", "until"):
                 if row.get(key) and str(row[key]).isdigit():
                     if request["data"] == "members":
-                        row[key] = local_day(int(row[key]) - int(key == "until"), "24_7")
+                        row[key] = local_day(int(row[key]) - int(key == "until"), calendar)
                     else:
                         row[key] = local_day(row[key], zone)
             for key in ("from", "until"):
@@ -255,7 +257,7 @@ class PublicActions(PublicData):
         )
         result = {
             "data": request["data"],
-            "columns": columns(fields),
+            "columns": columns(fields, {"weight": "percent"}),
             "rows": [],
             "nextCursor": page["nextCursor"],
             "total": page["total"],
@@ -273,7 +275,7 @@ class PublicActions(PublicData):
                 break
         if not fits(result) or rows and not result["rows"]:
             raise MarketError(
-                "too_large", "Research metadata is too large for a page; narrow the selection"
+                "too_large", t("Research metadata is too large for a page; narrow the selection")
             )
         return result
 
@@ -339,13 +341,13 @@ class PublicActions(PublicData):
             params["instrument"] = await self.record(params.pop("symbol"))
         if "materialId" in params:
             if not params.get("version"):
-                raise MarketError("invalid_input", "Reading a material requires version")
+                raise MarketError("invalid_input", t("Reading a material requires version"))
             if "kind" in params or "sourceId" in params:
-                raise MarketError("invalid_input", "kind and sourceId filter the material list")
+                raise MarketError("invalid_input", t("kind and sourceId filter the material list"))
             page = await self.market.professional.read(params)
         else:
             if "version" in params or "quoteType" in params:
-                raise MarketError("invalid_input", "version and quoteType require a materialId")
+                raise MarketError("invalid_input", t("version and quoteType require a materialId"))
             page = await self.market.professional.list(params)
         page["nextCursor"] = page.pop("nextAfter")
         del page["hasMore"]
@@ -355,7 +357,7 @@ class PublicActions(PublicData):
         data = request.get("data")
         if request.get("series"):
             if data is not None:
-                raise MarketError("invalid_input", "Exact series already specify the data to fetch")
+                raise MarketError("invalid_input", t("Exact series already specify the data to fetch"))
             targets = []
             data = []
             for entry in request["series"]:
@@ -386,7 +388,7 @@ class PublicActions(PublicData):
                 for s in request["symbols"]
             ]
         if not data:
-            raise MarketError("invalid_input", "Supply data to download, or exact series")
+            raise MarketError("invalid_input", t("Supply data to download, or exact series"))
         params = {
             "targets": targets,
             "kinds": data,
@@ -426,7 +428,7 @@ class PublicActions(PublicData):
                     break
                 summaries.append(row)
             if not summaries and start < len(records):
-                raise MarketError("too_large", "Download summary exceeds the page size")
+                raise MarketError("too_large", t("Download summary exceeds the page size"))
             end = start + len(summaries)
             return {"jobs": summaries, "nextCursor": str(end) if end < len(records) else None}
         return await jobs.control(op["op"], op["jobId"], workspace_id)
@@ -436,7 +438,7 @@ class PublicActions(PublicData):
         if request.get("series"):
             if request.get("data") or request.get("timeframe"):
                 raise MarketError(
-                    "invalid_input", "Exact series already specify the data and timeframe"
+                    "invalid_input", t("Exact series already specify the data and timeframe")
                 )
             for entry in request["series"]:
                 record = await self.record(entry["instrumentId"])

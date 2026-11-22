@@ -18,6 +18,7 @@ from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.tools import StructuredTool
 from langgraph.errors import GraphBubbleUp
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .children import CHILD
 from .profile import model_tools
@@ -81,7 +82,7 @@ class ToolExecutor:
     def show_steps(self):
         runtime = self.turn.get("childRunId", self.turn["id"])
         self.service.runtime_card(self.turn, {"id": "process_" + runtime, "type": "process_group",
-                                             "title": "Working", "steps": list(self.steps().values())})
+                                             "title": t("Working"), "steps": list(self.steps().values())})
 
     async def invoke(self, action, arguments, *, tool_call=None):
         """Run the call once: replayed at a saved boundary, it answers what the recorded call did."""
@@ -101,18 +102,18 @@ class ToolExecutor:
                 if previous["state"] == "completed":
                     return await self._current(previous["response"])
                 if previous["error"] is None:
-                    return {"status": "unknown", "callId": previous["callId"], "message": "The previous call was dispatched; inspect its original status before retrying"}
+                    return {"status": "unknown", "callId": previous["callId"], "message": t("The previous call was dispatched; inspect its original status before retrying")}
                 return {"error": previous["error"], "callId": previous["callId"]}
         return await self._dispatch(action, arguments, tool_call)
 
     def _check_running(self):
         if self.store.turn(self.turn["id"])["state"] == "stopping" or "childRunId" in self.turn and self.turn["childRunId"] in self.service.children.stopping:
-            raise ContractError("cancelled", "This work is stopping; no new operation was submitted", execution="not_started", effects="none")
+            raise ContractError("cancelled", t("This work is stopping; no new operation was submitted"), execution="not_started", effects="none")
 
     async def _dispatch(self, action, arguments, tool_call):
         self._check_running()
         if action not in self.tools:
-            raise ContractError("unknown_capability", f"{action} is not among this conversation's tools")
+            raise ContractError("unknown_capability", t("{action} is not among this conversation's tools", action=action))
         item = self.tools[action]
         call_id = "call_" + uuid4().hex
         self.store.call(self.turn["id"], tool_call, call_id, action, arguments, child_run_id=self.turn.get("childRunId"))
@@ -126,7 +127,7 @@ class ToolExecutor:
         steps[tool_call] = step
 
         def process():
-            self.service.runtime_card(self.turn, {"id": card_id, "type": "process_group", "title": "Working", "steps": list(steps.values())})
+            self.service.runtime_card(self.turn, {"id": card_id, "type": "process_group", "title": t("Working"), "steps": list(steps.values())})
         process()
         try:
             receipt = await self.service.ai_call(self.turn, action, arguments)
@@ -198,7 +199,7 @@ class FixedTools(AgentMiddleware):
 
         async def read(name):
             if name not in catalog:
-                raise ContractError("unknown_capability", f"No action {name}; find actions with talyx_find_actions")
+                raise ContractError("unknown_capability", t("No action {name}; find actions with talyx_find_actions", name=name))
             item = catalog[name]
             detail = await self.service.ctx.call("platform.ai.catalog", {"action": name})
             return encode({"name": name, "outputFields": detail["outputFields"], "description": item["description"], "effects": item["effects"],

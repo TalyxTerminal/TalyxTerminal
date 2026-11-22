@@ -19,6 +19,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from vocabulary.python.types import FileRef
 
@@ -40,7 +41,7 @@ COMPUTE_SECONDS = 120.0  # an indicator's first output on it
 def workspace_of(call_ctx) -> str:
     workspace = call_ctx.workspace_id
     if not workspace:
-        raise ContractError("invalid_input", "Chart's actions act in a workspace; this call names none")
+        raise ContractError("invalid_input", t("Chart's actions act in a workspace; this call names none"))
     return workspace
 
 
@@ -55,7 +56,7 @@ def ms_of(text: str, field: str) -> int:
     try:
         moment = datetime.fromisoformat(text.strip().replace("Z", "+00:00"))
     except ValueError as error:
-        raise ContractError("invalid_input", f"{field}: not an ISO-8601 date or time: {text}") from error
+        raise ContractError("invalid_input", t("{field}: not an ISO-8601 date or time: {text}", field=field, text=text)) from error
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=UTC)
     return int(moment.timestamp() * 1000)
@@ -71,7 +72,7 @@ def decode_cursor(text: str | None) -> dict:
     try:
         return json.loads(base64.urlsafe_b64decode(text.encode()))
     except ValueError as error:
-        raise ContractError("invalid_input", "Unknown cursor") from error
+        raise ContractError("invalid_input", t("Unknown cursor")) from error
 
 
 def characters(value) -> int:
@@ -91,8 +92,7 @@ def fitted(build, count: int, limit: int = READ_LIMIT) -> dict:
             low = middle
         else:
             high = middle - 1
-    raise ContractError("too_large", f"The answer is over {limit} characters; ask again with limit={low} "
-                                     f"(the same cursor continues from the same place)",
+    raise ContractError("too_large", t("The answer is over {limit} characters; ask again with limit={low} (the same cursor continues from the same place)", limit=limit, low=low),
                         {"limitCharacters": limit, "fits": low}, execution="failed")
 
 
@@ -128,7 +128,7 @@ def indicator_ref(item: dict, catalog) -> dict:
     for ref in catalog.refs():  # built-ins come first when the caller only gives a name
         if ref["id"] == name and (not item.get("source") or ref["source"] == item["source"]):
             return ref
-    raise ContractError("not_found", f"No indicator {name} with that source; read_indicator lists them")
+    raise ContractError("not_found", t("No indicator {name} with that source; read_indicator lists them", name=name))
 
 
 # ── read_chart ──
@@ -170,11 +170,11 @@ async def read_chart(app, value: dict, call_ctx) -> dict:
         return fitted(lambda size: {"view": "list", "charts": charts}, len(charts))
     if value["view"] == "layer":
         if not value.get("chartId") or not value.get("layerId"):
-            raise ContractError("invalid_input", "view=layer needs chartId and layerId")
+            raise ContractError("invalid_input", t("view=layer needs chartId and layerId"))
         layer = await app.stored_layer(workspace, wire.LayerRead(chartId=value["chartId"], id=value["layerId"]))
         return await asyncio.to_thread(exports.research_snapshot, app.export_folder, layer, DATA_LIMIT)
     if not value.get("chartId"):
-        raise ContractError("invalid_input", "view=one needs chartId")
+        raise ContractError("invalid_input", t("view=one needs chartId"))
     entry = app.charts.entry(workspace, value["chartId"])
     document = entry.document
     head = {"view": "one", "chart": chart_summary(app, entry),
@@ -206,7 +206,7 @@ async def first_output(app, feed, ref: dict, params: dict) -> dict:
     try:
         return await asyncio.wait_for(asyncio.shield(done), COMPUTE_SECONDS)
     except TimeoutError:
-        return {"op": "error", "code": "timeout", "message": f"No output within {COMPUTE_SECONDS:.0f} seconds", "line": None}
+        return {"op": "error", "code": "timeout", "message": t("No output within {COMPUTE_SECONDS} seconds", COMPUTE_SECONDS=f'{COMPUTE_SECONDS:.0f}'), "line": None}
     finally:
         app.indicators.detach(feed, instance, listener)
 
@@ -219,8 +219,7 @@ async def window_of(app, instrument: dict, series: dict, chart_type: str, projec
                                                       whole=latest_rows is None, latest_rows=latest_rows,
                                                       window_of=chart_window), READY_SECONDS)
     except TimeoutError:
-        raise ContractError("unavailable", f"Market sent no whole window for this series within {READY_SECONDS:.0f} "
-                                           "seconds", execution="failed") from None
+        raise ContractError("unavailable", t("Market sent no whole window for this series within {READY_SECONDS} seconds", READY_SECONDS=f'{READY_SECONDS:.0f}'), execution="failed") from None
 
 
 def indicator_failure(error: ContractError) -> dict:
@@ -236,7 +235,7 @@ async def read_data(app, value: dict, call_ctx) -> dict:
         wanted = [(item.id, item.definition.model_dump(), item.params) for item in document.indicators]
     else:
         if not value.get("symbol") or not value.get("timeframe"):
-            raise ContractError("invalid_input", "Give chartId, or symbol and timeframe")
+            raise ContractError("invalid_input", t("Give chartId, or symbol and timeframe"))
         instrument = await resolve(app, value["symbol"])
         series = app.market.default_series(instrument, value["timeframe"])
         chart_type, projection = "candles", None
@@ -254,7 +253,7 @@ async def read_data(app, value: dict, call_ctx) -> dict:
         if visible:
             if value.get("chartId"):
                 continue  # a reading has no visible range
-            raise ContractError("unsupported", f"{ref['id']} reads the chart's visible range, so it runs on charts only")
+            raise ContractError("unsupported", t("{id} reads the chart's visible range, so it runs on charts only", id=ref['id']))
         outputs[indicator_id] = (ref, params, None)
     needs_history = any(message is None for _, _, message in outputs.values())
     limit = min(int(value.get("limit", 100)), 500)
@@ -298,7 +297,7 @@ async def read_data(app, value: dict, call_ctx) -> dict:
     if value.get("columns"):
         unknown = [name for name in value["columns"] if name not in columns]
         if unknown:
-            raise ContractError("invalid_input", f"Unknown columns {unknown}; this read has {chosen}")
+            raise ContractError("invalid_input", t("Unknown columns {unknown}; this read has {chosen}", unknown=unknown, chosen=chosen))
         chosen = ["time", *[name for name in value["columns"] if name != "time"]]
     before = decode_cursor(value.get("cursor")).get("before")
     end = bisect_left(times, ms_of(before, "cursor")) if before else len(times)
@@ -346,13 +345,11 @@ async def edit_commands(app, document, changes: list[dict]) -> tuple[list[dict],
                 patch["paneId"] = change["paneId"]
             if change.get("id") in indicators:
                 if "name" in change and change["name"] != indicators[change["id"]].definition.id:
-                    raise ContractError("invalid_input", f"Indicator {change['id']} is "
-                                                         f"{indicators[change['id']].definition.id}; add a new one "
-                                                         "for another indicator")
+                    raise ContractError("invalid_input", t("Indicator {id} is {id2}; add a new one for another indicator", id=change['id'], id2=indicators[change['id']].definition.id))
                 commands.append({"type": "indicator.update", "id": change["id"], "patch": patch})
                 continue
             if "name" not in change:
-                raise ContractError("invalid_input", "A new indicator needs its name")
+                raise ContractError("invalid_input", t("A new indicator needs its name"))
             ref = indicator_ref(change, app.catalog)
             indicator_id = change.get("id") or new_id("indicator")
             if "paneId" not in patch:
@@ -362,7 +359,7 @@ async def edit_commands(app, document, changes: list[dict]) -> tuple[list[dict],
             added["indicators"].append(indicator_id)
         elif kind == "layer":
             if "layer" not in change:
-                raise ContractError("invalid_input", "kind=layer needs a research layer")
+                raise ContractError("invalid_input", t("kind=layer needs a research layer"))
             commands.append({"type": "layer.set", "layer": change["layer"]})
         elif kind == "drawing":
             fields = {key: change[key] for key in ("text", "style", "settings", "locked", "visible", "paneId")
@@ -376,7 +373,7 @@ async def edit_commands(app, document, changes: list[dict]) -> tuple[list[dict],
                 commands.append({"type": "drawing.update", "id": change["id"], "patch": fields})
                 continue
             if "tool" not in change:
-                raise ContractError("invalid_input", "A new drawing needs its tool and points")
+                raise ContractError("invalid_input", t("A new drawing needs its tool and points"))
             drawing_id = change.get("id") or new_id("d")
             commands.append({"type": "drawing.add", "value": {"id": drawing_id, "tool": change["tool"], **fields}})
             added["drawings"].append(drawing_id)
@@ -387,7 +384,7 @@ async def edit_commands(app, document, changes: list[dict]) -> tuple[list[dict],
                                  **({"visible": change["visible"]} if "visible" in change else {})})
                 continue
             if "symbol" not in change:
-                raise ContractError("invalid_input", "A new comparison needs its symbol")
+                raise ContractError("invalid_input", t("A new comparison needs its symbol"))
             comparison_id = change.get("id") or new_id("c")
             commands.append({"type": "comparison.add", "id": comparison_id,
                              "instrumentId": (await resolve(app, change["symbol"]))["instrumentId"], **fields})
@@ -400,7 +397,7 @@ async def write_chart(app, value: dict, call_ctx) -> dict:
     operation = value["operation"]
     if operation["op"] == "create":
         if operation.get("copyOf") and any(key in operation for key in ("symbol", "timeframe", "importId", "indicators", "layers")):
-            raise ContractError("invalid_input", "Give copyOf alone to copy a chart")
+            raise ContractError("invalid_input", t("Give copyOf alone to copy a chart"))
         record = await resolve(app, operation["symbol"]) if operation.get("symbol") else None
         indicators = []
         for item in operation.get("indicators", []):
@@ -415,7 +412,7 @@ async def write_chart(app, value: dict, call_ctx) -> dict:
         layers = [await app.research_file(FileRef.model_validate(item)) if "path" in item
                   else ResearchLayer.model_validate(item) for item in operation.get("layers", [])]
         if len({layer.id for layer in layers}) != len(layers):
-            raise ContractError("invalid_input", "Research layer ids must be unique on a chart")
+            raise ContractError("invalid_input", t("Research layer ids must be unique on a chart"))
         instrument = layers[0].instrumentId if layers else record["instrumentId"] if record else None
         timeframe = layers[0].timeframe if layers else operation.get("timeframe")
         state = await app.charts.create(workspace, instrument, timeframe,
@@ -426,15 +423,15 @@ async def write_chart(app, value: dict, call_ctx) -> dict:
                 "openTarget": {"module":"chart", "panelType":"main", "objectId":"chart:" + state["chartId"]}}
     entry = app.charts.entry(workspace, operation["chartId"])
     if operation["baseRevision"] != entry.revision:
-        raise ContractError("conflict", "The chart changed since that revision; read it again",
+        raise ContractError("conflict", t("The chart changed since that revision; read it again"),
                             {"revision": entry.revision})
     if "commands" in operation:
         if any(key in operation for key in ("changes", "indicators", "drawings", "comparisons", "layers")):
-            raise ContractError("invalid_input", "Give commands as the entire edit")
+            raise ContractError("invalid_input", t("Give commands as the entire edit"))
         commands, added = operation["commands"], None
     elif operation["op"] == "edit":
         if not operation.get("changes"):
-            raise ContractError("invalid_input", "Give changes or commands")
+            raise ContractError("invalid_input", t("Give changes or commands"))
         commands, added = await edit_commands(app, entry.document, operation["changes"])
     else:
         added = None
@@ -443,7 +440,7 @@ async def write_chart(app, value: dict, call_ctx) -> dict:
                                       ("comparison", "comparisons"), ("layer", "layers"))
                     for item_id in operation.get(key, [])]
         if not commands:
-            raise ContractError("invalid_input", "Name the indicators, drawings, comparisons or layers to remove")
+            raise ContractError("invalid_input", t("Name the indicators, drawings, comparisons or layers to remove"))
     try:
         parsed = COMMANDS.validate_python(commands)
     except ValidationError as error:
@@ -452,7 +449,7 @@ async def write_chart(app, value: dict, call_ctx) -> dict:
     if operation["op"] == "edit" and any(command.type.endswith(".delete")
             or command.type in ("drawings.replace", "indicators.replace")
             or command.type == "drawing.bulk" and command.remove for command in parsed):
-        raise ContractError("invalid_input", "Use op=remove for commands that delete or replace a group")
+        raise ContractError("invalid_input", t("Use op=remove for commands that delete or replace a group"))
     state = await app.charts.commit(workspace, entry.id, operation["baseRevision"], parsed)
     return {"chartId": entry.id, "revision": state["revision"], "added": added}
 
@@ -468,7 +465,7 @@ async def write_template(app, op, call_ctx) -> dict:
         group = document.drawings.get(drawing_group(document), [])
         drawing = next((item for item in group if item.id == op.drawingId), None)
         if drawing is None:
-            raise ContractError("not_found", "Give the id of a drawing on this chart")
+            raise ContractError("not_found", t("Give the id of a drawing on this chart"))
     if op.op == "save":
         if kind == "chart":
             content = {key: document.display[key] for key in ("appearance", "precision", "scales", "statusLine", "alertLine")
@@ -485,7 +482,7 @@ async def write_template(app, op, call_ctx) -> dict:
         command = {"type": "display.update", "patch": content}
     elif kind == "drawing":
         if drawing.tool != content["tool"]:
-            raise ContractError("invalid_input", f"This template is for {content['tool']}")
+            raise ContractError("invalid_input", t("This template is for {tool}", tool=content['tool']))
         command = {"type": "drawing.update", "id": drawing.id,
                    "patch": {"style": content["style"], "settings": content["settings"]}}
     else:
@@ -513,7 +510,7 @@ async def read_indicator(app, value: dict, call_ctx) -> dict:
         return paged(listed, value, 100, 300,
                      lambda page, cursor: {"view": "list", "indicators": page, "nextCursor": cursor})
     if "name" not in value:
-        raise ContractError("invalid_input", "view=one needs the indicator's name")
+        raise ContractError("invalid_input", t("view=one needs the indicator's name"))
     ref = indicator_ref(value, app.catalog)
     entry = await app.catalog.describe(ref)
     answer = {"view": "one", "name": entry["id"], "source": entry["source"], "title": entry["title"],
@@ -531,24 +528,24 @@ async def save_document(ctx, project_id: str, path: Path, content: str, *, creat
     document = await ctx.call("developer.documents.open", {"source": {"kind": "file", "uri": path.as_uri(),
                                                                       "projectId": project_id}})
     if create and path.exists():
-        raise ContractError("conflict", f"{path.name} already exists; update it")
+        raise ContractError("conflict", t("{name} already exists; update it", name=path.name))
     if not create and not path.is_file():
-        raise ContractError("not_found", f"No file {path.name} in the indicators folder; create it")
+        raise ContractError("not_found", t("No file {name} in the indicators folder; create it", name=path.name))
     if document["dirty"] or document["conflict"]:
-        raise ContractError("conflict", f"{path.name} has unsaved edits in an editor; save or discard them first")
+        raise ContractError("conflict", t("{name} has unsaved edits in an editor; save or discard them first", name=path.name))
     edited = await ctx.call("developer.documents.edit", {"documentId": document["documentId"],
                                                          "expectedVersion": document["version"], "content": content})
     saved = await ctx.call("developer.documents.save", {"documentId": edited["documentId"],
                                                         "expectedVersion": edited["version"]})
     if saved["status"] not in ("saved", "clean"):
-        raise ContractError("conflict", f"{path.name} was not saved: {saved['message'] or saved['status']}")
+        raise ContractError("conflict", t("{name} was not saved: {value}", name=path.name, value=saved['message'] or saved['status']))
 
 
 async def write_indicator(app, value: dict, call_ctx) -> dict:
     operation = value["operation"]
     name, folder = operation["name"], app.catalog.user_dir
     if any(part in {".", ".."} or ntpath.isreserved(part) for part in name.split("/")):
-        raise ContractError("invalid_input", "Use a file or folder name valid on Windows")
+        raise ContractError("invalid_input", t("Use a file or folder name valid on Windows"))
     if operation["op"] == "delete":
         indicator_ref({"source": "user", "name": name}, app.catalog)
         app.catalog.definition({"source": "user", "id": name})
@@ -558,9 +555,9 @@ async def write_indicator(app, value: dict, call_ctx) -> dict:
         return {"name": name, "file": None, "check": None}
     path = (folder / name).resolve()
     if not path.is_relative_to(folder.resolve()):
-        raise ContractError("invalid_input", "Choose an indicator file inside the indicators folder")
+        raise ContractError("invalid_input", t("Choose an indicator file inside the indicators folder"))
     if "/" in name and path.name != "main.py" and not (path.parent / "main.py").is_file():
-        raise ContractError("invalid_input", f"Create {path.parent.name}/main.py before its helper files")
+        raise ContractError("invalid_input", t("Create {name}/main.py before its helper files", name=path.parent.name))
     project = await app.ctx.call("developer.projects.open", {"directory": str(folder.resolve()), "name": "Indicators"})
     await save_document(app.ctx, project["projectId"], path, operation["content"], create=operation["op"] == "create")
     entry = await app.catalog.describe({"source": "user", "id": name.partition("/")[0]})  # a file, or its folder

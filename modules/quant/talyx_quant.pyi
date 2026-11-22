@@ -74,8 +74,9 @@ class ResearchData:
     def shares(self) -> pd.DataFrame:
         """Shares outstanding as of each day, where Market has them."""
     @property
-    def industry(self) -> pd.Series:
-        """Each instrument's industry (today's classification with free sources)."""
+    def industry(self) -> pd.DataFrame:
+        """Each instrument's industry on each date (dates by instruments): as known then where Market keeps dated answers (A shares),
+        else the source's current classification on every date."""
     @property
     def timeframe(self) -> str: ...
     @property
@@ -88,11 +89,11 @@ _Adjustment = Literal["raw", "split", "split_dividend"]
 @overload
 def data() -> ResearchData: ...
 @overload
-def data(symbols: str | Iterable[str], timeframe: str, start: str, end: str | None = None, *, adjustment: _Adjustment = "split") -> ResearchData: ...
+def data(symbols: str | Iterable[str], timeframe: str, start: str, end: str | None = None, *, adjustment: _Adjustment = "split_dividend") -> ResearchData: ...
 @overload
-def data(*, index: dict[str, Any], timeframe: str, start: str, end: str | None = None, adjustment: _Adjustment = "split") -> ResearchData: ...
+def data(*, index: dict[str, Any], timeframe: str, start: str, end: str | None = None, adjustment: _Adjustment = "split_dividend") -> ResearchData: ...
 @overload
-def data(*, list: str, timeframe: str, start: str, end: str | None = None, adjustment: _Adjustment = "split") -> ResearchData: ...
+def data(*, list: str, timeframe: str, start: str, end: str | None = None, adjustment: _Adjustment = "split_dividend") -> ResearchData: ...
 def index_members(index: str, at: int | str | pd.Timestamp, *, as_of: int | str | pd.Timestamp | None = None) -> pd.DataFrame:
     """An exact index's members on a trading date or at a moment, known by as_of (default at); unmapped members are kept."""
 def bars(symbol: str, timeframe: str, start: str, end: str | None = None) -> pd.DataFrame:
@@ -291,7 +292,7 @@ class _Ops:
         """CSDemean(x): minus the mean across names each day"""
     def IndRank(self, x: _Table | pd.Series | float) -> _Table:
         """IndRank(x): rank inside each industry each day, 0 to 1"""
-    def Neutralize(self, x: _Table, industry: pd.Series | None = None, size: _Table | None = None) -> _Table:
+    def Neutralize(self, x: _Table, industry: pd.DataFrame | pd.Series | None = None, size: _Table | None = None) -> _Table:
         """Neutralize(x, [$industry], [y]): residual after industry dummies and log size each day"""
     def Abs(self, x: _Table | pd.Series | float) -> _Table:
         """Abs(x): absolute value"""

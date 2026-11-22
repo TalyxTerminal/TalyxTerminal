@@ -6,8 +6,8 @@ concurrency and requests per minute, and every request waits at that source's ga
 limit closes the gate until the source's retryAt; waiting is not failing.
 
 Ranking (per market or venue, data kind, daily or intraday): usable (enabled, key
-configured, not rejected) > covers it and not recent-only for history > delisted /
-point-in-time coverage > deeper history > realtime over delayed (live kinds) >
+configured, not rejected) > covers it and not recent-only for history > deeper history > delisted /
+point-in-time coverage > realtime over delayed (live kinds) >
 bulk and wider limits > paid > source id. One series holds one source's rows.
 """
 
@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any
+
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -156,6 +158,7 @@ class SourceEntry:
     problem: dict | None = None
     gate: Gate = field(default_factory=lambda: Gate(1, None))
     rejected: str | None = None  # "unauthorized" or "unsubscribed"
+    denied_kinds: set[str] = field(default_factory=set)
     test: dict | None = None
 
 
@@ -180,7 +183,7 @@ class Registry:
     def entry(self, source_id: str) -> SourceEntry:
         entry = self.entries.get(source_id)
         if entry is None:
-            raise MarketError("not_found", f"No data source {source_id}")
+            raise MarketError("not_found", t("No data source {source_id}", source_id=source_id))
         return entry
 
     def enabled(self, source_id: str) -> bool:
@@ -233,14 +236,18 @@ class Registry:
                 periods = [p for p in item.get("periods", []) if (timeframe is None or not _intraday(p["timeframe"])) == daily]
                 if kind == "bars" and not periods:
                     continue
+                if instrument.get("delistedAt") and kind in ("bars", "actions") and not item.get("delisted"):
+                    continue
+                if kind in entry.denied_kinds:
+                    continue
                 if history and item.get("historyRole") == "recent_only" and kind not in LIVE_KINDS:
                     continue
                 first = min((period_start(p, "last", now) for p in periods), default=now)
                 live = {"realtime": 2, "delayed": 1, "none": 0}[item["live"]]
                 key = (
                     0 if usable else 1,
-                    0 if item.get("delisted") or item.get("pointInTime") else 1,
                     first,
+                    0 if item.get("delisted") or item.get("pointInTime") else 1,
                     -live if kind in LIVE_KINDS or not history else 0,
                     0 if "bulk" in entry.descriptor["supports"] else 1,
                     -(coverage.get("requestsPerMinute") or 10**6),
@@ -275,7 +282,10 @@ class Registry:
         from talyx_sdk import rest_queue
         token = rest_queue.PRIORITY.set({INTERACTIVE: rest_queue.INTERACTIVE, LIVE: rest_queue.LIVE,
                                          QUOTES: rest_queue.LIVE, JOBS: rest_queue.BULK}[priority])
-        await entry.gate.acquire(priority)
+        from .sources.base import MeteredSource
+        metered = isinstance(entry.source, MeteredSource)
+        if not metered:
+            await entry.gate.acquire(priority)
         try:
             return await getattr(entry.source, method)(source_id, *args)
         except MarketError as exc:
@@ -284,11 +294,15 @@ class Registry:
             if exc.code == "unauthorized":
                 entry.rejected = "unauthorized"
             if exc.code == "forbidden" and entry.descriptor["credentials"] == "required":
-                # The key works but its plan does not cover this: rank the next source until settings change.
-                entry.rejected = "unsubscribed"
+                denied = (exc.details or {}).get("dataKind")
+                if denied:
+                    entry.denied_kinds.add(denied)
+                else:
+                    entry.rejected = "unsubscribed"
             raise
         finally:
-            entry.gate.release()
+            if not metered:
+                entry.gate.release()
             rest_queue.PRIORITY.reset(token)
 
 

@@ -16,6 +16,7 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 from vocabulary.instruments import MarketInstrument, MarketSeries, ohlcv_series
@@ -126,7 +127,7 @@ class Data:
         periods = [p for p in self.market.registry.periods(source, instrument, kind)
                    if bars.is_intraday(p["timeframe"]) and bars.divides(p["timeframe"], target_tf, instrument["calendarId"])]
         if not periods:
-            raise MarketError("unsupported", f"No source gives {target_tf} bars for {instrument['symbol']}")
+            raise MarketError("unsupported", t("No source gives {target_tf} bars for {symbol}", target_tf=target_tf, symbol=instrument['symbol']))
         now = now_ns()
         periods.sort(key=lambda p: timeframe_nanoseconds(p["timeframe"]), reverse=True)
         basis = series.priceBasis
@@ -254,6 +255,8 @@ class Data:
         not recorded unavailable with its retry time still ahead (unless ``retry_unavailable``: a fetch the user or
         AI asked for)."""
         pointer = self.store.pointer(plan.key)
+        if pointer and not pointer["parts"] and pointer["source"] != plan.source_id:
+            pointer = None  # an empty response from another source says nothing about this source
         spans = pointer["spans"] if pointer else []
         now = now_ns()
         end = self.reach_end(plan, self.base_end(plan, start, end), now)
@@ -272,11 +275,13 @@ class Data:
 
     # ── filling ─────────────────────────────────────────────────────────────
 
-    def target(self, instrument: dict, environment: str = "production") -> Target:
+    def target(self, instrument: dict, environment: str, source_id: str) -> Target:
         codes = self.market.identity.codes(instrument["instrumentId"]) if instrument["identityVersion"] == 2 else []
         keys = self.market.identity.external_ids(instrument["instrumentId"])
-        return Target(instrument, codes, None, environment=environment, key=None) if not keys else \
-            Target(instrument, codes, next(iter(keys.values())), environment=environment)
+        return Target(instrument, codes, keys.get(source_id), environment=environment)
+
+    def lock(self, key: SeriesKey) -> asyncio.Lock:
+        return self._locks.setdefault(key, asyncio.Lock())
 
     async def fill(self, plan: Plan, start: int, end: int, *, limit: int | None = READ_REQUEST_LIMIT,
                    progress=None, retry_unavailable: bool = False) -> Fill:
@@ -286,8 +291,12 @@ class Data:
         is the fill's problem and asked for again by the next fill."""
         if plan.source_id is None or plan.source_id.startswith("import:"):
             return Fill("not_needed")
-        lock = self._locks.setdefault(plan.key, asyncio.Lock())
-        async with lock:
+        async with self.lock(plan.key):
+            pointer = self.store.pointer(plan.key)
+            if plan.kind == "bars" and pointer and pointer["parts"] and pointer["source"] != plan.source_id:
+                # A switch may have finished while this fill waited for the series lock.
+                plan.source_id = pointer["source"]
+                plan.period = self._period(plan.source_id, plan.instrument, plan.base)
             # Pointer, actions and identity reads are files and SQLite: in a worker, never on the event loop.
             gaps = await in_worker(self.missing, plan, start, end, retry_unavailable)
             if not gaps:
@@ -297,10 +306,9 @@ class Data:
             estimate = layers.requests(units) if layers is not None else len(units)
             if limit is not None and estimate > limit:
                 raise MarketError("fill_too_large",
-                                  f"Filling this read takes about {estimate} requests to {plan.source_id}; "
-                                  f"download it with the fetch action first",
+                                  t("Filling this read takes about {estimate} requests to {source_id}; download it with the fetch action first", estimate=estimate, source_id=plan.source_id),
                                   source_id=plan.source_id, details={"estimatedRequests": estimate})
-            target = await in_worker(self.target, plan.instrument, plan.key.environment)
+            target = await in_worker(self.target, plan.instrument, plan.key.environment, plan.source_id)
             requests, problems = [0], []
 
             async def ask(cursor: int, stop: int, archive):
@@ -329,8 +337,7 @@ class Data:
                     if cause is not None:
                         await failed(unit.start, unit.end, cause)
                         return
-                    problem = MarketError("no_data", f"{plan.source_id} has no file for this span yet and its API "
-                                          f"reaches back to {iso_of_ns(layers.api_from)[:10]}",
+                    problem = MarketError("no_data", t("{source_id} has no file for this span yet and its API reaches back to {api_from}", source_id=plan.source_id, api_from=iso_of_ns(layers.api_from)[:10]),
                                           source_id=plan.source_id).problem()
                     await self.unavailable(plan, unit.start, unit.end, unit.retry_at, problem)
                     problems.append(problem)
@@ -490,7 +497,7 @@ class Data:
         instrument = await in_worker(self.market.instrument_record, value["instrument"])
         series = MarketSeries.from_wire(value["series"])
         if series.instrumentId != value["instrument"]["instrumentId"]:
-            raise MarketError("invalid_input", "series.instrumentId does not name the instrument")
+            raise MarketError("invalid_input", t("series.instrumentId does not name the instrument"))
         if instrument["instrumentId"] != series.instrumentId:
             series = _rebase(series, instrument)
         limit = min(int(value.get("limit", 1000)), MAX_PAGE)
@@ -739,7 +746,7 @@ class Data:
         instrument = plan.instrument
         source, gaps = await in_worker(self.action_gaps, plan, start, end)
         if gaps:
-            target = await in_worker(self.target, instrument, environment)
+            target = await in_worker(self.target, instrument, environment, source)
         for gap_start, gap_end in gaps[:request_limit]:
             history = await self.market.registry.call(source, "history", target, "actions", None, "last",
                                                       gap_start, gap_end)
@@ -770,7 +777,7 @@ class Data:
 
         daily, days = await in_worker(missing)
         if request_limit is not None and len(days) > request_limit:
-            raise MarketError("fill_too_large", "Fetch daily bars for the cash dividend reference dates first")
+            raise MarketError("fill_too_large", t("Fetch daily bars for the cash dividend reference dates first"))
         for day in days:
             result = await self.fill(daily, day, day + DAY_NS, limit=request_limit)
             if result.problem:
@@ -827,8 +834,7 @@ class Data:
                 if a < hi and lo < b:
                     out.append({"start": str(max(a, lo)), "end": str(min(b, hi)), "reason": "unavailable",
                                 "retryAt": None, "problem": MarketError(
-                                    "no_data", f"{plan.source_id} keeps no file for this span and its API reaches "
-                                    f"back to {iso_of_ns(layers.api_from)[:10]}", source_id=plan.source_id).problem()})
+                                    "no_data", t("{source_id} keeps no file for this span and its API reaches back to {api_from}", source_id=plan.source_id, api_from=iso_of_ns(layers.api_from)[:10]), source_id=plan.source_id).problem()})
         out.sort(key=lambda g: int(g["start"]))
         return out
 

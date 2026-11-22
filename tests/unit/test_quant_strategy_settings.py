@@ -21,7 +21,7 @@ def test_code_params_come_from_declarations():
 
 @pytest.mark.parametrize("kind, capital, currency", [("perpetual", 10_000, "USDT"), ("spot", 10_000, "USDT"), ("stock", 100_000, "USD")])
 def test_defaults_by_kind(kind, capital, currency):
-    value = S.defaults(kind, {})
+    value = S.defaults(kind, {}, market="US" if kind == "stock" else None)
     assert (value["capital"], value["currency"]) == (capital, currency)
 
 
@@ -30,7 +30,7 @@ def test_exchange_conditions_by_kind():
     # a stock has one last price and one net position: no stop trigger, no position mode, and the margin line is read-only text
     assert S.exchange_fields("stock") == ["margin"] and S.margin_label("stock") == "Reg T, 2× overnight"
     assert S.exchange_fields("spot") == []
-    stock = S.effective("stock", {"exchange": {"stopTrigger": "mark", "positionMode": "hedge"}}, ACCOUNT)
+    stock = S.effective("stock", {"exchange": {"stopTrigger": "mark", "positionMode": "hedge"}}, ACCOUNT, market="US")
     assert stock["exchange"]["stopTrigger"] == "last" and stock["exchange"]["positionMode"] == "oneway"
 
 
@@ -52,30 +52,51 @@ def test_limit_orders_option_and_stock_shorting_borrow_default():
     assert S.check({"limitThroughTicks": 2})["limitThroughTicks"] == 2
     with pytest.raises(ContractError):
         S.check({"limitThroughTicks": -1})
-    stock = S.defaults("stock", {})
+    stock = S.defaults("stock", {}, market="US")
     assert stock["shorting"] == "allowed" and stock["costs"]["borrowPct"] == 0.3
     assert S.defaults("perpetual", {})["limitThroughTicks"] == 0 and "makerPct" in S.defaults("perpetual", {})["costs"]
 
 
 def test_volume_cap_is_on_both_costs_and_defaults_to_none():
     for kind in ("perpetual", "stock"):
-        assert "volumeCapPct" in S.defaults(kind, {})["costs"] and S.defaults(kind, {})["costs"]["volumeCapPct"] is None
+        assert "volumeCapPct" in S.defaults(kind, {}, market="US")["costs"] and S.defaults(kind, {}, market="US")["costs"]["volumeCapPct"] is None
+
+
+def stock(venue, asset="equity"):
+    return {"instrument": {"venueId": venue, "assetClass": asset}}
+
+
+def test_benchmark_and_risk_free_follow_the_market_traded():
+    """A shares measure against CSI 300 over a fixed 4% a year, US stocks against SPY over the 13-week T-bill, crypto against holding what it trades over zero."""
+    cn = S.effective("stock", None, ACCOUNT, market=S.market_of({"symbols": [stock("CN"), stock("CN")]}))
+    assert cn["benchmark"] == {"kind": "symbol", "symbol": "CN:000300.SH"} and cn["riskFree"] == {"basis": "fixed", "pct": 4.0}
+    us = S.effective("stock", None, ACCOUNT, market=S.market_of({"symbols": [stock("US", "fund")]}))
+    assert us["benchmark"] == {"kind": "symbol", "symbol": "US:SPY"} and us["riskFree"] == {"basis": "irx"}
+    indexed = S.market_of({"index": stock("US", "index")})
+    assert indexed == "US"
+    crypto = S.effective("perpetual", None, ACCOUNT, market=S.market_of({"symbols": [{"instrument": {"venueId": "okx", "assetClass": "crypto"}}]}))
+    assert crypto["benchmark"] == {"kind": "hold"} and crypto["riskFree"] == {"basis": "zero"}
+    assert S.effective("spot", None, ACCOUNT)["riskFree"] == {"basis": "zero"}
+    # what the user set wins: any Market symbol, and the A-share rate can be changed
+    mine = S.effective("stock", {"benchmark": {"kind": "symbol", "symbol": "US:QQQ"}, "riskFree": {"basis": "fixed", "pct": 2.5}}, ACCOUNT, market="CN")
+    assert mine["benchmark"]["symbol"] == "US:QQQ" and mine["riskFree"]["pct"] == 2.5
 
 
 def test_benchmark_kinds_by_instrument():
-    assert S.benchmark_options("perpetual", 1) == ["hold", "none"]
-    assert S.benchmark_options("stock", 20) == ["beta", "equal", "none"]
-    assert S.benchmark_options("stock", 1)[0] == "hold"
-    assert (S.benchmark_default("stock", 20), S.benchmark_default("stock", 1), S.benchmark_default("perpetual", 1)) == ("beta", "hold", "hold")
-    assert S.check({"benchmark": {"kind": "beta"}})["benchmark"] == {"kind": "beta"}
+    assert S.benchmark_options("perpetual", 1) == ["symbol", "hold", "none"]
+    assert S.benchmark_options("stock", 20) == ["symbol", "equal", "none"]
+    assert S.benchmark_options("stock", 1) == ["symbol", "hold", "none"]
+    with pytest.raises(ContractError):
+        S.check({"benchmark": {"kind": "beta"}})  # cash plus beta times the S&P 500 is gone
     with pytest.raises(ContractError):
         S.check({"benchmark": {"kind": "nonsense"}})
     with pytest.raises(ContractError):
         S.check({"benchmark": {"kind": "symbol"}})  # a symbol benchmark names its symbol
+    assert S.check({"benchmark": {"kind": "symbol", "symbol": "CN:000300.SH"}})["benchmark"] == {"kind": "symbol", "symbol": "CN:000300.SH"}
 
 
 def test_risk_free_basis_and_fixed_rate():
-    assert S.defaults("stock", {})["riskFree"] == {"basis": "irx"} and S.defaults("perpetual", {})["riskFree"] == {"basis": "zero"}
+    assert S.defaults("stock", {}, market="US")["riskFree"] == {"basis": "irx"} and S.defaults("perpetual", {})["riskFree"] == {"basis": "zero"}
     assert S.check({"riskFree": {"basis": "fixed", "pct": 4.0}})["riskFree"] == {"basis": "fixed", "pct": 4.0}
     with pytest.raises(ContractError):
         S.check({"riskFree": {"basis": "fixed"}})
@@ -97,11 +118,10 @@ def test_accounts_per_venue():
         S.check({"accounts": [{"venue": "OKX", "balances": ["lots"]}]})
 
 
-def test_memory_estimate_scales_with_names_and_bars():
+def test_memory_estimate_is_within_a_quarter_of_measured_peaks():
     gib = 1024 ** 3
-    assert S.memory_estimate(1, 0) == pytest.approx(.5 * gib)
-    assert S.memory_estimate(500, 2500) - S.memory_estimate(0, 0) == pytest.approx(500 * 2500 * 6 * 1024)
-    assert S.memory_estimate(10, 1000, fine_bars=5000) > S.memory_estimate(10, 1000)
+    for names, bars, peak in [(5, 2445, .26), (362, 174_811, 1.4), (559, 657_359, 2.27), (559, 1_369_917, 2.88)]:
+        assert 1 <= S.memory_estimate(names, bars) / gib / peak <= 1.25
 
 
 def test_run_settings_have_stable_keys():

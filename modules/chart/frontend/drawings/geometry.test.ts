@@ -39,7 +39,7 @@ describe("TALYX professional overlay geometry", () => {
           { time: 1_000, open: 99, high: 102, low: 98, close: 101, volume: 10 },
           { time: 86_401_000, open: 110, high: 117, low: 108, close: 115, volume: 20 },
         ],
-        tool.text === "required" || tool.text === "optional" ? "Note" : undefined,
+        tool.textMode === "required" || tool.textMode === "optional" ? "Note" : undefined,
       );
       const projected = tool.id === "anchored_vwap"
         ? { ...runtime, projectedCurve: pixels.slice(0, 2) }

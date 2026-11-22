@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { platformRuntime } from "../kernel/runtime";
 import type { Subscription } from "@talyx/sdk";
 import { workspaceWindowChannel as channel, type Command, type FrameRequest, type OpenWorkspace, type PanelNavigation } from "./workspaceWindows";
@@ -63,7 +64,7 @@ export class WorkspaceWindowController {
     });
     if (!acquired) {
       if (window.talyxDesktop) { await window.talyxDesktop.openWorkspaceWindow(id); return; }
-      throw new Error("This workspace is open in another window.");
+      throw new Error(t("This workspace is open in another window."));
     }
     if (!this.view.owned.includes(id)) this.set({ owned: [...this.view.owned, id] });
     this.select(id);
@@ -143,9 +144,9 @@ export class WorkspaceWindowController {
     await this.request(target.workspaceId, { notificationNavigation: target });
     if (window.talyxDesktop) await window.talyxDesktop.openWorkspaceWindow(target.workspaceId);
   }
-  /** The Host restarted: each frame keeps its unsaved changes in this tab, then the page reloads and every open
-      workspace comes back as it was (WorkspaceFrame takes the stash back as unsaved). */
-  async hostRestarted(): Promise<void> {
+  /** The Host restarted, or the language changed: each frame keeps its unsaved changes in this tab, then the page
+      reloads and every open workspace comes back as it was (WorkspaceFrame takes the stash back as unsaved). */
+  async reloadKeepingUnsaved(): Promise<void> {
     if (this.restarting) return;
     this.restarting = true;
     const frames = [...this.frames.entries()];
@@ -164,7 +165,7 @@ export class WorkspaceWindowController {
           else if (event.data.recovery?.workspaceId === id) { finish(); resolve(event.data.recovery); }
         };
         const timer = setTimeout(() => {
-          finish(); reject(new Error("A workspace did not return its recovery state."));
+          finish(); reject(new Error(t("A workspace did not return its recovery state.")));
         }, 10000);
         window.addEventListener("message", receive);
         this.post(frame.contentWindow, { requestId, stash: true });
@@ -175,7 +176,7 @@ export class WorkspaceWindowController {
     } catch (error) {
       this.restarting = false;
       for (const [, frame] of frames) frame.inert = false;
-      this.ui.fail(`Workspaces kept open: ${error instanceof Error ? error.message : String(error)}`, () => void this.hostRestarted());
+      this.ui.fail(`Workspaces kept open: ${error instanceof Error ? error.message : String(error)}`, () => void this.reloadKeepingUnsaved());
     }
   }
 
@@ -185,7 +186,7 @@ export class WorkspaceWindowController {
     const runtime = platformRuntime();
     // This window owns navigation; workspace panels live in its frames.
     runtime.kernel.displayed.set(false);
-    runtime.bridge.onHostRestart = () => this.hostRestarted();
+    runtime.bridge.onHostRestart = () => this.reloadKeepingUnsaved();
     this.navigation.onmessage = event => {
       const { id, request, requestId } = event.data as { id: string; request?: FrameRequest; requestId: string };
       if (!request || !this.releases.has(id)) return;
@@ -195,7 +196,7 @@ export class WorkspaceWindowController {
     const receive = (event: MessageEvent) => {
       if (event.origin !== location.origin || event.data?.channel !== channel ||
           event.source !== window && ![...this.frames.values()].some(frame => frame.contentWindow === event.source)) return;
-      if (event.data.restart) { void this.hostRestarted(); return; }
+      if (event.data.restart) { void this.reloadKeepingUnsaved(); return; }
       if (!event.data.command) return;
       const { command, requestId } = event.data as { command: Command; requestId: string };
       this.tail = this.tail.then(async () => {
@@ -218,6 +219,10 @@ export class WorkspaceWindowController {
       const records = await this.refresh();
       if (stopped) return;
       subscriptions.push(runtime.bridge.subscribe("platform.workspace.changes", {}, () => { void this.refresh().catch(reason => this.fail(reason)); }));
+      subscriptions.push(runtime.bridge.subscribe("platform.settings.changes", {}, value => {
+        const change = value as { module: string; keys: string[] };
+        if (change.module === "platform" && change.keys.includes("language")) void this.reloadKeepingUnsaved();
+      }));
       subscriptions.push(runtime.bridge.subscribe("platform.notifications.activated", {}, value => {
         void this.navigate((value as unknown as { navigation: PanelNavigation }).navigation).catch(reason => this.fail(reason));
       }));

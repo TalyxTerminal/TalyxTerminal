@@ -22,6 +22,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from talyx_sdk.i18n import t
+
 from . import history
 from .process import PineProcess
 from .visible import VIEW
@@ -527,7 +529,7 @@ class PineEngine:
         for instance in worker.stuck:
             instance.pending.clear()
             item = instance.apply({"op": "error", "code": "script_error", "line": None,
-                                   "message": "The script did not finish a bar in time and was stopped."})
+                                   "message": t("The script did not finish a bar in time and was stopped.")})
             for listener in list(instance.listeners):
                 listener(item)
         for instance in instances:
@@ -535,7 +537,7 @@ class PineEngine:
             instance.pending.clear()
             for listener in list(instance.listeners):
                 listener({"op": "error", "code": "worker_restarted",
-                          "message": "The indicator process stopped; it is starting again.", "line": None})
+                          "message": t("The indicator process stopped; it is starting again."), "line": None})
         if not instances and (worker.sites or worker.index == view_index(worker.sites)):
             return  # a project's or the visible-range process starts again when something asks for it
         replacement = self.worker(worker.sites, worker.index, restarted=True)  # the pool stays whole

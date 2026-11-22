@@ -5,6 +5,7 @@ import asyncio
 from pathlib import Path
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import editing_language
 from .execution_recipe import RUNTIME
@@ -44,7 +45,7 @@ class SourceLanguage:
 
     async def invoke(self, request, call):
         if request["capability"] != "language":
-            raise ContractError("unknown_capability", "Quant provides only editing language for its own code folders.")
+            raise ContractError("unknown_capability", t("Quant provides only editing language for its own code folders."))
         project, document = request.get("project") or {}, request.get("document") or {}
         root = project.get("root") or project.get("rootPath") or project.get("rootUri") or (document.get("context") or {}).get("rootUri")
         if not root:

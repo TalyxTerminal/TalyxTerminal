@@ -170,7 +170,7 @@ elif case == "custom":
     from skfolio.pre_selection import SelectKExtremes
     from sklearn.pipeline import Pipeline
     q._Run.mode = "values"; q._Run.cutoff = None; q._Run.publications = []; q._Run.invocation = None
-    allocation_run.ACTIVE.clear(); allocation_run.ACTIVE.update(returns=r, annualization=252, riskFree=0.0)
+    allocation_run.ACTIVE.clear(); allocation_run.ACTIVE.update(returns=r, annualization=252, riskFree=0.0, benchmark=None)
     est = Pipeline([("pre", SelectKExtremes(k=3)), ("opt", MeanRisk())])
     result = allocation_run.allocate(R.settings(), estimator=est)
     zeros = [int((p["weights"].abs() < 1e-9).sum()) for p in result["periods"]]

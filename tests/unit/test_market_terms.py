@@ -147,6 +147,7 @@ def test_stock_price_steps_follow_the_price():
     from modules.market.backend.terms import tick
     day = "2026-11-13"
     assert [str(tick("US", price, day)) for price in (0.85, 0.9999, 1.0, 245.5)] == ["0.0001", "0.0001", "0.01", "0.01"]
+    assert str(tick("US", 245.5, "2028-03-01")) == "0.01"  # past the SEC relief: still a step, not a refusal
     hk = {0.25: "0.001", 0.255: "0.005", 8.40: "0.005", 10.0: "0.005", 10.02: "0.01", 20.0: "0.01", 49.98: "0.02",
           50.0: "0.02", 99.95: "0.05", 100.0: "0.05", 150.1: "0.1", 386.6: "0.2", 512.0: "0.5", 1500.0: "1"}
     assert {price: str(tick("HK", price, day)) for price in hk} == hk
@@ -162,6 +163,7 @@ def test_stock_price_increment_is_the_step_at_the_latest_close(tmp_path):
              "calendarId": "XHKG"}
             for code, name, asset in (("00700.HK", "TENCENT", "equity"), ("00005.HK", "HSBC", "equity"),
                                       ("01398.HK", "ICBC", "equity"), ("02800.HK", "TRACKER FUND", "fund"))], "test")
+        market.terms.board_lots.write("HK", {"date": "2026-11-13", "listings": {}})   # the HKEX list read, with none of these lots
         try:
             def store(record, close):
                 series = ohlcv_series(MarketInstrument.from_wire(record), "1d", adjustment="raw")

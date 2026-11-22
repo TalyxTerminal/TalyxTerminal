@@ -7,6 +7,7 @@ import shutil
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .run_flow import ACTIVE, terminal_state
 
@@ -25,7 +26,7 @@ def directories(root, kind, identity):
         parent = root.resolve() / name
         path = parent / identity
         if path.parent != parent or path.resolve() != path or parent.resolve() != parent:
-            raise ContractError("invalid_input", "Quant's workspace directory is outside its data folder.")
+            raise ContractError("invalid_input", t("Quant's workspace directory is outside its data folder."))
         yield path
 
 
@@ -60,7 +61,7 @@ def copy_workspace(records, library, source, destination):
             for file in old.rglob("*"):
                 target = new / file.relative_to(old)
                 if file.is_symlink() or file.is_junction():
-                    raise ContractError("invalid_input", "Quant cannot duplicate a project link outside its source tree.")
+                    raise ContractError("invalid_input", t("Quant cannot duplicate a project link outside its source tree."))
                 if file.is_dir():
                     target.mkdir(exist_ok=True)
                 elif old.parent.name in {"qruns", "qmodels", "qallocations"} and file.relative_to(old).as_posix() in {
@@ -118,7 +119,7 @@ def delete_workspace(records, library, workspace, preview):
     for (call_id,) in records.db.execute("SELECT DISTINCT call_id FROM quant_changes WHERE workspace=? AND original IS NULL AND kind='qobject'", (workspace,)):
         path = (snapshots / call_id).resolve()
         if path.parent != snapshots or snapshots.parent != records.root.resolve():
-            raise ContractError("invalid_input", "Quant's change snapshot is outside its data folder.")
+            raise ContractError("invalid_input", t("Quant's change snapshot is outside its data folder."))
         if path.exists():
             shutil.rmtree(path)
     with library.store.connect() as catalog:

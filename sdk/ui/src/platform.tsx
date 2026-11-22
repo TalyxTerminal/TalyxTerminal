@@ -167,6 +167,26 @@ output: Task
 input: TaskStart
 output: TaskId
 }
+"updates.check": {
+input: Empty
+output: UpdateState
+}
+"updates.download": {
+input: Empty
+output: UpdateState
+}
+"updates.notes_seen": {
+input: Empty
+output: UpdateState
+}
+"updates.open": {
+input: Empty
+output: Empty
+}
+"updates.read": {
+input: Empty
+output: UpdateState
+}
 "workspace.close": {
 input: WorkspaceInput
 output: Empty
@@ -230,6 +250,10 @@ item: Activated
 "stream:settings.changes": {
 params: Empty
 item: SettingsChange
+}
+"stream:updates.changes": {
+params: Empty
+item: UpdateState
 }
 "stream:workspace.changes": {
 params: Empty
@@ -765,6 +789,81 @@ error?: ({
 export interface TaskStart {
 action: string
 }
+export interface UpdateState {
+/**
+ * This installation's version
+ */
+current: string
+/**
+ * A newer published version, or null when none is known
+ */
+latest: (Release | null)
+/**
+ * When GitHub was last asked (ms), or null
+ */
+checkedAt: (number | null)
+/**
+ * Why the last check (or the last update's installer) failed, or null
+ */
+problem: (string | null)
+/**
+ * The newer version's installer being downloaded, or null
+ */
+download: (UpdateDownload | null)
+/**
+ * This version's notes, until they have been seen once after it was installed; null otherwise
+ */
+notes: (ReleaseNotes | null)
+}
+export interface Release {
+version: string
+/**
+ * The release page, with the installer
+ */
+url: string
+/**
+ * What changed, as the release says (Markdown)
+ */
+notes: string
+publishedAt: (string | null)
+/**
+ * Whether the release has a Windows installer with a published SHA-256, so TALYX can download and install it itself
+ */
+installer: boolean
+}
+export interface UpdateDownload {
+version: string
+/**
+ * ready: downloaded and its SHA-256 matches the release's
+ */
+state: ("downloading" | "ready" | "failed")
+/**
+ * Bytes downloaded so far
+ */
+received: number
+/**
+ * The installer's size in bytes, or null when unknown
+ */
+total: (number | null)
+/**
+ * Why it failed (a checksum that does not match deletes the download), or null
+ */
+problem: (string | null)
+/**
+ * The checked installer on this machine, once ready
+ */
+path: (string | null)
+}
+export interface ReleaseNotes {
+/**
+ * This installation's version
+ */
+version: string
+/**
+ * What changed in it, as its release says (Markdown)
+ */
+notes: string
+}
 export interface CopyInput {
 workspaceId: string
 name?: (string | null)
@@ -956,7 +1055,7 @@ action?: (string | null)
 }
 
 export const MODULE = "platform";
-export const ACTIONS = ["activity.list", "activity.stop", "ai.call", "ai.calls", "ai.catalog", "ai.guide", "catalog.implementations", "changes.list", "changes.revert", "modules.definitions", "modules.disable", "modules.enable", "modules.install", "modules.list", "modules.reload", "modules.uninstall", "notifications.channels", "notifications.configure", "notifications.read_delivery", "notifications.send", "notifications.test", "notifications.toast", "panels.activate", "panels.capture", "panels.close", "panels.list", "panels.open", "panels.open_target", "runs.calls", "runs.end", "runs.start", "secrets.configured", "secrets.get", "secrets.set", "settings.read", "settings.reset", "settings.write", "storage.directories", "tasks.cancel", "tasks.get", "tasks.start", "workspace.close", "workspace.copy", "workspace.delete", "workspace.delete_preview", "workspace.folder", "workspace.list", "workspace.list_open", "workspace.load", "workspace.open", "workspace.save", "workspace.set_folder", "workspace.shown"] as const;
+export const ACTIONS = ["activity.list", "activity.stop", "ai.call", "ai.calls", "ai.catalog", "ai.guide", "catalog.implementations", "changes.list", "changes.revert", "modules.definitions", "modules.disable", "modules.enable", "modules.install", "modules.list", "modules.reload", "modules.uninstall", "notifications.channels", "notifications.configure", "notifications.read_delivery", "notifications.send", "notifications.test", "notifications.toast", "panels.activate", "panels.capture", "panels.close", "panels.list", "panels.open", "panels.open_target", "runs.calls", "runs.end", "runs.start", "secrets.configured", "secrets.get", "secrets.set", "settings.read", "settings.reset", "settings.write", "storage.directories", "tasks.cancel", "tasks.get", "tasks.start", "updates.check", "updates.download", "updates.notes_seen", "updates.open", "updates.read", "workspace.close", "workspace.copy", "workspace.delete", "workspace.delete_preview", "workspace.folder", "workspace.list", "workspace.list_open", "workspace.load", "workspace.open", "workspace.save", "workspace.set_folder", "workspace.shown"] as const;
 /** Actions that answer with a task id at once; read the result with platform.tasks. */
 export const TASKS = [] as const;
 export type Actions = { [K in (typeof ACTIONS)[number]]: ContractTypes[K] };

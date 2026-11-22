@@ -1,6 +1,7 @@
 {
   "manifestVersion": 5,
   "id": "agent",
+  "locales": {"zh-CN": "locales/zh-CN.json"},
   "name": "Agent",
   "version": "2.0.0",
   "ai": {"guide": "GUIDE.md", "docs": [{"topic": "skills", "title": "Write an Agent skill (SKILL.md) or workspace instructions (AGENTS.md)", "file": "docs/skills.md"}]},

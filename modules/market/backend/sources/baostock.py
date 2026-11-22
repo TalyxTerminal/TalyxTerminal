@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from vocabulary.identity import timeframe_nanoseconds
 
@@ -33,6 +34,7 @@ from ..codes import baostock_code
 from ..common import DAY_NS, NS, MarketError, now_ns
 from ..routing import in_worker
 from .base import History, Source, coverage, empty_history, row
+from .indices import CN_INDICES, cn_indices
 
 CALENDAR = "XSHG"
 SCOPE = {"markets": ["CN"]}
@@ -111,9 +113,9 @@ class BaostockClient:
                 self._logged_in = False
                 if attempt == 0:
                     continue
-                raise MarketError("source_unavailable", f"Baostock connection failed: {exc or 'no answer'}",
+                raise MarketError("source_unavailable", t("Baostock connection failed: {exc}", exc=exc or 'no answer'),
                                   source_id="baostock") from exc
-        raise MarketError("source_unavailable", "Baostock gave no answer", source_id="baostock")
+        raise MarketError("source_unavailable", t("Baostock gave no answer"), source_id="baostock")
 
     def close(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=True)
@@ -121,10 +123,10 @@ class BaostockClient:
 
 def _error(code: str, message: str) -> MarketError:
     if code in ("10004011", "10004015"):
-        return MarketError("not_found", f"Baostock: {message}", source_id="baostock")
+        return MarketError("not_found", t("Baostock: {message}", message=message), source_id="baostock")
     if code in ("10001006", "10001011"):
-        return MarketError("forbidden", f"Baostock: {message}", source_id="baostock")
-    return MarketError("source_unavailable", f"Baostock {code}: {message}", source_id="baostock")
+        return MarketError("forbidden", t("Baostock: {message}", message=message), source_id="baostock")
+    return MarketError("source_unavailable", t("Baostock {code}: {message}", code=code, message=message), source_id="baostock")
 
 
 def market_code(bcode: str) -> str:
@@ -149,7 +151,7 @@ def _float(values: list[str]) -> np.ndarray:
 class BaostockSource(Source):
     id = "baostock"
     descriptor = {"name": "Baostock", "sourceIds": ["baostock"],
-                  "kinds": ["listings", "bars", "actions", "classification", "shares"],
+                  "kinds": ["listings", "bars", "actions", "classification", "shares", "members"],
                   "assetClasses": ["equity", "fund", "index"], "credentials": "none", "paid": False,
                   "supports": ["catalog", "history", "research"]}
 
@@ -165,6 +167,7 @@ class BaostockSource(Source):
             row(SCOPE, "bars", [*minutes, ("1d", "1990-12-19", 100000)], delisted=True),
             row(SCOPE, "actions", [("1d", "1990-12-19", 100000)], delisted=True),
             row(SCOPE, "classification", delisted=True),
+            row({"markets": ["CN"], "assetClasses": ["index"]}, "members", point_in_time=True),
             row(SCOPE, "shares", [("1d", "2007-03-31", 1)], delisted=True),
         ], concurrency=1, rpm=None)
 
@@ -359,10 +362,21 @@ class BaostockSource(Source):
         if kind == "classification":
             _f, rows = await self.client.query("query_stock_industry", code, "")
             return [_industry_row(item)[1] for item in rows]
-        raise MarketError("unsupported", f"Baostock gives {kind} only in parts", source_id=source_id)
+        raise MarketError("unsupported", t("Baostock gives {kind} only in parts", kind=kind), source_id=source_id)
+
+    def indices(self, source_id: str) -> list[dict]:
+        return cn_indices(self.market.identity)
 
     def research_parts(self, source_id: str, target, kind: str, start: int | None, end: int | None) -> list[str] | None:
         """Share counts come per quarter: one part (and one request) per quarter in [start, end)."""
+        if kind == "members":
+            if target.code_at() not in CN_INDICES:
+                raise MarketError("unsupported", t("No member history for {symbol}", symbol=target.code_at()))
+            stop = date.fromisoformat(_date_text(min(end or now_ns(), now_ns()) - 1))
+            first = start if start is not None else int(target.instrument.get("listedFrom") or day_ns("2004-01-02"))
+            begin = date.fromisoformat(_date_text(first))
+            monday = begin - timedelta(days=begin.weekday())
+            return [(monday + timedelta(days=i)).isoformat() for i in range(0, (stop - monday).days + 1, 7)]
         if kind != "shares":
             return None
         stop = min(end or now_ns(), now_ns())
@@ -382,6 +396,12 @@ class BaostockSource(Source):
 
     async def research_part(self, source_id: str, target, kind: str, part: str) -> list[dict]:
         code = baostock_code(target.code_at())
+        if kind == "members":
+            query, _ = CN_INDICES[target.code_at()]
+            _, rows = await self.client.query(query, part)
+            begin = day_ns(part)
+            return [{"code": market_code(stock), "from": str(begin), "until": str(begin + 7 * DAY_NS),
+                     "knownAt": str(day_ns(updated))} for updated, stock, _name in rows]
         year, quarter = part.split("Q")
         _f, rows = await self.client.query("query_profit_data", code, int(year), int(quarter))
         out = []
@@ -399,7 +419,7 @@ class BaostockSource(Source):
     async def research_market(self, source_id: str, market: str, kind: str, at: int) -> list[dict]:
         """The whole market's CSRC industry at a date, in one query; rows carry their code."""
         if kind != "classification" or market != "CN":
-            raise MarketError("unsupported", f"Baostock has no market-wide {kind} for {market}", source_id=source_id)
+            raise MarketError("unsupported", t("Baostock has no market-wide {kind} for {market}", kind=kind, market=market), source_id=source_id)
         _f, rows = await self.client.query("query_stock_industry", "", _date_text(at))
         return [{"stock": stock, **value} for stock, value in map(_industry_row, rows)]
 

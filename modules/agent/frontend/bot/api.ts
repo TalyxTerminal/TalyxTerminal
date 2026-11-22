@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ModuleContext } from "@talyx/sdk";
 import { createContext, useContext } from "react";
 import { agentRequest } from "../data/client";
@@ -43,7 +44,7 @@ interface RailActions {
 export const RailContext = createContext<RailActions | null>(null);
 export function useRailActions() {
   const value = useContext(RailContext);
-  if (!value) throw new Error("Bot rail requires a mounted panel");
+  if (!value) throw new Error(t("Bot rail requires a mounted panel"));
   return value;
 }
 

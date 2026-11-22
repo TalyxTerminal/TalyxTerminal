@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useState, type ReactNode } from "react";
 import { TxButton, TxCheckbox, TxDialog, TxField, TxIconButton, TxSearch, TxSegmented } from "@talyx/sdk";
 import type { Instrument } from "@talyx/vocab";
@@ -7,14 +8,17 @@ import { usePanelContext } from "./MarketPanel";
 
 type Span = typeof spans[number]["value"];
 type Market = "us" | "cn" | "hk" | "crypto";
-const marketName: Record<Market, string> = { us: "US", cn: "A shares", hk: "HK", crypto: "Crypto" };
+const marketName: Record<Market, string> = { us: "US", cn: t("A shares"), hk: "HK", crypto: t("Crypto") };
 
 /** Something to fetch: an index's members over time, or one instrument. */
 export interface Pickable { id: string; label: string; detail: string; count: number; market: Market; target: FetchTarget }
 
 /** Indexes whose historical members Market holds (the members are fetched first, delisted ones included). */
 export const starters: Pickable[] = [
-  { id: "spx-members", label: "S&P 500 members", detail: "Index members since 1996, delisted included", count: 500, market: "us", target: { index: "^GSPC" } },
+  { id: "spx-members", label: t("S&P 500 members"), detail: t("Index members since 1996, delisted included"), count: 500, market: "us", target: { index: "^GSPC" } },
+  { id: "csi300", label: t("CSI 300 members"), detail: "000300.SH", count: 300, market: "cn", target: { index: "CN:000300.SH" } },
+  { id: "csi500", label: t("CSI 500 members"), detail: "000905.SH", count: 500, market: "cn", target: { index: "CN:000905.SH" } },
+  { id: "sse50", label: t("SSE 50 members"), detail: "000016.SH", count: 50, market: "cn", target: { index: "CN:000016.SH" } },
 ];
 
 type SearchMatches = { query: string; items: Pickable[] };
@@ -31,13 +35,13 @@ function marketOf(instrument: Instrument): Market {
 }
 
 /** Per kind of data and market: what Market fetches it as. A kind no picked market has is not offered. */
-const plan: Record<string, { kind: FetchKind; markets: Partial<Record<Market, string>> }> = {
-  Daily: { kind: { kind: "bars", timeframe: "1d" }, markets: { us: "Yahoo, or a keyed source", cn: "Baostock, or Tushare with a token", hk: "Yahoo", crypto: "The exchange" } },
-  "1 hour": { kind: { kind: "bars", timeframe: "1h" }, markets: { us: "Yahoo (2 years), Alpaca (from 2016)", crypto: "The exchange" } },
-  "1 minute": { kind: { kind: "bars", timeframe: "1m" }, markets: { us: "Yahoo (30 days), Alpaca (from 2016)", crypto: "The exchange's archives" } },
-  "Corporate actions": { kind: { kind: "actions" }, markets: { us: "Yahoo", cn: "Baostock", hk: "Yahoo" } },
-  Funding: { kind: { kind: "funding_rate" }, markets: { crypto: "The exchange" } },
-  "Open interest": { kind: { kind: "open_interest" }, markets: { crypto: "The exchange" } },
+const plan: Record<string, { label: string; kind: FetchKind; markets: Partial<Record<Market, string>> }> = {
+  Daily: { label: t("Daily"), kind: { kind: "bars", timeframe: "1d" }, markets: { us: t("Yahoo, or a keyed source"), cn: t("Baostock, or Tushare with a token"), hk: "Yahoo", crypto: t("The exchange") } },
+  "1 hour": { label: t("1 hour"), kind: { kind: "bars", timeframe: "1h" }, markets: { us: t("Yahoo (2 years), Alpaca (from 2016)"), crypto: t("The exchange") } },
+  "1 minute": { label: t("1 minute"), kind: { kind: "bars", timeframe: "1m" }, markets: { us: t("Yahoo (30 days), Alpaca (from 2016)"), crypto: t("The exchange's archives") } },
+  "Corporate actions": { label: t("Corporate actions"), kind: { kind: "actions" }, markets: { us: "Yahoo", cn: "Baostock", hk: "Yahoo" } },
+  Funding: { label: t("Funding"), kind: { kind: "funding_rate" }, markets: { crypto: t("The exchange") } },
+  "Open interest": { label: t("Open interest"), kind: { kind: "open_interest" }, markets: { crypto: t("The exchange") } },
 };
 
 /** Rows a year per instrument, and how many years back the source goes at most; a local estimate, not a source query.
@@ -109,35 +113,35 @@ export function GetDataDialog({ initial, alpaca, onClose, onGet }: { initial?: P
     onGet(Promise.all(requests));
     onClose();
   };
-  return <TxDialog open onOpenChange={value => { if (!value) onClose(); }} title="Get data" size="wide" footer={<>
-    {tooBig ? <span className="market-disk tx-num">Needs ≈ {formatBytes(estimate)}; {disk!.drive} has {formatBytes(disk!.free)} free</span>
-      : <span className="tx-secondary tx-num">{total ? `${total.toLocaleString("en-US")} ${total === 1 ? "instrument" : "instruments"} × ${chosen.length} ${chosen.length === 1 ? "kind" : "kinds"}` : ""}</span>}
+  return <TxDialog open onOpenChange={value => { if (!value) onClose(); }} title={t("Get data")} size="wide" footer={<>
+    {tooBig ? <span className="market-disk tx-num">{t("Needs ≈ {estimate}; {drive} has {free} free", { estimate: formatBytes(estimate), drive: disk!.drive, free: formatBytes(disk!.free) })}</span>
+      : <span className="tx-secondary tx-num">{total ? `${total === 1 ? t("1 instrument") : t("{count} instruments", { count: total.toLocaleString("en-US") })} × ${chosen.length === 1 ? t("1 kind") : t("{count} kinds", { count: chosen.length })}` : ""}</span>}
     <span className="tx-spacer" />
-    <TxButton size="sm" variant="quiet" onClick={onClose}>Cancel</TxButton>
+    <TxButton size="sm" variant="quiet" onClick={onClose}>{t("Cancel")}</TxButton>
     {estimate > 0 && !tooBig && <span className="tx-num tx-secondary">≈ {formatBytes(estimate)}</span>}
-    <TxButton size="sm" variant="primary" disabled={!picked.length || !chosen.length || tooBig} onClick={get}>{total ? `Get ${total.toLocaleString("en-US")} ${total === 1 ? "instrument" : "instruments"}` : "Get"}</TxButton>
+    <TxButton size="sm" variant="primary" disabled={!picked.length || !chosen.length || tooBig} onClick={get}>{total ? (total === 1 ? t("Get {total} instrument", { total: total.toLocaleString("en-US") }) : t("Get {total} instruments", { total: total.toLocaleString("en-US") })) : t("Get")}</TxButton>
   </>}>
     <div className="market-get">
       <div className="market-get-col">
-        <TxField label="Instruments"><TxSearch value={query} onValueChange={setQuery} placeholder="Index, exchange, code or name" autoFocus /></TxField>
+        <TxField label={t("Instruments")}><TxSearch value={query} onValueChange={setQuery} placeholder={t("Index, exchange, code or name")} autoFocus /></TxField>
         {picked.length > 0 && <div className="market-get-list market-get-picked">{picked.map(item => <PickRow key={item.id} item={item}>
-          <TxIconButton size="sm" icon="close" label={`Remove ${item.label}`} onClick={() => setPicked(picked.filter(other => other !== item))} />
+          <TxIconButton size="sm" icon="close" label={t("Remove {label}", { label: item.label })} onClick={() => setPicked(picked.filter(other => other !== item))} />
         </PickRow>)}</div>}
         <div className="market-get-list market-get-offered">{offered.map(item => <TxButton key={item.id} variant="row" onClick={() => { setPicked([...picked, item]); setQuery(""); }}>
           <PickRow item={item} />
         </TxButton>)}</div>
       </div>
       <div className="market-get-col">
-        <TxField label="Data">
+        <TxField label={t("Data")}>
           <div className="market-kinds">{available.map(kind => {
             const from = markets.flatMap(market => plan[kind]!.markets[market] ? [`${markets.length > 1 ? `${marketName[market]} · ` : ""}${plan[kind]!.markets[market]}`] : []);
             return <div key={kind} className="market-kind">
-              <TxCheckbox label={kind} checked={kinds.includes(kind)} onCheckedChange={on => setKinds(on ? [...kinds, kind] : kinds.filter(item => item !== kind))} />
+              <TxCheckbox label={plan[kind]!.label} checked={kinds.includes(kind)} onCheckedChange={on => setKinds(on ? [...kinds, kind] : kinds.filter(item => item !== kind))} />
               <span className="market-kind-from">{from.map(line => <span key={line} className="tx-secondary market-clip" title={line}>{line}</span>)}</span>
             </div>;
           })}</div>
         </TxField>
-        <TxField label="Period"><TxSegmented value={span} onChange={setSpan} label="Period" options={spans.map(item => ({ value: item.value, label: item.label }))} /></TxField>
+        <TxField label={t("Period")}><TxSegmented value={span} onChange={setSpan} label={t("Period")} options={spans.map(item => ({ value: item.value, label: item.label }))} /></TxField>
       </div>
     </div>
   </TxDialog>;

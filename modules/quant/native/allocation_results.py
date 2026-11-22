@@ -11,6 +11,8 @@ from native import metrics as M
 from native.allocation_shock import shock_row
 from native.figures import Missing, figure, iso, line, nums, reason_of, trace
 
+from . import i18n
+
 CRISES = [("2008 GFC", "2008-09-15", "2009-03-09"), ("2020-03 COVID", "2020-02-19", "2020-03-23"), ("2022 rate hikes", "2022-01-03", "2022-10-12"),
           ("2023 regional banks", "2023-03-08", "2023-03-17"), ("Aug 2024 yen carry unwind", "2024-07-16", "2024-08-05"), ("2025 tariff shock", "2025-02-19", "2025-04-08")]
 DAY = "%{x}"
@@ -243,7 +245,7 @@ def frontier_figure(weights, returns, settings, lookback, annual=252, size=20):
     mine = weights.reindex(assets).fillna(0.0).to_numpy()
     equal = np.full(len(assets), 1.0 / len(assets))
     point = lambda row: (float(np.sqrt(row @ cov @ row) * np.sqrt(annual) * 100), float(row @ mean * annual * 100))  # noqa: E731
-    note = [] if len(solved) == len(grid) else [{"text": f"{len(grid) - len(solved)} of {len(grid)} points did not solve", "xref": "paper", "yref": "paper", "x": 0, "y": -0.2,
+    note = [] if len(solved) == len(grid) else [{"text": i18n.t("{unsolved} of {total} points did not solve", unsolved=len(grid) - len(solved), total=len(grid)), "xref": "paper", "yref": "paper", "x": 0, "y": -0.2,
                                                   "xanchor": "left", "showarrow": False, "font": {"size": 10}}]
     hover = "%{customdata}<br>Predicted volatility %{x:.2f}%<br>Expected return %{y:+.2f}%<extra></extra>"
     mx, my = point(mine)
@@ -377,7 +379,7 @@ def style_exposures(returns, held, groups=None, amount=None, annual=252, daily=N
     return rows
 
 
-PERIOD_OF = {12: "Monthly", 52: "Weekly"}   # observations a year of an aligned pool; any other count is Market's calendar of days
+PERIOD_OF = {12: i18n.mark("Monthly"), 52: i18n.mark("Weekly")}   # observations a year of an aligned pool; any other count is Market's calendar of days
 
 
 def risk_measures(daily, benchmark=None, annual=None, vol_figure=None):
@@ -389,16 +391,16 @@ def risk_measures(daily, benchmark=None, annual=None, vol_figure=None):
     growth = (1 + daily).cumprod()
     depth = M.drawdown_path(growth, 1.0)
     deep = np.quantile(depth, 0.05)
-    period = PERIOD_OF.get(annual, "Daily")
-    rows = [{"label": f"{period} VaR 95%", "value": var}, {"label": f"{period} CVaR 95%", "value": cvar},
-            {"label": "CDaR 95%", "value": float(depth[depth <= deep].mean())}]
+    period = i18n.t(PERIOD_OF.get(annual, i18n.mark("Daily")))
+    rows = [{"label": i18n.t("{period} VaR 95%", period=period), "value": var}, {"label": i18n.t("{period} CVaR 95%", period=period), "value": cvar},
+            {"label": i18n.t("CDaR 95%"), "value": float(depth[depth <= deep].mean())}]
     if benchmark is not None and len(daily) > 2:
-        rows.append({"label": "Tracking error vs 60/40", "value": float((daily - benchmark).std() * np.sqrt(annual)), "plain": True})
+        rows.append({"label": i18n.t("Tracking error vs 60/40"), "value": float((daily - benchmark).std() * np.sqrt(annual)), "plain": True})
     traces = {t.get("meta", {}).get("key"): t for t in (vol_figure or {}).get("data", [])} if isinstance(vol_figure, dict) else {}
-    for key, label in (("predicted", "Predicted volatility, average"), ("realized", "Realized next month, average")):
+    for key, label in (("predicted", i18n.mark("Predicted volatility, average")), ("realized", i18n.mark("Realized next month, average"))):
         values = [v for v in (traces.get(key) or {}).get("y", []) if v is not None]
         if values:
-            rows.append({"label": label, "value": float(np.mean(values)) / 100.0, "plain": True})
+            rows.append({"label": i18n.t(label), "value": float(np.mean(values)) / 100.0, "plain": True})
     return rows
 
 

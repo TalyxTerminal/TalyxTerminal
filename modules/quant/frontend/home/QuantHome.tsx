@@ -1,5 +1,6 @@
 /** Quant home: what to handle first (each row ends in its one action), then what runs and waits beside New, then recently changed objects with
     their representative run's key number. Weakening and late items only get a link to the library; Home lists what needs a hand now. */
+import { t } from "../i18n";
 import { useEffect, useMemo, useState } from "react";
 import { TxButton, TxIcon, TxLive, TxObjectTitle, TxSpacer, TxTag, useTxToast, type ModuleContext } from "@talyx/sdk";
 import { at as at_, route } from "../types";
@@ -29,9 +30,9 @@ const kindLabel = (kind: string) => (KINDS as Record<string, {label: string}>)[k
 export function AttentionSection({items, watch, summary, onAction, onOpen, onLibrary}: {items: AttentionItem[]; watch: number; summary: {onTime: number};
   onAction(item: AttentionItem): void; onOpen(item: AttentionItem): void; onLibrary(): void}) {
   return <section className="qv-home-sec">
-    <div className="qv-home-head"><h3>To handle</h3>{items.length > 0 && <b className="qv-home-count">{items.length}</b>}<span className="tx-spacer" />
-      {watch > 0 && <button type="button" className="qv-home-link" onClick={onLibrary}>{`${watch} more to watch in the library`}</button>}</div>
-    {items.length === 0 ? <div className="qv-home-calm">Nothing to handle{summary.onTime > 0 && <> <span className="qv-home-dim">·</span> <b>{summary.onTime}</b> {summary.onTime === 1 ? "library item" : "library items"} on time</>}</div>
+    <div className="qv-home-head"><h3>{t("To handle")}</h3>{items.length > 0 && <b className="qv-home-count">{items.length}</b>}<span className="tx-spacer" />
+      {watch > 0 && <button type="button" className="qv-home-link" onClick={onLibrary}>{t("{watch} more to watch in the library", { watch })}</button>}</div>
+    {items.length === 0 ? <div className="qv-home-calm">{t("Nothing to handle")}{summary.onTime > 0 && <> <span className="qv-home-dim">·</span> {summary.onTime === 1 ? t.rich("{count} library item on time", { count: <b>{summary.onTime}</b> }) : t.rich("{count} library items on time", { count: <b>{summary.onTime}</b> })}</>}</div>
       : <table className="qv-table qv-home-attn"><tbody>{items.map((item, index) => <tr key={index} onClick={() => onOpen(item)}>
         <td className="l"><span className="qv-home-name"><b title={item.subject.name}>{item.subject.name}</b>{item.subject.version ? <TxTag tone="version">{`v${item.subject.version}`}</TxTag> : null}<span className="qv-home-dim">{kindLabel(item.subject.itemKind ?? item.subject.kind)}</span></span></td>
         {/* The state as a word in its tone before why; when it only repeats the action at the row's end, the action alone says it. */}
@@ -42,15 +43,15 @@ export function AttentionSection({items, watch, summary, onAction, onOpen, onLib
 
 export function QueueSection({jobs, onStop}: {jobs: QueueJob[]; onStop(job: QueueJob): void}) {
   const running = jobs.filter(job => job.state === "running").length, queued = jobs.filter(job => job.state === "queued").length;
-  return <section className="qv-home-sec"><div className="qv-home-head"><h3>Running and queued</h3><span className="qv-home-dim">{`${running} running, ${queued} queued`}</span></div>
+  return <section className="qv-home-sec"><div className="qv-home-head"><h3>{t("Running and queued")}</h3><span className="qv-home-dim">{t("{running} running, {queued} queued", { running, queued })}</span></div>
     <table className="qv-table qv-home-jobs"><tbody>{jobs.map((job, index) => <tr key={index}>
       <td className="l"><span className="qv-home-name"><b>{job.subject.name}</b><span className="qv-home-dim">{kindLabel(job.subject.kind)}</span></span></td>
       <td className="l">{job.state === "running" && typeof job.progress === "number" ? <TxLive label={job.what} value={job.progress} /> : <span className="qv-home-dim">{job.what}</span>}</td>
       <td className="qv-home-dim num">{job.state === "running" ? elapsedText(job.elapsed) : ""}</td><td className="qv-home-dim">{job.left ?? ""}</td>
-      <td className="qv-home-act">{job.can_stop ? <TxButton variant="quiet" size="sm" onClick={() => onStop(job)}>{job.state === "queued" ? "Cancel" : "Stop"}</TxButton> : null}</td></tr>)}</tbody></table></section>;
+      <td className="qv-home-act">{job.can_stop ? <TxButton variant="quiet" size="sm" onClick={() => onStop(job)}>{job.state === "queued" ? t("Cancel") : t.c("action", "Stop")}</TxButton> : null}</td></tr>)}</tbody></table></section>;
 }
 
-const BLANK: Partial<Record<Kind, string>> = {factor: "Blank formula", model: "Standard pipeline", allocation: "Standard pipeline", strategy: "Blank", notebook: "Blank"};
+const BLANK: Partial<Record<Kind, string>> = {factor: t("Blank formula"), model: t("Standard pipeline"), allocation: t("Standard pipeline"), strategy: t("Blank"), notebook: t("Blank")};
 /** New: a column for each kind of object, in the order work flows (a factor feeds a model, a model an allocation or a strategy), each starting blank or
     from what is ready-made for it; what a ready-made one is shows on hover. */
 /** A small drawing of what a kind of object gives, in the lines its own pages use: a factor's groups fanning out, a model's rolling windows (train,
@@ -96,24 +97,24 @@ export function KindArt({kind}: {kind: Kind}) {
 
 export function NewSection({kinds, presets, counts = {}, onCreate}: {kinds: Kind[]; presets: Preset[]; counts?: Partial<Record<Kind, number>>; onCreate(kind: Kind, preset?: string): void}) {
   const order = (["factor", "model", "allocation", "strategy", "notebook"] as Kind[]).filter(kind => kinds.includes(kind));
-  return <section className="qv-home-sec qv-home-new"><div className="qv-home-head"><h3>New</h3></div>
+  return <section className="qv-home-sec qv-home-new"><div className="qv-home-head"><h3>{t("New")}</h3></div>
     <div className="qv-home-kinds" style={{["--qv-kinds" as string]: order.length}}>{order.map(kind => {
       const own = presets.filter(preset => preset.kind === kind);
       // Each kind a cover with a drawing of what it gives; the cover starts a blank one, as the first row under it does.
       return <div key={kind} className="qv-home-kind">
-        <div className="qv-home-cover"><KindArt kind={kind} /><TxButton variant="row" aria-label={`New ${KINDS[kind].label.toLowerCase()}`} onClick={() => onCreate(kind)} /></div>
+        <div className="qv-home-cover"><KindArt kind={kind} /><TxButton variant="row" aria-label={t("New {label}", { label: KINDS[kind].label.toLowerCase() })} onClick={() => onCreate(kind)} /></div>
         <h4><span>{KINDS[kind].label}</span>{counts[kind] ? <span className="qv-home-dim">{counts[kind]}</span> : null}</h4>
         <TxButton variant="row" size="sm" onClick={() => onCreate(kind)}><TxIcon name="plus" />{BLANK[kind]}</TxButton>
-        {own.length > 0 && <ul aria-label={`Ready-made ${KINDS[kind].plural.toLowerCase()}`}>{own.map(preset => <li key={preset.id}>
+        {own.length > 0 && <ul aria-label={t("Ready-made {plural}", { plural: KINDS[kind].plural.toLowerCase() })}>{own.map(preset => <li key={preset.id}>
           <TxButton variant="row" size="sm" title={preset.description} onClick={() => onCreate(kind, preset.id)}><span className="qv-home-dim">{preset.label}</span></TxButton></li>)}</ul>}
       </div>;
     })}</div></section>;
 }
 
 export function RecentSection({items, total, onOpen, onAll}: {items: ObjectRow[]; total: number; onOpen(row: ObjectRow): void; onAll(): void}) {
-  return <section className="qv-home-sec"><div className="qv-home-head"><h3>Recently changed</h3><span className="tx-spacer" /><button type="button" className="qv-home-link" onClick={onAll}>{total === 1 ? "All objects" : `All ${total} objects`}</button></div>
-    <table className="qv-table qv-home-recent"><thead><tr><th className="l">Name</th><th className="l">Kind</th><th className="l" title="Published run; else the starred one; else the latest successful">Representative run</th><th className="l">Key number</th><th title="Checks passed">Checks</th><th>Changed</th></tr></thead>
-      <tbody>{items.map(row => <tr key={row.id} onClick={() => onOpen(row)}><td className="l"><span className="qv-home-name"><b>{row.name}</b>{["factor", "model", "allocation"].includes(row.kind) && !row.library && <TxTag tone="muted">candidate</TxTag>}</span></td>
+  return <section className="qv-home-sec"><div className="qv-home-head"><h3>{t("Recently changed")}</h3><span className="tx-spacer" /><button type="button" className="qv-home-link" onClick={onAll}>{total === 1 ? t("All objects") : t("All {total} objects", { total })}</button></div>
+    <table className="qv-table qv-home-recent"><thead><tr><th className="l">{t("Name")}</th><th className="l">{t("Kind")}</th><th className="l" title={t("Published run; else the starred one; else the latest successful")}>{t("Representative run")}</th><th className="l">{t("Key number")}</th><th title={t("Checks passed")}>{t("Checks")}</th><th>{t("Changed")}</th></tr></thead>
+      <tbody>{items.map(row => <tr key={row.id} onClick={() => onOpen(row)}><td className="l"><span className="qv-home-name"><b>{row.name}</b>{["factor", "model", "allocation"].includes(row.kind) && !row.library && <TxTag tone="muted">{t("candidate")}</TxTag>}</span></td>
         <td className="l qv-home-dim">{KINDS[row.kind].label}</td><td className="l"><RepCell o={row} /></td><td className="l"><KeyNumberCell o={row} /></td><td><ChecksCell o={row} /></td><td className="qv-home-dim">{whenText(row.changedAt)}</td></tr>)}</tbody></table></section>;
 }
 
@@ -144,24 +145,24 @@ export function QuantHome({ctx, list, presets, onOpen, onCreate, onOpenObjects, 
   };
   const act = (item: AttentionItem) => {
     const subject = item.subject, action = item.action;
-    if ((action.id === "retry" || action.id === "check_source") && subject.versionId) void said(api.retry(subject.versionId), `Retrying ${subject.name} v${subject.version ?? ""} now`);
+    if ((action.id === "retry" || action.id === "check_source") && subject.versionId) void said(api.retry(subject.versionId), t("Retrying {name} v{version} now", { name: subject.name, version: subject.version ?? "" }));
     else if (action.id === "open_input" && subject.versionId) onOpenVersion(subject.versionId);
     else if (action.id === "review_period" && action.objectId) onOpen(action.objectId);  // the review is in the allocation's Work
     else if (action.id === "republish" && action.objectId) onOpen(action.objectId);  // a failure a retry cannot mend: run it there and publish again
-    else if (action.id === "switch_version" && action.versionId && subject.id) void said(route(ctx, "POST", at_`/objects/${subject.id}/library-version`, {versionId: action.versionId}), `${subject.name} now pins the newer version; run it again to see the difference`);
+    else if (action.id === "switch_version" && action.versionId && subject.id) void said(route(ctx, "POST", at_`/objects/${subject.id}/library-version`, {versionId: action.versionId}), t("{name} now pins the newer version; run it again to see the difference", { name: subject.name }));
     else if (subject.versionId) onOpenVersion(subject.versionId); else open(item);
   };
   const stop = (job: QueueJob) => {
-    if (job.subject.kind === "library" && job.subject.versionId) void said(api.cancel(job.subject.versionId), `Cancelled the update of ${job.subject.name}`);
-    else if (job.subject.id) void said(route(ctx, "POST", at_`/object-runs/${job.subject.id}/cancel`), `Stopped ${job.subject.name}`);
+    if (job.subject.kind === "library" && job.subject.versionId) void said(api.cancel(job.subject.versionId), t("Cancelled the update of {name}", { name: job.subject.name }));
+    else if (job.subject.id) void said(route(ctx, "POST", at_`/object-runs/${job.subject.id}/cancel`), t("Stopped {name}", { name: job.subject.name }));
   };
   const all = (list?.items ?? []) as ObjectRow[];
   const recent = useMemo(() => all.filter(row => row.inThisWorkspace !== false).sort((a, b) => (b.changedAt ?? b.updatedAt) - (a.changedAt ?? a.updatedAt)).slice(0, 10), [list]);
   const kinds = (list?.kinds ?? []).filter(item => item.creatable).map(item => item.kind);
   const counts = Object.fromEntries((list?.kinds ?? []).map(item => [item.kind, item.count])) as Partial<Record<Kind, number>>;
   return <div className="qv-home-page">
-    <div className="qx-bar"><TxButton variant="quiet" size="sm" onClick={onOpenObjects}><TxIcon name="list" />All objects</TxButton><TxObjectTitle name="Quant" kind="Home" /><TxSpacer />
-      <TxButton variant="quiet" size="sm" onClick={() => onOpenLibrary()}><TxIcon name="bookmark" />Library</TxButton></div>
+    <div className="qx-bar"><TxButton variant="quiet" size="sm" onClick={onOpenObjects}><TxIcon name="list" />{t("All objects")}</TxButton><TxObjectTitle name={t("Quant")} kind={t("Home")} /><TxSpacer />
+      <TxButton variant="quiet" size="sm" onClick={() => onOpenLibrary()}><TxIcon name="bookmark" />{t("Library")}</TxButton></div>
     <div className="qv-scroll qv-home">
       <AttentionSection items={attention?.items ?? []} watch={attention?.watchInLibrary ?? 0} summary={{onTime}} onAction={act} onOpen={open} onLibrary={() => onOpenLibrary()} />
       {(queue?.jobs ?? []).length > 0 && <QueueSection jobs={queue!.jobs} onStop={stop} />}

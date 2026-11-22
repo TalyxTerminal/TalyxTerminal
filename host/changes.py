@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from talyx_sdk.errors import ContractError
+from talyx_sdk.i18n import t
 
 from kernel.router import QUEUE_SECONDS
 
@@ -27,8 +28,7 @@ def check_owner(requester: dict, recorded: dict) -> None:
                 return
         elif origin == requester["origin"] == "module":
             return
-    raise ContractError("permission_denied", "Only the original caller in its workspace and conversation can "
-                                             "access this call's changes")
+    raise ContractError("permission_denied", t("Only the original caller in its workspace and conversation can access this call's changes"))
 
 
 async def _ask(host, module_id: str, envelope: dict):
@@ -37,11 +37,11 @@ async def _ask(host, module_id: str, envelope: dict):
     try:
         await asyncio.wait_for(process.ready_event.wait(), QUEUE_SECONDS)
     except TimeoutError as exc:
-        raise ContractError("unavailable", f"{module_id} did not become ready to handle its changes") from exc
+        raise ContractError("unavailable", t("{module_id} did not become ready to handle its changes", module_id=module_id)) from exc
     try:
         return await host._ask_module(process, envelope, QUEUE_SECONDS)
     except TimeoutError as exc:
-        raise ContractError("unavailable", f"{module_id} did not confirm its changes request", execution="unknown",
+        raise ContractError("unavailable", t("{module_id} did not confirm its changes request", module_id=module_id), execution="unknown",
                             effects="may_have_occurred" if envelope["t"] == "revert_changes" else "none") from exc
 
 
@@ -66,5 +66,5 @@ async def revert(host, caller: dict, call_id: str, direction: str) -> None:
     check_owner(caller, record["caller"])
     owner = record["capability"].partition(".")[0]
     if owner == "platform" or not host.catalog.get(owner).contract.get("changes"):
-        raise ContractError("unavailable", f"{owner} does not provide change restoration")
+        raise ContractError("unavailable", t("{owner} does not provide change restoration", owner=owner))
     await _ask(host, owner, {"t": "revert_changes", "callId": call_id, "direction": direction})

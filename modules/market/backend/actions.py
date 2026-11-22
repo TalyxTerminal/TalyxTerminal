@@ -12,6 +12,7 @@ import threading
 from bisect import bisect_left, bisect_right
 
 import numpy as np
+from talyx_sdk.i18n import t
 
 from . import calendars
 from .common import DAY_NS, MarketError
@@ -97,7 +98,7 @@ class Actions:
                 sessions = calendars._session_midnights(calendar)
                 pos = int(sessions.searchsorted(ex)) - 1
                 if pos < 0:
-                    raise MarketError("no_data", f"No trading calendar before ex-date {ex}")
+                    raise MarketError("no_data", t("No trading calendar before ex-date {ex}", ex=ex))
                 days[ex] = int(sessions[pos])
         return days
 
@@ -121,7 +122,7 @@ class Actions:
             elif ex in references and row["kind"] == "cash_dividend":
                 previous = reference_close(closes, references[ex], spans)
                 if previous is None:
-                    raise MarketError("no_data", f"Missing daily reference close for cash dividend on {ex}")
+                    raise MarketError("no_data", t("Missing daily reference close for cash dividend on {ex}", ex=ex))
                 times.append(ex)
                 ratios.append(1.0)
                 dividends.append(1.0 - float(row["amount"]) / previous)

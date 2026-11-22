@@ -35,10 +35,11 @@ from native.figures import (
     trace,
 )
 
+from . import i18n
+
 NS = 1_000_000
 DAY_NS = 86_400_000_000_000
 LOG_IN_WORK = 1000
-SHORT_SAMPLE = 60
 BENCH_NONE = "No benchmark"
 # Market stress periods a run is measured in when it covers them (UTC days, inclusive).
 CRISES = {
@@ -394,7 +395,7 @@ class Report:
         kind = spec.get("kind")
         if kind == "none":
             raise Missing("No benchmark")
-        if kind in ("series", "beta"):
+        if kind == "series":
             rows = spec.get("rows") or []
             if not rows:
                 raise Missing(spec.get("unavailable") or f"Market gave no prices for {spec.get('label', 'the benchmark')}.")
@@ -423,51 +424,27 @@ class Report:
                 raise Missing("No index member had a price at the first close.")
             values = (closes[held].ffill() / first[held]).mean(axis=1)
             label = (self.display.get(held[0], held[0]) + " hold") if len(held) == 1 else f"Equal-weight hold of the {len(held)} names"
-        if kind not in ("series", "beta") and len(days) and days[0] < values.index[0]:
+        if kind != "series" and len(days) and days[0] < values.index[0]:
             values = pd.concat([pd.Series([1.0], index=[days[0]]), values])  # the level before the first open, where the account starts
         values = values.reindex(values.index.union(days)).ffill().reindex(days)
         return values, label
-
-    def benchmark_levels(self, equity, returns, rf):
-        level, label = self.benchmark_series(equity.index)
-        beta = None
-        if (self.invocation.get("benchmark") or {}).get("kind") == "beta":
-            level, beta = self.beta_benchmark(level, returns.reindex(equity.index), rf)
-        return level, label, beta
-
-    def beta_benchmark(self, market, returns, rf):
-        """Cash plus beta times the index: each day the risk-free rate plus beta times the index's return over it; beta is the least-squares slope
-        of this run's excess return on the index's excess return (the run, not the held-out end)."""
-        if rf is None or rf.reindex(returns.dropna().index).isna().any():
-            raise Missing("No complete risk-free series for the beta benchmark.")
-        daily_rf = rf
-        index_return = market.pct_change().reindex(returns.index)
-        joined = pd.concat([returns - daily_rf, index_return - daily_rf], axis=1).dropna()
-        if self.invocation.get("heldOutFrom") is not None:
-            joined = joined[joined.index < pd.Timestamp(self.invocation["heldOutFrom"], unit="ms", tz="UTC")]
-        if len(joined) < 3 or float(joined.iloc[:, 1].var()) == 0:
-            raise Missing("Too few days with the index to measure beta.")
-        beta = float(joined.iloc[:, 0].cov(joined.iloc[:, 1]) / joined.iloc[:, 1].var())
-        daily = daily_rf + beta * (index_return - daily_rf)
-        level = (1 + daily.fillna(0.0)).cumprod()
-        return level, beta
 
     def risk_free(self, days):
         """The risk-free rate a day (a share), and how it was taken."""
         spec = self.invocation.get("riskFree") or {"basis": "zero" if self.crypto else "irx"}
         basis = spec.get("basis") or ("zero" if self.crypto else "irx")
         if basis == "zero":
-            return pd.Series(0.0, index=days), {"basis": "zero", "label": "zero"}
+            return pd.Series(0.0, index=days), {"basis": i18n.t("zero"), "label": i18n.t("zero")}
         if basis == "fixed":
             pct = float(spec.get("pct") or 0)
-            return pd.Series(pct / 100 / self.A, index=days), {"basis": "fixed", "label": f"fixed {pct:g}% a year", "meanPct": pct}
+            return pd.Series(pct / 100 / self.A, index=days), {"basis": "fixed", "label": i18n.t("fixed {rate}% a year", rate=f'{pct:g}'), "meanPct": pct}
         rows = spec.get("rows") or []
         if not rows:
-            return None, {"basis": "irx", "label": "13-week T-bill", "unavailable": spec.get("unavailable") or "Market has no ^IRX closes for this period"}
+            return None, {"basis": "irx", "label": i18n.t("13-week T-bill"), "unavailable": spec.get("unavailable") or i18n.t("Market has no ^IRX closes for this period")}
         values = pd.Series([float(value) for _, value in rows], index=pd.to_datetime([int(at) for at, _ in rows], unit="ms", utc=True).normalize())
         values = values[~values.index.duplicated(keep="last")].sort_index()
         values = values.reindex(values.index.union(days)).ffill().reindex(days)
-        return values / 100 / self.A, {"basis": "irx", "label": "13-week T-bill (^IRX)", "meanPct": num(values.mean(), 4) if values.notna().all() else None}
+        return values / 100 / self.A, {"basis": "irx", "label": i18n.t("13-week T-bill (^IRX)"), "meanPct": num(values.mean(), 4) if values.notna().all() else None}
 
     # ------------------------------------------------------------------------------------------------ positions, fills, orders
     def trade_rows(self):
@@ -684,9 +661,8 @@ class Report:
         drawdown = drawdown_of(equity)
         rf, rf_info = self.risk_free(days)
         excess = returns - rf if rf is not None and rf.notna().all() else None
-        beta = None
         try:
-            bench_level, bench_label, beta = self.benchmark_levels(equity, returns, rf)
+            bench_level, bench_label = self.benchmark_series(equity.index)
             bench_returns = bench_level.pct_change().reindex(days)
             if len(bench_returns) and pd.isna(bench_returns.iloc[0]):
                 bench_returns.iloc[0] = 0.0  # the benchmark starts at the first day's close, as the account does
@@ -712,7 +688,7 @@ class Report:
         orders = self.order_rows()
         log = self.log_lines(trades)
         work = {"kind": self.kind, "currency": self.currency, "capital": self.capital, "annualization": self.A, "riskFree": rf_info,
-                "benchmarkLabel": bench_label, "stats": stats, "shortSample": len(returns) < SHORT_SAMPLE,
+                "benchmarkLabel": bench_label, "stats": stats,
                 "sharpeInputs": self.sharpe_inputs(excess),
                 "equity": series_points(equity, 4), "drawdown": series_points(drawdown),
                 "benchmark": series_points(bench_equity, 4) if bench_equity is not None else [],
@@ -725,8 +701,6 @@ class Report:
         # The daily returns the statistics were computed from, unrounded, so anything the page or a test derives from them agrees with the engine's own.
         work["dailyReturns"] = [[day_ms(at), num(value, 12), num(bench_returns.get(at), 12) if bench_returns is not None else None] for at, value in returns.items()]
         work["dailyRiskFree"] = series_points(rf, 12) if rf is not None else None
-        if beta is not None:
-            work["benchmarkBeta"] = num(beta)
         if self.account_rows:
             work["accounts"] = self.account_rows
         self.extra = {"orders": orders, "log": log, "fills": [
@@ -753,7 +727,7 @@ class Report:
         excess = returns - rf if rf is not None and rf.notna().all() else None
         bench_equity = bench_returns = None
         try:
-            bench_level, _, _ = self.benchmark_levels(equity, returns, rf)
+            bench_level, _ = self.benchmark_series(equity.index)
             bench_returns = bench_level.pct_change().reindex(days)
             if len(bench_returns) and pd.isna(bench_returns.iloc[0]):
                 bench_returns.iloc[0] = 0.0
@@ -993,15 +967,17 @@ class Report:
                               + f": {order['reason'] or order['status']}"})
         for item in trades:
             lines.append({"t": item["entry"], "instrument": item["instrument"], "kind": "Trade", "trade": item["id"],
-                          "text": f"{item['side']} {quantity_text(item['qty'])} at {price_text(item['entryPrice'])}"})
+                          "text": i18n.t("{side} {quantity} at {price}", side=i18n.t("Long") if item["side"] == "Long" else i18n.t("Short"), quantity=quantity_text(item['qty']), price=price_text(item['entryPrice']))})
             if item["exit"] is not None:
                 lines.append({"t": item["exit"], "instrument": item["instrument"], "kind": "Stop" if item["exitBy"] in ("stop", "trail", "liquidation") else "Trade", "trade": item["id"],
                               "text": (f"Liquidated at {price_text(item['exitPrice'])}, P&L {item['pnl']:.2f}" if item["exitBy"] == "liquidation" else
                                        f"Exit ({item['exitBy']}) at {price_text(item['exitPrice'])}, P&L {item['pnl']:.2f}") if item["pnl"] is not None else f"Exit ({item['exitBy']})"})
         funding = [entry for entry in self.ledger.entries if entry["kind"] == "funding"]
         for entry in funding:
+            wording = (i18n.mark("Funding {rate}%: paid {amount} {currency}") if entry["amount"] > 0
+                       else i18n.mark("Funding {rate}%: received {amount} {currency}"))
             lines.append({"t": ms(entry["t"]), "instrument": self.display.get(entry["instrument"], entry["instrument"]), "kind": "Funding",
-                          "text": f"Funding {entry['rate'] * 100:.4f}%: {'paid' if entry['amount'] > 0 else 'received'} {abs(entry['amount']):.2f} {entry['currency']}"})
+                          "text": i18n.t(wording, rate=f"{entry['rate'] * 100:.4f}", amount=f"{abs(entry['amount']):.2f}", currency=entry["currency"])})
         lines = [line for line in lines if line.get("t") is not None]
         lines.sort(key=lambda line: line["t"])
         return lines
@@ -1275,10 +1251,10 @@ class Report:
             joined = pd.concat([returns, bench], axis=1)
             beta = joined.iloc[:, 0].rolling(window).cov(joined.iloc[:, 1]) / joined.iloc[:, 1].rolling(window).var()
             figures["beta"] = figure("strategy.rollingBeta", [line(x, nums(beta.to_numpy()), "main", "beta", "Beta"), reference(x, [1.0] * len(x), "one", "1")],
-                                     yaxis={"title": {"text": "Beta"}})
+                                     yaxis={"title": {"text": "Beta"}})  # Axis title discarded by figure().  # i18n: ignore
         else:
             figures["beta"] = {"key": "strategy.rollingBeta", "unavailable": self.missing.get("benchmark", "No benchmark")}
-        figures["volatility"] = figure("strategy.rollingVolatility", traces, yaxis={"title": {"text": "Volatility, a year"}, "tickformat": ".0%"})
+        figures["volatility"] = figure("strategy.rollingVolatility", traces, yaxis={"title": {"text": "Volatility, a year"}, "tickformat": ".0%"})  # Axis title discarded by figure().  # i18n: ignore
         return {"window": window, "longerThanRun": len(returns) <= window, "figures": figures}
 
     def long_short(self, trades, exposure, bench_level, turnover_a_year):
@@ -1356,15 +1332,15 @@ class Report:
         edges, held_axis = whole_bins(winner_bars + loser_bars)
         figures = {
             "returns": figure("strategy.tradeReturns", [bars_of(returns * 100, "returns", "Trades", 1, 2)],
-                              xaxis={"title": {"text": "Return of each trade, %"}}, bargap=0),
+                              xaxis={"title": {"text": "Return of each trade, %"}}, bargap=0),  # Axis title discarded by figure().  # i18n: ignore
             "held": figure("strategy.barsHeld", [bars_of(winner_bars, "winners", "Winners", 0, 2, edges=edges), bars_of(loser_bars, "losers", "Losers", 1, 2, edges=edges)],
-                           barmode="overlay", bargap=0, showlegend=True, xaxis={"title": {"text": "Bars held"}, **held_axis}),
+                           barmode="overlay", bargap=0, showlegend=True, xaxis={"title": {"text": "Bars held"}, **held_axis}),  # Axis title discarded by figure().  # i18n: ignore
             "mae": figure("strategy.mae", [trace("scatter", "updown", "mae", mode="markers", x=[num((item["mae"] or 0) * 100, 4) for item in closed], y=nums(returns * 100, 4),
                                                  text=[f"#{item['id']} {item['instrument']} {item['side'].lower()}" for item in closed], customdata=[item["exitBy"] for item in closed], name="MAE")],
-                          xaxis={"title": {"text": "Worst move against, %"}}, yaxis={"title": {"text": "Trade return, %"}}),
+                          xaxis={"title": {"text": "Worst move against, %"}}, yaxis={"title": {"text": "Trade return, %"}}),  # Axis title discarded by figure().  # i18n: ignore
             "mfe": figure("strategy.mfe", [trace("scatter", "updown", "mfe", mode="markers", x=[num((item["mfe"] or 0) * 100, 4) for item in closed], y=nums(returns * 100, 4),
                                                  text=[f"#{item['id']} {item['instrument']} {item['side'].lower()}" for item in closed], customdata=[item["exitBy"] for item in closed], name="MFE")],
-                          xaxis={"title": {"text": "Best move for, %"}}, yaxis={"title": {"text": "Trade return, %"}}),
+                          xaxis={"title": {"text": "Best move for, %"}}, yaxis={"title": {"text": "Trade return, %"}}),  # Axis title discarded by figure().  # i18n: ignore
         }
         return {"statistics": statistics, "byExit": exits, "count": len(closed), "figures": figures}
 
@@ -1409,7 +1385,7 @@ class Report:
                   if row["reason"] and "margin" in row["reason"].lower()]
         for item in self.trades_cache:
             if item["exitBy"] == "liquidation":
-                events.append({"time": item["exit"], "event": "Liquidated", "detail": f"{item['side']} {item['qty']} {item['instrument']} closed at {item['exitPrice']}"})
+                events.append({"time": item["exit"], "event": "Liquidated", "detail": i18n.t("{side} {quantity} {instrument} closed at {price}", side=i18n.t("Long") if item["side"] == "Long" else i18n.t("Short"), quantity=item['qty'], instrument=item['instrument'], price=item['exitPrice'])})
         if settings.get("liquidation") and self.crypto:
             # Equity over the maintenance margin (the rate times the notional held), at each day's end: under 1.2 the account is near its liquidation.
             maintenance = float(settings.get("maintenancePct", 0.5)) / 100
@@ -1418,7 +1394,7 @@ class Report:
             liquidated_days = {pd.Timestamp(item["exit"] - 1, unit="ms", tz="UTC").normalize() for item in self.trades_cache if item["exitBy"] == "liquidation" and item["exit"]}
             for at, value in ratio[ratio < 1.2].items():
                 if at not in liquidated_days:
-                    events.append({"time": day_ms(at), "event": "Near liquidation", "detail": f"Equity {value:.2f}× the maintenance margin at the day's end"})
+                    events.append({"time": day_ms(at), "event": "Near liquidation", "detail": i18n.t("Equity {multiple}× the maintenance margin at the day's end", multiple=f'{value:.2f}')})
         events.sort(key=lambda row: row["time"] or 0)
         x = iso(daily.index)
         lines = [line(x, nums(daily["total"].to_numpy(), 4), "main", "balance", "Balance", customdata=nums(leverage.to_numpy()))]
@@ -1428,7 +1404,7 @@ class Report:
         else:
             lines.append(line(x, nums(daily["locked"].to_numpy(), 4), "group", "margin", "Cash held for orders", index=1, of=2))
         figures = {"balance": figure("strategy.account", lines, showlegend=True),
-                   "leverage": figure("strategy.leverage", [line(x, nums(leverage.to_numpy()), "main", "leverage", "Leverage")], yaxis={"title": {"text": "Position value / equity"}})}
+                   "leverage": figure("strategy.leverage", [line(x, nums(leverage.to_numpy()), "main", "leverage", "Leverage")], yaxis={"title": {"text": "Position value / equity"}})}  # Axis title discarded by figure().  # i18n: ignore
         return {"points": rows, "marginEvents": events[:500], "currency": self.currency, "figures": figures}
 
     def sectors_section(self, work):
@@ -1489,7 +1465,7 @@ class Report:
         for name, start, end in CRISES["crypto" if self.crypto else "stocks"]:
             begin, finish = pd.Timestamp(start, tz="UTC"), pd.Timestamp(end, tz="UTC")
             if finish < first or begin > last:
-                rows.append({"name": name, "from": start, "to": end, "covered": False, "note": "Not in this backtest"})
+                rows.append({"name": name, "from": start, "to": end, "covered": False, "note": i18n.t("Not in this backtest")})
                 continue
             inside = returns[(returns.index > begin) & (returns.index <= finish)]  # from the first day's close: the day's own move is not in it
             path = (1 + inside).cumprod()

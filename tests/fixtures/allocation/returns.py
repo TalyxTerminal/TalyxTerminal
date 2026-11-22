@@ -22,6 +22,7 @@ def make(days=1260, seed=7, late_start=None, stop_at=None):
 
 def settings(**more):
     base = {"pool": [{"ticker": a, "group": GROUPS[a]} for a in ASSETS], "objective": "min_risk", "risk_measure": "variance", "covariance": "empirical",
-            "lookback": 252, "frequency": "monthly", "annualization": 252, "costs": [{"group": g, "bps": 0} for g in ("Bonds", "Stocks", "Other")], "cost_multiple": 1.0, "cost_aware": False}
+            "lookback": 252, "frequency": "monthly", "annualization": 252, "costs": [{"group": g, "bps": 0} for g in ("Bonds", "Stocks", "Other")], "cost_multiple": 1.0, "cost_aware": False,
+            "benchmarkColumns": {}}
     base.update(more)
     return base

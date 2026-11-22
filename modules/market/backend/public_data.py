@@ -14,6 +14,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+from talyx_sdk.i18n import t
 
 from vocabulary.instruments import MarketInstrument, market_data_series, ohlcv_series
 
@@ -21,6 +22,7 @@ from . import calendars
 from .common import MarketError, now_ns
 from .data import READ_REQUEST_LIMIT
 from .public_identity import PublicIdentity, fits, instant
+from .research import member_periods
 from .routing import in_worker
 
 
@@ -28,7 +30,7 @@ def page_cursor(request):
     """A read_data cursor: the instrument to go on from and, inside a long history, its next row ("3" or "3:250")."""
     position, _, row = (request.get("cursor") or "0").partition(":")
     if not all(part.isascii() and part.isdecimal() for part in (position, row or "0")):
-        raise MarketError("invalid_input", "Invalid page cursor")
+        raise MarketError("invalid_input", t("Invalid page cursor"))
     return int(position), int(row or 0)
 
 
@@ -60,11 +62,11 @@ def make_series(record, request):
     if request.get("data", "bars") != "bars":
         invalid = {"adjustment", "anchor", "sessionScope", "priceBasis"}.intersection(request)
         if invalid:
-            raise MarketError("invalid_input", f"{', '.join(sorted(invalid))} applies only to bars")
+            raise MarketError("invalid_input", t("{invalid} applies only to bars", invalid=', '.join(sorted(invalid))))
         return market_data_series(model, request["data"], timeframe=request.get("timeframe"))
     adjustment = request.get("adjustment", "split") if model.adjustmentEligible else None
     if not model.adjustmentEligible and request.get("adjustment") not in (None, "raw"):
-        raise MarketError("invalid_input", f"{record['symbol']} does not support adjustment")
+        raise MarketError("invalid_input", t("{symbol} does not support adjustment", symbol=record['symbol']))
     return ohlcv_series(
         model,
         request.get("timeframe") or "1d",
@@ -103,13 +105,17 @@ class PublicData(PublicIdentity):
         start = instant(request.get("start"), calendar)
         end = instant(request.get("end"), calendar, inclusive_end=True)
         at = instant(index.get("at"), calendar)
-        doc = await self.market.research.ensure(idx, "members")
+        doc = await self.market.research.ensure(idx, "members", start=at if at is not None else start,
+                                                end=at + 1 if at is not None else end)
 
         def history():
             result = []
             seen = set()
             first, last = (at, at + 1) if at is not None else (start or 0, end or now_ns())
-            for row in doc["rows"]:
+            members = doc["rows"]
+            if at is None:
+                members = member_periods(members)
+            for row in members:
                 window = self.market.research.member_window(row, first, last)
                 if window is None:
                     continue
@@ -118,13 +124,13 @@ class PublicData(PublicIdentity):
                 if identity is None:
                     if missing is None:
                         raise MarketError(
-                            "not_found", f"No instrument held {code} in its membership interval"
+                            "not_found", t("No instrument held {code} in its membership interval", code=code)
                         )
                     if code not in seen:
                         missing.append(
                             {
                                 "symbol": code,
-                                "reason": "No matching listing in the membership interval",
+                                "reason": t("No matching listing in the membership interval"),
                             }
                         )
                         seen.add(code)
@@ -148,7 +154,7 @@ class PublicData(PublicIdentity):
             series = make_series(record, request)
             lo, hi, latest = data.window(record, series, start, end, None, limit)
             if hi <= lo:
-                raise MarketError("invalid_input", "end precedes start")
+                raise MarketError("invalid_input", t("end precedes start"))
             plan = data.plan(record, series, lo, environment=request.get("environment", "production"))
             gaps = data.missing(plan, lo, hi) if plan.source_id else []
             if gaps:
@@ -162,7 +168,7 @@ class PublicData(PublicIdentity):
             if estimate > READ_REQUEST_LIMIT:
                 raise MarketError(
                     "fill_too_large",
-                    f"This read needs more than {READ_REQUEST_LIMIT} source requests; run market.fetch first",
+                    t("This read needs more than {READ_REQUEST_LIMIT} source requests; run market.fetch first", READ_REQUEST_LIMIT=READ_REQUEST_LIMIT),
                 )
             prepared.append((record, series, plan, gaps, lo, hi, latest, actions_missing))
         return prepared
@@ -170,7 +176,7 @@ class PublicData(PublicIdentity):
     async def read(self, request):
         file = request.get("format") == "file"
         if file and "cursor" in request:
-            raise MarketError("invalid_input", "A file contains the full selection; omit cursor")
+            raise MarketError("invalid_input", t("A file contains the full selection; omit cursor"))
         missing = []
         selections = await self.selections(request, missing=missing)
         prepared = await in_worker(self.prepare, selections, request)
@@ -353,7 +359,7 @@ class PublicData(PublicIdentity):
                         if not whole and (low <= 0 and not page["meta"] or "index" in request):
                             raise MarketError(
                                 "too_large",
-                                "This selection does not fit a page; request format=file or a shorter window",
+                                t("This selection does not fit a page; request format=file or a shorter window"),
                             )
                         if low > 0 or whole:
                             rows.extend(new[:low])

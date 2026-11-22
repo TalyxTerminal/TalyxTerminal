@@ -12,7 +12,6 @@
 .qx-nb-strip .tx-icon { width: 13px; height: 13px; flex: none; color: var(--tx-text-3); }
 .qx-nb-strip .tx-btn { margin-top: 0; }
 .qx-nb-strip[data-tone="warn"] > span { color: var(--tx-ember-text); }
-.qx-pre-line { white-space: pre-line; }
 
 .qx-nb { flex: 1; min-height: 0; overflow-y: auto; padding: var(--tx-space-2) 0 80px; scrollbar-width: thin;
   --qx-ansi-0: var(--tx-text-3); --qx-ansi-1: var(--tx-red); --qx-ansi-2: var(--tx-green); --qx-ansi-3: var(--tx-user-palette-7);

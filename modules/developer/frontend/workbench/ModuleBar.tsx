@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* A TALYX module's life in the running app, from its project: use it in TALYX, reload it after a change (only it
    restarts; its contract is generated again), disable or enable it, uninstall it, and debug its backend in VS Code. */
 import { useEffect, useState } from "react";
@@ -10,7 +11,7 @@ import { message } from "./errors";
 type ModuleState = Platform.ModuleState;
 
 const states: Record<string, [string, "done" | "busy" | "off" | "failed"]> = {
-  ready: ["Running in TALYX", "done"], starting: ["Starting", "busy"], stopped: ["Stopped", "off"], failed: ["Couldn't start", "failed"],
+  ready: [t("Running in TALYX"), "done"], starting: [t("Starting"), "busy"], stopped: [t("Stopped"), "off"], failed: [t("Couldn't start"), "failed"],
 };
 
 export function ModuleBar({ ctx, projectId, module, onError, onProblem, onUninstalled }: { ctx: ModuleContext; projectId: string; module: ProjectModule; onError(message: string): void; onProblem(problem: string | null): void; onUninstalled?(): Promise<void> }) {
@@ -34,26 +35,26 @@ export function ModuleBar({ ctx, projectId, module, onError, onProblem, onUninst
   const enable = () => run(async () => setState(await platform<ModuleState>("enable", { id: module.id })));
   const disable = () => run(async () => setState(await platform<ModuleState>("disable", { id: module.id })));
   const uninstall = () => run(async () => { await platform("uninstall", { id: module.id }); setUninstalling(false); setState(null); await onUninstalled?.(); });
-  useEffect(() => onProblem(state?.state === "failed" ? state.problem ?? "It exited." : null), [state?.state, state?.problem]);
+  useEffect(() => onProblem(state?.state === "failed" ? state.problem ?? t("It exited.") : null), [state?.state, state?.problem]);
   if (state === undefined) return null;
-  const [label, tone] = state === null ? ["Not in TALYX", "off" as const] : !state.enabled ? ["Disabled", "off" as const] : states[state.state] ?? [state.state, "off" as const];
+  const [label, tone] = state === null ? [t("Not in TALYX"), "off" as const] : !state.enabled ? [t("Disabled"), "off" as const] : states[state.state] ?? [state.state, "off" as const];
   /** The next step stays a button; the rest waits in a menu so the toolbar fits a narrow panel. */
   const actions: TxMenuItem[] = [
-    ...(state && state.enabled ? [{ id: "disable", label: "Disable", onSelect: disable }] : []),
-    ...(state && state.source === "installed" ? [{ id: "uninstall", label: "Uninstall…", tone: "danger" as const, onSelect: () => setUninstalling(true) }] : []),
-    { id: "debug", label: "Debug in VS Code", disabled: state?.pid == null, separated: !!state, onSelect: () => run(() => debugInVsCode(ctx, projectId)) },
+    ...(state && state.enabled ? [{ id: "disable", label: t("Disable"), onSelect: disable }] : []),
+    ...(state && state.source === "installed" ? [{ id: "uninstall", label: t("Uninstall…"), tone: "danger" as const, onSelect: () => setUninstalling(true) }] : []),
+    { id: "debug", label: t("Debug in VS Code"), disabled: state?.pid == null, separated: !!state, onSelect: () => run(() => debugInVsCode(ctx, projectId)) },
   ];
   return <>
     <TxToolbarDivider />
     <span title={state?.problem ?? undefined}><TxStatus tone={tone} label={label} /></span>
-    {state === null && <TxButton variant="primary" loading={busy} onClick={use}>Use in TALYX</TxButton>}
-    {state && state.enabled && <TxButton variant="primary" loading={busy} onClick={reload}>Reload</TxButton>}
-    {state && !state.enabled && <TxButton variant="primary" loading={busy} onClick={enable}>Enable</TxButton>}
-    <TxMenu label="Module actions" align="end" trigger={<TxIconButton label="Module actions" icon="more" disabled={busy} />} items={actions} />
-    <TxDialog open={uninstalling} onOpenChange={open => { if (!open && !busy) setUninstalling(false); }} title={`Uninstall ${module.name}`} footer={<>
-      <TxButton disabled={busy} onClick={() => setUninstalling(false)}>Cancel</TxButton>
-      <TxButton variant="primary" loading={busy} onClick={uninstall}>Uninstall</TxButton></>}>
-      <p>{module.installed ? `This deletes ${module.directory}, the module's source with it.` : `TALYX removes its copy of ${module.name}; this project's folder stays.`}</p>
+    {state === null && <TxButton variant="primary" loading={busy} onClick={use}>{t("Use in TALYX")}</TxButton>}
+    {state && state.enabled && <TxButton variant="primary" loading={busy} onClick={reload}>{t("Reload")}</TxButton>}
+    {state && !state.enabled && <TxButton variant="primary" loading={busy} onClick={enable}>{t("Enable")}</TxButton>}
+    <TxMenu label={t("Module actions")} align="end" trigger={<TxIconButton label={t("Module actions")} icon="more" disabled={busy} />} items={actions} />
+    <TxDialog open={uninstalling} onOpenChange={open => { if (!open && !busy) setUninstalling(false); }} title={t("Uninstall {name}", { name: module.name })} footer={<>
+      <TxButton disabled={busy} onClick={() => setUninstalling(false)}>{t("Cancel")}</TxButton>
+      <TxButton variant="primary" loading={busy} onClick={uninstall}>{t("Uninstall")}</TxButton></>}>
+      <p>{module.installed ? t("This deletes {directory}, the module's source with it.", { directory: module.directory }) : t("TALYX removes its copy of {name}; this project's folder stays.", { name: module.name })}</p>
     </TxDialog>
   </>;
 }

@@ -19,6 +19,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.errors import GraphRecursionError
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import checkpoints
 from .activities import Activities
@@ -109,7 +110,7 @@ class AgentService:
     async def get_secret(self, reference):
         value = await self.ctx.platform.secret(reference)
         if value is None:
-            raise ContractError("credential_missing", "Configure this credential in Agent settings before using the connection")
+            raise ContractError("credential_missing", t("Configure this credential in Agent settings before using the connection"))
         return value
 
     async def search_secret(self, reference):
@@ -210,7 +211,7 @@ class AgentService:
         remembered = self.store.defaults()["modelThinking"]
         if "thinking" in changes and changes["thinking"] is not None:
             if model_id is None:
-                raise ContractError("invalid_input", "Choose a model before its thinking level")
+                raise ContractError("invalid_input", t("Choose a model before its thinking level"))
             level = thinking_level(self.catalogue.thinking(model_id), changes["thinking"])
             self.store.configure_defaults({"modelThinking": {**remembered, model_id: level}})
             return changes
@@ -288,7 +289,7 @@ class AgentService:
         """Start one background run on its line through the same graph as a user turn."""
         conversation = self.store.conversation(conversation_id, workspace)
         if conversation["modelId"] is None:
-            raise ContractError("model_missing", "Choose a model for this run")
+            raise ContractError("model_missing", t("Choose a model for this run"))
         identity = self.store.tool_identity("wake", {"text": text, "cause": cause})
         with self.store.transaction():
             previous = self.store.sent_request(conversation_id, request_id, identity)
@@ -304,7 +305,7 @@ class AgentService:
             conversation = self.store.conversation(conversation_id, workspace)
             queued = args.get("queued", [*conversation.get("queued", []), args.get("text")])
             if not isinstance(queued, list) or any(not isinstance(s, str) or not s.strip() for s in queued):
-                raise ContractError("invalid_input", "Queue a nonempty message")
+                raise ContractError("invalid_input", t("Queue a nonempty message"))
             conversation = self.store.save_conversation({**conversation, "queued": queued})
             self.store.event(conversation_id, None, "conversation", conversation)
         return queued
@@ -328,7 +329,7 @@ class AgentService:
                 except FileExistsError:
                     continue
                 return dest.name
-            raise ContractError("already_exists", "Choose a different name for this export")
+            raise ContractError("already_exists", t("Choose a different name for this export"))
         return {"name": await asyncio.to_thread(write)}
 
     async def card_decision(self, operation, args, workspace):
@@ -336,16 +337,16 @@ class AgentService:
         self.store.conversation(cid, workspace)
         row = self.store.db.execute("SELECT value,turn_id FROM cards WHERE conversation=? AND id=?", (cid, args["cardId"])).fetchone()
         if row is None:
-            raise ContractError("not_found", "Choose a card in this conversation")
+            raise ContractError("not_found", t("Choose a card in this conversation"))
         card, turn = json.loads(row["value"]), self.store.turn(row["turn_id"])
         if operation == "memory_decision" and card["type"] == "memory_saved":
             return self.knowledge.memory_decision(turn, card, redo=args["direction"] == "redo")
         if operation == "plan_decision" and card["type"] == "plan":
             if card["state"] != "waiting" or type(args.get("accepted")) is not bool:
-                raise ContractError("conflict", "This plan is no longer waiting for a decision")
+                raise ContractError("conflict", t("This plan is no longer waiting for a decision"))
             reason = args.get("reason", "")
             if not isinstance(reason, str) or len(reason) > 100000:
-                raise ContractError("invalid_input", "Enter a shorter instruction for the revised plan")
+                raise ContractError("invalid_input", t("Enter a shorter instruction for the revised plan"))
             with self.store.transaction():
                 self.runtime_card(turn, {**card, "state": "accepted" if args["accepted"] else "skipped"})
                 if args["accepted"]:
@@ -360,23 +361,23 @@ class AgentService:
             return None
         if operation == "retry" and card["type"] == "error":
             if turn["state"] not in {"failed", "budget_exceeded"} or self.store.active(cid):
-                raise ContractError("conflict", "This run cannot be retried now")
+                raise ContractError("conflict", t("This run cannot be retried now"))
             with self.store.transaction():
                 self.store.save_turn({**turn, "state": "queued", "businessContinuation": True, "finishedAt": None, "error": None})
             await self.refresh_business(turn)
             self.schedule(cid)
             return None
-        raise ContractError("invalid_input", "This action does not apply to this card")
+        raise ContractError("invalid_input", t("This action does not apply to this card"))
 
     async def send(self, conversation_id, workspace, text, *, include_view=True, attachments=(), supplemental=True):
         conversation = self.store.conversation(conversation_id, workspace)
         if conversation["modelId"] is None:
-            raise ContractError("model_missing", "Add and select a tool-capable model in Agent settings before sending")
+            raise ContractError("model_missing", t("Add and select a tool-capable model in Agent settings before sending"))
         selected = [self.attachment(item, conversation_id) for item in attachments]
         model = self.catalogue.resolve(conversation["modelId"])
         for attachment in selected:
             if attachment["mime"].startswith("image/") and model["images"] is not True:
-                raise ContractError("unsupported", "This model cannot read image attachments; choose an image-capable model")
+                raise ContractError("unsupported", t("This model cannot read image attachments; choose an image-capable model"))
         view = await self.current_view(workspace) if include_view else None
         active = self.store.active(conversation_id)
         if active is not None and supplemental and active["state"] != "stopping":
@@ -431,9 +432,9 @@ class AgentService:
         for attachment_id in turn["attachments"]:
             attachment = self.attachment(attachment_id, conversation["id"])
             if attachment["mime"].startswith("image/") and model["images"] is not True:
-                raise ContractError("unsupported", "The newly selected model cannot read this image attachment")
+                raise ContractError("unsupported", t("The newly selected model cannot read this image attachment"))
             if attachment["mime"] == "application/pdf" and model["pdf"] is not True:
-                blocks.append({"type": "text", "text": f"Attached PDF {attachment['name']}. Use read_pdf with "
+                blocks.append({"type": "text", "text": f"Attached PDF {attachment['name']}. Use read_pdf with "  # i18n: ignore (model input)
                                f"attachment_id={attachment_id} and a 1-based page number."})
                 continue
             data = await asyncio.to_thread(self.attachment_bytes, attachment)
@@ -449,7 +450,7 @@ class AgentService:
             blocks.append({"type": "text", "text": "Current workspace view (observed when the user sent this message):\n" +
                   encode({key: value for key, value in turn['view'].items() if key != 'workspaceId'})})
         else:
-            blocks.append({"type":"text", "text":"No panel was shared with this message. Use the named instrument or object directly."})
+            blocks.append({"type":"text", "text":"No panel was shared with this message. Use the named instrument or object directly."})  # i18n: ignore (model input)
         if blocks:
             messages.append(HumanMessage(content=blocks, id="materials_" + turn["messageId"]))
         return messages
@@ -472,7 +473,7 @@ class AgentService:
         for row in rows:
             call = json.loads(row[0])
             if call["state"] == "started":
-                error = {"code": "unconfirmed", "message": "TALYX stopped while this call ran; its effects are unconfirmed",
+                error = {"code": "unconfirmed", "message": t("TALYX stopped while this call ran; its effects are unconfirmed"),
                          "execution": "unknown", "effects": "may_have_occurred"}
                 self.store.finish_call(call["callId"], error=error)
                 observations.append({"callId": call["callId"], "action": call["action"], "status": "unknown", "error": error})
@@ -503,11 +504,11 @@ class AgentService:
             if error is not None:
                 turn = self.store.active(conversation_id)
                 if turn is not None:
-                    failure = {"code": "agent_internal_error", "message": "Agent stopped after an internal failure; review the recorded calls before continuing",
+                    failure = {"code": "agent_internal_error", "message": t("Agent stopped after an internal failure; review the recorded calls before continuing"),
                                "details": {"type": type(error).__name__, "execution": "unknown", "effects": "may_have_occurred"}}
                     self.store.state(turn["id"], "failed", error=failure)
                     self.store.card(conversation_id, turn["id"], {"id": "error_" + turn["id"], "type": "error", **failure})
-                asyncio.get_running_loop().call_exception_handler({"message": "Agent graph failed", "exception": error, "task": completed})
+                asyncio.get_running_loop().call_exception_handler({"message": "Agent graph failed", "exception": error, "task": completed})  # i18n: ignore (log)
             pending = self.store.active(conversation_id)
             if pending is not None and pending["state"] == "queued":
                 self.schedule(conversation_id)
@@ -564,11 +565,11 @@ class AgentService:
                         queued = self.store.new_turn(conversation_id, turn["workspaceId"], first)
                         self.record_user(queued)
             except TimeoutError:
-                error = {"code": "run_timeout", "message": "This background run reached its working time limit."}
+                error = {"code": "run_timeout", "message": t("This background run reached its working time limit.")}
                 self.store.state(turn["id"], "failed", error=error)
                 self.runtime_card(turn, {"id": "error_" + turn["id"], "type": "error", **error})
             except ContextOverflowError:
-                failure = {"code": "context_window_exceeded", "message": "The request and selected tools do not fit this model's context window. Reduce the input or choose a larger window."}
+                failure = {"code": "context_window_exceeded", "message": t("The request and selected tools do not fit this model's context window. Reduce the input or choose a larger window.")}
                 self.store.state(turn["id"], "failed", error=failure)
                 self.store.card(conversation_id, turn["id"], {"id": "error_" + turn["id"], "type": "error", **failure})
             except asyncio.CancelledError:
@@ -579,14 +580,14 @@ class AgentService:
                 self.store.card(conversation_id, turn["id"], {"id": "error_" + turn["id"], "type": "error", "code": error.code,
                     "message": error.message, "details": error.details})
                 if error.code == "budget_exceeded" and self.usage.claim_limit_notification():
-                    await self.ctx.call("platform.notifications.toast", {"title": "Agent spending limit reached",
-                        "message": "Priced model requests have reached this month's spending limit."}, workspace=turn["workspaceId"])
+                    await self.ctx.call("platform.notifications.toast", {"title": t("Agent spending limit reached"),
+                        "message": t("Priced model requests have reached this month's spending limit.")}, workspace=turn["workspaceId"])
             except PROVIDER_ERRORS as error:
                 failure = provider_error(error)
                 self.store.state(turn["id"], "failed", error=failure)
                 self.store.card(conversation_id, turn["id"], {"id": "error_" + turn["id"], "type": "error", **failure})
             except GraphRecursionError:
-                failure = {"code": "step_limit", "message": "The agent reached its turn step limit; review its completed work before continuing"}
+                failure = {"code": "step_limit", "message": t("The agent reached its turn step limit; review its completed work before continuing")}
                 self.store.state(turn["id"], "failed", error=failure)
                 self.store.card(conversation_id, turn["id"], {"id": "error_" + turn["id"], "type": "error", **failure})
             finally:
@@ -603,7 +604,7 @@ class AgentService:
         policy = self.store.defaults(turn["workspaceId"])["chatNotification"]
         if policy == "never" or policy == "background" and self.focused_views:
             return
-        await self.ctx.call("platform.notifications.toast", {"title":owner["title"],"message":"Chat finished",
+        await self.ctx.call("platform.notifications.toast", {"title":owner["title"],"message":t("Chat finished"),
             "navigation":{"workspaceId":turn["workspaceId"],"panel":"agent.chat","state":{"conversationId":owner["id"]}}},
             workspace=turn["workspaceId"])
 
@@ -684,7 +685,7 @@ class AgentService:
                 if business["terminal"] and step["finishedAt"] is None:
                     step["finishedAt"] = observed["observedAt"]
                 self.runtime_card(turn, {"id": "process_" + runtime_id, "type": "process_group",
-                    "title": "Working", "steps": list(steps.values())})
+                    "title": t("Working"), "steps": list(steps.values())})
             self.runtime_card(turn, {"id": "task_" + call_id, "type": "result" if business["terminal"] else "task",
                 "callId": call_id, "state": business["status"], "action": business["action"], "op": None,
                 "task": observed["task"],
@@ -705,7 +706,7 @@ class AgentService:
                 if error.code != "not_found":
                     raise
                 return {"business":{"action":original["action"],"status":"unknown","terminal":True},
-                        "result":{"error":{"code":"result_unknown","message":"The original task ended or expired while disconnected. Its result is unknown."}},
+                        "result":{"error":{"code":"result_unknown","message":t("The original task ended or expired while disconnected. Its result is unknown.")}},
                         "task":{"taskId":task_id,"progress":None},"observedAt":time.time()}
 
         initial = await read_original()
@@ -737,33 +738,33 @@ class AgentService:
     def attachment(self, attachment_id, conversation_id):
         row = self.store.db.execute("SELECT conversation,value FROM attachments WHERE id=?", (attachment_id,)).fetchone()
         if row is None or row["conversation"] != conversation_id:
-            raise ContractError("target_gone", "This attachment is unavailable in the conversation")
+            raise ContractError("target_gone", t("This attachment is unavailable in the conversation"))
         value = json.loads(row["value"])
         if value["state"] != "complete":
-            raise ContractError("conflict", "This attachment upload is not complete")
+            raise ContractError("conflict", t("This attachment upload is not complete"))
         return value
 
     def attachment_bytes(self, attachment):
         data = (self.root / "attachments" / attachment["id"]).read_bytes()
         if hashlib.sha256(data).hexdigest() != attachment["digest"]:
-            raise ContractError("conflict", "An immutable attachment changed on disk; attach it again")
+            raise ContractError("conflict", t("An immutable attachment changed on disk; attach it again"))
         return data
 
     def attach(self, conversation_id, workspace, name, mime, content, *, attachment_id=None):
         self.store.conversation(conversation_id, workspace)
         if len(content) > 10 * 1024 * 1024:
-            raise ContractError("attachment_too_large", "Each attachment may contain at most 10 MiB")
+            raise ContractError("attachment_too_large", t("Each attachment may contain at most 10 MiB"))
         if mime not in {"image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain", "text/markdown", "text/csv", "application/json"}:
-            raise ContractError("unsupported", "Attach a supported image, PDF or UTF-8 text file")
+            raise ContractError("unsupported", t("Attach a supported image, PDF or UTF-8 text file"))
         if mime not in {"image/png", "image/jpeg", "image/webp", "application/pdf"}:
             try:
                 content.decode("utf-8")
             except UnicodeDecodeError as error:
-                raise ContractError("invalid_input", "Text attachments must use UTF-8") from error
+                raise ContractError("invalid_input", t("Text attachments must use UTF-8")) from error
             if len(content) > 100000:
-                raise ContractError("attachment_too_large", "Text attachments may contain at most 100000 bytes")
+                raise ContractError("attachment_too_large", t("Text attachments may contain at most 100000 bytes"))
         if not name or len(name) > 200 or Path(name).name != name:
-            raise ContractError("invalid_input", "Use a file name without a directory path")
+            raise ContractError("invalid_input", t("Use a file name without a directory path"))
         attachment_id = attachment_id or uuid4().hex
         directory = self.root / "attachments"
         directory.mkdir(exist_ok=True)
@@ -777,9 +778,9 @@ class AgentService:
     def upload_start(self, conversation_id, workspace, name, mime, size):
         self.store.conversation(conversation_id, workspace)
         if type(size) is not int or not 0 <= size <= 10 * 1024 * 1024:
-            raise ContractError("attachment_too_large", "Each attachment may contain at most 10 MiB")
+            raise ContractError("attachment_too_large", t("Each attachment may contain at most 10 MiB"))
         if not name or len(name) > 200 or Path(name).name != name:
-            raise ContractError("invalid_input", "Use a file name without a directory path")
+            raise ContractError("invalid_input", t("Use a file name without a directory path"))
         attachment_id = uuid4().hex
         directory = self.root / "attachments"
         directory.mkdir(exist_ok=True)
@@ -793,20 +794,20 @@ class AgentService:
         self.store.conversation(conversation_id, workspace)
         row = self.store.db.execute("SELECT conversation,value FROM attachments WHERE id=?", (attachment_id,)).fetchone()
         if row is None or row["conversation"] != conversation_id:
-            raise ContractError("target_gone", "This attachment upload is unavailable")
+            raise ContractError("target_gone", t("This attachment upload is unavailable"))
         value = json.loads(row["value"])
         if value["state"] != "uploading" or value["received"] != offset:
-            raise ContractError("conflict", "The attachment upload offset changed")
+            raise ContractError("conflict", t("The attachment upload offset changed"))
         try:
             content = base64.b64decode(data, validate=True)
         except ValueError as error:
-            raise ContractError("invalid_input", "Attachment chunks must be valid base64") from error
+            raise ContractError("invalid_input", t("Attachment chunks must be valid base64")) from error
         if len(content) > 256 * 1024 or offset + len(content) > value["size"]:
-            raise ContractError("invalid_input", "Upload at most 256 KiB per chunk within the declared file size")
+            raise ContractError("invalid_input", t("Upload at most 256 KiB per chunk within the declared file size"))
         with (self.root / "attachments" / attachment_id).open("r+b") as stream:
             stream.seek(0, 2)
             if stream.tell() != offset:
-                raise ContractError("conflict", "The partial upload changed on disk; attach the file again")
+                raise ContractError("conflict", t("The partial upload changed on disk; attach the file again"))
             stream.write(content)
         value["received"] += len(content)
         with self.store.transaction():
@@ -817,25 +818,25 @@ class AgentService:
         self.store.conversation(conversation_id, workspace)
         row = self.store.db.execute("SELECT conversation,value FROM attachments WHERE id=?", (attachment_id,)).fetchone()
         if row is None or row["conversation"] != conversation_id:
-            raise ContractError("target_gone", "This attachment upload is unavailable")
+            raise ContractError("target_gone", t("This attachment upload is unavailable"))
         value = json.loads(row["value"])
         if value["state"] == "complete":
             return value
         if value["received"] != value["size"]:
-            raise ContractError("conflict", "Upload all attachment bytes before finishing")
+            raise ContractError("conflict", t("Upload all attachment bytes before finishing"))
         content = (self.root / "attachments" / attachment_id).read_bytes()
         if len(content) != value["size"]:
-            raise ContractError("conflict", "The partial upload changed on disk")
+            raise ContractError("conflict", t("The partial upload changed on disk"))
         return self.attach(conversation_id, workspace, value["name"], value["mime"], content, attachment_id=attachment_id)
 
     def remove_attachment(self, conversation_id, workspace, attachment_id):
         self.store.conversation(conversation_id, workspace)
         row = self.store.db.execute("SELECT conversation FROM attachments WHERE id=?", (attachment_id,)).fetchone()
         if row is None or row[0] != conversation_id:
-            raise ContractError("target_gone", "This attachment is unavailable")
+            raise ContractError("target_gone", t("This attachment is unavailable"))
         for row in self.store.db.execute("SELECT value FROM cards WHERE conversation=? AND json_extract(value,'$.type')='answer' AND json_extract(value,'$.role')='user'", (conversation_id,)):
             if attachment_id in json.loads(row[0])["attachments"]:
-                raise ContractError("conflict", "This immutable attachment belongs to a sent message")
+                raise ContractError("conflict", t("This immutable attachment belongs to a sent message"))
         (self.root / "attachments" / attachment_id).unlink(missing_ok=True)
         with self.store.transaction():
             self.store.db.execute("DELETE FROM attachments WHERE id=?", (attachment_id,))
@@ -843,7 +844,7 @@ class AgentService:
     async def copy_workspace(self, source, copy):
         """A copied workspace gets its own copies of the workspace's conversations and memories."""
         if source == copy or self.store.db.execute("SELECT 1 FROM conversations WHERE workspace=?", (copy,)).fetchone():
-            raise ContractError("conflict", "Choose a new workspace for the copy")
+            raise ContractError("conflict", t("Choose a new workspace for the copy"))
         try:
             for original, copied in copy_workspace(self, source, copy).items():
                 await checkpoints.copy_thread(self.engine.checkpointer, self.history.thread(original), copied)
@@ -857,7 +858,7 @@ class AgentService:
     async def delete(self, conversation_id, workspace):
         self.store.conversation(conversation_id, workspace)
         if self.store.active(conversation_id) is not None or self.store.pending_business_turns(conversation_id):
-            raise ContractError("conflict", "Stop the conversation before deleting it")
+            raise ContractError("conflict", t("Stop the conversation before deleting it"))
         pending = [self.observers[call["callId"]] for row in self.store.db.execute("SELECT id FROM turns WHERE conversation=?", (conversation_id,))
                    for call in self.store.calls(row[0]) if call["callId"] in self.observers]
         for task in pending:

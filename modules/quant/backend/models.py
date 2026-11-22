@@ -280,7 +280,7 @@ class StartStrategyWalkForwardInput(Model):
     """
     axes: Annotated[list_aliased[Axe], Field(max_length=8, min_length=1)]
     """
-    The swept axes; the combinations are every mix of their values, at most 200.
+    The swept axes; the combinations are every mix of their values.
     """
     of: Annotated[str | None, Field(min_length=1)] = None
     """

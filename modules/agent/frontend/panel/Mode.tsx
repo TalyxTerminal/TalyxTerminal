@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useState } from "react";
 import { TxSegmented, type ModuleContext } from "@talyx/sdk";
 import { ChatPanel } from "../chat/ChatPanel";
@@ -11,8 +12,8 @@ import { BotPanel } from "../bot/BotPanel";
 export type Mode = "chats" | "bots";
 
 export function ModeSwitch({ mode, onMode }: { mode: Mode; onMode: (mode: Mode) => void }) {
-  return <TxSegmented label="Chats or bots" size="sm" value={mode} onChange={onMode}
-    options={[{ value: "chats", label: "Chats" }, { value: "bots", label: "Bots" }]} />;
+  return <TxSegmented label={t("Chats or bots")} size="sm" value={mode} onChange={onMode}
+    options={[{ value: "chats", label: t("Chats") }, { value: "bots", label: t("Bots") }]} />;
 }
 
 export interface PanelState { mode?: Mode; conversationId?: string; objectId?: string; botLineId?: string }

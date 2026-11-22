@@ -21,6 +21,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import library_summary
 from .index_universe import member_spans
@@ -113,10 +114,19 @@ class LibraryStore:
         return value
 
     # --- reads -------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def summary_row(row):
+        summary = json.loads(row["content"])
+        summary["stateLabel"] = t(library_summary.LABEL[summary["state"]])
+        for period in summary["last20"]:
+            if period["result"] in ("ok", "late") and period["why"]:
+                period["why"] = t(period["why"])
+        return summary
+
     def summaries(self, query=None):
         """What the list shows, one stored row per item; nothing is computed or read from the values here."""
         with self.connect() as db:
-            rows = [json.loads(row["content"]) for row in db.execute("SELECT content FROM summaries")]
+            rows = [self.summary_row(row) for row in db.execute("SELECT content FROM summaries")]
         if query:
             rows = [row for row in rows if query.casefold() in row["name"].casefold()]
         return library_summary.ordered(rows)
@@ -125,14 +135,14 @@ class LibraryStore:
         with self.connect() as db:
             row = db.execute("SELECT content FROM summaries WHERE item_id=?", (item_id,)).fetchone()
         if row is None:
-            raise ContractError("not_found", "This library item does not exist.")
-        return json.loads(row["content"])
+            raise ContractError("not_found", t("This library item does not exist."))
+        return self.summary_row(row)
 
     def version(self, version_id):
         with self.connect() as db:
             row = db.execute("SELECT * FROM versions WHERE id=?", (version_id,)).fetchone()
             if row is None:
-                raise ContractError("not_found", "This library version does not exist.")
+                raise ContractError("not_found", t("This library version does not exist."))
             return self.version_row(row)
 
     def version_number(self, version_id):
@@ -140,7 +150,7 @@ class LibraryStore:
         with self.connect() as db:
             row = db.execute("SELECT version FROM versions WHERE id=?", (version_id,)).fetchone()
         if row is None:
-            raise ContractError("not_found", "This library version does not exist.")
+            raise ContractError("not_found", t("This library version does not exist."))
         return row["version"]
 
     def versions(self, version_ids):
@@ -177,7 +187,7 @@ class LibraryStore:
         with self.connect() as db:
             row = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
             if row is None:
-                raise ContractError("not_found", "This library item does not exist.")
+                raise ContractError("not_found", t("This library item does not exist."))
             return dict(row)
 
     def version_summary(self, db, version):
@@ -197,7 +207,7 @@ class LibraryStore:
     def item_versions(self, item_id):
         with self.connect() as db:
             if db.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone() is None:
-                raise ContractError("not_found", "This library item does not exist.")
+                raise ContractError("not_found", t("This library item does not exist."))
             return [self.version_summary(db, version) for version in self.versions_of(db, item_id)]
 
     def find_item(self, name, kind=None):
@@ -222,12 +232,20 @@ class LibraryStore:
         query = "SELECT * FROM periods WHERE " + " AND ".join(clauses) + " ORDER BY label DESC" + (" LIMIT ?" if limit else "")
         with self.connect() as db:
             rows = [dict(row) for row in db.execute(query, [*values, *([limit] if limit else [])])]
+        for row in rows:
+            if row["result"] in ("ok", "late") and row["why"]:
+                row["why"] = t(row["why"])
         return rows[::-1]
 
     def period(self, version_id, label):
         with self.connect() as db:
             row = db.execute("SELECT * FROM periods WHERE version_id=? AND label=?", (version_id, label)).fetchone()
-            return dict(row) if row else None
+            if row is None:
+                return None
+            period = dict(row)
+            if period["result"] in ("ok", "late") and period["why"]:
+                period["why"] = t(period["why"])
+            return period
 
     def failure_logs(self, version_id):
         with self.connect() as db:
@@ -384,13 +402,13 @@ class LibraryStore:
                 for spec, entry in zip(specs, written, strict=True):
                     kind = item_kind(spec["kind"])
                     if kind not in KINDS:
-                        raise ContractError("invalid_input", f"The library keeps factors, models, allocations and data, not {kind}.")
+                        raise ContractError("invalid_input", t("The library keeps factors, models, allocations and data, not {kind}.", kind=kind))
                     item = db.execute("SELECT id, kind FROM items WHERE name=?", (spec["name"],)).fetchone()
                     if item is None:
                         item_id = str(uuid4())
                         db.execute("INSERT INTO items(id, name, kind, created_at) VALUES (?,?,?,?)", (item_id, spec["name"], kind, stamp))
                     elif item["kind"] != kind:
-                        raise ContractError("conflict", f"{spec['name']} is already a {item['kind']} in the library; choose another name.", {"kind": item["kind"]})
+                        raise ContractError("conflict", t("{name} is already a {kind} in the library; choose another name.", name=spec['name'], kind=item['kind']), {"kind": item["kind"]})
                     else:
                         item_id = item["id"]
                     number = (db.execute("SELECT MAX(version) FROM versions WHERE item_id=?", (item_id,)).fetchone()[0] or 0) + 1
@@ -414,7 +432,7 @@ class LibraryStore:
                                                                                          kind, f"{spec['name']} v{number}", owner.get("how") or f"v{number} reads it every period", stamp))
                         held = db.execute("SELECT item_id FROM versions WHERE id=?", (owner["versionId"],)).fetchone()
                         if held is None:
-                            raise ContractError("not_found", "A library version this publication reads does not exist.")
+                            raise ContractError("not_found", t("A library version this publication reads does not exist."))
                     created.append({"itemId": item_id, "versionId": spec["versionId"], "version": number})
                 for item_id in {row["itemId"] for row in created} | {self._item_of(db, owner["versionId"]) for spec in specs for owner in spec.get("holds", [])}:
                     self._summarize(db, item_id)
@@ -441,7 +459,7 @@ class LibraryStore:
                 version = db.execute("SELECT cursor, item_id, state, archived_at FROM versions WHERE id=?", (version_id,)).fetchone()
                 current = version["cursor"]
                 if expected_cursor is not None and current != expected_cursor:
-                    raise ContractError("conflict", "This library period has already been advanced by another update.")
+                    raise ContractError("conflict", t("This library period has already been advanced by another update."))
                 if current is not None and cursor <= current:
                     if entry is not None:
                         entry["path"].unlink(missing_ok=True)
@@ -576,7 +594,7 @@ class LibraryStore:
                 found = db.execute("SELECT meta, item_id FROM versions WHERE id=?", (version_id,)).fetchone()
                 meta = json.loads(found["meta"])
                 if str(label) in meta.get("reviews", {}):
-                    raise ContractError("conflict", "This period was already reviewed.", {"period": label})
+                    raise ContractError("conflict", t("This period was already reviewed."), {"period": label})
                 self._register(db, version_id, entry, stamp)
                 meta["reviews"] = {**meta.get("reviews", {}), str(label): {"how": "one_off", "reason": reason, "at": int(at)}}
                 db.execute("UPDATE versions SET meta=?, updated_at=? WHERE id=?", (json.dumps(meta), stamp, version_id))
@@ -592,7 +610,7 @@ class LibraryStore:
             found = db.execute("SELECT meta, item_id FROM versions WHERE id=?", (version_id,)).fetchone()
             meta = json.loads(found["meta"])
             if str(label) in meta.get("reviews", {}):
-                raise ContractError("conflict", "This period was already reviewed.", {"period": label})
+                raise ContractError("conflict", t("This period was already reviewed."), {"period": label})
             meta["reviews"] = {**meta.get("reviews", {}), str(label): {"how": "accepted", "at": int(at)}}
             db.execute("UPDATE versions SET meta=?, updated_at=? WHERE id=?", (json.dumps(meta), self.clock(), version_id))
             self._summarize(db, found["item_id"])
@@ -602,9 +620,9 @@ class LibraryStore:
         with self.connect() as db:
             version = db.execute("SELECT state, archived_at, item_id FROM versions WHERE id=?", (version_id,)).fetchone()
             if version is None:
-                raise ContractError("not_found", "This library version does not exist.")
+                raise ContractError("not_found", t("This library version does not exist."))
             if version["state"] == "delisted" or version["archived_at"] is not None:
-                raise ContractError("conflict", "A stopped version cannot be used by anything new.")
+                raise ContractError("conflict", t("A stopped version cannot be used by anything new."))
             db.execute("INSERT OR REPLACE INTO occupancy VALUES (?,?,?,?,?,?,?)", (version_id, owner_id, workspace_id, kind, name, how, self.clock()))
             self._summarize(db, version["item_id"])
 
@@ -634,9 +652,9 @@ class LibraryStore:
             db.execute("BEGIN IMMEDIATE")
             version = db.execute("SELECT * FROM versions WHERE id=?", (version_id,)).fetchone()
             if version is None:
-                raise ContractError("not_found", "This library version does not exist.")
+                raise ContractError("not_found", t("This library version does not exist."))
             if version["archived_at"] is not None:
-                raise ContractError("conflict", "This version is archived already.")
+                raise ContractError("conflict", t("This version is archived already."))
             if version["state"] != "delisted":
                 self._mark(db, version_id, {"state": "delisted", "stopped_at": self.clock(), "retry_after": None, "pending": None})
             self._summarize(db, version["item_id"])
@@ -648,16 +666,16 @@ class LibraryStore:
         with self.connect() as db:
             version = db.execute("SELECT * FROM versions WHERE id=?", (version_id,)).fetchone()
             if version is None:
-                raise ContractError("not_found", "This library version does not exist.")
+                raise ContractError("not_found", t("This library version does not exist."))
             if version["archived_at"] is not None:
-                raise ContractError("conflict", "An archived version has no values to continue from; publish again from its run.")
+                raise ContractError("conflict", t("An archived version has no values to continue from; publish again from its run."))
             meta = json.loads(version["meta"])
             if meta.get("oneOff"):
                 self._mark(db, version_id, {"state": "fixed", "stopped_at": None})
                 self._summarize(db, version["item_id"])
                 return
             if version["state"] not in ("delisted", "expired", "failed"):
-                raise ContractError("invalid_input", "This version is producing already.")
+                raise ContractError("invalid_input", t("This version is producing already."))
             self._mark(db, version_id, {"state": "updating", "stopped_at": None, "misses": 0, "auto": True, "failure": None, "retry_after": None, "pending": None})
             # Kept so the log can say why those periods came late: they were due while it was stopped.
             if version["stopped_at"] is not None:
@@ -669,9 +687,9 @@ class LibraryStore:
         with self.connect() as db:
             version = db.execute("SELECT state, item_id, archived_at FROM versions WHERE id=?", (version_id,)).fetchone()
             if version is None:
-                raise ContractError("not_found", "This library version does not exist.")
+                raise ContractError("not_found", t("This library version does not exist."))
             if version["state"] in ("delisted", "fixed") or version["archived_at"] is not None:
-                raise ContractError("invalid_input", "Only a producing version has auto-update.")
+                raise ContractError("invalid_input", t("Only a producing version has auto-update."))
             self._mark(db, version_id, {"auto": bool(on), **({} if on else {"pending": None})})
             self._summarize(db, version["item_id"])
 
@@ -681,14 +699,14 @@ class LibraryStore:
             db.execute("BEGIN IMMEDIATE")
             version = db.execute("SELECT * FROM versions WHERE id=?", (version_id,)).fetchone()
             if version is None:
-                raise ContractError("not_found", "This library version does not exist.")
+                raise ContractError("not_found", t("This library version does not exist."))
             if version["archived_at"] is not None:
-                raise ContractError("conflict", "This version is archived already.")
+                raise ContractError("conflict", t("This version is archived already."))
             if version["state"] != "delisted":
-                raise ContractError("conflict", "Stop this version first; a stopped version nobody uses can be archived.")
+                raise ContractError("conflict", t("Stop this version first; a stopped version nobody uses can be archived."))
             users = [dict(row) for row in db.execute("SELECT * FROM occupancy WHERE version_id=?", (version_id,))]
             if users:
-                raise ContractError("conflict", "Something still uses this version: " + ", ".join(row["name"] or row["owner_id"] for row in users) + ".",
+                raise ContractError("conflict", t("Something still uses this version: {users}.", users=', '.join(row['name'] or row['owner_id'] for row in users)),
                                     {"users": users})
             rows = db.execute("SELECT COALESCE(SUM(rows),0) FROM value_files WHERE version_id=?", (version_id,)).fetchone()[0]
             db.execute("DELETE FROM value_files WHERE version_id=?", (version_id,))

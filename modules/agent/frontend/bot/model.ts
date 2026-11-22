@@ -1,3 +1,5 @@
+import { intlLocale } from "@talyx/sdk";
+import { t } from "../i18n";
 import type { Item, Permission } from "../chat/model";
 
 /* Bot panel data from Agent's private routes. */
@@ -75,8 +77,8 @@ export type Entry = { kind: "bot"; bot: Bot } | { kind: "group"; group: Group };
 export function displayTime(value: string): string {
   const date = new Date(value);
   const today = new Date();
-  if (date.toDateString() === today.toDateString()) return date.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  if (date.toDateString() === today.toDateString()) return date.toLocaleTimeString(intlLocale(), {hour:"2-digit", minute:"2-digit"});
   today.setDate(today.getDate()-1);
-  const day = date.toDateString() === today.toDateString() ? "Yesterday" : date.toLocaleDateString([], {month:"short",day:"numeric"});
-  return day+" "+date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+  const day = date.toDateString() === today.toDateString() ? t("Yesterday") : date.toLocaleDateString(intlLocale(), {month:"short",day:"numeric"});
+  return day+" "+date.toLocaleTimeString(intlLocale(), {hour:"2-digit",minute:"2-digit"});
 }

@@ -12,6 +12,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from ..skills import SkillsService
 from .records import decode_rows, stamp
@@ -19,9 +20,9 @@ from .records import decode_rows, stamp
 
 def wake_label(cause):
     return cause.get("routine") or {
-        "you": "Your messages",
-        "mention": "Other bots",
-        "resumed": "Resumed runs",
+        "you": t("Your messages"),
+        "mention": t("Other bots"),
+        "resumed": t("Resumed runs"),
     }.get(cause["kind"], cause["kind"])
 
 
@@ -83,7 +84,7 @@ def project_bot(bots, ws, bot):
         }.get(row["state"], "running")
         amounts_text = [f"{amount:.4f} {currency}" for currency, amount in sorted(amounts.items())]
         if unpriced:
-            amounts_text.append("Unpriced usage")
+            amounts_text.append(t("Unpriced usage"))
         effects = effects_by_turn[row["turn_id"]]
         runs.append(
             {
@@ -91,7 +92,7 @@ def project_bot(bots, ws, bot):
                 "at": stamp(start),
                 "wake": present_wake(cause),
                 "outcome": outcome,
-                "duration": f"{duration // 60}m {duration % 60}s",
+                "duration": t("{minutes}m {seconds}s", minutes=duration // 60, seconds=duration % 60),
                 "cost": ", ".join(amounts_text),
                 "tokens": str(tokens),
                 "effects": effects,
@@ -275,29 +276,29 @@ async def upload(bots, ws, args):
     bot = bots.entry(ws, args["id"], "bot")
     name = args["name"]
     if not isinstance(name, str) or Path(name).name != name or name in {".", "..", ""}:
-        raise ContractError("invalid_input", "Choose a file name")
+        raise ContractError("invalid_input", t("Choose a file name"))
     folder = Path(await bots.agent.ctx.platform.workspace_folder(ws))
     path = (folder / name).resolve()
     if path.parent != folder.resolve():
-        raise ContractError("invalid_input", "The upload must stay in the workspace folder")
+        raise ContractError("invalid_input", t("The upload must stay in the workspace folder"))
     try:
         data = base64.b64decode(args["data"], validate=True)
         with path.open("xb") as stream:
             stream.write(data)
     except FileExistsError as exc:
         raise ContractError(
-            "conflict", "A file with this name already exists in the workspace"
+            "conflict", t("A file with this name already exists in the workspace")
         ) from exc
     except (ValueError, binascii.Error) as exc:
-        raise ContractError("invalid_input", "Could not read the uploaded file") from exc
+        raise ContractError("invalid_input", t("Could not read the uploaded file")) from exc
     await bots.patch(ws, bot["id"], {"knowledge": [*bot["knowledge"], "/workspace/" + name]})
 
 
 async def dispatch(bots, ws, operation, args):
     if ws is None:
-        raise ContractError("invalid_target", "Open a workspace to use Bots")
+        raise ContractError("invalid_target", t("Open a workspace to use Bots"))
     if not isinstance(args, dict):
-        raise ContractError("invalid_input", "Bot requests require an object")
+        raise ContractError("invalid_input", t("Bot requests require an object"))
     if operation == "list":
         entries = bots.entries(ws)
         return {
@@ -369,7 +370,7 @@ async def dispatch(bots, ws, operation, args):
             (ws, args["id"]),
         ).fetchone()
         if row is None:
-            raise ContractError("conflict", "This bot run cannot be retried now")
+            raise ContractError("conflict", t("This bot run cannot be retried now"))
         await bots.agent.card_decision("retry", {"conversationId": row[0], "cardId": args["cardId"]}, ws)
         with bots.store.transaction():
             bots.db.execute("UPDATE bot_wakes SET result=NULL WHERE id=?", (args["id"],))
@@ -381,6 +382,6 @@ async def dispatch(bots, ws, operation, args):
             (args["id"], ws),
         ).fetchone()
         if not row or not row["turn_id"]:
-            raise ContractError("not_found", "This run's changes are unavailable")
+            raise ContractError("not_found", t("This run's changes are unavailable"))
         return await bots.agent.changes.revert(ws, row[0], row[1], args["direction"])
-    raise ContractError("invalid_input", "Unknown bot operation")
+    raise ContractError("invalid_input", t("Unknown bot operation"))

@@ -16,7 +16,7 @@ def freeze(tmp_path, monkeypatch):
     settings = {"symbols": [{"instrument": {"instrumentId": "A"}}], "timeframe": "1d",
                 "since": "2024-01-01", "until": "2024-01-03"}
 
-    async def prepare(key, resolved, report, directory, calendars):
+    async def prepare(key, resolved, report, directory, calendars, facts=True):
         if calendars == "one":
             raise ContractError("invalid_input", "2 different calendars")
         directory.mkdir()

@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+import { displayedPanelTitle } from "./workspaceSummary";
 import { TxContextMenu, TxIcon, type TxMenuItem } from "@talyx/sdk";
 import { createContext, type CSSProperties, type FunctionComponent, type ReactNode, useContext, useEffect, useState } from "react";
 import type { DockviewApi, DockviewTheme, IDockviewHeaderActionsProps, IDockviewPanel, IDockviewPanelHeaderProps, IDockviewPanelProps } from "dockview-react";
@@ -75,14 +77,14 @@ export function DockModuleTab({ params, api, containerApi }: IDockviewPanelHeade
   const { panel } = params as DockPanelParams;
   useDockRevision(api, containerApi);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const title = api.title ?? panel.title;
+  const title = api.title ?? displayedPanelTitle(panel);
   const live = containerApi.getPanel(panel.id);
   const maximized = api.isMaximized();
   const others = live ? live.group.panels.filter(item => item.id !== panel.id) : [];
   const items: TxMenuItem[] = [
-    { id: "close", label: "Close", icon: "close", onSelect: () => { if (live) void closePanels(context, [live]); } },
-    { id: "close-others", label: "Close others", disabled: others.length === 0, onSelect: () => { void closePanels(context, others); } },
-    { id: "maximize", label: maximized ? "Restore" : "Maximize", icon: maximized ? "restore" : "maximize", separated: true, onSelect: () => toggleMaximized(api) },
+    { id: "close", label: t("Close"), icon: "close", onSelect: () => { if (live) void closePanels(context, [live]); } },
+    { id: "close-others", label: t("Close others"), disabled: others.length === 0, onSelect: () => { void closePanels(context, others); } },
+    { id: "maximize", label: maximized ? t("Restore") : t("Maximize"), icon: maximized ? "restore" : "maximize", separated: true, onSelect: () => toggleMaximized(api) },
   ];
   return <>
     <div className="talyx-tab" title={title}
@@ -91,21 +93,21 @@ export function DockModuleTab({ params, api, containerApi }: IDockviewPanelHeade
       onMouseDown={event => { if (event.button === 1 && live) { event.preventDefault(); void closePanels(context, [live]); } }}>
       <ModuleIcon module={panel.kind} className="talyx-tab-icon" />
       <span className="talyx-tab-title">{title}</span>
-      <button className="talyx-tab-close" type="button" aria-label={`Close ${title}`} title="Close"
+      <button className="talyx-tab-close" type="button" aria-label={t("Close {title}", { title })} title={t("Close")}
         onPointerDown={event => event.stopPropagation()}
         onDoubleClick={event => event.stopPropagation()}
         onClick={event => { event.stopPropagation(); if (live) void closePanels(context, [live]); }}>
         <TxIcon name="close" />
       </button>
     </div>
-    <TxContextMenu open={menu !== null} onOpenChange={open => { if (!open) setMenu(null); }} point={menu ?? { x: 0, y: 0 }} label={`${title} panel`} items={items} />
+    <TxContextMenu open={menu !== null} onOpenChange={open => { if (!open) setMenu(null); }} point={menu ?? { x: 0, y: 0 }} label={t("{title} panel", { title })} items={items} />
   </>;
 }
 
 /** Right after the tabs: add a module to this group. Shows while the tab row is hovered. */
 export function DockGroupAdd({ activePanel }: IDockviewHeaderActionsProps) {
   const context = useContext(DockPreviewContext);
-  return <button type="button" className="talyx-group-add" aria-label="Add module here" title="Add module"
+  return <button type="button" className="talyx-group-add" aria-label={t("Add module here")} title={t("Add module")}
     onClick={event => { activePanel?.api.setActive(); context?.onAddModule(event.currentTarget); }}><TxIcon name="plus" /></button>;
 }
 
@@ -117,7 +119,7 @@ export function DockGroupRestore({ api, containerApi }: IDockviewHeaderActionsPr
     return () => disposable.dispose();
   }, [containerApi]);
   if (!api.isMaximized()) return null;
-  return <button type="button" className="talyx-group-restore" aria-label="Restore" title="Restore" onClick={() => api.exitMaximized()}><TxIcon name="restore" /></button>;
+  return <button type="button" className="talyx-group-restore" aria-label={t("Restore")} title={t("Restore")} onClick={() => api.exitMaximized()}><TxIcon name="restore" /></button>;
 }
 
 export function dockModuleSurfaceStyle(isVisible: boolean): CSSProperties | undefined {
@@ -168,7 +170,7 @@ function DockModuleSurface({ params, api }: IDockviewPanelProps) {
     <section
       aria-hidden={!isVisible}
       className="talyx-dock-module-live"
-      aria-label={panel.title}
+      aria-label={displayedPanelTitle(panel)}
       data-dock-panel-visible={isVisible ? "true" : "false"}
       onPointerDown={() => api.setActive()}
       onFocusCapture={() => api.setActive()}

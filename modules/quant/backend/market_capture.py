@@ -5,6 +5,7 @@ import asyncio
 from collections import defaultdict
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import market_inputs as M
 from .materials import acquire, release, run_task
@@ -42,7 +43,7 @@ async def fetch(ctx, selections, since, until, progress):
                 "start": M.timestamp(since), "end": M.timestamp(until)}, report)
             failures.extend(result["failures"])
             if result.get("state") == "interrupted":
-                raise ContractError("interrupted", "Market fetch was interrupted.", {"jobId": result["jobId"]}, execution="failed")
+                raise ContractError("interrupted", t("Market fetch was interrupted."), {"jobId": result["jobId"]}, execution="failed")
             done += len(batch)
     return failures
 
@@ -109,7 +110,7 @@ async def capture_window(ctx, request, owner):
                         await release(ctx, own, owner)
                         own = []
                         if attempt == 2:
-                            raise ContractError("conflict", "Market data changed repeatedly while freezing the run.",
+                            raise ContractError("conflict", t("Market data changed repeatedly while freezing the run."),
                                                 {"instruments": [item["instrument"]["instrumentId"] for item in changed]})
                         before.update(after)
                         # The artifact groups several names; regenerate this bounded group as one consistent file.

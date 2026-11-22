@@ -1,4 +1,5 @@
 /* A strategy's page: the private routes of backend/strategy_views.py and the shapes they return. */
+import { t } from "../i18n";
 import type { ModuleContext } from "@talyx/sdk";
 import { at, route } from "../types";
 import type { DataSettings, ParamValue, RunState } from "../objects";
@@ -11,7 +12,7 @@ export interface RunSettings {
   limitThroughTicks: number;
   costs: {feePct?: number | null; makerPct?: number | null; commissionBps?: number | null; feeSource?: string; halfSpreadBps: number; impact: number; volumeCapPct: number | null; funding?: boolean; borrowPct?: number};
   fill: "nextOpen" | "nextClose"; shorting: "allowed" | "off"; halted?: "keep" | "close";
-  benchmark: {kind: "hold" | "symbol" | "beta" | "equal" | "none"; symbol?: string}; riskFree: {basis: "irx" | "zero" | "fixed"; pct?: number}; heldOutFrom: string | null;
+  benchmark: {kind: "hold" | "symbol" | "equal" | "none"; symbol?: string}; riskFree: {basis: "irx" | "zero" | "fixed"; pct?: number}; heldOutFrom: string | null;
 }
 export interface RunSettingsView {
   objectId: string; kind: Kind; effective: RunSettings; defaults: RunSettings; stored: Partial<RunSettings>;
@@ -52,7 +53,7 @@ export interface Costs { fees: number; spread: number; impact: number; funding: 
 export interface StrategyWork {
   kind: "single" | "multi"; currency: string; capital: number; annualization: number; riskFree: {basis: string; label: string; meanPct?: number; unavailable?: string}; benchmarkLabel: string; stats: Stats;
   /** The equity's first and last day, milliseconds. */
-  span: [number, number] | null; tradesTotal: number; logTotal: number; costs: Costs; checks: Check[]; instrument: {id: string; symbol: string; type: string} | null; instrumentCount: number; notes: string[]; dataNotes?: string[]; shortSample?: boolean;
+  span: [number, number] | null; tradesTotal: number; logTotal: number; costs: Costs; checks: Check[]; instrument: {id: string; symbol: string; type: string} | null; instrumentCount: number; notes: string[]; dataNotes?: string[];
   heldOut?: {from: number; of: number | null; figure: import("../chart/Plot").PlotFigure | null; rows: [string, string, string][]; inSample: HeldPart | null; heldOut: HeldPart | null};
   partial?: boolean; stoppedAt?: number | null; usedToPick?: {name: string; to: string | null}[];
   multi?: {rebalancesTotal: number; holdings: {name: string; weight: number | null; pnl: number | null; days: number | null; sector: string | null}[]; holdingsTotal: number;
@@ -96,8 +97,8 @@ export interface StrategyRunRow {
 export const ACTIVE = ["queued", "preparing", "running", "cancel_requested"];
 export const isActive = (run: {state: string}) => ACTIVE.includes(run.state);
 /** The data stage's steps in the order they run; a step with a total counts names (prices: names fetched; export: series written, two a stock). */
-export const FETCH_STEPS = {names: "Checking names", prices: "Fetching prices", export: "Exporting series", terms: "Reading trading terms", coverage: "Checking coverage",
-  inputs: "Writing backtest inputs", library: "Reading library inputs", benchmark: "Reading the benchmark and risk-free rate", extras: "Reading extra series"} as const;
+export const FETCH_STEPS = {names: t("Checking names"), prices: t("Fetching prices"), export: t("Exporting series"), terms: t("Reading trading terms"), coverage: t("Checking coverage"),
+  inputs: t("Writing backtest inputs"), library: t("Reading library inputs"), benchmark: t("Reading the benchmark and risk-free rate"), extras: t("Reading extra series")} as const;
 /** How far fetching a run's data is: the step, how many of its total are done, and the names left out so far. */
 export interface Fetching {waitingFor?: string | null; waitingUntil?: string | null; message?: string; step: keyof typeof FETCH_STEPS; done: number; total: number; leftOut: string[]}
 export const usable = (run: StrategyRunRow | StrategyRun | null | undefined): boolean => Boolean(run && run.state === "completed" && run.kind === "backtest" && run.stats);

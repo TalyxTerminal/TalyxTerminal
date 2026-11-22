@@ -5,6 +5,7 @@ import pandas as pd
 from joblib import parallel_backend
 from qlib.model.trainer import begin_task_train, end_task_train
 
+from . import i18n
 from .model_training import validate_training_windows
 
 
@@ -50,7 +51,7 @@ def publish_recorder(recorder, task, publisher, name, title, *, include_model=Tr
         artifacts.extend(native_files)
         artifacts.extend(publish_states(recorder, task, publisher, name, native_files, include_model=include_model))
     except Exception as error:
-        failures.append({"title": "Native Recorder files", "message": str(error)})
+        failures.append({"title": i18n.t("Native Recorder files"), "message": str(error)})
     try:
         from mlflow.tracking import MlflowClient
         from plotly import graph_objects as go
@@ -66,7 +67,7 @@ def publish_recorder(recorder, task, publisher, name, title, *, include_model=Tr
             artifacts.append(publisher.table(pd.DataFrame(history), f"{name}/learning-history", "Native learning metrics", **native))
             artifacts.extend(plotly_figures(publisher, [figure], f"{name}/learning-curves", "Training and validation learning curves", chapter="training", engine="lightgbm"))
     except Exception as error:
-        failures.append({"title": "Learning curves", "message": str(error)})
+        failures.append({"title": i18n.t("Learning curves"), "message": str(error)})
     actual_ranges = {}
     quality_metrics = {}
     for filename, label in (("pred.pkl", "Prediction"), ("label.pkl", "Label")):
@@ -86,17 +87,17 @@ def publish_recorder(recorder, task, publisher, name, title, *, include_model=Tr
             quality, quality_metrics = prediction_quality(pred, label, target_column)
             artifacts.append(publisher.table(quality, f"{name}/prediction-quality", "Prediction quality by observation", **native))
         except Exception as error:
-            failures.append({"title": "Prediction quality", "message": str(error)})
+            failures.append({"title": i18n.t("Prediction quality"), "message": str(error)})
         try:
             artifacts.extend(plotly_figures(publisher, model_performance_graph(aligned, N=min(5, len(aligned.index.get_level_values("instrument").unique())), show_notebook=False), f"{name}/signal", "Signal analysis", chapter="quality", engine="qlib"))
         except Exception as error:
-            failures.append({"title": "Signal figures", "message": str(error)})
+            failures.append({"title": i18n.t("Signal figures"), "message": str(error)})
         try:
             from qlib.contrib.report.analysis_position.score_ic import _get_score_ic, score_ic_graph
             artifacts.append(publisher.table(_get_score_ic(aligned), f"{name}/score-ic", "Score IC and Rank IC", **native))
             artifacts.extend(plotly_figures(publisher, score_ic_graph(aligned, show_notebook=False), f"{name}/score-ic", "Score IC", chapter="quality", engine="qlib", order=10))
         except Exception as error:
-            failures.append({"title": "Score IC", "message": str(error)})
+            failures.append({"title": i18n.t("Score IC"), "message": str(error)})
     from native.prediction_figures import feature_importance, position_figures
     artifacts.extend(feature_importance(publisher, recorder, paths, name, failures, figures=figures) if include_model else [])
     portfolio_paths = recorder.list_artifacts("portfolio_analysis") if "portfolio_analysis" in paths else []
@@ -124,7 +125,7 @@ def publish_recorder(recorder, task, publisher, name, title, *, include_model=Tr
             try:
                 artifacts.extend(plotly_figures(publisher, report_graph(report.copy(), show_notebook=False, time_format="%Y-%m-%d %H:%M:%S"), f"{name}/{filename[:-4]}-report", "Research backtest · cumulative period returns", chapter="performance", engine="qlib", order=10))
             except Exception as error:
-                failures.append({"title": "Financial figures", "message": str(error)})
+                failures.append({"title": i18n.t("Financial figures"), "message": str(error)})
         elif filename.startswith("port_analysis_"):
             frequency = filename.removeprefix("port_analysis_").removesuffix(".pkl")
             analysis = recorder.load_object(path)
@@ -132,7 +133,7 @@ def publish_recorder(recorder, task, publisher, name, title, *, include_model=Tr
             try:
                 artifacts.extend(plotly_figures(publisher, risk_analysis_graph(analysis, show_notebook=False), f"{name}/{filename[:-4]}-risk", "Risk analysis", chapter="risk", engine="qlib"))
             except Exception as error:
-                failures.append({"title": "Risk figures", "message": str(error)})
+                failures.append({"title": i18n.t("Risk figures"), "message": str(error)})
     unit = {"id": name, "title": title, "state": "completed", **native, "segments": task.get("dataset", {}).get("kwargs", {}).get("segments"), "actualRanges": actual_ranges, "metrics": {**quality_metrics, **recorder.list_metrics()}, "reportErrors": failures}
     existing = next((item for item in publisher.index["units"] if item["id"] == name), None)
     if existing is None:

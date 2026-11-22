@@ -15,7 +15,7 @@ describe("The notebook page", () => {
     expect(page).toContain("...menu]");
     expect(page).not.toContain('id: "packages"');
     expect(shell.match(/id: "packages"/g)).toHaveLength(1);
-    expect(page).toContain('label: "Open file in Developer"');
+    expect(page).toContain('label: t("Open file in Developer")');
     expect(page).not.toContain("Open in VS Code");
     // Save and Clear all outputs open the menu now: no separator above the first item.
     expect(page).not.toMatch(/id: "save"[^}]*separated/);
@@ -32,7 +32,7 @@ describe("The notebook page", () => {
   });
   it("no_title_outside_definitions: the new parts carry no explanatory hover text", () => {
     // the one hover text is the draft's: which cell set a variable
-    expect(parts.join("\n").match(/\btitle=\{?[^ >]*/g)).toEqual(["title={item.fromCell", "title={`Extract"]);
+    expect(parts.join("\n").match(/\btitle=\{?[^ >]*/g)).toEqual(["title={item.fromCell", "title={(count"]);
     expect(page).not.toContain("The kernel's environment");
     expect(page).not.toContain("Tick cells in the left margin first");
   });
@@ -52,15 +52,15 @@ describe("The notebook page", () => {
 
 describe("environment install flow and controls", () => {
   it("the install confirmation names the offer, offers a build choice, and installs through D's action with the chosen build", () => {
-    expect(page).toContain("Install the deep-learning environment (${deepAsk.offer.label}, ${deepAsk.offer.size}) and restart the kernel in it?");
+    expect(page).toContain("Install the deep-learning environment ({label}, {size}) and restart the kernel in it?");
     expect(page).toContain('"Install and restart"');
     expect(page).toContain("installDeep(deepChoice, wanted)");
     expect(page).toContain("nb.installDeep(variant)");
-    expect(page).toContain('variant === "cpu" ? "CPU" : "Intel GPU"');
+    expect(page).toContain('variant === "cpu" ? "CPU" : t("Intel GPU")');
   });
   it("a failed install says why and offers Retry; the kernel stays where it was", () => {
-    expect(page).toContain("Deep-learning environment failed: ${status.failure}");
-    expect(page).toContain(">Retry</TxButton>");
+    expect(page).toContain("Deep-learning environment failed: {failure}");
+    expect(page).toContain('>{t("Retry")}</TxButton>');
   });
   it("a running cell is named in the confirmation", () => {
     expect(page).toContain("is running and will be stopped");

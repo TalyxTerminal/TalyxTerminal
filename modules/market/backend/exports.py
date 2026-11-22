@@ -23,6 +23,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.csv as pa_csv
 import pyarrow.parquet as pq
+from talyx_sdk.i18n import t
 
 from vocabulary.instruments import MarketSeries
 
@@ -179,7 +180,7 @@ class Exports:
                                 value.get("allowEmpty", False), failures, gaps, environment)
                 if progress:
                     progress({"done": chunk_start + len(chunk), "total": len(todo), "waitingFor": None,
-                              "waitingUntil": None, "message": "exporting"})
+                              "waitingUntil": None, "message": t("exporting")})
             for selection in research_items:
                 await self.research_file(selection, folder, file_format, writers, value)
             for selection in materials:
@@ -206,7 +207,7 @@ class Exports:
                           "range": None, "sources": [{"sourceId": material["sourceId"], "name": material["name"]}],
                           "path": str(path) if destination else None})
         if not files and not value.get("allowEmpty"):
-            raise MarketError("no_data", "Nothing to export: no selected series has stored rows",
+            raise MarketError("no_data", t("Nothing to export: no selected series has stored rows"),
                               details={"failures": failures[:20]})
         return {"files": files, "gaps": gaps[:MAX_GAPS], "failures": failures[:MAX_FAILURES]}
 
@@ -224,7 +225,7 @@ class Exports:
             if table is None:
                 if not allow_empty:
                     failures.append({"instrumentId": instrument["instrumentId"], "problem": {
-                        "code": "no_data", "message": f"No stored rows for {instrument['symbol']}",
+                        "code": "no_data", "message": t("No stored rows for {symbol}", symbol=instrument['symbol']),
                         "sourceId": source, "status": None, "retryAt": None}})
                 continue
             writer.append(table)

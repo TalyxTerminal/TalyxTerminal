@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 import jsonschema
 from referencing import Registry, Resource
+from talyx_sdk.i18n import t
 
 from .common import MarketError, now_ns
 from .routing import in_worker
@@ -102,7 +103,7 @@ def _timepoints(value) -> None:
 
 def _instrument(value) -> dict:
     if not isinstance(value, dict) or not isinstance(value.get("instrumentId"), str) or not value["instrumentId"]:
-        raise ValueError("Each instrument must carry its instrumentId")
+        raise ValueError(t("Each instrument must carry its instrumentId"))
     return value
 
 
@@ -141,9 +142,9 @@ def _positive(value, name: str, index: int) -> None:
     try:
         number = Decimal(value)
     except (InvalidOperation, TypeError) as exc:
-        raise ValueError(f"Row {index + 1}: {name} must be a decimal") from exc
+        raise ValueError(t("Row {index}: {name} must be a decimal", index=index + 1, name=name)) from exc
     if not number.is_finite() or number <= 0:
-        raise ValueError(f"Row {index + 1}: {name} must be a positive finite decimal")
+        raise ValueError(t("Row {index}: {name} must be a positive finite decimal", index=index + 1, name=name))
 
 
 class MaterialStore:
@@ -153,7 +154,7 @@ class MaterialStore:
 
     def paths(self, material_id: str, version: str) -> tuple[Path, Path, Path]:
         if not re.fullmatch(r"mpm_[0-9a-f]{32}", material_id) or not re.fullmatch(r"[0-9a-f]{64}", version):
-            raise MarketError("invalid_input", "Select an exact professional material version")
+            raise MarketError("invalid_input", t("Select an exact professional material version"))
         root = self.directory / material_id / version
         return root, root / "material.json", root / "rows.json"
 
@@ -162,7 +163,7 @@ class MaterialStore:
         validate("Descriptor", descriptor)
         _timepoints(descriptor)
         if not 1 <= len(raw) <= MAX_BYTES:
-            raise ValueError("Choose a professional material file up to 8 MB")
+            raise ValueError(t("Choose a professional material file up to 8 MB"))
         suffix = Path(filename).suffix.lower()
         if suffix == ".json":
             rows = json.loads(raw.decode("utf-8-sig"))
@@ -170,25 +171,25 @@ class MaterialStore:
             rows = []
             for row in csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))):
                 if None in row:
-                    raise ValueError("CSV rows must match the named columns")
+                    raise ValueError(t("CSV rows must match the named columns"))
                 rows.append({key: json.loads(value) if key in JSON_COLUMNS else value for key, value in row.items()})
         else:
-            raise ValueError("Choose JSON rows or CSV with JSON structured columns")
+            raise ValueError(t("Choose JSON rows or CSV with JSON structured columns"))
         if not isinstance(rows, list) or not 1 <= len(rows) <= MAX_ROWS:
-            raise ValueError("A file must contain between 1 and 100,000 rows")
+            raise ValueError(t("A file must contain between 1 and 100,000 rows"))
         identities = set()
         for index, row in enumerate(rows):
             try:
                 validate(ROW_SCHEMA[descriptor["kind"]], row)
             except ValueError as exc:
-                raise ValueError(f"Row {index + 1}: {exc}") from exc
+                raise ValueError(t("Row {index}: {exc}", index=index + 1, exc=exc)) from exc
             _timepoints(row)
             if "instrument" in row:
                 _instrument(row["instrument"])
                 if descriptor["kind"] == "instrument_definitions":
                     identity = row["definitionId"]
                     if identity in identities:
-                        raise ValueError(f"Row {index + 1}: duplicate source definition identity")
+                        raise ValueError(t("Row {index}: duplicate source definition identity", index=index + 1))
                     identities.add(identity)
                     continue
                 terms = row["terms"]
@@ -199,30 +200,30 @@ class MaterialStore:
                         _positive(terms[key], key, index)
                 if row["termType"] == "bond":
                     if terms["couponType"] == "fixed" and terms["couponRate"] is None:
-                        raise ValueError("Fixed coupon bonds require a source couponRate")
+                        raise ValueError(t("Fixed coupon bonds require a source couponRate"))
                     if terms["couponType"] == "floating" and not terms["floatingIndex"]:
-                        raise ValueError("Floating coupon bonds require a source floatingIndex")
+                        raise ValueError(t("Floating coupon bonds require a source floatingIndex"))
                 identity = (member(row), digest(row["effectiveFrom"]), row["termType"])
             else:
                 if "instrument" in row["subject"]:
                     _instrument(row["subject"]["instrument"])
                 if row["quoteType"] == "volatility" and not row["dimensions"].get("volType"):
-                    raise ValueError("Volatility quotes require the source volType convention")
+                    raise ValueError(t("Volatility quotes require the source volType convention"))
                 identity = row["quoteId"]
             if identity in identities:
-                raise ValueError(f"Row {index + 1}: duplicate term or quote identity")
+                raise ValueError(t("Row {index}: duplicate term or quote identity", index=index + 1))
             identities.add(identity)
         coverage = descriptor["coverage"]
         returned = set(map(member, rows))
         if returned != set(coverage["returnedMembers"]):
-            raise ValueError("Coverage returnedMembers must match the actual file members")
+            raise ValueError(t("Coverage returnedMembers must match the actual file members"))
         requested = set(coverage["requestedMembers"])
         if returned - requested or set(coverage["missingMembers"]) != requested - returned:
-            raise ValueError("Coverage missingMembers must identify requested members absent from the file")
+            raise ValueError(t("Coverage missingMembers must identify requested members absent from the file"))
         if coverage["completeness"] == "complete" and coverage["missingMembers"]:
-            raise ValueError("Complete coverage cannot contain missing requested members")
+            raise ValueError(t("Complete coverage cannot contain missing requested members"))
         if any(item["member"] not in returned for item in coverage["timeRanges"]):
-            raise ValueError("Coverage time ranges must identify actual returned members")
+            raise ValueError(t("Coverage time ranges must identify actual returned members"))
         content_sha = hashlib.sha256(raw).hexdigest()
         material_id = "mpm_" + digest({key: descriptor[key] for key in ("name", "kind", "sourceId")})[:32]
         # Acquisition time is local metadata, never part of the version.
@@ -250,7 +251,7 @@ class MaterialStore:
                 declared = next((item for item in material["files"] if item["filename"] == filename), None)
                 if Path(filename).name != filename or not declared or declared["byteSize"] != len(content) \
                         or declared["sha256"] != hashlib.sha256(content).hexdigest():
-                    raise ValueError("An original response differs from its declared file")
+                    raise ValueError(t("An original response differs from its declared file"))
                 _atomic(root / filename, content)
             _atomic(metadata, encoded(material))
         return material
@@ -259,12 +260,12 @@ class MaterialStore:
         root, metadata, body = self.paths(material_id, version)
         with _LOCK:
             if not metadata.exists():
-                raise MarketError("not_found", "The selected professional material version is not here")
+                raise MarketError("not_found", t("The selected professional material version is not here"))
             material = json.loads(metadata.read_text(encoding="utf-8"))
             for file in material["files"]:
                 path = root / file["filename"]
                 if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != file["sha256"]:
-                    raise MarketError("source_unavailable", "A stored professional material file is missing or changed")
+                    raise MarketError("source_unavailable", t("A stored professional material file is missing or changed"))
             return material, json.loads(body.read_text(encoding="utf-8"))
 
     def list(self) -> list[dict]:
@@ -299,9 +300,9 @@ def _offset(after: str | None, query: dict) -> int:
         value = json.loads(base64.urlsafe_b64decode(after.encode()))
         offset = int(value["offset"])
     except (ValueError, KeyError, TypeError) as exc:
-        raise MarketError("invalid_input", "The paging cursor is not one Market gave") from exc
+        raise MarketError("invalid_input", t("The paging cursor is not one Market gave")) from exc
     if value.get("query") != digest(query) or offset < 0:
-        raise MarketError("invalid_input", "The paging cursor belongs to a different fixed query")
+        raise MarketError("invalid_input", t("The paging cursor belongs to a different fixed query"))
     return offset
 
 

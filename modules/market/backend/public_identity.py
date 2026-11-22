@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 import orjson
 import pandas as pd
+from talyx_sdk.i18n import t
 
 from . import calendars
 from .codes import MARKET_CALENDARS, parse_typed
@@ -23,11 +24,11 @@ def instant(text, calendar, *, inclusive_end=False):
             return pd.Timestamp(day, tz=calendars.timezone(calendar)).value
         stamp = pd.Timestamp(text)
         if stamp.tz is None:
-            raise ValueError("missing timezone")
+            raise ValueError(t("missing timezone"))
         return stamp.value + int(inclusive_end)
     except (ValueError, OverflowError) as error:
         raise MarketError(
-            "invalid_input", f"Expected a trading date or a zoned ISO instant, got {text}"
+            "invalid_input", t("Expected a trading date or a zoned ISO instant, got {text}", text=text)
         ) from error
 
 
@@ -36,7 +37,7 @@ def offset(value):
     if cursor is None:
         return 0
     if not isinstance(cursor, str) or not cursor.isascii() or not cursor.isdecimal():
-        raise MarketError("invalid_input", "Invalid page cursor")
+        raise MarketError("invalid_input", t("Invalid page cursor"))
     return int(cursor)
 
 
@@ -69,7 +70,7 @@ class PublicIdentity:
     def by_id(self, symbol):
         record = self.identity.record(symbol)
         if record is None:
-            raise MarketError("not_found", f"Unknown instrument ID {symbol}")
+            raise MarketError("not_found", t("Unknown instrument ID {symbol}", symbol=symbol))
         return record
 
     async def record(self, symbol, *, at=None, environment="production"):
@@ -86,7 +87,7 @@ class PublicIdentity:
         if result["kind"] == "missing":
             raise MarketError(
                 "ambiguous",
-                f"Could not reconcile {original['symbol']} with a local listing",
+                t("Could not reconcile {symbol} with a local listing", symbol=original['symbol']),
                 details={
                     "instrumentId": original["instrumentId"],
                     "candidates": result["candidates"],
@@ -157,7 +158,7 @@ class PublicIdentity:
             item = await self.match(target, request)
             if not fits({"items": [*items, item], "nextCursor": str(start + len(items))}):
                 if not items:
-                    raise MarketError("too_large", "One instrument record exceeds the page size")
+                    raise MarketError("too_large", t("One instrument record exceeds the page size"))
                 break
             items.append(item)
         end = start + len(items)
@@ -183,14 +184,14 @@ class PublicIdentity:
             if fits(page):
                 return page
             if len(page["results"]) <= 1:
-                raise MarketError("too_large", "One search result exceeds the page size")
+                raise MarketError("too_large", t("One search result exceeds the page size"))
             value["limit"] = len(page["results"]) // 2
 
     async def search_page(self, value):
         if not value.get("query"):
             venues = value.get("venues", [])
             if len(venues) != 1:
-                raise MarketError("invalid_input", "Supply query or one venue")
+                raise MarketError("invalid_input", t("Supply query or one venue"))
             page = await self.instruments.catalog(
                 {
                     "venueId": venues[0],

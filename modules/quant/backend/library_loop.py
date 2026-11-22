@@ -19,6 +19,7 @@ import time
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark, t
 
 from . import library_after, library_summary, research_calendar
 from .library_produce import (
@@ -173,7 +174,7 @@ class LibraryLoop:
         """Try a failed, missing or waiting version now, ahead of the round."""
         version = self.store.version(version_id)
         if version["state"] not in ("updating", "failed") or not version["auto"] or version["archived_at"] is not None:
-            raise ContractError("invalid_input", "Only a producing version with auto-update on can be retried.")
+            raise ContractError("invalid_input", t("Only a producing version with auto-update on can be retried."))
         if library_summary.republish(version):   # a retry fails the same way: the failure says to publish again
             raise ContractError("conflict", version["failure"]["message"])
         self.store.mark(version_id, retry_after=None, pending=None if version["pending"] is None else {**version["pending"], "nextAt": self.clock()})
@@ -187,7 +188,7 @@ class LibraryLoop:
         """Stop the update running now; the version keeps its values and tries again at the next check."""
         entry = self.running.get(version_id)
         if entry is None:
-            raise ContractError("conflict", "No update of this version is running.")
+            raise ContractError("conflict", t("No update of this version is running."))
         self.cancelled.add(version_id)
         entry["task"].cancel()
         await asyncio.gather(entry["task"], return_exceptions=True)
@@ -350,9 +351,9 @@ class LibraryLoop:
             late = host_closed or waited or upstream
             edge = closing if edge_kind == "close" else opened
             stopped = any(start <= due_at <= end for start, end in meta.get("stops", []))
-            why = ("Stopped when it was due; made when it was produced again" if stopped else "TALYX was not open when it was due" if host_closed
-                   else "The source gave the bar late" if waited else "An input gave its value late") if late \
-                else "Made at publication; it was due before the version existed" if before else None
+            why = (mark("Stopped when it was due; made when it was produced again") if stopped else mark("TALYX was not open when it was due") if host_closed
+                   else mark("The source gave the bar late") if waited else mark("An input gave its value late")) if late \
+                else mark("Made at publication; it was due before the version existed") if before else None
             if label in made.solver:   # an allocation period not solved as set says how it ended
                 why = "; ".join(part for part in (why, made.solver[label]) if part)
             periods.append({"label": label, "due_at": due_at, "result": "late" if late else "ok", "ready_at": now, "names": names, "distinct_values": distinct,

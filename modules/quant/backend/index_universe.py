@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from .public_settings import milliseconds, timestamp
 from .research_inputs import instruments_by_id, read_pages, source_problem
@@ -16,7 +17,7 @@ def summary(index):
     """What a record keeps of a frozen index: the selection, the period, the limitation and the counts. The members and the exclusions
     (megabytes for the S&P 500 over ten years) stay in the file of the frozen data."""
     return {key: index[key] for key in ('selection', 'since', 'until', 'limitation', 'assumedSince') if key in index} | {
-        'memberCount': len({member['assetId'] for interval in index['intervals'] for member in interval['members']}),
+        'memberCount': len({member['assetId'] for member in index['members']}),
         'mappedCount': len(index['instruments']),
         'excludedCount': len({item['assetId'] for item in index['exclusions']}),
         'unmappedCount': index['unmappedCount']}
@@ -26,13 +27,12 @@ def member_spans(index):
     """Each mapped member's stretches in the index, {instrumentId: [[since, until], ...]} in inclusive ms: who was a member on a day,
     without the full member identities of every interval."""
     spans = {}
-    for interval in index['intervals']:
-        for member in interval['members']:
-            if member['instrument'] is not None:
-                span = [member['effectiveTime'], member['effectiveUntil']]
-                held = spans.setdefault(member['instrument']['instrumentId'], [])
-                if span not in held:
-                    held.append(span)
+    for member in index['members']:
+        if member['instrumentId'] is not None:
+            span = [member['effectiveTime'], member['effectiveUntil']]
+            held = spans.setdefault(member['instrumentId'], [])
+            if span not in held:
+                held.append(span)
     return spans
 
 
@@ -42,7 +42,7 @@ def gaps(index, without_prices):
     unmapped = {item['assetId'] for item in index['exclusions'] if item.get('kind') == 'unmapped'}
     worst, year = 0, None
     for interval in index['intervals']:
-        lacking = sum(1 for member in interval['members'] if member['instrument'] is None)
+        lacking = sum(1 for member in members_of(index, interval) if member['instrumentId'] is None)
         if lacking > worst:
             worst, year = lacking, datetime.fromtimestamp(interval['since'] / 1000, UTC).year
     if not unmapped and not without_prices:
@@ -60,9 +60,12 @@ def gap_text(found):
     return "Index members: " + "; ".join(parts)
 
 
+def members_of(index, interval):
+    return [index['members'][position] for position in interval['members']]
+
+
 def members_at(index, instrument_id, interval):
-    return [member for member in interval['members'] if member['instrument'] is not None
-            and member['instrument']['instrumentId'] == instrument_id]
+    return [member for member in members_of(index, interval) if member['instrumentId'] == instrument_id]
 
 
 def exclude(index, instrument_id, since, until, kind, *, source_reason=None):
@@ -73,7 +76,7 @@ def exclude(index, instrument_id, since, until, kind, *, source_reason=None):
             continue
         for member in members_at(index, instrument_id, interval):
             item = {'assetId': member['assetId'], 'instrumentId': instrument_id,
-                    'symbol': member['instrument']['displaySymbol'],
+                    'symbol': member['symbol'],
                     'since': start, 'until': end, 'kind': kind, 'reason': MISSING_PRICE}
             if source_reason is not None:
                 item['sourceReason'] = source_reason
@@ -83,11 +86,11 @@ def exclude(index, instrument_id, since, until, kind, *, source_reason=None):
 
 def check(selection):
     if not isinstance(selection, dict) or set(selection) - {'instrument', 'asOf', 'at'}:
-        raise ContractError('invalid_input', 'index holds an instrument and optional asOf.')
+        raise ContractError('invalid_input', t("index holds an instrument and optional asOf."))
     if not isinstance(selection.get('instrument'), dict) or not selection['instrument'].get('instrumentId'):
-        raise ContractError('invalid_input', 'Choose the Market instrument of an index.')
+        raise ContractError('invalid_input', t("Choose the Market instrument of an index."))
     if 'asOf' in selection and (type(selection['asOf']) is not int or selection['asOf'] < 0):
-        raise ContractError('invalid_input', 'index.asOf is an availability cutoff in UTC milliseconds.')
+        raise ContractError('invalid_input', t("index.asOf is an availability cutoff in UTC milliseconds."))
 
 
 async def freeze(ctx, selection, since, until, *, progress=None, timeframe="1d"):
@@ -120,7 +123,7 @@ async def freeze(ctx, selection, since, until, *, progress=None, timeframe="1d")
 
 def freeze_rows(selection, since, until, rows, identities, *, unmapped, note=None):
     """Project half-open ns membership rows into Quant's inclusive ms intervals."""
-    members, boundaries = [], {since, until + 1}
+    members, boundaries, mapped = [], {since, until + 1}, {}
     for row in rows:
         start = max(since, milliseconds(row['start']))
         end = min(until, milliseconds(row['end'], end=True)) if row['end'] is not None else until
@@ -128,24 +131,29 @@ def freeze_rows(selection, since, until, rows, identities, *, unmapped, note=Non
             continue
         instrument = identities.get(row['instrumentId']) if row['instrumentId'] is not None else None
         asset = instrument['instrumentId'] if instrument is not None else 'unmapped:' + row['symbol'] + ':' + row['start']
-        members.append({'assetId': asset, 'code': row['symbol'], 'instrument': instrument,
+        # A member names its instrument by id (the records are in `instruments`, once): the intervals repeat every member, and with the whole
+        # record each the frozen index of ten years of the S&P 500 was 72 MB.
+        members.append({'assetId': asset, 'code': row['symbol'], 'instrumentId': None if instrument is None else instrument['instrumentId'],
+                        'symbol': row['symbol'] if instrument is None else instrument['displaySymbol'],
                         'effectiveTime': start, 'effectiveUntil': end, 'knownAt': milliseconds(row['knownAt'])})
+        if instrument is not None:
+            mapped[instrument['instrumentId']] = instrument
         boundaries.update((start, end + 1))
     points = sorted(boundaries)
     intervals, instruments, exclusions = [], {}, []
     for start, end in zip(points[:-1], points[1:], strict=True):
-        current = [member for member in members if member['effectiveTime'] <= start <= member['effectiveUntil']]
-        for member in current:
-            instrument = member['instrument']
-            if instrument is None:
+        current = [position for position, member in enumerate(members) if member['effectiveTime'] <= start <= member['effectiveUntil']]
+        for member in (members[position] for position in current):
+            if member['instrumentId'] is None:
                 exclusions.append({'assetId': member['assetId'], 'instrumentId': None, 'symbol': member['code'],
                                    'since': start, 'until': end - 1, 'kind': 'unmapped', 'reason': MISSING_PRICE})
             else:
-                instruments[instrument['instrumentId']] = instrument
+                instruments[member['instrumentId']] = mapped[member['instrumentId']]
         intervals.append({'since': start, 'until': end - 1, 'members': current})
     if not instruments:
-        raise ContractError('no_data', 'The index has no mapped members in the selected range.', {'unmapped': unmapped})
-    return {'selection': dict(selection), 'since': since, 'until': until, 'intervals': intervals,
+        raise ContractError('no_data', t("The index has no mapped members in the selected range."), {'unmapped': unmapped})
+    # Each interval names its members by their place in `members`: the S&P 500 over ten years has some 300 intervals of 500 members.
+    return {'selection': dict(selection), 'since': since, 'until': until, 'members': members, 'intervals': intervals,
             'instruments': list(instruments.values()), 'exclusions': exclusions, 'unmappedCount': unmapped,
             'limitation': note}  # the gaps in numbers (limitation()), no caution sentence: the free source's limits are told once, outside the app (design.md 11-13)
 

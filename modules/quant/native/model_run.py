@@ -35,6 +35,7 @@ sys.path.insert(0, str(native_directory.parent))
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+from native import i18n
 from native import metrics as M  # noqa: E402
 from native import model_algorithms as A  # noqa: E402
 from native import model_data as D  # noqa: E402
@@ -74,7 +75,7 @@ def write_json(path, value):
 
 def _day(label):
     moment = pd.Timestamp(int(label), unit="ms", tz="UTC")
-    return f"{moment.strftime('%b')} {moment.day}, {moment.year}"
+    return i18n.t("{month} {day}, {year}", month=moment.strftime(i18n.t("%b")), day=moment.day, year=moment.year)
 
 
 # ---------------------------------------------------------------------------------------------------------------- data
@@ -344,15 +345,20 @@ class Training:
         for f, name in enumerate(self.data.features):
             if np.isnan(self.data.x[first:last + 1, :, f]).all():
                 names.append(name)
-        span = f"{_day(self.panel.labels[first])} to {_day(self.panel.labels[last])}"
-        detail = (f"{names[0]} has no values from {span}" + (f" (and {len(names) - 1} more inputs)" if len(names) > 1 else "") + ", and rows with a missing input are dropped."
-                  if names else f"No name has a label and every input from {span}.")
-        return {"stage": "compute", "window": window.k, "title": f"Window {window.k} of {len(self.data.windows)} has no training rows", "message": detail, "detail": detail}
+        span = i18n.t("{start} to {end}", start=_day(self.panel.labels[first]), end=_day(self.panel.labels[last]))
+        if len(names) > 1:
+            detail = i18n.t("{name} has no values from {span} (and {others} more inputs), and rows with a missing input are dropped.",
+                            name=names[0], span=span, others=len(names) - 1)
+        elif names:
+            detail = i18n.t("{name} has no values from {span}, and rows with a missing input are dropped.", name=names[0], span=span)
+        else:
+            detail = i18n.t("No name has a label and every input from {span}.", span=span)
+        return {"stage": "compute", "window": window.k, "title": i18n.t("Window {window} of {total} has no training rows", window=window.k, total=len(self.data.windows)), "message": detail, "detail": detail}
 
     # training ------------------------------------------------------------------------------------------------------------
     def fit(self, algorithm, window, params=None, *, seed=42, reproducible=True):
         if not algorithm:
-            raise RunFailure({"stage": "code", "title": "no algorithm", "message": "Choose an algorithm in the preparation first."})
+            raise RunFailure({"stage": "code", "title": i18n.t("no algorithm"), "message": i18n.t("Choose an algorithm in the preparation first.")})
         self.job.setdefault("algorithm", algorithm)
         self.job.setdefault("algorithmParams", params or {})
         self.job.setdefault("seed", seed)
@@ -374,7 +380,7 @@ class Training:
             label = self.job["settings"]["label"]
             objective = label.get("objective", "l2")
             if objective not in A.SUPPORTS.get(algorithm, ["l2"]):
-                raise RunFailure({"stage": "settings", "title": "objective not available", "message": f"{A.BY_ID[algorithm]['label']} cannot train {objective}; choose another objective."})
+                raise RunFailure({"stage": "settings", "title": i18n.t("objective not available"), "message": i18n.t("{algorithm} cannot train {objective}; choose another objective.", algorithm=i18n.t(A.BY_ID[algorithm]['label']), objective=objective)})
             if label.get("weight", "equal") != "equal" and not A.takes_weight(algorithm, objective):
                 parts = {key: {name: value for name, value in part.items() if name != "w"} if isinstance(part, dict) else part for key, part in parts.items()}
             engine = A.engine_params(algorithm, (self.job.get("params") or {}).get("engine_params", ""), declared=set(A.CONTROL_NAMES.get(algorithm, {}).values()))
@@ -494,7 +500,7 @@ class Training:
                                                 threads=self.threads, device=params.get("device") or ND_device(), checkpoint=str(folder / "epoch.pt"), digest=self.digest(window._window),
                                                 on_epoch=on_epoch)
         except ND.DeepFailure as error:
-            raise RunFailure({**error.failure, "window": window.k, "title": f"Window {window.k}: {error.failure['title']}"}) from error
+            raise RunFailure({**error.failure, "window": window.k, "title": i18n.t("Window {window}: {title}", window=window.k, title=error.failure['title'])}) from error
         fitted = ND.NeuralFitted("own", model, features, curve, best, params={**checked, "_module": net}, d_feat=len(features), lookback=lookback, seed=seed)
         fitted.source = source
         fitted.valid_rows = {key: parts["valid"][key] for key in ("t", "i", "y")}
@@ -519,13 +525,13 @@ class Training:
         if algorithm == "tcts":
             found = self.aux_labels()
             if not found:
-                raise RunFailure({"stage": "settings", "title": "TCTS needs an auxiliary label", "message": "TCTS needs at least one auxiliary label; the label here is not a plain return over some days."})
+                raise RunFailure({"stage": "settings", "title": i18n.t("TCTS needs an auxiliary label"), "message": i18n.t("TCTS needs at least one auxiliary label; the label here is not a plain return over some days.")})
             extras["aux"] = {name: [np.where(np.isfinite(a[part["t"], part["i"]]), a[part["t"], part["i"]], part["y"]) for a in found]
                              for name, part in (("train", train), ("valid", valid))}
         if algorithm == "hist":
             found = self.concepts(window)
             if found is None:
-                raise RunFailure({"stage": "settings", "title": "HIST needs concept data", "message": "Market gives no concept-sector membership for these names."})
+                raise RunFailure({"stage": "settings", "title": i18n.t("HIST needs concept data"), "message": i18n.t("Market gives no concept-sector membership for these names.")})
             extras["concepts"] = {**found, "names": [self.panel.columns[n] for n in range(len(self.panel.columns))]}
         if algorithm == "add":
             raw = np.where(self.data.rows, self.data.label_raw, np.nan)
@@ -580,19 +586,21 @@ class Training:
         """A network's failure as the run shows it: an out of memory names the window and epoch; anything else is that window's reason."""
         if failure.get("kind") in ("memory", "gpu-memory"):
             return self.out_of_memory(window, kind=failure["kind"], epoch=failure.get("epoch"), saved=failure.get("saved"), batch=failure.get("batch"))
-        return {**failure, "window": window.k, "title": f"Window {window.k}: {failure['title']}"}
+        return {**failure, "window": window.k, "title": i18n.t("Window {window}: {title}", window=window.k, title=failure['title'])}
 
     def out_of_memory(self, window, *, kind="memory", epoch=None, saved=None, batch=None):
         """Ran out of memory (or a card's): which window and epoch, from which epoch it can go on, the batch size it could try instead (half)."""
         gpu = kind == "gpu-memory"
         need = float(self.job.get("memoryEstimate") or 0) / GB
         free = available_memory() / GB
-        detail = (f"Window {window.k} needed about {need:.1f} GB; {free:.1f} GB was free." if need else f"{free:.1f} GB was free when window {window.k} ran out.") if not gpu else \
-            "The card's memory was full."
+        detail = (i18n.t("Window {window} needed about {need} GB; {free} GB was free.", window=window.k, need=f"{need:.1f}", free=f"{free:.1f}") if need else i18n.t("{free} GB was free when window {window} ran out.", window=window.k, free=f"{free:.1f}")) if not gpu else \
+            i18n.t("The card's memory was full.")
         if saved is not None:
-            detail += f" Window {window.k} saved epoch {saved}." if saved else f" Window {window.k} had not saved an epoch."
-        where = f"window {window.k}" + ("" if gpu else f" of {len(self.data.windows)}") + (f", epoch {epoch}" if epoch else "")
-        return {"stage": "compute", "window": window.k, "kind": kind, "title": f"Ran out of {'GPU ' if gpu else ''}memory in {where}", "message": detail,
+            detail += i18n.t(" Window {window} saved epoch {saved}.", window=window.k, saved=saved) if saved else i18n.t(" Window {window} had not saved an epoch.", window=window.k)
+        where = i18n.t("window {window}", window=window.k) if gpu else i18n.t("window {window} of {total}", window=window.k, total=len(self.data.windows))
+        if epoch:
+            where = i18n.t("{window}, epoch {epoch}", window=where, epoch=epoch)
+        return {"stage": "compute", "window": window.k, "kind": kind, "title": (i18n.t("Ran out of GPU memory in {where}", where=where) if gpu else i18n.t("Ran out of memory in {where}", where=where)), "message": detail,
                 "detail": detail, "need": round(need, 1), "free": round(free, 1), **({"epoch": epoch} if epoch else {}), **({"saved": saved} if saved is not None else {}),
                 **({"batch": batch, "tryBatch": max(1, int(batch) // 2)} if batch else {})}
 
@@ -603,7 +611,7 @@ class Training:
         if predictions is None:
             predict = model.predict if hasattr(model, "predict") else None
             if predict is None:
-                raise RunFailure({"stage": "code", "title": "cannot predict", "message": "q.record needs a model with predict(x), or predictions=."})
+                raise RunFailure({"stage": "code", "title": i18n.t("cannot predict"), "message": i18n.t("q.record needs a model with predict(x), or predictions=.")})
             if getattr(model, "neural", False):
                 def predict_part(part):
                     return model.predict_rows(part["t"], part["i"])
@@ -720,7 +728,7 @@ def run_code(training):
     except Exception as error:  # the code's own error: where it broke is the result
         if not roots:
             if isinstance(error, (ValueError, TypeError)) and "Setting" in str(error) or "Parameter" in str(error):
-                raise RunFailure({"stage": "settings", "title": "a setting is not valid", "message": str(error)}) from error
+                raise RunFailure({"stage": "settings", "title": i18n.t("a setting is not valid"), "message": str(error)}) from error
             raise
         found = failure(error, roots)
         inner = next((item for item in reversed(found["frames"]) if item["root"] in {"source", "library"}), None)
@@ -763,7 +771,7 @@ def summarize(training, *, future=None):
         pred[:start] = np.nan
         windows = [window for window in windows if window["testSpan"][0] >= start]
     if pred is None or not np.isfinite(pred).any():
-        raise RunFailure({"stage": "code", "title": "trained nothing", "message": "The code finished without a prediction: call q.record(window, model) for each window, or q.predict(scores)."})
+        raise RunFailure({"stage": "code", "title": i18n.t("trained nothing"), "message": i18n.t("The code finished without a prediction: call q.record(window, model) for each window, or q.predict(scores).")})
     report = Report(data, pred, windows if per_window else [], run_settings={**(training.job.get("run") or {}), "number": training.job.get("number")}, per_window=per_window,
                     ridge=training.ridge if per_window else None, importance=[w["importance"] for w in windows if w.get("importance")] if per_window else [],
                     curves=[w.get("curve") for w in windows] if per_window else [])
@@ -798,7 +806,7 @@ def train(job):
     progress(output, "compute", state="running")
     run_code(training)
     if training.data is None:
-        raise RunFailure({"stage": "code", "title": "no data", "message": "The code never asked for its data: call q.model_data()."})
+        raise RunFailure({"stage": "code", "title": i18n.t("no data"), "message": i18n.t("The code never asked for its data: call q.model_data().")})
     progress(output, "numbers", state="running")
     work = summarize(training)
     progress(output, "numbers", state="done")
@@ -814,7 +822,7 @@ def cutoff(job):
     run_code(training)
     window = training.recorded.get(job["windows"][0]) if job.get("windows") else None
     if window is None:
-        raise RunFailure({"stage": "compute", "title": "no cut-off window", "message": "The cut-off window was not trained."})
+        raise RunFailure({"stage": "compute", "title": i18n.t("no cut-off window"), "message": i18n.t("The cut-off window was not trained.")})
     original = np.load(Path(job["sourceCache"]) / str(window["k"]) / "test.npz")
     mine = np.load(training.cache / str(window["k"]) / "test.npz")
     theirs = {(int(t), int(i)): float(value) for t, i, value in zip(original["t"], original["i"], original["pred"], strict=True)}
@@ -827,11 +835,10 @@ def cutoff(job):
             break
     if worst is None:
         return {"ok": True, "passed": True, "window": window["k"], "compared": int(len(mine["t"])),
-                "title": f"Window {window['k']} retrained on the data cut at {_day(cut_labels[-1])}: its {len(mine['t'])} predictions are the same"}
+                "title": i18n.t("Window {window} retrained on the data cut at {cutoff}: its {count} predictions are the same", window=window['k'], cutoff=_day(cut_labels[-1]), count=len(mine['t']))}
     t, i, before, after = worst
     return {"ok": True, "passed": False, "window": window["k"], "label": int(cut_labels[t]), "name": training.panel.columns[i],
-            "title": f"{training.panel.columns[i]} on {_day(cut_labels[t])} is {before:.6g} with all the data but {after:.6g} when the data is cut at "
-                     f"{_day(cut_labels[-1])}: the model reads data from after the time it predicts"}
+            "title": i18n.t("{symbol} on {date} is {before} with all the data but {after} when the data is cut at {cutoff}: the model reads data from after the time it predicts", symbol=training.panel.columns[i], date=_day(cut_labels[t]), before=f'{before:.6g}', after=f'{after:.6g}', cutoff=_day(cut_labels[-1]))}
 
 
 def update(job):
@@ -865,7 +872,7 @@ def _update_one(job):
     run_code(training)
     newest = max(training.recorded) if training.recorded else None
     if newest is None:
-        raise RunFailure({"stage": "compute", "title": "no window", "message": "No window of this publication could be trained."})
+        raise RunFailure({"stage": "compute", "title": i18n.t("no window"), "message": i18n.t("No window of this publication could be trained.")})
     # Each window predicts its own test period (the newest one up to the last bar), so a publication that resumes after months, or whose
     # held-out period lies between its data and today, has a value for every day after its cursor, not only for the newest window's days.
     after = int(job.get("after") or 0)
@@ -926,7 +933,7 @@ def values_figure(rows):
                                               "text": [row["ticker"] for row in have], "customdata": [[row["prediction"], row["later"]] for row in have],
                                               "hovertemplate": "%{text}<br>Prediction %{customdata[0]:+.2f}<br>Realised %{customdata[1]:+.1%}<extra></extra>",
                                               "meta": {"role": "main", "key": "values"}}],
-                    xaxis={"title": "Prediction rank"}, yaxis={"title": "Realised rank"})
+                    xaxis={"title": i18n.t("Prediction rank")}, yaxis={"title": i18n.t("Realised rank")})
 
 
 _WARM = {}  # the one run whose values this process keeps ready: {"key", "training", "models"}
@@ -959,6 +966,11 @@ def values_training(job):
     if key is not None:
         _WARM.update(key=key, training=training, models=models)
     return training, models
+
+
+def _label(value):
+    """An industry cell as text, or None where the name had none that day."""
+    return None if value is None or (isinstance(value, float) and value != value) else str(value)
 
 
 def values(job):
@@ -1010,7 +1022,7 @@ def values(job):
     out = []
     for position, (a, b) in enumerate(zip(t, i, strict=True)):
         entry = {"ticker": training.panel.columns[b], "prediction": M.finite(pred[a, b]), "rank": M.finite(ranks[b]),
-                 "later": M.finite(later[b]), "sector": training.panel.industry[b] if training.panel.industry else None}
+                 "later": M.finite(later[b]), "sector": _label(training.panel.industry.iat[row, b]) if training.panel.industry is not None else None}
         if contributions is not None:
             parts = contributions[position]
             order = np.argsort(-np.abs(parts[:-1]))[:8]
@@ -1151,14 +1163,14 @@ def main():
         progress(output, "failed", failure=error.failure)
         answer = {"ok": False, "failure": error.failure}
     except MemoryError:
-        failure = {"stage": "compute", "title": "Ran out of memory", "message": f"The run ran out of memory; {available_memory() / GB:.1f} GB was free.",
+        failure = {"stage": "compute", "title": i18n.t("Ran out of memory"), "message": i18n.t("The run ran out of memory; {free} GB was free.", free=f'{available_memory() / GB:.1f}'),
                    "free": round(available_memory() / GB, 1), "need": round(float(job.get("memoryEstimate") or 0) / GB, 1)}
         progress(output, "failed", failure=failure)
         answer = {"ok": False, "failure": failure}
     except Exception as error:  # noqa: BLE001 - the run ends and says what broke; the traceback goes to the log
         traceback.print_exc()
-        failure = {"stage": "compute", "title": "The model engine failed",
-                   "message": f"The model engine hit an internal error ({type(error).__name__}: {str(error)[:200]}) and stopped; the details are in Quant's log."}
+        failure = {"stage": "compute", "title": i18n.t("The model engine failed"),
+                   "message": i18n.t("The model engine hit an internal error ({error_type}: {reason}) and stopped; the details are in Quant's log.", error_type=type(error).__name__, reason=str(error)[:200])}
         progress(output, "failed", failure=failure)
         answer = {"ok": False, "failure": failure}
     write_json(output / "answer.json", answer)

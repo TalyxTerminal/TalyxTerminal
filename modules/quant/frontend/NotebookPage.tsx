@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ContractError, ModuleView, TxButton, TxCheckbox, TxDialog, TxIcon, TxIconButton, TxInput, TxMenu, TxSelect, type Json, type LeaveDecision, type ModuleContext, type TxMenuItem } from "@talyx/sdk";
 import type { ContractTypes as DeveloperTypes } from "../../developer/public/ts/types";
@@ -81,17 +82,17 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
     void nb.deep().then(status => {setDeepAsk(status); setDeepChoice(status.offer.choices?.[0] ?? status.offer.variant);}, fail);
   }, [envAsk]);
   const installDeep = async (variant: string, then: KernelEnvironment) => {
-    setDeepWork({text: "Installing the deep-learning environment…", failed: false});
+    setDeepWork({text: t("Installing the deep-learning environment…"), failed: false});
     let status = await nb.installDeep(variant);
     for (;;) {
-      if (status.failure !== null) {setDeepWork({text: `Deep-learning environment failed: ${status.failure}`, failed: true}); return;}
+      if (status.failure !== null) {setDeepWork({text: t("Deep-learning environment failed: {failure}", { failure: status.failure }), failed: true}); return;}
       if (status.installing === null || status.installing.state !== "running") break;
       const fraction = status.installing.fraction;
-      setDeepWork({text: `Installing the deep-learning environment…${typeof fraction === "number" ? ` ${Math.round(fraction * 100)}%` : ""}`, failed: false});
+      setDeepWork({text: (typeof fraction === "number" ? t("Installing the deep-learning environment… {percent}%", { percent: Math.round(fraction * 100) }) : t("Installing the deep-learning environment…")), failed: false});
       await new Promise(resolve => setTimeout(resolve, 1500));
       status = await nb.deep();
     }
-    if (!status.installed) {setDeepWork({text: "Deep-learning environment failed: the install did not finish", failed: true}); return;}
+    if (!status.installed) {setDeepWork({text: t("Deep-learning environment failed: the install did not finish"), failed: true}); return;}
     setDeepWork(null);
     setEnvironments(await nb.environments());
     await nb.setEnvironment(detail.id, then.id);
@@ -148,6 +149,7 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
   // Open: read the file, then join the kernel (started on connect if it was not running).
   useEffect(() => {
     let live = true;
+    host.detached.delete(detail.id);
     void nb.read(detail.id).then(read => {
       if (!live) return;
       docRef.current = openDoc(read);
@@ -247,16 +249,18 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
       const others = current.kernel.panels - (current.connected ? 1 : 0);
       if (cells.length === 0 || others > 0) return {decision: "allow"};
       const lines = cells.map(cell => `• ${cell.source.split("\n").find(line => line.trim()) ?? ""}`.slice(0, 90));
-      return {decision: "confirm", message: `${current.name} is still running ${cells.length === 1 ? "a cell" : `${cells.length} cells`}:\n${lines.join("\n")}\n\nClose it and stop the kernel? Its variables are lost.`};
+      return {decision: "confirm", message: (cells.length === 1 ? t("{name} is still running a cell:\n{lines}\n\nClose it and stop the kernel? Its variables are lost.", { name: current.name, lines: lines.join("\n") }) : t("{name} is still running {cellsCount} cells:\n{lines}\n\nClose it and stop the kernel? Its variables are lost.", { name: current.name, cellsCount: cells.length, lines: lines.join("\n") }))};
     };
     return () => {host.leave.guard = null;};
   }, []);
-  /** Leaving the notebook: save, then stop the kernel if no other panel shows it and nothing runs that the user did not agree to stop. */
+  /** Leaving the notebook: save; closing the panel then stops the kernel if no other panel shows it and nothing runs that the user did not
+   * agree to stop. Going to another page of the panel leaves the kernel running: the panel stops it when it closes. */
   const leave = () => {
     const connection = socket.current, current = docRef.current;
     const {reason, confirmed: agreed} = host.leave;
-    host.leave.reason = "detach"; host.leave.confirmed = false;
+    host.leave.confirmed = false;
     if (connection === null || current === null) return;
+    if (reason !== "close") host.detached.set(current.objectId, {name: current.name, running: busyCells(current).length});
     void (async () => {
       try {
         if (current.dirty && savingRef.current !== "conflict") await lasting.save(current.objectId, fileModel(current), current.version);
@@ -265,7 +269,7 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
         const others = kernel.panels - (current.connected ? 1 : 0);
         if (others <= 0 && (kernel.running.length === 0 || agreed)) await lasting.stop(current.objectId);
       } finally {connection.close();}
-    })().catch(reason => console.error("Closing the notebook failed", reason));
+    })().catch(reason => console.error(t("Closing the notebook failed"), reason));
   };
 
   // Running
@@ -319,8 +323,8 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
     });
     focusCell(cell.id);
   };
-  const openExtract = (kind = "Factor") => {
-    if (ticked.length === 0) {setError("Select the cells to take: tick them in the left margin"); return;}
+  const openExtract = (kind = t("Factor")) => {
+    if (ticked.length === 0) {setError(t("Select the cells to take: tick them in the left margin")); return;}
     setExtract({kind, preview: null, failure: null});
     // The sheet is read from the saved file, so cells typed a moment ago are saved first.
     (docRef.current !== null && docRef.current.dirty ? save() : Promise.resolve()).then(() => nb.previewExtract(detail.id, ticked, kind.toLowerCase())).then(preview => setExtract(current => current === null ? null : {...current, preview}),
@@ -363,7 +367,7 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
   const stable = useMemo<Actions>(() => new Proxy({} as Actions, {get: (_target, name: keyof Actions) => (...args: never[]) => (actions.current[name] as (...items: never[]) => void)(...args)}), []);
 
   if (doc === null) return <div className="qx-page"><div className="qx-bar">{title}</div>
-    {error !== null ? <div className="qx-page-error" role="alert"><span>{error}</span></div> : <p className="qx-muted qx-pad">Opening notebook…</p>}</div>;
+    {error !== null ? <div className="qx-page-error" role="alert"><span>{error}</span></div> : <p className="qx-muted qx-pad">{t("Opening notebook…")}</p>}</div>;
   const busy = running.length > 0;
   const source = (detail.settings as {openedFrom?: OpenedFrom} | undefined)?.openedFrom;
   const opened: OpenedFrom | null = source === undefined ? null : {...source, deleted: runGone, objectName: detail.name.replace(/ #\d+$/, ''), number: Number(/#(\d+)$/.exec(detail.name)?.[1]) || undefined};
@@ -371,55 +375,55 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
   const kernel = deepWork === null ? kernelBase : {text: deepWork.text, tone: deepWork.failed ? "off" as const : "wait" as const};
   return <WidgetBusContext.Provider value={bus}><OpenRunContext.Provider value={onOpenObject}><RunStateContext.Provider value={readRun}><div className="qx-page">
     <div className="qx-bar qv-notebook-toolbar">
-      {title}<span className="fx-kind">Notebook</span>
+      {title}<span className="fx-kind">{t("Notebook")}</span>
       <span className="tx-spacer" />
       {environments.length > 0 && <span className="qv-notebook-env"><TxSelect value={doc.kernel.environmentId ?? "research"} onChange={event => setEnvAsk(environments.find(item => item.id === event.target.value) ?? null)}>
         {environments.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</TxSelect></span>}
-      {deepWork?.failed === true && envAsk === null && <TxButton size="sm" variant="quiet" onClick={() => {const wanted = environments.find(item => item.id === "deep"); if (wanted) setEnvAsk(wanted);}}>Retry</TxButton>}
-      {saving === "conflict" && <span className="qx-nb-saved qx-muted">Not saved</span>}
-      <TxMenu label="Notebook actions" align="end" items={[
+      {deepWork?.failed === true && envAsk === null && <TxButton size="sm" variant="quiet" onClick={() => {const wanted = environments.find(item => item.id === "deep"); if (wanted) setEnvAsk(wanted);}}>{t("Retry")}</TxButton>}
+      {saving === "conflict" && <span className="qx-nb-saved qx-muted">{t("Not saved")}</span>}
+      <TxMenu label={t("Notebook actions")} align="end" items={[
         // Save while there is something unsaved (autosave keeps up otherwise); after a conflict the strip offers the other version instead.
-        ...(doc.dirty && saving !== "conflict" ? [{id: "save", label: "Save", icon: "check" as const, shortcut: "Ctrl+S", disabled: saving === "saving", onSelect: () => void save()}] : []),
-        {id: "clear", label: "Clear all outputs", icon: "close", onSelect: () => change(current => ({...current, dirty: true, cells: current.cells.map(cell => ({...cell, outputs: [], executionCount: null, note: null}))}))},
-        {id: "common", label: "Open common code", icon: "folder", detail: "Modules every workspace's code can import", separated: true, onSelect: () => void openCommonCode(ctx, api).catch(fail)},
-        {id: "developer", label: "Open file in Developer", icon: "external", onSelect: () => void ctx.platform.panels.openTarget({module: "developer", panelType: "main", objectId: `file:${detail.entryUri}`}).catch(fail)},
-        ...menu]} trigger={<TxIconButton label="Notebook actions" icon="more" />} />
+        ...(doc.dirty && saving !== "conflict" ? [{id: "save", label: t("Save"), icon: "check" as const, shortcut: "Ctrl+S", disabled: saving === "saving", onSelect: () => void save()}] : []),
+        {id: "clear", label: t("Clear all outputs"), icon: "close", onSelect: () => change(current => ({...current, dirty: true, cells: current.cells.map(cell => ({...cell, outputs: [], executionCount: null, note: null}))}))},
+        {id: "common", label: t("Open common code"), icon: "folder", detail: t("Modules every workspace's code can import"), separated: true, onSelect: () => void openCommonCode(ctx, api).catch(fail)},
+        {id: "developer", label: t("Open file in Developer"), icon: "external", onSelect: () => void ctx.platform.panels.openTarget({module: "developer", panelType: "main", objectId: `file:${detail.entryUri}`}).catch(fail)},
+        ...menu]} trigger={<TxIconButton label={t("Notebook actions")} icon="more" />} />
     </div>
     <Toolbar status={<span className="qx-nb-kernel" data-state={kernel.tone}>{kernel.tone === "wait" ? <span className="qx-spin" /> : <span className="qx-nb-dot" />}{kernel.text}</span>} busy={busy} canRestart={doc.kernel.state !== "restarting" && doc.connected} selected={ticked.length}
       onRunAll={runAll} onInterrupt={() => send({op: "interrupt"})} onRestart={() => {if (busy) setRestartAsk(true); else restart();}}
       onAdd={type => insertAfter(null, type)} onExtract={() => openExtract()} onClear={() => setTicked([])} />
     {opened !== null && <RunBand from={opened} onOpen={() => onOpenObject(opened.objectId, opened.runId)} />}
     {doc.kernel.state === "dead" && doc.kernel.message !== null && <div className="qx-page-error" role="alert"><span>{doc.kernel.message}</span>
-      <TxButton size="sm" onClick={() => send({op: "restart"})}>Restart kernel</TxButton></div>}
-    {restartForPackages && doc.kernel.state !== "dead" && <div className="qx-nb-strip"><TxIcon name="box" /><span>Packages changed. Restart the kernel to use them.</span>
-      <TxButton size="sm" disabled={busy} onClick={restart}>Restart</TxButton></div>}
-    {saving === "conflict" && <div className="qx-nb-strip" data-tone="warn" role="alert"><span>This notebook changed outside this panel since it was opened.</span>
-      <TxButton size="sm" onClick={() => void reload(true).catch(fail)}>Load the other version</TxButton>
-      <TxButton size="sm" variant="quiet" onClick={() => void keepMine().catch(fail)}>Keep this one</TxButton></div>}
-    {error !== null && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>Dismiss</TxButton></div>}
+      <TxButton size="sm" onClick={() => send({op: "restart"})}>{t("Restart kernel")}</TxButton></div>}
+    {restartForPackages && doc.kernel.state !== "dead" && <div className="qx-nb-strip"><TxIcon name="box" /><span>{t("Packages changed. Restart the kernel to use them.")}</span>
+      <TxButton size="sm" disabled={busy} onClick={restart}>{t("Restart")}</TxButton></div>}
+    {saving === "conflict" && <div className="qx-nb-strip" data-tone="warn" role="alert"><span>{t("This notebook changed outside this panel since it was opened.")}</span>
+      <TxButton size="sm" onClick={() => void reload(true).catch(fail)}>{t("Load the other version")}</TxButton>
+      <TxButton size="sm" variant="quiet" onClick={() => void keepMine().catch(fail)}>{t("Keep this one")}</TxButton></div>}
+    {error !== null && <div className="qx-page-error" role="alert"><span>{error}</span><TxButton size="sm" variant="quiet" onClick={() => setError(null)}>{t("Dismiss")}</TxButton></div>}
     <div className="qv-body">
-      <div className="qx-nb" role="list" aria-label="Cells">
+      <div className="qx-nb" role="list" aria-label={t("Cells")}>
         {doc.cells.map(cell => <NotebookCell key={cell.id} ctx={ctx} cell={cell} active={cell.id === active} actions={stable} ticked={ticked.includes(cell.id)} ticking={ticked.length > 0}
           input={doc.inputs[cell.id]} answer={answers[cell.id]} focusRequestId={focus !== null && focus.cell === cell.id ? focus.id : undefined} />)}
         <div className="qx-nb-add">
-          <TxButton size="sm" variant="quiet" onClick={() => insertAfter(null, "code")}><TxIcon name="plus" />Code</TxButton>
-          <TxButton size="sm" variant="quiet" onClick={() => insertAfter(null, "markdown")}><TxIcon name="plus" />Text</TxButton>
+          <TxButton size="sm" variant="quiet" onClick={() => insertAfter(null, "code")}><TxIcon name="plus" />{t("Code")}</TxButton>
+          <TxButton size="sm" variant="quiet" onClick={() => insertAfter(null, "markdown")}><TxIcon name="plus" />{t("Text")}</TxButton>
         </div>
       </div>
       {side !== null && <SidePanel side={side} variables={doc.variables} loaded={doc.loaded} opened={doc.opened} library={library} onInsert={insertLine}
         onOpenVariable={name => send({op: "variable", name})} onCloseVariable={() => change(current => ({...current, opened: null}))}
-        kernelLine={[doc.startedAt === null ? "" : `Started ${new Date(doc.startedAt).toISOString().slice(11, 16)} UTC`, doc.memory === null ? "" : `${(doc.memory / 1024 ** 3).toFixed(1)} GB in use`].filter(Boolean).join(" · ")} />}
+        kernelLine={[doc.startedAt === null ? "" : t("Started {time} UTC", { time: new Date(doc.startedAt).toISOString().slice(11, 16) }), doc.memory === null ? "" : t("{memory} GB in use", { memory: (doc.memory / 1024 ** 3).toFixed(1) })].filter(Boolean).join(" · ")} />}
       <Rail side={side} onSide={setSide} />
     </div>
-    {envAsk !== null && <TxDialog open title="Change the kernel's environment?" onOpenChange={open => {if (!open) setEnvAsk(null);}}
-      footer={<><TxButton onClick={() => setEnvAsk(null)}>Cancel</TxButton><TxButton variant="primary" onClick={() => {
+    {envAsk !== null && <TxDialog open title={t("Change the kernel's environment?")} onOpenChange={open => {if (!open) setEnvAsk(null);}}
+      footer={<><TxButton onClick={() => setEnvAsk(null)}>{t("Cancel")}</TxButton><TxButton variant="primary" onClick={() => {
         const wanted = envAsk; setEnvAsk(null);
         if (wanted.id === "deep" && !wanted.installed) void installDeep(deepChoice, wanted).catch(fail);
         else void nb.setEnvironment(detail.id, wanted.id).catch(fail);
-      }}>{envAsk.id === "deep" && !envAsk.installed ? "Install and restart" : "Restart"}</TxButton></>}>
-      {envAsk.id === "deep" && !envAsk.installed && deepAsk?.offer.choices && <div role="radiogroup" aria-label="Build">{deepAsk.offer.choices.map(variant => <label key={variant} style={{marginRight: 12}}>
-        <input type="radio" name="nb-deep-build" checked={deepChoice === variant} onChange={() => setDeepChoice(variant)} /> {variant === "cpu" ? "CPU" : "Intel GPU"}</label>)}</div>}
-      <p>{envAsk.id === "deep" && !envAsk.installed && deepAsk !== null ? `Install the deep-learning environment (${deepAsk.offer.label}, ${deepAsk.offer.size}) and restart the kernel in it?` : `Restart the kernel in the ${envAsk.id === "deep" ? "deep-learning" : "research"} environment?`} Variables are cleared; outputs stay.{busy ? ` Cell [${running.map(cell => cell.executionCount ?? "*").join(", ")}] is running and will be stopped.` : ""}</p>
+      }}>{envAsk.id === "deep" && !envAsk.installed ? t("Install and restart") : t("Restart")}</TxButton></>}>
+      {envAsk.id === "deep" && !envAsk.installed && deepAsk?.offer.choices && <div role="radiogroup" aria-label={t("Build")}>{deepAsk.offer.choices.map(variant => <label key={variant} style={{marginRight: 12}}>
+        <input type="radio" name="nb-deep-build" checked={deepChoice === variant} onChange={() => setDeepChoice(variant)} /> {variant === "cpu" ? "CPU" : t("Intel GPU")}</label>)}</div>}
+      <p>{(envAsk.id === "deep" && !envAsk.installed && deepAsk !== null ? t("Install the deep-learning environment ({label}, {size}) and restart the kernel in it? Variables are cleared; outputs stay.", { label: deepAsk.offer.label, size: deepAsk.offer.size }) : (envAsk.id === "deep" ? t("Restart the kernel in the deep-learning environment? Variables are cleared; outputs stay.") : t("Restart the kernel in the research environment? Variables are cleared; outputs stay.")))}{busy ? t(" Cell [{running}] is running and will be stopped.", { running: running.map(cell => cell.executionCount ?? "*").join(", ") }) : ""}</p>
     </TxDialog>}
     {extract !== null && <ExtractSheet open count={ticked.length} total={doc.cells.filter(cell => cell.type === "code").length} kind={extract.kind} preview={extract.preview} failure={extract.failure}
       onKind={kind => openExtract(kind)} onClose={() => setExtract(null)}
@@ -427,9 +431,9 @@ export function NotebookPage({ctx, host, api, detail, title, menu, panelKey, onP
         setExtract(null); setTicked([]);
         onOpenObject(made.id);
       }, reason => setExtract(current => current === null ? null : {...current, failure: reason instanceof Error ? reason.message : String(reason)}))} />}
-    {restartAsk && <TxDialog open title="Restart the kernel?" onOpenChange={setRestartAsk}
-      footer={<><TxButton onClick={() => setRestartAsk(false)}>Cancel</TxButton><TxButton variant="primary" onClick={() => {setRestartAsk(false); restart();}}>Restart</TxButton></>}>
-      <p>The running cells are stopped, every variable is lost and the outputs are cleared.</p>
+    {restartAsk && <TxDialog open title={t("Restart the kernel?")} onOpenChange={setRestartAsk}
+      footer={<><TxButton onClick={() => setRestartAsk(false)}>{t("Cancel")}</TxButton><TxButton variant="primary" onClick={() => {setRestartAsk(false); restart();}}>{t("Restart")}</TxButton></>}>
+      <p>{t("The running cells are stopped, every variable is lost and the outputs are cleared.")}</p>
     </TxDialog>}
   </div></RunStateContext.Provider></OpenRunContext.Provider></WidgetBusContext.Provider>;
 }
@@ -448,15 +452,16 @@ function kernelLabel(doc: Doc, device: string | undefined, now: number): {text: 
   switch (doc.kernel.state) {
   case "none": case "preparing": {
     const preparation = environment === null ? null : environment.preparation;
-    const step = preparation === null ? null : preparation.message ?? (preparation.state === "queued" ? "Waiting to prepare the research environment" : null);
-    return {text: (step ?? "Preparing the research environment") + waited, tone: "wait"};
+    const step = preparation === null ? null : preparation.message ?? (preparation.state === "queued" ? t("Waiting to prepare the research environment") : null);
+    return {text: (step ?? t("Preparing the research environment")) + waited, tone: "wait"};
   }
-  case "starting": return {text: `${python} · starting${waited}`, tone: "wait"};
-  case "restarting": return {text: `${python} · restarting${waited}`, tone: "wait"};
-  case "dead": return {text: `${python} · stopped${doc.kernel.message !== null ? `: ${doc.kernel.message.split("\n").slice(-3).join(" ")}` : ""}`, tone: "off"};
+  case "starting": return {text: t("{python} · starting{waited}", { python, waited }), tone: "wait"};
+  case "restarting": return {text: t("{python} · restarting{waited}", { python, waited }), tone: "wait"};
+  case "dead": return {text: (doc.kernel.message !== null ? t("{python} · stopped: {message}", { python, message: doc.kernel.message.split("\n").slice(-3).join(" ") }) : t("{python} · stopped", { python })), tone: "off"};
   default:
-    if (doc.restarted && busyCells(doc).length === 0) return {text: `${python} · kernel restarted${where}`, tone: "ok"};
-    return {text: `${python} · ${busyCells(doc).length > 0 || doc.kernel.state === "busy" ? "busy" : "idle"}${where}`, tone: busyCells(doc).length > 0 || doc.kernel.state === "busy" ? "busy" : "ok"};
+    if (doc.restarted && busyCells(doc).length === 0) return {text: t("{python} · kernel restarted{where}", { python, where }), tone: "ok"};
+    const busy = busyCells(doc).length > 0 || doc.kernel.state === "busy";
+  return {text: busy ? t("{python} · busy{where}", {python, where}) : t("{python} · idle{where}", {python, where}), tone: busy ? "busy" : "ok"};
   }
 }
 
@@ -484,32 +489,32 @@ const NotebookCell = memo(function NotebookCell({ctx, cell, active, actions, ans
     <div className="qx-nb-prompt">{prompt}</div>
     {cell.type === "code" && <span className="qv-notebook-tick" onPointerDown={event => event.stopPropagation()}><TxCheckbox checked={ticked} onCheckedChange={() => actions.tick(id)} name="Select for Extract to new object" /></span>}
     <div className="qx-nb-source" data-kind={cell.type}>
-      {rendered ? <div className="qx-nb-markdown qx-nb-rendered" onDoubleClick={() => actions.editMarkdown(id)} title="Double-click to edit"
+      {rendered ? <div className="qx-nb-markdown qx-nb-rendered" onDoubleClick={() => actions.editMarkdown(id)} title={t("Double-click to edit")}
         dangerouslySetInnerHTML={{__html: renderMarkdown(cell.source, cell.attachments)}} />
         : <div className="qx-nb-editor"><ModuleView id="developer.text_editor" context={ctx} props={props} on={on} /></div>}
       <div className="qx-nb-tools">
-        <TxIconButton size="sm" icon="play" label={cell.type === "code" ? "Run cell (Shift+Enter)" : "Show (Shift+Enter)"} onClick={() => actions.key(id, "Shift+Enter")} />
-        <TxIconButton size="sm" icon="arrow-up" label="Move up" onClick={() => actions.move(id, -1)} />
-        <TxIconButton size="sm" icon="arrow-down" label="Move down" onClick={() => actions.move(id, 1)} />
-        <TxMenu label="Cell actions" align="end" items={[
-          ...(rendered ? [{id: "edit", label: "Edit", icon: "edit" as const, onSelect: () => actions.editMarkdown(id)}] : []),
-          cell.type === "code" ? {id: "markdown", label: "Change to text", icon: "file", onSelect: () => actions.convert(id, "markdown")}
-            : {id: "code", label: "Change to code", icon: "code", onSelect: () => actions.convert(id, "code")},
-          ...(cell.type === "code" && cell.outputs.length > 0 ? [{id: "clear", label: "Clear output", icon: "close" as const, onSelect: () => actions.clear(id)}] : []),
-          {id: "delete", label: "Delete cell", icon: "trash", tone: "danger", separated: true, onSelect: () => actions.remove(id)},
-        ]} trigger={<TxIconButton size="sm" icon="more" label="Cell actions" />} />
+        <TxIconButton size="sm" icon="play" label={cell.type === "code" ? t("Run cell (Shift+Enter)") : t("Show (Shift+Enter)")} onClick={() => actions.key(id, "Shift+Enter")} />
+        <TxIconButton size="sm" icon="arrow-up" label={t("Move up")} onClick={() => actions.move(id, -1)} />
+        <TxIconButton size="sm" icon="arrow-down" label={t("Move down")} onClick={() => actions.move(id, 1)} />
+        <TxMenu label={t("Cell actions")} align="end" items={[
+          ...(rendered ? [{id: "edit", label: t("Edit"), icon: "edit" as const, onSelect: () => actions.editMarkdown(id)}] : []),
+          cell.type === "code" ? {id: "markdown", label: t("Change to text"), icon: "file", onSelect: () => actions.convert(id, "markdown")}
+            : {id: "code", label: t("Change to code"), icon: "code", onSelect: () => actions.convert(id, "code")},
+          ...(cell.type === "code" && cell.outputs.length > 0 ? [{id: "clear", label: t("Clear output"), icon: "close" as const, onSelect: () => actions.clear(id)}] : []),
+          {id: "delete", label: t("Delete cell"), icon: "trash", tone: "danger", separated: true, onSelect: () => actions.remove(id)},
+        ]} trigger={<TxIconButton size="sm" icon="more" label={t("Cell actions")} />} />
       </div>
     </div>
     {cell.type === "code" && (cell.outputs.length > 0 || cell.note !== null || input !== undefined) && <>
-      <button type="button" className="qx-nb-prompt qx-nb-out-prompt" onClick={() => actions.toggleOutput(id)} title={hidden ? "Show output" : "Hide output"}>
-        {result !== undefined && !hidden ? `Out[${cell.executionCount !== null ? cell.executionCount : " "}]:` : ""}</button>
+      <button type="button" className="qx-nb-prompt qx-nb-out-prompt" onClick={() => actions.toggleOutput(id)} title={hidden ? t("Show output") : t("Hide output")}>
+        {result !== undefined && !hidden ? t("Out[{executionCount}]:", { executionCount: cell.executionCount !== null ? cell.executionCount : " " }) : ""}</button>
       <div className="qx-nb-outputs">
-        {hidden ? <button type="button" className="qx-nb-hidden" onClick={() => actions.toggleOutput(id)}>Output hidden · show</button>
+        {hidden ? <button type="button" className="qx-nb-hidden" onClick={() => actions.toggleOutput(id)}>{t("Output hidden · show")}</button>
           : cell.outputs.map((output, index) => <NotebookOutput key={index} output={output} onStop={actions.interrupt} live={cell.status === "running" || cell.status === "queued"} />)}
         {input !== undefined && <InputLine prompt={input.prompt} password={input.password} onReply={value => actions.reply(id, value)} />}
-        {cell.note !== null && (cell.note.kind === "interrupted" ? <p className="qx-nb-note">Interrupted</p>
+        {cell.note !== null && (cell.note.kind === "interrupted" ? <p className="qx-nb-note">{t("Interrupted")}</p>
           : <div className="qx-nb-note" data-tone="warn" role="alert"><span>{cell.note.message}</span>
-            {cell.note.code === "pip_blocked" && <TxButton size="sm" onClick={actions.packages}><TxIcon name="box" />Open packages</TxButton>}</div>)}
+            {cell.note.code === "pip_blocked" && <TxButton size="sm" onClick={actions.packages}><TxIcon name="box" />{t("Open packages")}</TxButton>}</div>)}
       </div>
     </>}
   </div>;

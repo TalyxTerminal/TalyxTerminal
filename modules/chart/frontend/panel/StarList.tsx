@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /* A TradingView picker list: grouped rows (groups fold), the current one marked, a star on each row to pin it. Used by
    the timeframe and chart type menus. */
 import { useState, type ReactNode } from "react";
@@ -19,7 +20,7 @@ export function StarList({ groups, current, onPick, onStar }: {
         <TxButton variant="row" size="sm" role="option" aria-selected={row.id === current} onClick={() => onPick(row.id)}>
           {row.glyph}<span>{row.label}</span>
         </TxButton>
-        <TxIconButton size="sm" icon="star" label={row.starred ? "Remove from favorites" : "Add to favorites"} tone={row.starred ? "active" : "default"} onClick={() => onStar(row.id)} />
+        <TxIconButton size="sm" icon="star" label={row.starred ? t("Remove from favorites") : t("Add to favorites")} tone={row.starred ? "active" : "default"} onClick={() => onStar(row.id)} />
       </div>)}
     </div>)}
   </div>;

@@ -78,7 +78,7 @@ def prepare(root, params, code=CROSSOVER):
     close = 40000 * np.exp(np.cumsum(rng.normal(0, 0.004, count)))
     start = np.r_[close[0], close[:-1]]
     text = lambda values, digits: [format(round(float(value), digits), "f") for value in values]
-    ends = [str(value) for value in opened.as_unit("ns").asi8 + 3_600_000_000_000]
+    ends = opened.as_unit("ns").asi8 + 3_600_000_000_000
     pd.DataFrame({"open": text(start, 1), "high": text(np.maximum(start, close) * 1.001, 1), "low": text(np.minimum(start, close) * .999, 1),
                   "close": text(close, 1), "volume": text(rng.uniform(10, 500, count), 3), "instrument": INSTRUMENT, "barType": BAR_TYPE,
                   "ts_event": ends, "ts_init": ends}).to_parquet(root / "bars.parquet", index=False)

@@ -126,9 +126,9 @@ describe("the held-out confirmation", () => {
     expect(html(createElement(HeldOutConfirm, {open: false, status: null, onCancel: noop, onConfirm: noop}))).toBe("<div></div>");
   });
   it("second_look_and_short_part_are_said", () => {
-    expect(warnings({...base, used: {runId: "x", number: 13, same: true}})).toEqual(["#13 already used the held-out period with these values; a second look is no longer untouched"]);
-    expect(warnings({...base, used: {runId: "x", number: 13, same: false}})[0]).toBe("#13 already used the held-out period; changes made after it are judged on a period you have seen");
-    expect(warnings({...base, days: 41, short: true})).toEqual(["The held-out part has 41 trading days; its Sharpe will be noisy"]);
+    expect(warnings({...base, used: {runId: "x", number: 13, same: true}})).toEqual(["#13 already ran on the held-out period with these values"]);
+    expect(warnings({...base, used: {runId: "x", number: 13, same: false}})[0]).toBe("#13 already ran on the held-out period");
+    expect(warnings({...base, days: 41, short: true})).toEqual([]);
   });
 });
 
@@ -180,13 +180,13 @@ describe("ranges typed into the settings", () => {
     expect(parseList("24, x", lookback)).toEqual({error: "Lookback x is not a number"});
     expect(parseList("1.5, 2.5", stop)).toEqual({values: [1.5, 2.5]});
   });
-  it("combinations_multiply_and_over_200_is_refused_with_the_count_in_the_words", () => {
+  it("combinations_multiply_with_no_cap_on_how_many", () => {
     const parameters = [lookback, stop];
     const plan = planRanges(parameters, {lookback: "24, 48, 96", stop: "1.5, 2, 3"});
-    expect(plan.total).toBe(9); expect(runWord(plan)).toBe("Sweep 9"); expect(plan.tooMany).toBeNull();
+    expect(plan.total).toBe(9); expect(runWord(plan)).toBe("Sweep 9");
     expect(runWord(planRanges(parameters, {}))).toBe("Run backtest");
     const many = planRanges(parameters, {lookback: Array.from({length: 24}, (_, i) => 12 + i).join(", "), stop: Array.from({length: 10}, (_, i) => 1 + i / 2).join(", ")});
-    expect(many.total).toBe(240); expect(many.tooMany).toBe("These ranges make 240 combinations; a sweep runs at most 200");
+    expect(many.total).toBe(240); expect(many.errors).toEqual({}); expect(runWord(many)).toBe("Sweep 240");
     expect(planRanges(parameters, {lookback: "24, 300"}).errors.lookback).toBe("Lookback 300 is outside 12–240");
   });
   it("a switch sweeps both sides and a choice each option", () => {

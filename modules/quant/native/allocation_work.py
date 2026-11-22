@@ -4,7 +4,7 @@ every period of the backtest are this same function), the walk-forward loop with
 Every Portfolio built here is compounded and weight-drifting. A period never sees returns from its own rebalance day on: the fit uses the
 `lookback` days before the rebalance close, the weights are held from the next day's close.
 
-Settings that cannot work (a limit that needs the 60/40 without it, a line naming what the pool does not have, an option the estimate does not take) raise
+Settings that cannot work (a tracking limit without a benchmark, a line naming what the pool does not have, an option the estimate does not take) raise
 `SettingsError` naming the fields, before any period is fitted; only a solver that fails on a period's data takes the fallback chain. `settings["annualization"]`
 (observations a year, from Market's calendar) is set by the run: the limits written a year are turned into the period's units with it.
 """
@@ -136,9 +136,9 @@ def estimator(settings, assets=None, previous=None, benchmark=None):
     keys = set(O.params_of(cls))
     assets = assets or [row["ticker"] for row in settings.get("pool", [])]
     if benchmark is None and settings.get("objective") == "benchmark_tracking":
-        raise SettingsError("Benchmark tracking follows the 60/40 of SPY and IEF; add both to the pool", ["objective"])
+        raise SettingsError("Benchmark tracking follows the benchmark; set one", ["benchmark"])
     if benchmark is None and settings.get("max_tracking") not in (None, "") and "max_tracking_error" in keys:
-        raise SettingsError("The tracking error is against the 60/40 of SPY and IEF; add both to the pool", ["max_tracking"])
+        raise SettingsError("The tracking error is against the benchmark; set one", ["benchmark"])
     params = {}
     if "prior_estimator" in keys:
         params["prior_estimator"] = prior(settings)
@@ -498,11 +498,35 @@ def metrics(daily, benchmark_daily=None, equal_daily=None, periods=(), annual=No
     return out
 
 
+def benchmark_daily(bars, weights, days, zones=None):
+    """The benchmark's return on each of the pool's `days` but the first (the index of its returns, aligned as they are): each column's last close on or before the
+    day, close to close, mixed by `weights` ({column: percent}; the columns need not be in the pool). None without weights. A benchmark with no price on the first
+    day raises SettingsError: the tracking would have nothing to follow there."""
+    if not weights:
+        return None
+    ordered = bars[bars["column"].isin(list(weights))].sort_values("label")
+    dates = pd.to_datetime(ordered["label"], unit="ms", utc=True)
+    session = dates.dt.tz_localize(None).dt.normalize()
+    for name, zone in (zones or {}).items():
+        selected = ordered["column"] == name
+        session.loc[selected] = dates.loc[selected].dt.tz_convert(zone).dt.tz_localize(None).dt.normalize()
+    closes = ordered.groupby([session, "column"])["close"].last().unstack("column")
+    levels = closes.reindex(closes.index.union(days)).ffill().reindex(days)
+    late = [name for name in weights if name not in levels.columns or pd.isna(levels[name].iloc[0])]
+    if late:
+        raise SettingsError(f"The benchmark has no price of {', '.join(late)} on {days[0]:%b} {days[0].day}, {days[0].year}, where the pool starts", ["benchmark"])
+    returns = levels.pct_change(fill_method=None).iloc[1:]
+    return sum(returns[name] * (weight / 100) for name, weight in weights.items())
+
+
 def risk_free_per_bar(spec, index, annual):
-    """The risk-free rate an observation on each day of `index` from the run's rate (`{basis: zero}`, or `{basis: irx, rows: [[ms, percent a year]], unavailable}`):
-    the newest ^IRX close not later than the day, over `annual`. 0.0 for zero; None when Market has no rate, so what uses it is empty."""
+    """The risk-free rate an observation on each day of `index` from the run's rate (`{basis: zero}`, `{basis: fixed, pct}` or `{basis: irx, rows: [[ms, percent a
+    year]], unavailable}`): the fixed percent, or the newest ^IRX close not later than the day, over `annual`. 0.0 for zero; None when Market has no rate, so what
+    uses it is empty."""
     if spec["basis"] == "zero":
         return 0.0
+    if spec["basis"] == "fixed":
+        return float(spec["pct"]) / 100 / annual
     if spec.get("unavailable") or not spec.get("rows"):
         return None
     days = pd.to_datetime([row[0] for row in spec["rows"]], unit="ms", utc=True).tz_localize(None).normalize()
@@ -643,7 +667,7 @@ def custom_needs_benchmark(estimator):
 
 def fit_custom(window, estimator, previous=None, settings=None, benchmark=None):
     """One period with an estimator the user's code built (any skfolio optimization, or a Pipeline that ends in one): a fresh clone is fitted on the window,
-    against the 60/40 when it tracks a benchmark (none in the pool raises SettingsError). A solver that fails on this window's data falls back to equal weight
+    against the run's benchmark when it tracks one (none raises SettingsError). A solver that fails on this window's data falls back to equal weight
     and says why; anything else (an estimator that needs what the run does not give) stops the run."""
     from sklearn.base import clone
     assets = list(window.columns)
@@ -651,7 +675,7 @@ def fit_custom(window, estimator, previous=None, settings=None, benchmark=None):
     y = {}
     if custom_needs_benchmark(estimator):
         if benchmark is None:
-            raise SettingsError("This estimator tracks a benchmark: the 60/40 of SPY and IEF; add both to the pool", ["pool"])
+            raise SettingsError("This estimator tracks a benchmark; set one", ["benchmark"])
         y = {"y": benchmark.loc[window.index]}
     model = clone(estimator)
     if previous is not None and hasattr(model, "set_params") and "previous_weights" in model.get_params(deep=False):

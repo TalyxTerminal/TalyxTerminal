@@ -6,6 +6,7 @@ import sqlite3
 from contextlib import closing
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 
 class DocumentChanges:
@@ -47,7 +48,7 @@ class DocumentChanges:
         with closing(sqlite3.connect(self.path)) as db:
             row = db.execute("SELECT operation,original,changed FROM changes WHERE call_id=?", (call_id,)).fetchone()
         if row is None:
-            raise ContractError("not_found", "No shared-document change was recorded for this call.")
+            raise ContractError("not_found", t("No shared-document change was recorded for this call."))
         checkpoint = json.loads(row[1 if direction == "undo" else 2])
         return row[0] != "edit", self.checkpoints.read(checkpoint)["documents"][0]
 

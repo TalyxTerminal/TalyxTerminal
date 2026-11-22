@@ -1,3 +1,3 @@
 {"manifestVersion": 5, "id": "echo", "name": "Echo", "version": "1.0.0", "description": "Platform test module",
- "entries": {"backend": "backend.entry"}, "requires": {},
+ "entries": {"backend": "backend.entry"}, "requires": {}, "locales": {"zh-CN": "locales/zh-CN.json"},
  "provides": {"echo.greeter": [{"id": "own", "descriptor": {}}]}}

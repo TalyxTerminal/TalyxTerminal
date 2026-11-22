@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, WebSocket
-from talyx_sdk import wire
+from talyx_sdk import i18n, wire
 from talyx_sdk.declare import Model, Module
 from talyx_sdk.jobs import spawn
 from talyx_sdk.process import Call, Context
@@ -89,6 +89,12 @@ class RunIn(Model):
 async def start(ctx: Context) -> None:
     global CTX
     CTX = ctx
+
+
+@module.action(effects=["read"])
+async def words(input: Empty, call: Call) -> Text:
+    """A text in the language of the moment, and the language a process it starts would start in."""
+    return Text(text=f"{i18n.t('Hello, {name}', name='TALYX')} | {os.environ[i18n.LANGUAGE_ENV]}")
 
 
 @module.action(effects=["read"])

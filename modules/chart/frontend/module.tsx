@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 /* Chart's frontend entry: the panel (one TradingView layout of up to 8 charts) and the workspace Save hook.
    A panel's saved state is its layout and the revision of each chart; the charts themselves live in the backend. */
 import type { ReactNode } from "react";
@@ -53,14 +54,14 @@ async function initialLayout(ctx: ModuleContext): Promise<Layout> {
 }
 
 function mountPanel(element: HTMLElement, ctx: ModuleContext) {
-  if (!ctx.panelRef) throw failure("invalid_target", "Chart requires a mounted panel.");
+  if (!ctx.panelRef) throw failure("invalid_target", t("Chart requires a mounted panel."));
   const panelId = ctx.panelRef.panelId;
   element.style.height = "100%"; element.style.minHeight = "0";
   const root = createRoot(element);
   const render = (body: ReactNode) => root.render(<ModuleContextProvider.Provider value={ctx}>
     <TxRoot overlay={ctx.overlayRoot} style={{ height: "100%", minHeight: 0 }}><TxToastProvider><style>{chartStyles}</style>{body}</TxToastProvider></TxRoot>
   </ModuleContextProvider.Provider>);
-  render(<div className="chart-loading">Opening chart…</div>);
+  render(<div className="chart-loading">{t("Opening chart…")}</div>);
 
   let disposed = false;
   const stops: (() => void)[] = [];

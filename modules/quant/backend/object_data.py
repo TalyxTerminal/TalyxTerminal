@@ -17,6 +17,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from vocabulary.instruments import MarketInstrument
 
@@ -72,7 +73,7 @@ def check_range(data):
     for key, label in (("since", "The start date"), ("until", "The end date"), ("heldOutFrom", "The held-out start")):
         value = data.get(key)
         if isinstance(value, str) and value != "latest" and value < FIRST_DAY:
-            raise ContractError("invalid_input", f"{label} {value} is before {FIRST_DAY}; Market keeps no data from before 1970. Choose {FIRST_DAY} or later.",
+            raise ContractError("invalid_input", t("{label} {value} is before {FIRST_DAY}; Market keeps no data from before 1970. Choose {FIRST_DAY} or later.", label=label, value=value, FIRST_DAY=FIRST_DAY),
                                 {"field": key, "earliest": FIRST_DAY})
 
 
@@ -199,7 +200,7 @@ async def check_routes(ctx, instruments, *timeframes):
         available = await verified_routes(ctx, instrument)
         for timeframe in timeframes:
             if timeframe not in available:
-                raise ContractError("unsupported", f"{route_name(instrument, timeframe)} history is not available in Market.",
+                raise ContractError("unsupported", t("{instrument} history is not available in Market.", instrument=route_name(instrument, timeframe)),
                                     {"instrumentId": instrument["instrumentId"], "timeframe": timeframe})
 
 
@@ -207,7 +208,7 @@ async def preflight(ctx, instrument, series, *, since=None, environment="product
     rows = await M.coverage(ctx, [instrument], "bars" if series["capability"] == "ohlcv" else series["capability"])
     candidates = [row for row in rows if row["capability"] == series["capability"]]
     if not candidates or series["timeframe"] not in routes(rows):
-        raise ContractError("unsupported", f"{instrument['displaySymbol']}: Market has no {series['timeframe']} {series['capability']} history.")
+        raise ContractError("unsupported", t("{displaySymbol}: Market has no {timeframe} {capability} history.", displaySymbol=instrument['displaySymbol'], timeframe=series['timeframe'], capability=series['capability']))
     row = next((item for item in candidates if item["timeframe"] == series["timeframe"]), candidates[0])
     earliest = row["available"]["earliest"]
     earliest_date = None
@@ -228,7 +229,7 @@ async def preflight(ctx, instrument, series, *, since=None, environment="product
             detail["earliestDate"] = earliest_date
         raise ContractError("history_unavailable", reason, detail)
     if realtime and row["available"]["live"] == "none":
-        raise ContractError("unsupported", f"{instrument['displaySymbol']}: Market has no live {series['capability']} data.")
+        raise ContractError("unsupported", t("{displaySymbol}: Market has no live {capability} data.", displaySymbol=instrument['displaySymbol'], capability=series['capability']))
     return row
 
 
@@ -249,7 +250,7 @@ async def close_times(ctx, instrument, series, times):
     closed = dict(found)
     missing = [int(value) for value in times if int(value) not in closed]
     if missing:
-        raise ContractError('unavailable', f"{instrument['displaySymbol']}: Market calendar has no close for bar {missing[0]}")
+        raise ContractError('unavailable', t("{displaySymbol}: Market calendar has no close for bar {missing}", displaySymbol=instrument['displaySymbol'], missing=missing[0]))
     return times.map(closed) * 1_000_000
 
 
@@ -270,11 +271,12 @@ async def trading_terms(ctx, instruments, *, selections=None, since=None, until=
                 result = plain(await ctx.call("market.instruments.terms", args))
                 return await asyncio.to_thread(lambda: [M.stock_times(item) for item in result["items"]])
             except ContractError as error:
-                if index is None:
+                if index is None and skipped is None:
                     raise
                 from .index_universe import exclude
                 for instrument in batch:
-                    exclude(index, instrument["instrumentId"], since, until, "missing_price_evidence", source_reason=error.message)
+                    if index is not None:
+                        exclude(index, instrument["instrumentId"], since, until, "missing_price_evidence", source_reason=error.message)
                     if skipped is not None:
                         skipped.append({"symbol": instrument["displaySymbol"], "reason": error.message, "code": error.code})
                 return []
@@ -291,28 +293,29 @@ async def trading_terms(ctx, instruments, *, selections=None, since=None, until=
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-def agreed_fee(venue, named_terms):
-    """(fee, None) when Market gives every instrument in `named_terms` (display symbol, Market trading terms) the same maker/taker,
-    else (None, the error that says why)."""
+def fees_for(venue, named_terms, account):
+    """Each name's maker/taker rate, [fee] in the order of `named_terms` (display symbol, Market trading terms): the account's own when set, else
+    Market's for that name (the venue's, or the venue's standard tier: basis market_fee_table). Names on one venue may be charged differently;
+    no fee is made up."""
+    if account.get("fee"):
+        return [account["fee"] for _ in named_terms]
     missing = [f"{name} ({terms['unavailable']['fees']})" for name, terms in named_terms if terms["fees"] is None]
     if missing:
-        return None, ContractError("unavailable", f"Market has no fees for {', '.join(missing)}. Set the fees in the account settings.", {"venue": venue})
-    schedules = {(terms["fees"]["maker"], terms["fees"]["taker"]) for _, terms in named_terms}
-    if len(schedules) != 1:
-        return None, ContractError("invalid_input", f"The symbols on {venue} are charged different fees by their markets; set one fee in the account settings.",
-                                   {"venue": venue, "symbols": [name for name, _ in named_terms]})
-    maker, taker = next(iter(schedules))
-    return {"maker": maker, "taker": taker}, None
+        raise ContractError("unavailable", t("Market has no fees for {missing}. Set the fees in the account settings.", missing=', '.join(missing)), {"venue": venue})
+    return [{"maker": terms["fees"]["maker"], "taker": terms["fees"]["taker"]} for _, terms in named_terms]
 
 
-def fee_for(venue, named_terms, account):
-    """The account's own fee when set, else Market's; no fee is made up."""
+def one_fee(fees):
+    """The fee when every name pays the same, else None (the settings then show no single rate)."""
+    return fees[0] if fees and all(fee == fees[0] for fee in fees) else None
+
+
+def assumed_fees(terms_by_venue, account):
+    """The venues whose fee comes from the venue's standard tier, not the venue's own market list ("assumed" in the settings)."""
     if account.get("fee"):
-        return account["fee"]
-    fee, error = agreed_fee(venue, named_terms)
-    if error:
-        raise error
-    return fee
+        return []
+    return sorted({name for name, entries in terms_by_venue.items() for native, market, _ in entries
+                   if native["type"] != "equity" and (market["fees"] or {}).get("basis") == "market_fee_table"})
 
 
 def sized(precision_floor, increment, volume_precision):
@@ -344,24 +347,24 @@ def instrument_terms(instrument, frame, market, *, execution_venue=None):
         if market["quantityUnit"] == "contracts":
             # The venue counts contracts; the simulator sizes in the base asset, in steps of whole contract steps (a step is `quantityIncrement` contracts of `contractMultiplier` base each).
             if increment is None:
-                raise ContractError("invalid_input", f"{instrument['displaySymbol']} is quoted in contracts of {market['contractMultiplier']} {instrument['base']}, "
-                                    f"but Market gives no contract step ({market['unavailable']['quantityIncrement']}).")
+                raise ContractError("invalid_input", t("{displaySymbol} is quoted in contracts of {contractMultiplier} {base}, but Market gives no contract step ({quantityIncrement}).", displaySymbol=instrument['displaySymbol'], contractMultiplier=market['contractMultiplier'], base=instrument['base'], quantityIncrement=market['unavailable']['quantityIncrement']))
             increment = (Decimal(str(increment)) * Decimal(str(market["contractMultiplier"]))).normalize()
         elif market["quantityUnit"] != "base":
-            raise ContractError("invalid_input", f"{instrument['displaySymbol']} is quoted in {market['quantityUnit'] or 'an unknown unit'}"
-                                + (f" ({market['unavailable']['quantityUnit']})" if market["quantityUnit"] is None else "")
-                                + "; the simulator sizes perpetuals in the base asset.")
+            raise ContractError("invalid_input", (t("{displaySymbol} is quoted in {unit} ({quantityUnit}); the simulator sizes perpetuals in the base asset.",
+                        displaySymbol=instrument['displaySymbol'], unit=market['quantityUnit'] or 'an unknown unit', quantityUnit=market['unavailable']['quantityUnit'])
+                    if market['quantityUnit'] is None else t("{displaySymbol} is quoted in {unit}; the simulator sizes perpetuals in the base asset.",
+                        displaySymbol=instrument['displaySymbol'], unit=market['quantityUnit'] or 'an unknown unit')))
         kind, symbol, (size_precision, size_increment) = "perpetual", f"{instrument['base']}{quote}-PERP", sized(6, increment, volume_precision)
     elif market_type == "spot" and asset == "crypto":
         kind, symbol, (size_precision, size_increment) = "spot", f"{instrument['base']}{quote}", sized(6, market["quantityIncrement"], volume_precision)
     elif market_type == "spot" and asset in {"equity", "fund"}:
         kind, symbol, size_precision, size_increment = "equity", raw, 0, "1"
         if volume_precision:
-            raise ContractError("invalid_input", f"{instrument['displaySymbol']} has fractional share volume; the equity simulator needs whole shares.")
+            raise ContractError("invalid_input", t("{displaySymbol} has fractional share volume; the equity simulator needs whole shares.", displaySymbol=instrument['displaySymbol']))
     else:
-        raise ContractError("invalid_input", f"{instrument['displaySymbol']} is a {market_type} {asset}; strategy backtests cover spot, linear perpetual and equity data.")
+        raise ContractError("invalid_input", t("{displaySymbol} is a {market_type} {asset}; strategy backtests cover spot, linear perpetual and equity data.", displaySymbol=instrument['displaySymbol'], market_type=market_type, asset=asset))
     if not quote:
-        raise ContractError("invalid_input", f"Market gives {instrument['displaySymbol']} no quote currency.")
+        raise ContractError("invalid_input", t("Market gives {displaySymbol} no quote currency.", displaySymbol=instrument['displaySymbol']))
     terms = {"id": f"{symbol}.{venue}", "type": kind, "symbol": symbol, "currency": quote,
              "pricePrecision": price_precision, "sizePrecision": size_precision,
              "priceIncrement": f"{price_increment:.{price_precision}f}", "sizeIncrement": size_increment}
@@ -375,8 +378,9 @@ def instrument_terms(instrument, frame, market, *, execution_venue=None):
         terms["settlementCurrency"] = instrument.get("settle") or quote
     if kind == 'equity':
         if 'stock' not in market:
-            raise ContractError('unavailable', f"{instrument['displaySymbol']}: Market has no verified equity execution conditions")
-        terms['stock'] = market['stock']
+            raise ContractError('unavailable', t("{displaySymbol}: Market has no verified equity execution conditions", displaySymbol=instrument['displaySymbol']))
+        # the backtest reads no corporate actions (the prices are adjusted); a ten-year history of them was most of the invocation
+        terms['stock'] = {key: value for key, value in market['stock'].items() if key != 'corporateActions'}
     return terms, venue
 
 
@@ -397,15 +401,13 @@ def venue_for(terms_by_venue, account):
                 item['stockCommission'] = stock_commission(item['stock'], account)
         margin = any(item["type"] == "perpetual" for item in terms)
         currency = terms[0]["currency"]
-        traded = [(label, market) for native, market, label in entries if native["type"] != "equity"]
-        fee = fee_for(name, traded, account) if traded else None
-        for item in terms:
-            if item["type"] != "equity":
-                # The risk check estimates a buy's commission from this, so it must be the venue's own taker rate.
-                item["takerFee"] = format(Decimal(str(fee["taker"])), "f")
+        traded = [(native, (label, market)) for native, market, label in entries if native["type"] != "equity"]
+        for (item, _), fee in zip(traded, fees_for(name, [named for _, named in traded], account), strict=True):
+            # Each name its own rate; the risk check estimates a buy's commission from the taker rate.
+            item["makerFee"], item["takerFee"] = format(Decimal(str(fee["maker"])), "f"), format(Decimal(str(fee["taker"])), "f")
         venue = {"name": name, "accountType": "MARGIN" if margin else "CASH", "omsType": "NETTING",
                  "balances": [f"{account.get('capital', CAPITAL)} {currency}"], "baseCurrency": currency if margin else None,
-                 "fees": {"type": "maker_taker", **fee} if terms[0]["type"] != "equity" else {"type": "instrument_conditions"},
+                 "fees": {"type": "per_instrument"} if traded else {"type": "instrument_conditions"},
                  "leverage": account.get("leverage", 1)}
         if not margin:
             venue.pop("baseCurrency")
@@ -422,16 +424,6 @@ def composite_bar_type(signal, fine):
     """The signal bar built inside the engine from the fine bars, e.g. BTCUSDT-PERP.OKX-1-HOUR-LAST-INTERNAL@5-MINUTE-EXTERNAL."""
     step, unit = int(fine[:-1]), fine[-1]
     return signal.removesuffix("-EXTERNAL") + "-INTERNAL@" + f"{step}-" + {"m": "MINUTE", "h": "HOUR", "d": "DAY"}[unit] + "-EXTERNAL"
-
-
-def check_coverage(selection, since, until, timeframe, now):
-    coverage, instrument = selection["coverage"], selection["instrument"]
-    if not coverage["exportedRows"]:
-        raise ContractError("no_data", f"{instrument['displaySymbol']}: no {timeframe} bars in the requested period.")
-    if coverage.get("missingBars", 0):
-        raise ContractError("history_gap", f"{instrument['displaySymbol']}: {coverage['missingBars']} missing {timeframe} bars.",
-                            {"instrumentId": instrument["instrumentId"], "missingBars": coverage["missingBars"],
-                             "gaps": coverage.get("gaps", [])})
 
 
 async def daily_annualization(ctx, selections, since, until):
@@ -453,6 +445,27 @@ def left_out(index, skipped):
     return list(dict.fromkeys(name for name in names if name))
 
 
+def none_left(skipped, index):
+    """The run's failure when no name is left: each name with Market's reason (the first five)."""
+    named = without_prices(skipped)
+    return ContractError("no_data", t("No name has prices for this run: {named}", named=named) if named else t("No name has prices for this run."), {"index": index})
+
+
+def without_prices(skipped, shown=5):
+    """The names a run left out with Market's reason, the first `shown` of them: "AAA: reason; BBB 2024-06-14: reason; and 3 more" (a reason
+    that names its symbol is not prefixed with it again)."""
+    def one(row):
+        symbol = row.get("symbol") or row.get("ticker")
+        return row["reason"] if symbol in row["reason"] else t("{symbol}: {reason}", symbol=symbol, reason=row["reason"])
+    named = "; ".join(one(row) for row in skipped[:shown])
+    return t("{named}; and {count} more", named=named, count=len(skipped) - shown) if len(skipped) > shown else named
+
+
+def left_out_text(skipped, total):
+    """The run's data note for the names it left out: "3 of 300 names have no prices: …"."""
+    return t("{count} of {total} names have no prices: {details}", count=len(skipped), total=total, details=without_prices(skipped))
+
+
 def stock_like(instrument):
     return instrument["assetClass"] in {"equity", "fund"}
 
@@ -472,12 +485,30 @@ def record_missing_bars(index, item, frame, now, schedule):
     absent = expected[~np.isin(expected, frame["time"].to_numpy())]
     item["coverage"]["missingBars"] = int(len(absent))
     if index is None:
-        if not item["coverage"]["exportedRows"]:
-            raise ContractError("no_data", f"{item['instrument']['displaySymbol']}: no {item['series']['timeframe']} bars in the requested period.")
-        item["coverage"]["missingDays"] = [time.strftime("%Y-%m-%d", time.gmtime(int(opened) / 1000)) for opened in absent]
+        # Sessions after the name's last bar are not gaps: its prices end there (delisted, or the source has none after), and the backtest
+        # sells what it holds at that bar's close.
+        last = int(frame["time"].max())
+        if len(expected) and last < int(expected[-1]):
+            item["coverage"]["endedAt"] = int(frame["closeAt"].max())  # its last close
+        item["coverage"]["missingDays"] = [time.strftime("%Y-%m-%d", time.gmtime(int(opened) / 1000)) for opened in absent if opened < last]
     else:
         from .index_universe import check_prices
         check_prices(index, item, frame, now, schedule)
+
+
+# A stock's sessions as the backtest reads them: one row a session, only what the simulated venue uses (`native/stock_execution.conditions`).
+# Kept as columns, 559 names' ten years take a few hundred MB in the backtest; one JSON text a stock, parsed whole, took 2.8 GiB.
+SESSION_SCHEMA = pa.schema([("instrument", pa.string()), ("sessionDate", pa.string()), ("openAt", pa.int64()), ("closeAt", pa.int64()),
+                            ("lower", pa.string()), ("upper", pa.string()), ("priceIncrement", pa.string()),
+                            ("priceScale", pa.string()), ("priceOffset", pa.string()), ("priceMaxError", pa.string())])
+
+
+def session_table(native_id, sessions):
+    column = lambda key: [row[key] for row in sessions]
+    price_map = lambda key: [row["priceMap"][key] for row in sessions]
+    return pa.table({"instrument": [native_id] * len(sessions), "sessionDate": column("sessionDate"), "openAt": column("openAt"),
+                     "closeAt": column("closeAt"), "lower": column("lower"), "upper": column("upper"), "priceIncrement": column("priceIncrement"),
+                     "priceScale": price_map("scale"), "priceOffset": price_map("offset"), "priceMaxError": price_map("maxError")}, schema=SESSION_SCHEMA)
 
 
 def write_strategy_input(selection, by_series, fine_ids, reference_ids, market, exports, write, index, now, schedule):
@@ -493,21 +524,20 @@ def write_strategy_input(selection, by_series, fine_ids, reference_ids, market, 
         expected = np.asarray(by_close["adjustedOHLC"].to_list(), dtype=float)
         actual = raw[["open", "high", "low", "close"]].to_numpy()
         if expected.shape != actual.shape or not np.allclose(actual, expected, rtol=0, atol=1e-8, equal_nan=False):
-            raise ContractError("conflict", f"{instrument['displaySymbol']}: adjusted history changed during capture.")
-        row = pd.DataFrame({"instrument": [terms["id"]], "sessions": [json.dumps(sessions, separators=(",", ":"))]})
-        write("stock-sessions", pa.Table.from_pandas(row, preserve_index=False))
+            raise ContractError("conflict", t("{displaySymbol}: adjusted history changed during capture.", displaySymbol=instrument['displaySymbol']))
+        write("stock-sessions", session_table(terms["id"], sessions))
     kind = bar_type(terms["id"], series["timeframe"])
     engine_selection = by_series[fine_ids[instrument["instrumentId"]]] if instrument["instrumentId"] in fine_ids else selection
     engine = raw if engine_selection is selection else engine_bars(engine_selection, exports)
     engine_kind = bar_type(terms["id"], engine_selection["series"]["timeframe"])
     out = M.decimal_columns(engine)
     out["instrument"], out["barType"] = terms["id"], engine_kind
-    out["ts_event"], out["ts_init"] = engine["closeNs"].astype(str).to_numpy(), engine["knownNs"].astype(str).to_numpy()
+    out["ts_event"], out["ts_init"] = engine["closeNs"].astype("int64").to_numpy(), engine["knownNs"].astype("int64").to_numpy()
     for basis, reference_id in reference_ids.get(instrument["instrumentId"], {}).items():
         reference = read_selection(by_series[reference_id], exports).set_index("closeNs")
         needed = engine["closeNs"]
         if not needed.isin(reference.index).all():
-            raise ContractError("history_gap", f"{instrument['displaySymbol']}: missing {basis.upper()} reference candles.")
+            raise ContractError("history_gap", t("{displaySymbol}: missing {upper} reference candles.", displaySymbol=instrument['displaySymbol'], upper=basis.upper()))
         matched = reference.loc[needed].reset_index(drop=True)
         values = M.decimal_columns(matched, fields=M.FIELDS[:4])
         for field in ("open", "high", "low", "close"):
@@ -529,7 +559,7 @@ def write_strategy_input(selection, by_series, fine_ids, reference_ids, market, 
               "coverage": selection["coverage"], "units": {"time": "unix_ms", "volume": "shares" if stock_like(instrument) else "base"},
               "timeSemantics": {"eventTime": "closeTime", "availability": "knownAt"}, "rows": len(raw)}
     if stock_like(instrument):
-        source["stock"] = market["stock"]
+        source["stock"] = terms["stock"]
     return terms, venue, source, len(out)
 
 
@@ -551,14 +581,14 @@ async def prepare(ctx, settings, params_run_id, directory, *, report=None):
         instrument = symbol["instrument"]
         try:
             instrument, series = await resolve_series(ctx, instrument, timeframe, adjustment=data.get("adjustment"))
-            await preflight(ctx, instrument, series, since=None if index is not None else since)
+            await preflight(ctx, instrument, series)
             item = {"instrument": instrument, "series": series}
             selected.append(item)
             wanted[series["seriesId"]] = item
             execution_tf = fine or timeframe
             if fine:
                 fine_series = M.price_series(instrument, fine, data.get("adjustment", stock_like(instrument)))
-                await preflight(ctx, instrument, fine_series, since=None if index is not None else since)
+                await preflight(ctx, instrument, fine_series)
                 wanted[fine_series["seriesId"]] = {"instrument": instrument, "series": fine_series}
                 fine_ids[instrument["instrumentId"]] = fine_series["seriesId"]
             for basis in data.get("referencePrices", []):
@@ -566,17 +596,18 @@ async def prepare(ctx, settings, params_run_id, directory, *, report=None):
                 wanted[reference["seriesId"]] = {"instrument": instrument, "series": reference}
                 reference_ids.setdefault(instrument["instrumentId"], {})[basis] = reference["seriesId"]
         except ContractError as error:
-            if index is None:
-                raise
+            # A name Market cannot price is left out of the run and named in its data notes, for a list as for an index; a run fails only
+            # when no name is left (as JoinQuant, RiceQuant and QuantConnect run a universe whose members lack data).
             from .index_universe import exclude
-            selected =[item for item in selected if item["instrument"]["instrumentId"] != instrument["instrumentId"]]
+            selected = [item for item in selected if item["instrument"]["instrumentId"] != instrument["instrumentId"]]
             wanted = {key: item for key, item in wanted.items() if item["instrument"]["instrumentId"] != instrument["instrumentId"]}
             fine_ids.pop(instrument["instrumentId"], None)
             reference_ids.pop(instrument["instrumentId"], None)
-            exclude(index, symbol["instrument"]["instrumentId"], since, until, "no_price_series", source_reason=error.message)
+            if index is not None:
+                exclude(index, symbol["instrument"]["instrumentId"], since, until, "no_price_series", source_reason=error.message)
             skipped.append({"symbol": symbol["instrument"]["displaySymbol"], "reason": error.message, "code": error.code})
     if not selected:
-        raise ContractError("no_data", "No selected instruments have price series.", {"index": index})
+        raise none_left(skipped, index)
     def prices_progress(value):
         # Market fetches names (one item a name), then exports series (adjusted and raw prices: two a stock): two steps, two counts.
         report(value["step"], value["done"], value["total"], left_out(index, skipped),
@@ -584,7 +615,7 @@ async def prepare(ctx, settings, params_run_id, directory, *, report=None):
     from .research_calendar import date_windows
     windows = await date_windows(ctx, [item["instrument"] for item in selected], timeframe, since, until)
     captured = await Materials(ctx).capture({"market": {"selections": list(wanted.values()), "since": since, "until": until, "windows": windows,
-                    "allowEmpty": index is not None, "progress": prices_progress}}, params_run_id)
+                    "allowEmpty": True, "progress": prices_progress}}, params_run_id)
     try:
         manifest = captured["manifest"]
         by_id = {item["series"]["seriesId"]: item for item in manifest["selections"]}
@@ -598,19 +629,15 @@ async def prepare(ctx, settings, params_run_id, directory, *, report=None):
             missing = next((by_id[key] for key in needed if not by_id[key]["coverage"]["exportedRows"]), None)
             if missing is not None:
                 problem = missing.get("problem")
-                if index is None:
-                    from .market_capture import failure
-                    if problem is not None:
-                        raise failure(problem, instrument)
-                    raise ContractError("no_data", f"Market has no prices for {instrument['displaySymbol']}.")
                 from .index_universe import exclude
-                reason = problem["message"] if problem else "Market has no prices in this period."
-                exclude(index, instrument["instrumentId"], since, until, "no_prices", source_reason=reason)
+                reason = problem["message"] if problem else t("Market has no prices in this period.")
+                if index is not None:
+                    exclude(index, instrument["instrumentId"], since, until, "no_prices", source_reason=reason)
                 skipped.append({"symbol": instrument["displaySymbol"], "reason": reason, "code": problem["code"] if problem else "no_data"})
                 continue
             usable.append(item)
         if not usable:
-            raise ContractError("no_data", "No selected instruments have prices.", {"index": index})
+            raise none_left(skipped, index)
         schedules = {}
         now = int(time.time() * 1000)
         directory.mkdir(parents=True, exist_ok=True)
@@ -648,20 +675,23 @@ async def prepare(ctx, settings, params_run_id, directory, *, report=None):
                     count += rows
                     report("inputs", position + 1, len(usable), left_out(index, skipped))
         if not sources:
-            raise ContractError("no_data", "Market has no execution conditions for the selected names.", {"index": index})
+            raise none_left(skipped, index)
         if index is not None:
             index["nativeInstruments"] = {item["nativeInstrument"]: item["marketInstrument"]["instrumentId"] for item in sources}
         venues = venue_for(by_venue, account)
+        assumed = assumed_fees(by_venue, account)
         annualization = await daily_annualization(ctx, sources, since, until)
         bar_types = [composite_bar_type(item["barType"], fine) if fine else item["barType"] for item in sources]
         summary = {"timeframe": timeframe, "since": since, "until": until, "adjustment": next((item["series"]["adjustment"] for item in usable if stock_like(item["instrument"])), "raw"),
-                   "rows": count, "skipped": skipped, "requested": len(data["symbols"]), "traded": len(sources),
+                   "rows": count, "skipped": skipped, "feeAssumed": assumed, "requested": len(data["symbols"]), "traded": len(sources),
                    "instruments": [{"id": item["nativeInstrument"], "symbol": item["instrument"]["displaySymbol"],
                        "venue": item["instrument"]["venueId"], "marketType": item["instrument"]["marketType"],
                        "rows": item["rows"], "version": item["version"], "range": item["coverage"]["exportedRange"],
                        "missingBars": item["coverage"]["missingBars"]} for item in sources],
                    # Sessions of a chosen symbol Market has no prices for: the run went through them without a bar for that name.
-                   "gaps": [{"symbol": item["instrument"]["displaySymbol"], "days": item["coverage"]["missingDays"]} for item in sources if item["coverage"].get("missingDays")]}
+                   "gaps": [{"symbol": item["instrument"]["displaySymbol"], "days": item["coverage"]["missingDays"]} for item in sources if item["coverage"].get("missingDays")],
+                   # Names whose prices stop before the run ends: what they held was sold at their last close.
+                   "ended": [{"symbol": item["instrument"]["displaySymbol"], "at": item["coverage"]["endedAt"]} for item in sources if item["coverage"].get("endedAt")]}
         ranges = [source["tested"] for source in sources]
         summary["tested"] = {"start": min(r["start"] for r in ranges), "end": max(r["end"] for r in ranges),
                              "bars":sum(r["bars"] for r in ranges), "timeframe":timeframe}
@@ -692,8 +722,8 @@ async def _prepare_reusing(ctx, settings, params_run_id, directory, kept, *, rep
     import pickle
     import shutil
     files = ("bars.parquet", "prices.parquet", "stock-sessions.parquet")
-    # Earlier freezes inferred the trading tick from observed prices and must be prepared again.
-    stored = kept / "prepared-v2.pickle"
+    # Earlier freezes inferred the trading tick from observed prices (v1), or wrote times as text and sessions as JSON (v2): prepared again.
+    stored = kept / "prepared-v3.pickle"
     found = await asyncio.to_thread(lambda: pickle.loads(stored.read_bytes())) if stored.is_file() else None
     if found is not None:
         frozen = found["frozen"]
@@ -748,13 +778,13 @@ async def defaults(ctx, settings):
                      "marketType": instrument["marketType"], "assetClass": instrument["assetClass"], "quote": instrument.get("quote") or instrument.get("currency"),
                      "calendarId": instrument["calendarId"], "seriesId": series["seriesId"], "timeframe": series["timeframe"], "adjustment": series["adjustment"] if stock_like(instrument) else "raw", 'history': availability})
     if not resolved:
-        raise ContractError('unavailable', 'No index members have price series in the selected range.', {'index': index})
+        raise ContractError('unavailable', t("No index members have price series in the selected range."), {'index': index})
     market_terms = await trading_terms(ctx, resolved)
     listed = [(item["displaySymbol"], market_terms[item["instrumentId"]]) for item in resolved]
     traded = [entry for entry, item in zip(listed, resolved, strict=True) if item["assetClass"] not in {"equity", "fund"}]
     venues = ", ".join(sorted({item["venueId"] for item in resolved}))
-    fee = fee_for(venues, traded, account) if traded else account.get('fee')
-    market_fee, _ = agreed_fee(venues, traded) if traded else (None, None)
+    fee = one_fee(fees_for(venues, traded, account)) if traded else account.get('fee')
+    market_fee = one_fee([terms["fees"] and {"maker": terms["fees"]["maker"], "taker": terms["fees"]["taker"]} for _, terms in traded])  # what Market alone gives
     for row in rows:
         term = market_terms[row['instrumentId']]
         row['tradingTerms'] = term

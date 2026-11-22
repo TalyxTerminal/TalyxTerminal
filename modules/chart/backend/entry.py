@@ -9,6 +9,7 @@ from typing import Any
 
 from talyx_sdk import ContractError
 from talyx_sdk.declare import Module
+from talyx_sdk.i18n import t
 from talyx_sdk.process import Call, Context
 
 from . import actions, authoring, changes, exports, object_actions
@@ -168,7 +169,7 @@ async def backfill_chart(input: m.BackfillChart, call: Call) -> w.BackfillResult
     """Extend an open chart's historical window by bars or back to an ISO date (one required). Read the added
     history with read_data or export_chart. Returns loaded, reachedStart and limitReached."""
     if (input.to is None) == (input.bars is None):
-        raise ContractError("invalid_input", "Give exactly one of to and bars")
+        raise ContractError("invalid_input", t("Give exactly one of to and bars"))
     body = w.Backfill(chartId=input.chartId, bars=input.bars, to=actions.ms_of(input.to, "to") if input.to is not None else None)
     return await app.backfill(actions.workspace_of(call), body)
 
@@ -331,6 +332,6 @@ async def restart_indicators(input: m.RestartIndicatorsInput, call: Call) -> m.R
     """Start Chart's indicator processes anew; the indicators on charts, alerts and screens start again (the health
     status item's Restart)."""
     if app is None:
-        raise ContractError("unavailable", "Chart is starting")
+        raise ContractError("unavailable", t("Chart is starting"))
     app.engine.restart_pool()
     return {}

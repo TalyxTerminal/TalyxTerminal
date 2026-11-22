@@ -17,13 +17,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import numpy as np
+from talyx_sdk.i18n import mark, t
 
 from vocabulary.identity import timeframe_nanoseconds
 
 from .. import bars, calendars
 from ..codes import alpaca_symbol
 from ..common import DAY_NS, NS, MarketError, now_ns
-from .base import History, Source, coverage, empty_history, row
+from .base import RPM_SETTING, History, MeteredSource, coverage, empty_history, row
 
 DATA = "https://data.alpaca.markets"
 SCOPE = {"markets": ["US"], "assetClasses": ["equity", "fund"]}
@@ -33,31 +34,32 @@ _SPAN = {"1m": 7 * DAY_NS, "5m": 30 * DAY_NS, "15m": 90 * DAY_NS, "1d": 40 * 365
 DELAY = 15 * 60 * NS
 
 
-class AlpacaSource(Source):
+class AlpacaSource(MeteredSource):
+    default_rpm = 200
     id = "alpaca"
     descriptor = {"name": "Alpaca", "sourceIds": ["alpaca"], "kinds": ["bars", "code_history"],
                   "assetClasses": ["equity", "fund"], "credentials": "required", "paid": False,
                   "supports": ["history"],
-                  "settings": [{"name": "keyId", "label": "API key id", "type": "string", "secret": True,
+                  "settings": [RPM_SETTING, {"name": "keyId", "label": mark("API key id"), "type": "string", "secret": True,
                                 "required": True},
-                               {"name": "secretKey", "label": "API secret key", "type": "string", "secret": True,
+                               {"name": "secretKey", "label": mark("API secret key"), "type": "string", "secret": True,
                                 "required": True}]}
     secret_settings = ("keyId", "secretKey")
 
     async def describe(self, source_id: str) -> dict:
         periods = [(tf, FIRST, 10000) for tf in ("1m", "5m", "15m", "1d")]
         return coverage([row(SCOPE, "bars", periods, publish_delay="PT15M"),
-                         row({"markets": ["US"]}, "code_history")], concurrency=4, rpm=200)
+                         row({"markets": ["US"]}, "code_history")], concurrency=4, rpm=self.rpm)
 
     async def _headers(self) -> dict:
         key, secret = await self.secret(self.id, "keyId"), await self.secret(self.id, "secretKey")
         if not key or not secret:
-            raise MarketError("unauthorized", "Alpaca needs its key id and secret key in its settings",
+            raise MarketError("unauthorized", t("Alpaca needs its key id and secret key in its settings"),
                               source_id=self.id)
         return {"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret}
 
     async def _get(self, path: str, params: dict) -> dict:
-        return await self.egress.json(self.id, DATA + path, params=params, headers=await self._headers(), timeout=60)
+        return await self.request(self.egress.json, DATA + path, params=params, headers=await self._headers(), timeout=60)
 
     # ── bars ────────────────────────────────────────────────────────────────
 

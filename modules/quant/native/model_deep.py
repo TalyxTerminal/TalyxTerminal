@@ -20,6 +20,8 @@ import numpy as np
 import pandas as pd
 import torch
 
+from . import i18n
+
 # id -> (module, class, the attribute holding the torch network, how its size controls are named)
 NETWORKS = {
     "lstm": ("pytorch_lstm", "LSTM", "lstm_model", "rnn"),
@@ -275,8 +277,8 @@ def fit_network(algorithm, train, valid, params, *, d_feat, lookback, seed=42, r
             raise DeepFailure({"stage": "compute", "kind": kind, "title": "ran out of GPU memory" if kind == "gpu-memory" else "ran out of memory", "message": str(error).splitlines()[0],
                                "epoch": state["epoch"] + 1, "saved": state["epoch"], "batch": int(params.get("batch", 800))}) from error
         if not math.isfinite(float(valid_loss)) or not math.isfinite(float(train_loss)):
-            raise DeepFailure({"stage": "compute", "title": f"the validation loss became NaN at epoch {state['epoch'] + 1}",
-                               "message": f"the validation loss became NaN at epoch {state['epoch'] + 1}; lower the learning rate (now {params.get('lr', 0.001)})",
+            raise DeepFailure({"stage": "compute", "title": i18n.t("the validation loss became NaN at epoch {epoch}", epoch=state['epoch'] + 1),
+                               "message": i18n.t("the validation loss became NaN at epoch {epoch}; lower the learning rate (now {rate})", epoch=state['epoch'] + 1, rate=params.get('lr', 0.001)),
                                "epoch": state["epoch"] + 1})
         state["epoch"] += 1
         state["train"].append(float(train_loss))
@@ -334,8 +336,8 @@ def start_from_base(holder, path):
     own = network_of(holder, "gats").state_dict()
     wrong = [key for key, value in base.items() if key not in own or own[key].shape != value.shape]
     if not base or wrong:
-        raise DeepFailure({"stage": "settings", "title": "Start from a run with the same inputs and look back",
-                           "message": "The run to start from does not have the same width, layers and inputs as GATs here; choose a run with the same settings."})
+        raise DeepFailure({"stage": "settings", "title": i18n.t("Start from a run with the same inputs and look back"),
+                           "message": i18n.t("The run to start from does not have the same width, layers and inputs as GATs here; choose a run with the same settings.")})
     network_of(holder, "gats").load_state_dict({**own, **base})
 
 
@@ -704,8 +706,8 @@ def fit_qlib(algorithm, train, valid, params, *, d_feat, lookback, seed=42, repr
     """Train one window with Qlib's own `fit(dataset)`. `train` and `valid` hold `x` (`[N, F × L]`), `y`, `t`, `i`; `aux` the auxiliary labels (TCTS),
     `concepts` {matrix, concepts} (HIST). Returns (model, curve, best epoch). `on_epoch` hears every epoch the network reports."""
     if algorithm == "tra" and int(lookback) <= int(horizon):
-        raise DeepFailure({"stage": "settings", "title": "the look back is shorter than the label's reach",
-                           "message": f"TRA needs a look back longer than the {int(horizon)} days its label reads ahead; now {int(lookback)}."})
+        raise DeepFailure({"stage": "settings", "title": i18n.t("the look back is shorter than the label's reach"),
+                           "message": i18n.t("TRA needs a look back longer than the {horizon} days its label reads ahead; now {lookback}.", horizon=int(horizon), lookback=int(lookback))})
     torch.set_num_threads(max(1, int(threads)))
     if reproducible:
         torch.use_deterministic_algorithms(True)
@@ -742,7 +744,7 @@ def fit_qlib(algorithm, train, valid, params, *, d_feat, lookback, seed=42, repr
         seen["valid"].append(float(score))
         mine = float(score)
         if not math.isfinite(mine):
-            raise DeepFailure({"stage": "compute", "title": f"the validation score became NaN at epoch {count}", "message": f"the validation score became NaN at epoch {count}; lower the learning rate", "epoch": count})
+            raise DeepFailure({"stage": "compute", "title": i18n.t("the validation score became NaN at epoch {epoch}", epoch=count), "message": i18n.t("the validation score became NaN at epoch {epoch}; lower the learning rate", epoch=count), "epoch": count})
         if seen["best"] is None or (mine > seen["best"] if higher else mine < seen["best"]):
             seen.update(best=mine, best_epoch=count)
         if on_epoch is not None:

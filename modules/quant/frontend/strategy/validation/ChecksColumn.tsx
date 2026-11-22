@@ -1,4 +1,5 @@
 /* The checks of a run: each with its value and what it needs, the ones that did not pass marked, and the ones not run with a button that runs them. */
+import { t } from "../../i18n";
 import {TxButton, TxIcon} from "@talyx/sdk";
 import type {CheckGo, CheckRow} from "./types";
 
@@ -11,10 +12,10 @@ export function buttonFor(row: {state: string; go: CheckGo | string | null}): {l
   if (!go || typeof go === "string") return null;
   if (row.state === "notrun") {
     switch (go.kind) {
-      case "validate": return {label: "Validate", run: "validate"};
-      case "walk": return {label: "Walk-forward", run: "walk"};
-      case "sweep": return {label: "Sweep", run: "sweep"};
-      case "costs": return {label: "Rerun at 2× costs", run: "costs"};
+      case "validate": return {label: t("Validate"), run: "validate"};
+      case "walk": return {label: t("Walk-forward"), run: "walk"};
+      case "sweep": return {label: t("Sweep"), run: "sweep"};
+      case "costs": return {label: t("Rerun at 2× costs"), run: "costs"};
       default: return null;
     }
   }
@@ -40,7 +41,7 @@ export function ChecksColumn({rows, actions}: {rows: CheckRow[]; actions: CheckA
       <span className="sv-cval">{row.value}{row.detail ? <span className="dim"> · {row.detail}</span> : null}</span>
       {row.need && row.state !== "notrun" && <span className="sv-cneed dim">{row.need}</span>}
       {button ? <TxButton size="sm" variant="quiet" onClick={() => act(row.go!, actions)}><TxIcon name="play" />{button.label}</TxButton>
-        : row.go && row.state !== "notrun" ? <TxButton size="sm" variant="quiet" onClick={() => act(row.go!, actions)}>{row.go.kind === "open" && row.go.resweep ? "Sweep around these" : "Open"}</TxButton> : null}
+        : row.go && row.state !== "notrun" ? <TxButton size="sm" variant="quiet" onClick={() => act(row.go!, actions)}>{row.go.kind === "open" && row.go.resweep ? t("Sweep around these") : t.c("action", "Open")}</TxButton> : null}
     </li>;
   })}</ul></div>;
 }

@@ -37,8 +37,8 @@ class AllocationProducer:
             settings, pool = meta["allocation"]["settings"], meta["allocation"]["pool"]
             # the pool's proxies and exchange rates go into the bars as they did for the run and its publication: an update in another currency is converted too
             prepared, extras = await with_pool_market(self.ctx, data, settings, pool,
-                                                      lambda wanted: research_data.prepare(self.ctx, wanted, "library-update:" + version["id"] + ":" + str(now), directory, strict=False, calendars="many"),
-                                                      lambda ready: ready["research"]["info"])
+                                                      lambda wanted: research_data.prepare(self.ctx, wanted, "library-update:" + version["id"] + ":" + str(now), directory, calendars="many"),
+                                                      lambda ready: ready["research"]["info"], code=meta["allocation"].get("mode") == "code")
             bars = pd.read_parquet(prepared["research"]["barsPath"])
             instruments = {item["column"]: item["instrumentId"] for item in info["instruments"]}
             present = {int(label) for label in bars["label"].unique()}

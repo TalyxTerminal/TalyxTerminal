@@ -22,6 +22,7 @@ import time
 from pathlib import Path
 
 from .errors import ContractError
+from .i18n import platform_t
 from .jobs import spawn
 
 UV_ISOLATED = ("--no-config",)
@@ -70,7 +71,7 @@ class Environments:
     # ── identity and records ────────────────────────────────────────────────────────────────────────────────────────
     def _record_path(self, preparation_id: str) -> Path:
         if not re.fullmatch(r"pep_[0-9a-f]{32}", preparation_id or ""):
-            raise ContractError("not_found", f"No environment {preparation_id}")
+            raise ContractError("not_found", platform_t("No environment {preparation_id}", preparation_id=preparation_id))
         return self.root / (preparation_id[4:24] + ".json")
 
     def _record(self, preparation_id: str) -> dict:
@@ -78,7 +79,7 @@ class Environments:
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except FileNotFoundError:
-            raise ContractError("not_found", f"No environment {preparation_id}", {"preparationId": preparation_id}) from None
+            raise ContractError("not_found", platform_t("No environment {preparation_id}", preparation_id=preparation_id), {"preparationId": preparation_id}) from None
 
     def _save(self, record: dict) -> None:
         record["updatedAt"] = _now()
@@ -117,14 +118,14 @@ class Environments:
         """The environment for this lock; preparation starts now unless it is there or under way. ``duplicate`` says
         it existed. Asking again is using it (it keeps it from being pruned)."""
         if not _PYTHON_VERSION.fullmatch(python_version):
-            raise ContractError("invalid_input", "pythonVersion must name CPython 3.8 to 3.13", {"pythonVersion": python_version})
+            raise ContractError("invalid_input", platform_t("pythonVersion must name CPython 3.8 to 3.13"), {"pythonVersion": python_version})
         if len(requirements_lock.encode()) > 1024 * 1024:
-            raise ContractError("invalid_input", "The lock is over 1 MiB")
+            raise ContractError("invalid_input", platform_t("The lock is over 1 MiB"))
         actual = hashlib.sha256(requirements_lock.encode()).hexdigest()
         if lock_digest is not None and lock_digest != actual:
-            raise ContractError("conflict", "The lock does not match its digest", {"expected": lock_digest, "actual": actual})
+            raise ContractError("conflict", platform_t("The lock does not match its digest"), {"expected": lock_digest, "actual": actual})
         if not verify_imports or any(not _IMPORT.fullmatch(name) for name in verify_imports):
-            raise ContractError("invalid_input", "verifyImports names an invalid module")
+            raise ContractError("invalid_input", platform_t("verifyImports names an invalid module"))
         intent = hashlib.sha256(json.dumps({"python": python_version, "lock": actual, "imports": verify_imports},
                                            sort_keys=True).encode()).hexdigest()
         preparation_id = "pep_" + intent[:32]
@@ -152,7 +153,7 @@ class Environments:
         """Prepare a failed, cancelled or interrupted environment again."""
         current = self.get(preparation_id)
         if current["state"] not in {"failed", "cancelled", "interrupted"}:
-            raise ContractError("conflict", "Only a failed, cancelled or interrupted preparation is tried again",
+            raise ContractError("conflict", platform_t("Only a failed, cancelled or interrupted preparation is tried again"),
                                 {"state": current["state"]})
         record = self._record(preparation_id)
         record.update(state="queued", attempt=record["attempt"] + 1, error=None)
@@ -185,7 +186,7 @@ class Environments:
     def hold(self, preparation_id: str, holder: str) -> None:
         """Say ``holder`` relies on this (completed) environment: it is not pruned while any hold remains."""
         if self.get(preparation_id)["state"] != "completed":
-            raise ContractError("conflict", "Only a completed environment can be held", {"preparationId": preparation_id})
+            raise ContractError("conflict", platform_t("Only a completed environment can be held"), {"preparationId": preparation_id})
         path = self._holder_file(preparation_id, holder)
         path.parent.mkdir(exist_ok=True)
         _write(path, {"holder": holder, "since": _now()})

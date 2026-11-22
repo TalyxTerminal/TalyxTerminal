@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
 
 from . import research_data, research_process
 from .library_checks import close_prices
@@ -88,7 +89,7 @@ class FactorProducer:
                                "params": meta.get("params") or {}}
             answer = await self.factors.engine.run_open(job)
             if not answer.get("ok"):
-                failure = answer.get("failure") or {"message": "The factor engine gave no answer."}
+                failure = answer.get("failure") or {"message": t("The factor engine gave no answer.")}
                 raise UpdateFailure("The code failed on the new data: " + failure["message"], {"code": "code_failed", **failure_of(failure)})
             values = await asyncio.to_thread(pd.read_parquet, output / "values.parquet")
         finally:
@@ -119,7 +120,7 @@ class RunProducer:
         directory.mkdir(parents=True, exist_ok=True)
         try:
             data = {**meta["data"], "until": day_of(through), "since": day_of(info["since"])}
-            prepared = await research_data.prepare(self.ctx, data, "library-update:" + version["id"] + ":" + str(now), directory, strict=False)
+            prepared = await research_data.prepare(self.ctx, data, "library-update:" + version["id"] + ":" + str(now), directory)
             bars = await asyncio.to_thread(pd.read_parquet, prepared["research"]["barsPath"])
             instruments = {item["column"]: item["instrumentId"] for item in prepared["research"]["info"]["instruments"]}
             if (meta.get("publication") or {}).get("kind") == "allocation" and after is not None and not rebalances(meta, through, previous=after):
@@ -174,7 +175,7 @@ class RunProducer:
         except ContractError as error:
             if error.code != "target_gone":
                 raise
-            raise ContractError("interrupted", "The update process was closed with its owning scope.") from error
+            raise ContractError("interrupted", t("The update process was closed with its owning scope.")) from error
         finally:
             try:
                 await self.ctx.processes.cancel(lease)

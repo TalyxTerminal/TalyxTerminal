@@ -7,13 +7,14 @@ from __future__ import annotations
 import time
 
 from talyx_sdk import ContractError
+from talyx_sdk.i18n import mark
 
 DECLARED = (
-    {"id": "longRuns", "group": "Runs", "title": "Long runs finished", "description": "A run, sweep, held-out validation or publication that took over a minute finished or failed."},
-    {"id": "libraryFailures", "group": "Library", "title": "Library failures", "description": "A published version's code failed on the new data."},
-    {"id": "libraryMissing", "group": "Library", "title": "Library missing periods", "description": "The source gave no bar, or an input had no value, for a version's newest period."},
-    {"id": "libraryWeakening", "group": "Library", "title": "Library weakening", "description": "A factor or model fell under a quarter of its published figure or flipped sign; an allocation drifted from its published risk."},
-    {"id": "libraryRecovered", "group": "Library", "title": "Library recovered", "description": "A version that failed or missed periods is producing again."},
+    {"id": "longRuns", "group": "Runs", "title": mark("Long runs finished"), "description": "A run, sweep, held-out validation or publication that took over a minute finished or failed."},
+    {"id": "libraryFailures", "group": "Library", "title": mark("Library failures"), "description": "A published version's code failed on the new data."},
+    {"id": "libraryMissing", "group": "Library", "title": mark("Library missing periods"), "description": "The source gave no bar, or an input had no value, for a version's newest period."},
+    {"id": "libraryWeakening", "group": "Library", "title": mark("Library weakening"), "description": "A factor or model fell under a quarter of its published figure or flipped sign; an allocation drifted from its published risk."},
+    {"id": "libraryRecovered", "group": "Library", "title": mark("Library recovered"), "description": "A version that failed or missed periods is producing again."},
 )
 DEFAULTS = {item["id"]: True for item in DECLARED}
 LONG_RUN_MS = 60_000
