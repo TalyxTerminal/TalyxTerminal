@@ -9,7 +9,7 @@ import time
 import pytest
 from talyx_sdk.errors import ContractError
 
-from tests.platform.harness import real_modules, route, run, running
+from tests.platform.harness import real_modules, route, run, running, window_state
 
 
 def alive(pid: int) -> bool:
@@ -121,7 +121,8 @@ def test_copying_a_workspace_asks_every_module_to_copy_its_content(tmp_path, mon
                                                             "values": {"color": "B"}})
             with pytest.raises(ContractError, match="Save the workspace"):
                 await platform.call("platform.workspace.copy", {"workspaceId": workspace})
-            await platform.call("platform.workspace.save", {"name": "original", "workspace": {}}, workspace=workspace)
+            await platform.call("platform.workspace.save", {"name": "original", "workspace": window_state()},
+                                workspace=workspace)
             copy = await platform.call("platform.workspace.copy", {"workspaceId": workspace})
             assert (copies / f"{workspace}-{copy['workspaceId']}").read_text() == "copied"
             await platform.call("platform.workspace.open", {"snapshotId": copy["snapshotId"]})
@@ -148,9 +149,8 @@ def test_copying_a_closed_workspace_copies_its_charts_watchlists_and_conversatio
                 {"name": "Crypto", "symbols": ["okx:BTC/USDT"]}]}}, workspace=original)
             talk = (await route(platform, "agent", "POST", "/conversation", original,
                                 {"operation": "create", "value": {"title": "Plan"}}))["id"]
-            layout = {"panels": [{"id": "p1", "kind": "module:chart", "title": "Chart", "state": {"chartId": chart}},
-                                 {"id": "p2", "kind": "module:agent", "title": "Agent",
-                                  "state": {"conversationId": talk}}]}
+            layout = window_state({"id": "p1", "kind": "module:chart", "state": {"chartId": chart}},
+                                  {"id": "p2", "kind": "module:agent", "state": {"conversationId": talk}})
             await platform.call("platform.workspace.save", {"name": "Desk", "workspace": layout}, workspace=original)
             await platform.call("platform.workspace.close", {"workspaceId": original})
 
@@ -200,7 +200,7 @@ def test_delete_and_discard_clean_the_modules_and_preserve_the_bound_folder(tmp_
             preview = await platform.call("platform.workspace.delete_preview", {"workspaceId": ws})
             assert "Watchlist · Delete me" in preview
             if saved:
-                snapshot = await platform.call("platform.workspace.save", {"name": "Delete trial", "workspace": {}},
+                snapshot = await platform.call("platform.workspace.save", {"name": "Delete trial", "workspace": window_state()},
                                                workspace=ws)
                 action = "platform.workspace.delete"
                 args = {"snapshotId": snapshot["snapshotId"], "expectedRevision": snapshot["revision"]}

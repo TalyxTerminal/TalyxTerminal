@@ -196,6 +196,12 @@ class Store:
         rows = self.db.execute(query + " ORDER BY at DESC LIMIT ?", (*args, limit))
         return [json.loads(row[0]) for row in rows]
 
+    def last_fired(self, alert: str) -> dict[str, int]:
+        """When the alert last fired on each member (instrument id → ms)."""
+        rows = self.db.execute("SELECT json_extract(record, '$.instrumentId'), MAX(at) FROM fired WHERE alert = ? "
+                               "GROUP BY 1", (alert,))
+        return dict(rows.fetchall())
+
     def prune_fired(self, before: int) -> None:
         self.write("DELETE FROM fired WHERE at < ?", (before,))
 

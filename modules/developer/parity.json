@@ -1,6 +1,7 @@
 {
   "GET /documents/checkpoints/{checkpoint_id}": {"actions":["developer.documents.read_checkpoint"]},
   "GET /documents/unsaved": {"actions":["developer.documents.list","developer.documents.read"]},
+  "GET /documents/{document_id}/text": {"actions":["developer.documents.read"]},
   "GET /documents/{document_id}/versions": {"actions":["developer.documents.read_versions"]},
   "GET /help": {"actions":["developer.help"]},
   "GET /projects": {"actions":["developer.projects.list"]},

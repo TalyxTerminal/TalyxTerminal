@@ -294,8 +294,7 @@ class Check:
         started = time.perf_counter()
         panel, settings = self.panel, self.settings
         inputs, tables, failed = self.tables()
-        year_bars = D.YEAR_BARS.get(panel.info.get("timeframe", "1d"), int(panel.annualization))
-        rows = D.rows_of(panel, settings.get("leaveOut") or D.LEAVE_OUT_DEFAULT, year_bars)
+        rows = D.rows_of(panel, settings.get("leaveOut") or D.LEAVE_OUT_DEFAULT)
         warm = max([D.WARMUP.get(item.ref, 0) for item in inputs if item.source == "builtin"] + [self.reach["back"] if self.reach else 0])
         windows = D.layout(panel.labels, settings["split"], self.gap_ahead, warmup=warm)
         label = D.label_of(panel, D.split_form(self.label_formula)[0]) if self.reach else np.full(panel.shape, np.nan)
@@ -563,8 +562,7 @@ class Check:
         training = np.zeros(len(self.panel.labels), dtype=bool)
         for window in windows:
             training[window.train[0]:window.train[1] + 1] = True
-        year_bars = D.YEAR_BARS.get(self.panel.info.get("timeframe", "1d"), int(self.panel.annualization))
-        rows = D.rows_of(self.panel, self.settings.get("leaveOut") or D.LEAVE_OUT_DEFAULT, year_bars)
+        rows = D.rows_of(self.panel, self.settings.get("leaveOut") or D.LEAVE_OUT_DEFAULT)
         before = np.where(rows, tables[name], np.nan)
         after = D.process_day(before[:, :, None], self.panel, self.settings["processing"]["inputs"])[:, :, 0]
         if self.settings["processing"]["inputs"]["scale"] == "robust" or self.settings["processing"]["inputs"]["missing"] == "train_median":

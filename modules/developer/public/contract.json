@@ -1106,7 +1106,7 @@
        "type": "null"
       }
      ],
-     "description": "The saved text; null on a page of a document without unsaved edits (the same as content).",
+     "description": "The saved text; null for a document without unsaved edits (the same as content).",
      "title": "Basecontent"
     },
     "version": {

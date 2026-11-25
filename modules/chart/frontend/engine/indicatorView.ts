@@ -9,9 +9,10 @@ import {
 } from "lightweight-charts";
 import { tokenValue } from "@talyx/sdk";
 import { MEASURED_SCALE, type ChartView } from "./ChartView";
+import { lastValueLabel } from "./priceLabels";
 import { VOLUME_FORMAT, seriesFormat, unitFormat, type PriceFormat } from "./precision";
 import type { PlotStyle } from "../wire";
-import { BandFill, BarBackground, PineDrawings, pineColor, type PineDrawingSet } from "./pinePrimitives";
+import { BandFill, BarBackground, NA_COLOR, PineDrawings, drawnColor, pineColor, scriptColor, type PineDrawingSet } from "./pinePrimitives";
 
 export interface PineMeta {
   id: string; kind: "plot" | "shape" | "char" | "arrow" | "candle" | "bar" | "bgcolor" | "barcolor" | "hline" | "fill";
@@ -119,8 +120,11 @@ export class IndicatorView {
 
   private paneOf(meta: PineMeta): number { return meta.force_overlay ? this.view.pricePane : this.placement.pane; }
 
+  /** Drawn in its pane: Pine's display.all or display.pane (a display.data_window plot, like Derivatives Basis's mark and
+      index, only has values). */
   private shown(meta: PineMeta): boolean {
-    return this.placement.visible && meta.display !== "none" && this.placement.styles[meta.id]?.visible !== false;
+    return this.placement.visible && (meta.display === undefined || meta.display === "all" || meta.display === "pane")
+      && this.placement.styles[meta.id]?.visible !== false;
   }
 
   /** Pine's `behind_chart` applies to the price pane only. */
@@ -146,9 +150,12 @@ export class IndicatorView {
   private build(): void {
     const { meta } = this.data;
     const pane = this.placement.pane;
-    const hlines = meta.filter(item => item.kind === "hline" && this.shown(item));
+    // An hline in na draws nothing (Pine), whatever colour the user chose.
+    const hlines = meta.filter(item => item.kind === "hline" && this.shown(item) && item.color !== NA_COLOR);
     let colorIndex = 0;
     const nextColor = (item: PineMeta) => this.placement.styles[item.id]?.color ?? pineColor(item.color) ?? this.placement.palette[colorIndex++ % this.placement.palette.length];
+    // Fills first: a pane draws its series in the order they were added, and Pine draws fills under the plots.
+    for (const item of meta) if (item.kind === "fill" && this.shown(item)) this.outputs.push(this.fill(item));
     for (const item of meta) {
       if (!this.shown(item)) continue;
       if (item.kind === "plot") this.outputs.push(this.plot(item, nextColor(item)));
@@ -156,20 +163,20 @@ export class IndicatorView {
     }
     if (pane === this.view.pricePane) this.host = this.view.main;
     else {
-      const first = this.outputs.length ? this.firstSeries : null;
+      const first = this.firstSeries;
       this.host = first ?? this.view.chart.addSeries(LineSeries, { visible: false, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false, priceScaleId: this.placement.side }, pane);
       const extra = () => { const range = this.extraRange(hlines), unit = this.hostUnit(); return range && { min: range.min / unit, max: range.max / unit }; };
       this.host.applyOptions({ autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => widen(base(), extra()) });
       if (!first) this.outputs.push(this.hidden(this.host as ISeriesApi<"Line", number>, hlines[0]?.price ?? 0));
     }
     for (const item of hlines) {
+      const look = this.placement.styles[item.id] ?? {};
       this.hlines.push(this.host.createPriceLine({
-        price: item.price! / this.hostUnit(), color: this.placement.styles[item.id]?.color ?? pineColor(item.color) ?? this.placement.palette[0],
-        lineWidth: (item.linewidth ?? 1) as 1, lineStyle: LINE_STYLES[(item.linestyle ?? "dashed") as keyof typeof LINE_STYLES] ?? LineStyle.Dashed,
+        price: item.price! / this.hostUnit(), color: look.color ?? pineColor(item.color) ?? this.placement.palette[0],
+        lineWidth: (look.lineWidth ?? item.linewidth ?? 1) as 1, lineStyle: LINE_STYLES[(look.lineStyle ?? item.linestyle ?? "solid") as keyof typeof LINE_STYLES],
         axisLabelVisible: false, title: "",
       }));
     }
-    for (const item of meta) if (item.kind === "fill" && this.shown(item)) this.outputs.push(this.fill(item));
     const markerMeta = meta.filter(item => (item.kind === "shape" || item.kind === "char" || item.kind === "arrow") && this.shown(item));
     if (markerMeta.length) this.outputs.push(this.markerOutput(markerMeta));
     // Price lines and absolute markers hang on the host in its scale's unit: placed again when it changes (first to go
@@ -204,7 +211,7 @@ export class IndicatorView {
 
   private plot(item: PineMeta, color: string): Output {
     const look = this.placement.styles[item.id] ?? {};
-    const style = item.style ?? "line", pane = this.paneOf(item), offset = item.offset ?? 0;
+    const style = item.style ?? "line", pane = this.paneOf(item), offset = item.offset ?? 0, clear = tokenValue("--tx-clear");
     const width = (look.lineWidth ?? item.linewidth ?? 1) as 1;
     const lineStyle = LINE_STYLES[look.lineStyle ?? "solid"];
     const format = item.precision !== undefined ? { precision: item.precision, minMove: 10 ** -item.precision } : pane === this.view.pricePane ? this.placement.format : null;
@@ -212,7 +219,7 @@ export class IndicatorView {
       priceScaleId: this.scaleOf(pane), ...(item.format === "volume" ? { priceFormat: VOLUME_FORMAT } : format ? { priceFormat: seriesFormat(format) } : {}) };
     let series: ISeriesApi<SeriesType, number>;
     if (style === "histogram" || style === "columns") series = this.view.chart.addSeries(HistogramSeries, { ...common, color, base: item.histbase ?? 0 }, pane);
-    else if (style === "area" || style === "areabr") series = this.view.chart.addSeries(AreaSeries, { ...common, lineColor: color, topColor: color, bottomColor: tokenValue("--tx-clear"), lineWidth: width, lineStyle }, pane);
+    else if (style === "area" || style === "areabr") series = this.view.chart.addSeries(AreaSeries, { ...common, lineColor: color, topColor: color, bottomColor: clear, lineWidth: width, lineStyle }, pane);
     else series = this.view.chart.addSeries(LineSeries, {
       ...common, color, lineWidth: width, lineStyle,
       lineType: style.startsWith("stepline") ? LineType.WithSteps : LineType.Simple,
@@ -220,34 +227,55 @@ export class IndicatorView {
       pointMarkersRadius: style === "circles" || style === "cross" ? width + 1 : undefined,
     }, pane);
     if (pane === this.view.pricePane && this.data.noScale) this.view.chart.priceScale(this.ownScale, this.view.pricePane).applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-    else if (this.placement.labels) this.view.labels.attach(series);
+    // A last bar in na (drawn clear) has no label either.
+    else if (this.placement.labels) this.view.labels.attach(series, shown => lastValueLabel(shown).filter(label => label.color !== clear));
     this.placed(series, pane);
     if (pane === this.placement.pane && !this.firstSeries) this.firstSeries = series;
     const values = this.data.values[item.id], colors = item.dynamic ? this.data.colors[item.id] : undefined;
+    const area = style === "area" || style === "areabr";
+    const paint = (color: string) => area ? { lineColor: color, topColor: color, bottomColor: clear } : { color };
+    // A bar the script colours na is drawn clear (Pine: as a colour of 100 transparency), not left out: a missing value
+    // is bridged by the line, an na colour is not. The engine colours a segment with its first bar's colour.
     const point = (index: number) => {
       const time = this.view.timeAtLogical(index + offset);
       if (time === null) return null;
       const value = values?.[index];
       if (value === null || value === undefined) return { time };
-      const dynamic = colors ? pineColor(colors[index] as string | null) : null;
-      return dynamic ? { time, value, color: dynamic } : { time, value };
+      const drawn = drawnColor(look.color, scriptColor(colors?.[index], item.color));
+      if (drawn === null) return { time, value, ...paint(clear) };
+      return colors && drawn ? { time, value, ...paint(drawn) } : { time, value };
     };
     return this.seriesOutput(series, point, item.show_last);
   }
 
+  /** plotcandle and plotbar, coloured like a plot: per bar while the script's colour varies, the whole output in the
+      colour the user chose, a bar whose body colour is na not drawn (a wick or border in na is clear). */
   private candles(item: PineMeta, color: string): Output {
-    const pane = this.paneOf(item);
+    const pane = this.paneOf(item), user = this.placement.styles[item.id]?.color, clear = tokenValue("--tx-clear");
+    const wick = user ?? pineColor(item.wickcolor) ?? color, border = user ?? pineColor(item.bordercolor) ?? color;
     const common = { lastValueVisible: false, priceLineVisible: false, ...this.paneFormat(pane) };
     const series = this.placed(item.kind === "candle"
-      ? this.view.chart.addSeries(CandlestickSeries, { ...common, upColor: color, downColor: color, wickColor: pineColor(item.wickcolor) ?? color, borderColor: pineColor(item.bordercolor) ?? color }, pane)
+      ? this.view.chart.addSeries(CandlestickSeries, { ...common, upColor: color, downColor: color, wickColor: wick, borderColor: border }, pane)
       : this.view.chart.addSeries(BarSeries, { ...common, upColor: color, downColor: color }, pane), pane);
     if (pane === this.placement.pane && !this.firstSeries) this.firstSeries = series;
     const column = (part: string) => this.data.values[`${item.id} (${part})`];
+    // Rows are [body, wick, border] for candles, a colour for bars; a wick or border the script names no colour for takes the
+    // body's.
+    const colors = item.dynamic ? this.data.colors[item.id] : undefined;
+    const part = (row: unknown, fallback: string | undefined, index: number, otherwise: string) => {
+      const drawn = drawnColor(user, scriptColor(row, fallback, index));
+      return drawn === null ? clear : drawn ?? otherwise;
+    };
     const point = (index: number) => {
       const time = this.view.timeAtLogical(index);
       if (time === null) return null;
       const [open, high, low, close] = ["open", "high", "low", "close"].map(part => column(part)?.[index]);
-      return open == null || high == null || low == null || close == null ? { time } : { time, open, high, low, close };
+      if (open == null || high == null || low == null || close == null) return { time };
+      const row = colors?.[index], body = drawnColor(user, scriptColor(row, item.color));
+      if (body === null) return { time };
+      if (!colors) return { time, open, high, low, close };
+      if (item.kind === "bar") return { time, open, high, low, close, color: body ?? color };
+      return { time, open, high, low, close, color: body ?? color, wickColor: part(row, item.wickcolor, 1, body ?? color), borderColor: part(row, item.bordercolor, 2, body ?? color) };
     };
     return this.seriesOutput(series, point, item.show_last);
   }
@@ -307,16 +335,17 @@ export class IndicatorView {
       return () => price;
     };
     const a = level(item.plot1, item.hline1), b = level(item.plot2, item.hline2);
-    const base = this.placement.styles[item.id]?.color ?? pineColor(item.color) ?? tokenValue("--tx-clear");
+    const user = this.placement.styles[item.id]?.color, clear = tokenValue("--tx-clear");
     const colors = item.dynamic ? this.data.colors[item.id] : undefined;
     const point = (index: number) => {
       const time = this.view.timeAtLogical(index);
       if (time === null) return null;
       const upper = a(index), lower = b(index);
       if (upper === null || lower === null) return { time };
-      const channel = colors?.[index];
-      const fill = Array.isArray(channel) ? pineColor(channel[2] as string | null) ?? base : pineColor(channel as string | null | undefined) ?? base;
-      return { time, upper: Math.max(upper, lower), lower: Math.min(upper, lower), fill };
+      // A gradient's row is [top value, bottom value, top colour, bottom colour]: the band takes the top colour.
+      const fill = drawnColor(user, scriptColor(colors?.[index], item.color, 2));
+      if (fill === null) return { time };
+      return { time, upper: Math.max(upper, lower), lower: Math.min(upper, lower), fill: fill ?? clear };
     };
     return this.seriesOutput(series as unknown as ISeriesApi<SeriesType, number>, point, item.show_last);
   }
@@ -329,13 +358,16 @@ export class IndicatorView {
       if (value === null || value === undefined || value === 0) return [];
       const time = this.view.timeAtLogical(index + (item.offset ?? 0));
       if (time === null) return [];
-      const channel = item.dynamic ? this.data.colors[item.id]?.[index] : null;
-      const dynamic = Array.isArray(channel) ? channel : [channel];
+      // Rows are [colour, text colour] for shapes and characters, [up, down] for arrows; a marker in na is not drawn.
+      const channel = item.dynamic ? this.data.colors[item.id]?.[index] : undefined;
       if (item.kind === "arrow") {
-        const up = value > 0, color = pineColor((up ? dynamic[0] : dynamic[1]) as string | null) ?? pineColor(up ? item.colorup : item.colordown) ?? this.placement.palette[0];
-        return [{ time, position: up ? "belowBar" : "aboveBar", shape: up ? "arrowUp" : "arrowDown", color }];
+        const up = value > 0, script = scriptColor(channel, up ? item.colorup : item.colordown, up ? 0 : 1);
+        if (script === NA_COLOR) return [];
+        return [{ time, position: up ? "belowBar" : "aboveBar", shape: up ? "arrowUp" : "arrowDown", color: pineColor(script) ?? this.placement.palette[0] }];
       }
-      const color = pineColor(dynamic[0] as string | null) ?? pineColor(item.color) ?? this.placement.palette[0];
+      const script = scriptColor(channel, item.color);
+      if (script === NA_COLOR) return [];
+      const color = pineColor(script) ?? this.placement.palette[0];
       const location = item.location ?? "abovebar";
       const shape = item.kind === "char" ? "circle" : SHAPES[item.style ?? "xcross"] ?? "circle";
       const text = item.kind === "char" ? `${item.char ?? ""}${item.text ? ` ${item.text}` : ""}` : item.text;
@@ -360,10 +392,13 @@ export class IndicatorView {
     };
   }
 
+  /** A bar's background or bar colour: the last call that paints the bar (na and null leave it to the earlier ones), in
+      the colour the user chose for that call if any. */
   private colorOf(items: PineMeta[], index: number): string | null {
     for (let at = items.length - 1; at >= 0; at--) {
       const item = items[at], row = index - (item.offset ?? 0);
-      const color = pineColor(this.data.colors[item.id]?.[row] as string | null | undefined);
+      const script = this.data.colors[item.id]?.[row] as string | null | undefined;
+      const color = script ? drawnColor(this.placement.styles[item.id]?.color, script) : null;
       if (color) return color;
     }
     return null;

@@ -29,7 +29,29 @@ def splice_proxy(closes, name, proxy):
     return first, corr
 
 
-ALIGN_RULE = {"weekly": ("W-FRI", 52, 5), "monthly": ("ME", 12, 21)}
+def risk_free_per_bar(spec, index, annual):
+    """The risk-free rate an observation on each day of `index` (days, as the pool's returns are indexed) from the run's rate (`{basis: zero}`, `{basis: fixed,
+    pct}` or `{basis: irx, rows: [[ms, percent a year]], unavailable}`): the fixed percent, or the newest ^IRX close not later than the day, over `annual`. 0.0 for
+    zero; None when Market has no rate, so what uses it is empty. The backtest and the library's figures after publication both read it."""
+    if spec["basis"] == "zero":
+        return 0.0
+    if spec["basis"] == "fixed":
+        return float(spec["pct"]) / 100 / annual
+    if spec.get("unavailable") or not spec.get("rows"):
+        return None
+    days = pd.to_datetime([row[0] for row in spec["rows"]], unit="ms", utc=True).tz_localize(None).normalize()
+    pct = pd.Series([float(row[1]) for row in spec["rows"]], index=days)
+    pct = pct[~pct.index.duplicated(keep="last")].sort_index()
+    return pct.reindex(pct.index.union(index)).ffill().reindex(index) / 100 / annual
+
+
+ALIGN_RULE = {"weekly": ("W-FRI", 52, 5), "monthly": ("M", 12, 21)}
+
+
+def observations_a_year(settings, calendar):
+    """Observations a year of the pool's returns: 52 or 12 when they are aligned weekly or monthly, else `calendar` (Market's count of the data's bars a year)."""
+    rule = ALIGN_RULE.get(settings.get("align") or "common")
+    return rule[1] if rule else calendar
 
 
 def aligned_lookback(settings):
@@ -39,11 +61,27 @@ def aligned_lookback(settings):
     return lookback if rule is None else max(8 if rule[1] == 52 else 6, round(lookback / rule[2]))
 
 
+def period_returns(closes):
+    """Close-to-close returns of aligned closes: a period without a close has no return (the holding stays at its last close), and the period the close comes back in
+    carries the whole move from the last close before the gap (a halt that spans a whole week or month on weekly or monthly returns)."""
+    return closes / closes.ffill().shift(1) - 1
+
+
+def period_closes(closes, period):
+    """Each asset's last close in each week or month (`period`: W-FRI or M), on the period's last day with a close: its
+    last trading day, a Thursday when Good Friday closes the market, never a day without a bar."""
+    traded = closes.dropna(how="all")
+    periods = traded.index.to_period(period)
+    last = traded.groupby(periods).last()
+    last.index = pd.DatetimeIndex(traded.index.to_series().groupby(periods).max().to_numpy(), name=closes.index.name)
+    return last
+
+
 def daily_returns(bars, pool, settings=None, zones=None):
     """The one definition of the pool's returns, used by the backtest worker and by `q.allocate` (so the frozen run and the original run agree to the bit):
     prices in another currency are converted with the rate columns the Host froze next to them (`settings.fxColumns`); an asset's missing early history is taken from
     its proxy (`settings.proxyColumns`); then from the common start (the latest first price, a proxied asset counting from its proxy's), on the days every pool asset
-    has a close (`align` common days), or the last of each week or month; a missing close is crossed (the return runs across the gap), never filled with 0. Only the pool's
+    has a close (`align` common days), or the last of each week or month; a missing close is crossed (`period_returns`: the return runs across the gap), never filled with 0. Only the pool's
     columns count (a benchmark's missing day does not remove a day from the pool)."""
     settings = settings or {}
     ordered = bars.sort_values("label")
@@ -95,6 +133,6 @@ def daily_returns(bars, pool, settings=None, zones=None):
     common = sliced.loc[~drop.any(axis=1)]
     rule = ALIGN_RULE.get(settings.get("align") or "common")
     if rule:
-        common = sliced.resample(rule[0]).last().dropna(how="all")
-    returns = common.pct_change(fill_method=None).iloc[1:]
+        common = period_closes(sliced, rule[0])
+    returns = period_returns(common).iloc[1:]
     return returns, {"start": start, "cutShort": cut_short, "missing": gaps, "closes": common, "spliced": spliced, "ended": ended, "annualization": rule[1] if rule else None}

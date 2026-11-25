@@ -352,6 +352,9 @@ class ChartApp:
             opening.cancel()
         self.defaults.pop(workspace, None)
         self.alerts.workspace_closed(workspace)
+        for screen in self.screens.all(workspace):
+            if screen["id"] in self.screens.runs:
+                self.screens.cancel(workspace, screen["id"])
         self.charts.workspace_closed(workspace)
 
     def watch_platform(self, changes, follow) -> None:

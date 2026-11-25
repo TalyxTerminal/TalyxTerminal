@@ -518,9 +518,14 @@ failures: Failure1[]
 }
 export interface File {
 /**
- * ohlcv:<timeframe>:<adjustment>, <capability>:<timeframe>, research:<kind> or professional:<materialId>@<version>.
+ * ohlcv:<timeframe>:<adjustment> (ohlcv:<timeframe>:<priceBasis>:<adjustment> for mark, index or premium prices), <capability>:<timeframe>,
+ * research:<kind> or professional:<materialId>@<version>; an imported series adds @<importId>. Two series of one instrument never share a file.
  */
 content: string
+/**
+ * The seriesId of each selected series whose rows are in this file (none for research rows and professional materials).
+ */
+series: string[]
 artifact: (Artifact | null)
 rows: number
 instruments: number
@@ -583,6 +588,10 @@ problem?: (Problem | null)
 }
 export interface Failure1 {
 instrumentId: string
+/**
+ * The series left out; the instrument's other series are still written.
+ */
+seriesId: string
 problem: Problem
 }
 export interface FetchOutput {

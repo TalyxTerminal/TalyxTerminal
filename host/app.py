@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import functools
 import itertools
 import json
 import logging
@@ -46,11 +47,34 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # A module must stop a closing workspace's work within this time, or its process is restarted.
 STOP_SECONDS = 5.0
-# The format of the platform's own data (settings, workspaces, call records, notification channels under platform/), and
-# for each version after 1 the step from the version before (talyx_sdk.upgrade). Bump it with a step whenever that
-# format changes: installed users' data is brought up before the Host reads it.
-PLATFORM_FORMAT = 1
-PLATFORM_FORMAT_STEPS: dict = {}
+# The folder among the user's files that holds the code of the modules the user installs or writes (not ``modules``:
+# with the data root as the user's folder, as the installed TALYX has it, that is where modules keep their data).
+INSTALLED_MODULES = "installed-modules"
+
+
+def separate_installed_modules(config: HostConfig) -> None:
+    """Format 2: installed modules' code no longer shares ``<user>/modules/<id>`` with their data. In format 1 the code
+    was there, and the installed TALYX (its user folder is its data root) keeps each module's data in that same folder.
+    Each module folder there is copied to the new code folder and left as it is: it stays the module's data folder,
+    with whatever the module wrote in it. Runs again after a copy cut short."""
+    old, new = config.user_dir / "modules", config.user_dir / INSTALLED_MODULES
+    if not old.is_dir():
+        return
+    for folder in sorted(old.iterdir()):
+        if not (folder / catalog_module.MANIFEST).is_file() or (new / folder.name).exists():
+            continue
+        staging = new / f".copy-{folder.name}"
+        shutil.rmtree(staging, ignore_errors=True)   # what a copy cut short left
+        shutil.copytree(folder, staging, ignore=shutil.ignore_patterns("__pycache__"))
+        staging.rename(new / folder.name)
+
+
+# The format of the platform's own data (settings, workspaces, call records, notification channels under platform/, the
+# installed modules' folder), and for each version after 1 the step from the version before (talyx_sdk.upgrade), given
+# the Host's config. Bump it with a step whenever that format changes: installed users' data is brought up before the
+# Host reads it.
+PLATFORM_FORMAT = 2
+PLATFORM_FORMAT_STEPS: dict = {2: separate_installed_modules}
 # How long a module may take to be ready for, and then to do, its part of copying a workspace.
 COPY_SECONDS = 60.0
 
@@ -182,11 +206,12 @@ class Host:
         self.config = config
         data = config.data_dir
         fresh = not (data / "platform").exists()   # no earlier version ran on this data: no release notes to show
-        for version in upgrade.bring_up_to_date_now(data / "platform", PLATFORM_FORMAT, PLATFORM_FORMAT_STEPS):
+        steps = {version: functools.partial(step, config) for version, step in PLATFORM_FORMAT_STEPS.items()}
+        for version in upgrade.bring_up_to_date_now(data / "platform", PLATFORM_FORMAT, steps):
             log.info("Platform data brought up to format %s", version)
         self.instance = secrets.token_hex(8)
-        self.catalog = Catalog(config.official_root, config.user_dir / "modules", data / "platform" / "modules.json",
-                               data / "platform" / "environments")
+        self.catalog = Catalog(config.official_root, config.user_dir / INSTALLED_MODULES,
+                               data / "platform" / "modules.json", data / "platform" / "environments")
         self.catalog_version = 0
         self.calls = CallLog(data / "platform" / "calls")
         self.router = Router(self.resolve, self.authorize, self.record)
@@ -195,7 +220,7 @@ class Host:
         self.asked: dict[str, tuple[ModuleProcess, asyncio.Future]] = {}
         self.sessions: dict[str, Endpoint] = {}
         self.workspaces = Workspaces(data / "platform", config.user_dir / "workspaces",
-                                     (data.resolve(), (config.user_dir / "modules").resolve()))
+                                     (data.resolve(), self.catalog.installed_root.resolve()))
         self.settings = Settings(data / "platform" / "settings.json", self.setting_declarations,
                                  self.workspaces.is_open)
         self.tasks = Tasks(self.cancel_task)
@@ -420,7 +445,7 @@ class Host:
 
     def definitions(self) -> list[dict]:
         return [{**self.module_state(item), "manifest": item.manifest, "contract": item.contract,
-                 "digest": item.digest, "assetBase": f"/api/modules/{item.id}/files/"}
+                 "digest": item.digest, "assetBase": f"/api/modules/{item.id}/files/{item.digest}/"}
                 for item in self.catalog.modules.values()] + [
                 {"id": "platform", "name": "TALYX", "version": "0.5.0", "description": "", "source": "official",
                  "enabled": True, "state": "ready", "problem": None, "pid": None, "digest": "platform",
@@ -528,7 +553,7 @@ class Host:
         if failed := self.catalog.skipped.get(module_id):
             if failed.source != "installed":
                 raise ContractError("permission_denied", t("{name} comes with TALYX and cannot be uninstalled", name=failed.name))
-            await asyncio.to_thread(shutil.rmtree, failed.directory)
+            await asyncio.to_thread(catalog_module.remove_code, failed.directory, failed.name)
             del self.catalog.skipped[module_id]
             self.modules_changed()
             return

@@ -354,3 +354,56 @@ def test_a_feed_is_supplied_on_the_newest_page_and_again_from_the_whole_windows_
         assert chart[100]["time"] in supplier.starts
         await engine.close()
     run(main())
+
+
+def test_a_lower_timeframe_reads_each_calendar_month_and_quarter_of_its_chart_bar(tmp_path):
+    """A month, a quarter or a year is no fixed number of seconds: with 30.4 days a month, January 2025's bar missed
+    January 31 and February's read March 1 and 2 (a look ahead); a quarter of 91.3 days took April 1 into Q1. The
+    chart bar ends at Market's closeTime."""
+    from datetime import UTC, date, datetime, timedelta
+
+    def ms(day):
+        return int(datetime(day.year, day.month, day.day, tzinfo=UTC).timestamp() * 1000)
+
+    days = [date(2025, 1, 1) + timedelta(days=index) for index in range(181)]  # Jan 1 to Jun 30, 2025, every day
+    daily = [{"time": ms(day), "closeTime": ms(day + timedelta(days=1)), "open": 1.0, "high": 1.0, "low": 1.0,
+              "close": float(day.strftime("%Y%m%d")), "volume": 1.0} for day in days]
+
+    def periods(starts):
+        return [{"time": ms(start), "closeTime": ms(end), "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0,
+                 "volume": 1.0} for start, end in zip(starts, starts[1:])]
+    months = periods([date(2025, month, 1) for month in range(1, 8)])
+    quarters = periods([date(2025, 1, 1), date(2025, 4, 1), date(2025, 7, 1)])
+    script = """
+        \"\"\"@pyne\"\"\"
+        from pynecore.lib import array, close, na, plot, request, script, syminfo
+
+        @script.indicator("Days")
+        def main():
+            days = request.security_lower_tf(syminfo.tickerid, "1D", close)
+            plot(array.first(days) if array.size(days) > 0 else na, "first")
+            plot(array.last(days) if array.size(days) > 0 else na, "last")
+            plot(array.size(days), "count")
+        """
+
+    async def main():
+        engine = PineEngine(tmp_path / "logs")
+        engine.supply = lambda symbol, timeframe, start: (
+            asyncio.get_running_loop().call_soon(engine.set_secondary, (symbol, timeframe), columns(daily), None),
+            lambda: None)[1]
+        engine.set_series("month", {**SYMINFO, "period": "1M"}, columns(months), None)
+        engine.set_series("quarter", {**SYMINFO, "period": "3M"}, columns(quarters), None)
+        definition = project(tmp_path / "days", {"main.py": script})
+        found = {}
+        for key in ("month", "quarter"):
+            collector = Collector()
+            await engine.attach(key, definition, {}, collector)
+            await collector.wait(1)
+            assert collector.items[0]["op"] == "replace", collector.items[0]
+            values = collector.items[0]["values"]
+            found[key] = list(zip(values["first"], values["last"], values["count"]))
+        assert found["month"] == [(20250101, 20250131, 31), (20250201, 20250228, 28), (20250301, 20250331, 31),
+                                  (20250401, 20250430, 30), (20250501, 20250531, 31), (20250601, 20250630, 30)]
+        assert found["quarter"] == [(20250101, 20250331, 90), (20250401, 20250630, 91)]
+        await engine.close()
+    run(main())

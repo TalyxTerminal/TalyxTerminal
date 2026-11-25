@@ -89,7 +89,7 @@ export async function loadSaved(snapshotId: string): Promise<SavedWorkspace> {
 export async function writeSaved(input: { name: string; workspace: Workspace; replace: { snapshotId: string; revision: string | null } | null }): Promise<Saved> {
   const kinds = new Map(input.workspace.panels.map(panel => [panel.id, panel.kind]));
   return await platformRuntime().platform["workspace.save"]({
-    name: input.name, workspace: input.workspace as unknown as SavedWorkspace["workspace"],
+    name: input.name, workspace: input.workspace as unknown as Platform.SaveInput["workspace"],
     summary: layoutSummary(input.workspace.layout, id => kinds.get(id)!.slice("module:".length)),
     ...(input.replace ? { snapshotId: input.replace.snapshotId, expectedRevision: input.replace.revision } : {}),
   });

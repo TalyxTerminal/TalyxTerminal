@@ -1967,9 +1967,9 @@ wheels = [
 [[package]]
 name = "pynesys-pynecore"
 version = "6.10.7"
-source = { path = "modules/chart/backend/engine_materials/pynesys_pynecore-6.10.7-7talyx-cp313-cp313-win_amd64.whl" }
+source = { path = "modules/chart/backend/engine_materials/pynesys_pynecore-6.10.7-8talyx-cp313-cp313-win_amd64.whl" }
 wheels = [
-    { filename = "pynesys_pynecore-6.10.7-7talyx-cp313-cp313-win_amd64.whl", hash = "sha256:ad46f18026f763dca162486bf31edb8db71d6df0ce71f32be33783f0136c84b5" },
+    { filename = "pynesys_pynecore-6.10.7-8talyx-cp313-cp313-win_amd64.whl", hash = "sha256:09bb9f6e748d678550ef68e613ca07e69871a2aebd2d5063728fcfdb3a135286" },
 ]
 
 [package.metadata]
@@ -2424,7 +2424,7 @@ wheels = [
 
 [[package]]
 name = "talyx"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -2516,7 +2516,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2" },
     { name = "pillow", marker = "sys_platform == 'win32'", specifier = "==13.0.0" },
     { name = "pyarrow", specifier = ">=17" },
-    { name = "pynesys-pynecore", path = "modules/chart/backend/engine_materials/pynesys_pynecore-6.10.7-7talyx-cp313-cp313-win_amd64.whl" },
+    { name = "pynesys-pynecore", path = "modules/chart/backend/engine_materials/pynesys_pynecore-6.10.7-8talyx-cp313-cp313-win_amd64.whl" },
     { name = "pypdf", specifier = ">=6,<8" },
     { name = "pystray", marker = "sys_platform == 'win32'", specifier = "==0.19.5" },
     { name = "pywebview", marker = "sys_platform == 'win32'", specifier = "==6.2.1" },

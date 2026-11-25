@@ -75,7 +75,7 @@ def series_rows(market, value: dict) -> list[dict]:
             continue
         rows.append({
             "instrumentId": key.instrument_id, "symbol": symbol, "venue": venue, "kind": kind,
-            "timeframe": key.timeframe, "rows": int(pointer["rows"]), "first": time_text(calendar, key.timeframe, first),
+            "timeframe": key.timeframe, "priceBasis": key.price_basis, "rows": int(pointer["rows"]), "first": time_text(calendar, key.timeframe, first),
             "last": time_text(calendar, key.timeframe, last), "gaps": len(gaps), "bytes": int(pointer["bytes"]),
             "source": pointer.get("source"), "status": status, "_first": first, "_last": last, "_record": record,
         })

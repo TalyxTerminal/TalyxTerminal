@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useFeedVersion } from "./feedVersion";
 import { TxButton, TxIconButton, TxMenu, type ModuleContext } from "@talyx/sdk";
 import { formatCompact, formatPrice, formatValue, shownFormat } from "../engine/precision";
-import { pineColor } from "../engine/pinePrimitives";
+import { pineColor, scriptColor } from "../engine/pinePrimitives";
 import { commit, openSource, retryChart, useStore, type ChartEntry } from "../store";
 import { PRICE_PANE, type CatalogEntry, type Comparison, type Indicator } from "../wire";
 import { comparisonColor } from "../engine/theme";
@@ -82,7 +82,7 @@ function IndicatorRow({ ctx, panelId, chartId, entry, indicator, index, precisio
   definition: CatalogEntry | undefined; onSettings(): void;
 }) {
   const data = entry.feed.indicators.get(indicator.id), error = entry.indicatorErrors[indicator.id];
-  const inputs = definition?.inputs.filter(input => input.type !== "source" && input.type !== "color" && input.type !== "bool")
+  const inputs = definition?.inputs.filter(input => !["source", "color", "bool", "time"].includes(input.type))
     .map(input => indicator.params[input.id] ?? input.default).join(" ");
   const plots = (data?.meta ?? []).filter(meta => meta.kind === "plot" && meta.display !== "none" && indicator.styles[meta.id]?.visible !== false);
   const precision = definition?.overlay ? pricePrecision : 2;
@@ -104,7 +104,7 @@ function IndicatorRow({ ctx, panelId, chartId, entry, indicator, index, precisio
     {error ? <span className="chart-legend-error" title={error.message}>{error.message}</span>
       : showValues && indicator.visible && index >= 0 && <span className="chart-legend-values">{plots.map(meta => {
         const value = data!.values[meta.id]?.[index];
-        const color = indicator.styles[meta.id]?.color ?? pineColor(meta.dynamic ? data!.colors[meta.id]?.[index] as string | null : meta.color) ?? undefined;
+        const color = indicator.styles[meta.id]?.color ?? pineColor(scriptColor(meta.dynamic ? data!.colors[meta.id]?.[index] : undefined, meta.color)) ?? undefined;
         return <span key={meta.id} style={{ color }}>{value === null || value === undefined ? "∅" : formatValue(value, meta.format, meta.precision ?? precision)}</span>;
       })}</span>}
   </div>;

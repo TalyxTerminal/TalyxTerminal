@@ -8,14 +8,15 @@ from talyx_sdk.declare import Module
 from talyx_sdk.i18n import t
 from talyx_sdk.process import Call, Context
 
+from . import data_formats, sdk_sources
 from . import models as m
-from . import sdk_sources
 from .app import Developer
 from .documents import actions as documents
 from .documents.service import origin
 from .projects.service import canonical_uri, file_path
 
 module = Module("developer")
+module.data_format(2, {2: data_formats.installed_modules_moved})
 app: Developer | None = None   # the running Developer, set when the process starts
 Answer = dict[str, Any]
 

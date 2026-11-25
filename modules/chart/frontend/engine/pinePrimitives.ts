@@ -12,10 +12,14 @@ import type { CanvasRenderingTarget2D } from "fancy-canvas";
 import { tokenValue } from "@talyx/sdk";
 import type { TimeMap } from "./timeMap";
 
-/** PyneCore writes colours as `#RRGGBBAA` (alpha 255 opaque). Read every frame for every drawing, so each is read once. */
+/** The script's na colour in meta records and colour rows (the worker's encoding): that output, or that bar of it, draws
+    nothing (Pine). */
+export const NA_COLOR = "na";
+/** PyneCore writes colours as `#RRGGBBAA` (alpha 255 opaque). Read every frame for every drawing, so each is read once.
+    na is no colour. */
 const COLORS = new Map<string, string>();
 export function pineColor(value: string | null | undefined): string | null {
-  if (!value) return null;
+  if (!value || value === NA_COLOR) return null;
   if (value.length !== 9) return value;
   let color = COLORS.get(value);
   if (color === undefined) {
@@ -26,6 +30,21 @@ export function pineColor(value: string | null | undefined): string | null {
     COLORS.set(value, color);
   }
   return color;
+}
+
+/** The script's colour for one part of an output on one row: the row's own while the colour varies (`row` is its entry in
+    the output's colour column: a colour, NA_COLOR, a list of parts, or null), else the meta's (`fallback`). */
+export function scriptColor(row: unknown, fallback: string | undefined, part = 0): string | undefined {
+  const own = (Array.isArray(row) ? row[part] : row) as string | null | undefined;
+  return own ?? fallback;
+}
+
+/** What a row of an output is drawn in: nothing (null) where the script's colour is na; else the colour the user chose
+    for the output, the whole output in it; else the script's (undefined when it names none). Reset to defaults clears the
+    user's, and the script's colours, per bar too, come back. */
+export function drawnColor(user: string | null | undefined, script: string | undefined): string | null | undefined {
+  if (script === NA_COLOR) return null;
+  return user ?? pineColor(script) ?? undefined;
 }
 
 // ── fill ─────────────────────────────────────────────────────────────────

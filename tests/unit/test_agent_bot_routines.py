@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 
 from langchain_core.messages import AIMessage
+from talyx_sdk import ContractError
 
 from modules.agent.backend.bots.records import group_handoff, recipients
 from modules.agent.backend.bots.schedules import due_run, next_due
@@ -716,4 +717,73 @@ def test_the_chat_runs_a_bot_routine_once_in_the_bots_runs_and_reads_bots_in_a_s
             await bots.worker.finish(WORKSPACE)
             [run] = {b["id"]: b for b in (await dispatch(bots, WORKSPACE, "list", {}))["bots"]}[bot]["runs"]
             assert run["wake"]["routineId"] == target and run["outcome"] == "done"
+    asyncio.run(scenario())
+
+PNG = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000")
+
+
+def test_a_group_image_goes_to_the_bots_that_read_images_and_says_which_did_not(tmp_path):
+    """Alice's model reads images, Bob's does not. The message is posted once, Alice gets it, and the answer names Bob
+    as skipped (nothing to send again). Sent to Bob alone, it is refused and nothing is posted."""
+    from modules.agent.backend.bots.api import dispatch
+
+    async def scenario():
+        async with agent(tmp_path, [AIMessage(content="Seen.")]) as (service, _):
+            service.catalogue.put_model({"id": "vision", "connectionId": "local", "model": "vision-model",
+                                         "contextWindow": 32000, "tools": True, "images": True})
+            bots = service.bots
+            alice = bots.make_bot(WORKSPACE, {"name": "Alice", "model": "vision"})["id"]
+            bob = bots.make_bot(WORKSPACE, {"name": "Bob", "model": "model"})["id"]
+            group = bots.make_group(WORKSPACE, [alice, bob])["id"]
+            lines = {key: bots.line(WORKSPACE, bots.entry(WORKSPACE, key), group) for key in (alice, bob)}
+            images = {key: [service.attach(line, WORKSPACE, "chart.png", "image/png", PNG)["id"]]
+                      for key, line in lines.items()}
+            answer = await dispatch(bots, WORKSPACE, "send", {"id": group, "text": "What do you see?", "attachments": images})
+            assert [(item["botId"], item["name"]) for item in answer["skipped"]] == [(bob, "Bob")]
+            assert "image" in answer["skipped"][0]["reason"]
+            await settled(service, lines[alice])
+            posted = service.store.db.execute("SELECT speaker FROM bot_messages WHERE line=? AND speaker IS NULL",
+                                              (group,)).fetchall()
+            assert len(posted) == 1
+            woken = service.store.db.execute("SELECT bot FROM bot_wakes WHERE line=?", (group,)).fetchall()
+            assert [row[0] for row in woken] == [alice]
+            images = {bob: [service.attach(lines[bob], WORKSPACE, "chart.png", "image/png", PNG)["id"]]}
+            try:
+                await dispatch(bots, WORKSPACE, "send", {"id": group, "text": "@Bob and you?", "attachments": images})
+            except ContractError as error:
+                assert error.code == "unsupported"
+            else:
+                raise AssertionError("a message no recipient can read is refused")
+            assert service.store.db.execute("SELECT COUNT(*) FROM bot_messages WHERE line=? AND speaker IS NULL",
+                                            (group,)).fetchone()[0] == 1
+
+    asyncio.run(scenario())
+
+
+def test_deleting_a_routine_takes_its_queued_wakes_with_it(tmp_path):
+    """A routine's wake waits in the queue while its bot is busy; deleting the routine stops it, so it never runs."""
+    from modules.agent.backend.bots.api import dispatch
+
+    async def scenario():
+        async with agent(tmp_path, [AIMessage(content="Done.")]) as (service, _):
+            bots = service.bots
+            key = bots.make_bot(WORKSPACE, {"name": "Review", "model": "model"})["id"]
+            conversation = bots.line(WORKSPACE, bots.entry(WORKSPACE, key), key)
+            routine = bots.save_routine(WORKSPACE, {"botId": key, "name": "Morning", "instruction": "Review",
+                                                    "when": "09:00", "zone": "UTC", "rrule": "FREQ=DAILY"})
+            with service.store.transaction():
+                queued = bots.worker.queue(WORKSPACE, key, key, conversation,
+                                           {"kind": "schedule", "routineId": routine["id"], "routine": "Morning"},
+                                           "Review", 100)
+                other = bots.worker.queue(WORKSPACE, key, key, conversation,
+                                          {"kind": "schedule", "routineId": "another", "routine": "Evening"},
+                                          "Review", 101)
+            await dispatch(bots, WORKSPACE, "delete_routine", {"id": routine["id"]})
+            result = dict(service.store.db.execute("SELECT id,result FROM bot_wakes").fetchall())
+            assert result == {queued: "stopped", other: None}
+            await bots.worker.dispatch(WORKSPACE)
+            await settled(service, conversation)
+            assert service.store.db.execute("SELECT turn_id FROM bot_wakes WHERE id=?", (queued,)).fetchone()[0] is None
+            assert service.store.db.execute("SELECT turn_id FROM bot_wakes WHERE id=?", (other,)).fetchone()[0]
+
     asyncio.run(scenario())

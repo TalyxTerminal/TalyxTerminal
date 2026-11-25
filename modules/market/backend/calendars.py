@@ -221,8 +221,9 @@ def bar_grid(calendar_id: str, timeframe: str, start: int, end: int, scope: str 
         keep = (opens >= start) & (opens < end)
         return opens[keep], closes[keep]
     days, s_open, s_close, b_start, b_end = _schedule(calendar_id)
+    # One session either side catches bars whose local day differs from the UTC day; past the calendar's last session there are none.
     lo = max(np.searchsorted(days, np.datetime64(_date(start))) - 1, 0)
-    hi = np.searchsorted(days, np.datetime64(_date(end - 1)), side="right") + 1
+    hi = min(np.searchsorted(days, np.datetime64(_date(end - 1)), side="right") + 1, len(days))
     if step is None or step >= DAY_NS:
         mids = _session_midnights(calendar_id)[lo:hi]
         if step == DAY_NS:

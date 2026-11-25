@@ -4,7 +4,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
-from tests.platform.harness import real_modules, route, run
+from tests.platform.harness import real_modules, route, run, window_state
 
 
 def test_public_quant_change_restores_its_documents_and_workspace_copy_has_its_own_source(tmp_path):
@@ -41,8 +41,8 @@ def test_public_quant_change_restores_its_documents_and_workspace_copy_has_its_o
                 detail = (await ai("quant.read_object", {"objectId":key}))["result"]
                 assert detail["mode"] == mode
 
-            await platform.call("platform.workspace.save", {"name":"Research","workspace":{"panels":[
-                {"kind":"module:quant", "state":{"objectId":key}}]}}, workspace=ws)
+            await platform.call("platform.workspace.save", {"name":"Research","workspace":window_state(
+                {"id":"q1", "kind":"module:quant", "state":{"objectId":key}})}, workspace=ws)
             copied = await platform.call("platform.workspace.copy", {"workspaceId":ws})
             copy = copied["workspaceId"]
             await platform.call("platform.workspace.open", {"snapshotId":copied["snapshotId"]})

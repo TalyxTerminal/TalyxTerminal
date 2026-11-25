@@ -1,12 +1,14 @@
 """Exports: selected series and research rows written as long-format files in bounded memory.
 
 One file per content (``ohlcv:<timeframe>:<adjustment>``, ``<capability>:<timeframe>``,
-``research:<kind>``); Parquet files get one row group per instrument and are written
+``research:<kind>``; a price basis other than trades and an import are named in it, so two series of one
+instrument never share a file); Parquet files get one row group per instrument and are written
 instrument by instrument. Bar files carry instrumentId, market, the code in force on
 each row's date, time, closeTime and knownAt, then the values as float64. Two clocks, two
 meanings: knownAt is when the market knew the bar's values (its close); the publish cutoff
 is when the source gives them as final, which only decides when Market fetches the bar. Adjusted prices are computed at export. ``fill=missing``
-first downloads what is missing through a fetch job. Files go to the caller as
+first downloads what is missing of exactly the selected series through a fetch job; a series whose download failed is left out
+and reported, the instrument's other series are still written. Files go to the caller as
 artifacts Market holds for 24 hours, or into a folder the user chose.
 """
 
@@ -29,6 +31,8 @@ from vocabulary.instruments import MarketSeries
 
 from . import bars
 from .common import DAY_NS, MarketError, now_ns, time_range
+from .data import SERIES_CAPABILITIES
+from .jobs import canonical
 from .routing import in_worker
 
 MAX_GAPS = 2000
@@ -37,9 +41,25 @@ EXPORT_CHUNK = 100
 
 
 def content_of(series: MarketSeries) -> str:
+    """The file a series goes to: trade-price bars are ``ohlcv:<timeframe>:<adjustment>``, other price bases add theirs
+    (``ohlcv:1m:mark:not_applicable``), an imported series adds ``@<importId>``."""
     if series.capability == "ohlcv":
-        return f"ohlcv:{series.timeframe}:{series.adjustment}"
-    return f"{series.capability}:{series.timeframe}" if series.timeframe else series.capability
+        basis = "" if series.priceBasis == "last" else f"{series.priceBasis}:"
+        name = f"ohlcv:{series.timeframe}:{basis}{series.adjustment}"
+    else:
+        name = f"{series.capability}:{series.timeframe}" if series.timeframe else series.capability
+    return f"{name}@{series.importId}" if series.importId else name
+
+
+def fetch_kind(series: MarketSeries) -> dict | None:
+    """The fetch job kind that downloads a series; None for one Market does not download (an import)."""
+    if series.importId:
+        return None
+    if series.capability == "ohlcv":
+        return {"kind": "bars", "timeframe": series.timeframe, "priceBasis": series.priceBasis}
+    if series.capability in SERIES_CAPABILITIES:
+        return {"kind": series.capability, "timeframe": series.timeframe} if series.timeframe else {"kind": series.capability}
+    return None
 
 
 def code_column(codes: list[dict], times: np.ndarray, fallback: str) -> list[str]:
@@ -66,6 +86,7 @@ class Writer:
         self.first: int | None = None
         self.last: int | None = None
         self.sources: dict[str, dict] = {}
+        self.series: list[str] = []
 
     def append(self, table: pa.Table) -> None:
         if table.num_rows == 0:
@@ -161,10 +182,10 @@ class Exports:
                 windows[lo, hi].append((instrument, series))
             for (lo, hi), group in windows.items():
                 failures.extend(await self.fill(group, lo, hi, environment, workspace_id, progress))
-        failed_ids = {f["instrumentId"] for f in failures}
+        failed = {f["seriesId"] for f in failures}
         if value.get("fill", "missing") == "missing":
             for instrument, series, lo, hi in series_items:
-                if series.adjustment == "split_dividend" and instrument["instrumentId"] not in failed_ids:
+                if series.adjustment == "split_dividend" and series.seriesId not in failed:
                     plan = await in_worker(self.market.data.plan, instrument, series, lo, environment=environment)
                     await self.market.data.fill_reference_closes(plan, None, lo, hi)
         writers: dict[str, Writer] = {}
@@ -173,7 +194,7 @@ class Exports:
         try:
             # Series go to a worker thread a chunk at a time: one hop per series made each wait for the Host's busy event
             # loop (595 daily series took 12 s in the Host against 4 s alone); between chunks a cancel still lands.
-            todo = [item for item in series_items if item[0]["instrumentId"] not in failed_ids]
+            todo = [item for item in series_items if item[1].seriesId not in failed]
             for chunk_start in range(0, len(todo), EXPORT_CHUNK):
                 chunk = todo[chunk_start:chunk_start + EXPORT_CHUNK]
                 await _write_worker(self.write_series, chunk, writers, folder, file_format,
@@ -196,14 +217,14 @@ class Exports:
             path = str(writer.path) if destination else None
             if not destination:
                 artifact = await self.market.handoff.publish(writer.path, "market-data", writer.path.name)
-            files.append({"content": content, "artifact": artifact, "rows": writer.rows,
+            files.append({"content": content, "series": writer.series, "artifact": artifact, "rows": writer.rows,
                           "instruments": writer.instruments, "columns": writer.columns,
                           "range": time_range(writer.first, writer.last + 1) if writer.first is not None else None,
                           "sources": list(writer.sources.values()), "path": path})
         for content, path, rows in fixed:
             artifact = None if destination else await self.market.handoff.publish(path, "market-data", path.name)
             material = self.market.professional.store.read(*content[len("professional:"):].split("@"))[0]
-            files.append({"content": content, "artifact": artifact, "rows": rows, "instruments": 0, "columns": [],
+            files.append({"content": content, "series": [], "artifact": artifact, "rows": rows, "instruments": 0, "columns": [],
                           "range": None, "sources": [{"sourceId": material["sourceId"], "name": material["name"]}],
                           "path": str(path) if destination else None})
         if not files and not value.get("allowEmpty"):
@@ -224,11 +245,12 @@ class Exports:
             gaps.extend(series_gaps)
             if table is None:
                 if not allow_empty:
-                    failures.append({"instrumentId": instrument["instrumentId"], "problem": {
+                    failures.append({"instrumentId": instrument["instrumentId"], "seriesId": series.seriesId, "problem": {
                         "code": "no_data", "message": t("No stored rows for {symbol}", symbol=instrument['symbol']),
                         "sourceId": source, "status": None, "retryAt": None}})
                 continue
             writer.append(table)
+            writer.series.append(series.seriesId)
             times = table.column("time")
             first, last = int(times[0].value), int(times[-1].value)
             writer.first = first if writer.first is None else min(writer.first, first)
@@ -244,24 +266,30 @@ class Exports:
         return f"professional:{material['materialId']}@{material['version']}", path, len(rows)
 
     async def fill(self, items, start, end, environment, workspace_id, progress) -> list[dict]:
-        """Download what is missing (a fetch job); instruments whose download failed are reported."""
-        kinds = {}
-        for _instrument, series in items:
-            if series.capability == "ohlcv":
-                kinds[(series.timeframe, series.priceBasis)] = {"kind": "bars", "timeframe": series.timeframe,
-                                                                "priceBasis": series.priceBasis}
+        """Download what is missing of exactly these series (one fetch job, each instrument with only its own kinds);
+        the series whose download failed are reported."""
+        targets: dict[str, dict] = {}
+        for instrument, series in items:
+            kind = fetch_kind(series)
+            if kind is None:
+                continue
+            target = targets.setdefault(instrument["instrumentId"], {"instrument": instrument, "kinds": []})
+            if kind not in target["kinds"]:
+                target["kinds"].append(kind)
+        if not targets:
+            return []
+        request = {"targets": list(targets.values()), "kinds": [], "start": str(start) if start else None,
+                   "end": str(end) if end else None, "environment": environment}
+        job_result = await self.market.jobs.fetch(request, workspace_id=workspace_id, progress=progress)
+        job = self.market.jobs.get(job_result["jobId"])
+        problems = {(item["instrument"]["instrumentId"], canonical(item["kind"])): item["problem"]
+                    for item in job.record["items"] if item["state"] == "failed"}
         failures = []
-        for kind in kinds.values():
-            targets = [{"instrument": instrument} for instrument, series in items
-                       if series.capability == "ohlcv" and series.timeframe == kind["timeframe"]]
-            request = {"targets": targets, "kinds": [kind], "start": str(start) if start else None,
-                       "end": str(end) if end else None, "environment": environment}
-            job_result = await self.market.jobs.fetch(request, workspace_id=workspace_id,
-                                                      progress=progress)
-            job = self.market.jobs.get(job_result["jobId"])
-            for item in job.record["items"]:
-                if item["state"] == "failed":
-                    failures.append({"instrumentId": item["instrument"]["instrumentId"], "problem": item["problem"]})
+        for instrument, series in items:
+            kind = fetch_kind(series)
+            problem = problems.get((instrument["instrumentId"], canonical(kind))) if kind else None
+            if problem is not None:
+                failures.append({"instrumentId": instrument["instrumentId"], "seriesId": series.seriesId, "problem": problem})
         return failures
 
     def table(self, instrument: dict, series: MarketSeries, start, end, environment="production") -> tuple[pa.Table | None, str | None, list]:

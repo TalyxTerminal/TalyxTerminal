@@ -51,6 +51,20 @@ const builtins: Record<string, { title: string; description: string }> = {
 };
 
 const labels: Record<string, string> = {
+  "Histogram": t("Histogram"),
+  "Above Grow": t("Above Grow"),
+  "Above Fall": t("Above Fall"),
+  "Below Grow": t("Below Grow"),
+  "Below Fall": t("Below Fall"),
+  "Up color": t("Up color"),
+  "Down color": t("Down color"),
+  "Positive color": t("Positive color"),
+  "Negative color": t("Negative color"),
+  "Cloud up color": t("Cloud up color"),
+  "Cloud down color": t("Cloud down color"),
+  "Up Volume": t("Up Volume"),
+  "Down Volume": t("Down Volume"),
+  "POC": t("POC"),
   "Uptrend background": t("Uptrend background"),
   "Downtrend background": t("Downtrend background"),
   "Bands Fill #1": t("Bands Fill #1"),

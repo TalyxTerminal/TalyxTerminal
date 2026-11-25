@@ -294,27 +294,36 @@ class Bots:
         return entry, text, mentions, reply, targets
 
     async def send(self, ws, args):
+        """Post the user's message and hand it to each bot it is for. Every bot is checked first (a model, one that
+        reads the attached images): the message goes to those that can take it and says which could not and why;
+        only when none can is it not posted at all. Answers ``{skipped: [{botId, name, reason}]}``."""
+        view = await self.agent.current_view(ws) if args.get("includeView") else None
         entry, text, mentions, reply, targets = self.recipients(ws, args)
         line = entry["id"]
         group = "members" in entry
+        attachments = args.get("attachments", {})
+        accepted, skipped, refusal = [], [], None
+        for bot_id in targets:
+            bot = self.entry(ws, bot_id)
+            with self.store.transaction():
+                conversation = self.line(ws, bot, line)
+            try:
+                selected = self.agent.admit(conversation, ws, attachments.get(bot_id, []))
+            except ContractError as error:   # what the user sent, or the bot's model, does not fit
+                refusal = refusal or error
+                skipped.append({"botId": bot_id, "name": bot["name"], "reason": error.message})
+                continue
+            accepted.append((bot_id, conversation, selected))
+        if refusal is not None and not accepted:
+            raise refusal
         with self.store.transaction():
             if group:
                 entry.update(rounds=0, limitNotified=False)
                 self.put(ws, "group", entry)
             self.message(ws, line, None, text, mentions=mentions, reply=reply)
-        # The user's own message is answered by a paused bot too; pausing holds only what wakes it by itself.
-        for bot_id in targets:
-            bot = self.entry(ws, bot_id)
-            with self.store.transaction():
-                conversation = self.line(ws, bot, line)
-            turn = await self.agent.send(
-                conversation,
-                ws,
-                text,
-                include_view=args.get("includeView", False),
-                attachments=args.get("attachments", {}).get(bot_id, []),
-            )
-            with self.store.transaction():
+            # The user's own message is answered by a paused bot too; pausing holds only what wakes it by itself.
+            for bot_id, conversation, selected in accepted:
+                turn = self.agent.send_admitted(conversation, ws, text, view, selected)
                 if self.db.execute(
                     "SELECT 1 FROM bot_wakes WHERE turn_id=?", (turn["id"],)
                 ).fetchone():
@@ -334,6 +343,7 @@ class Bots:
                     ),
                 )
         self.worker.ensure(ws)
+        return {"skipped": skipped}
 
     def recent_posts(self, ws, line, bot, before, excluding=None):
         last = (

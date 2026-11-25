@@ -9,6 +9,7 @@ run; a run can be cancelled. Indicator code is pinned when the screen is saved.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import uuid
 from collections.abc import Callable
@@ -51,9 +52,9 @@ def check_screen(spec: dict) -> None:
 
 def legend_name(described: dict, params: dict) -> str:
     """"RSI 14": the short title and the values of the inputs the chart legend shows (not sources,
-    colors or switches)."""
+    colors, switches or times)."""
     shown = [params.get(item["id"], item["default"]) for item in described["inputs"]
-             if item["type"] not in ("source", "color", "bool")]
+             if item["type"] not in ("source", "color", "bool", "time")]
     words = [f"{value:g}" if isinstance(value, float) else str(value) for value in shown]
     return " ".join([described["shortTitle"], *words])
 
@@ -64,6 +65,19 @@ class Screens:
         self.store, self.market, self.engine, self.pins = store, market, engine, pins
         self.watchlists, self.publish = watchlists, publish
         self.runs: dict[str, asyncio.Task] = {}
+        self.interrupted()
+
+    def interrupted(self) -> None:
+        """A run still recorded as running when Chart starts ended with Chart's last process (its task went with it):
+        it is closed as failed, with what it found so far, so the screen can be run again."""
+        rows = self.store.db.execute("SELECT workspace, record FROM objects WHERE kind = 'screen'").fetchall()
+        for workspace, record in rows:
+            screen = json.loads(record)["value"]
+            run = screen["lastRun"]
+            if run is not None and run["state"] == "running":
+                self.store.put_object("screen", {"id": screen["id"], "value": {**screen, "lastRun": {
+                    **run, "state": "failed", "finishedAt": now_ms(),
+                    "error": t("Chart stopped during this run; run it again")}}}, workspace)
 
     def all(self, workspace: str) -> list[dict]:
         return [record["value"] for record in self.store.objects("screen", workspace)]

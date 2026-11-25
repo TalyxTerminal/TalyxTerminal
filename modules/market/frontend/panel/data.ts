@@ -34,6 +34,8 @@ export interface Series {
   storedKind: string;
   capability: string;
   timeframe: string | null;
+  /** Trades (last), mark, index or premium prices: two series of one contract differ only in this. */
+  priceBasis: string;
   importId: string | null;
   market: string;
 }
@@ -74,7 +76,7 @@ export function kindLabel(capability: string, timeframe: string | null): string 
 /* ── backend rows → panel rows ───────────────────────────────────────────── */
 
 export interface LibraryRow {
-  instrumentId: string; symbol: string; venue: string; kind: string; timeframe: string | null; rows: number; first: string; last: string;
+  instrumentId: string; symbol: string; venue: string; kind: string; timeframe: string | null; priceBasis: string; rows: number; first: string; last: string;
   gaps: number; bytes: number; source: string | null; status: "current" | "behind" | "delisted"; name: string | null;
   delistedAt: string | null; importId: string | null; former: { code: string; until: string | null }[] | null;
 }
@@ -95,7 +97,7 @@ export function seriesOf(library: Library, sourceNames: Record<string, string>, 
   return libraryRows(library).map(row => {
     const capability = row.importId ? "ohlcv" : row.kind;
     const group = groupOf(row.venue, row.importId);
-    const id = `${row.instrumentId}:${row.kind}:${row.timeframe ?? ""}`;
+    const id = `${row.instrumentId}:${row.kind}:${row.timeframe ?? ""}:${row.priceBasis}`;
     const status: SeriesStatus = updating.has(row.instrumentId) && row.status !== "delisted" ? "updating" : row.status;
     return {
       id, group: group.id, code: row.symbol, name: row.name ?? "", kind: kindLabel(capability, row.timeframe), from: day(row.first), to: day(row.last),
@@ -103,7 +105,7 @@ export function seriesOf(library: Library, sourceNames: Record<string, string>, 
       source: row.importId ? imports.get(row.importId)?.name ?? row.importId : sourceNames[row.source ?? ""] ?? row.source ?? "",
       statusText: row.status === "delisted" && row.delistedAt ? t("Last traded {date}", { date: dateOfNs(row.delistedAt) }) : row.status === "behind" ? t("Newer rows are at the source") : undefined,
       identity: row.former ? row.former.map(item => ({ from: "", to: dateOfNs(item.until), code: item.code, name: "" })) : undefined,
-      instrumentId: row.instrumentId, storedKind: row.kind, capability, timeframe: row.timeframe, importId: row.importId, market: row.venue,
+      instrumentId: row.instrumentId, storedKind: row.kind, capability, timeframe: row.timeframe, priceBasis: row.priceBasis, importId: row.importId, market: row.venue,
     };
   });
 }
@@ -266,7 +268,7 @@ export function listOf<L extends readonly unknown[]>(items: L[number][], min: nu
 /** The instrument records and series ids of chosen rows, as fetch and export take them. */
 export async function selectionsOf(ctx: ModuleContext, rows: Series[]): Promise<{ instrument: MarketInstrument; series: SeriesRef }[]> {
   const answer = await panelCall<{ selections: { instrument: MarketInstrument; series: SeriesRef }[] }>(ctx, "selections",
-    { series: rows.map(row => ({ instrumentId: row.instrumentId, kind: row.storedKind, timeframe: row.timeframe, importId: row.importId })) });
+    { series: rows.map(row => ({ instrumentId: row.instrumentId, kind: row.storedKind, timeframe: row.timeframe, priceBasis: row.priceBasis, importId: row.importId })) });
   return answer.selections;
 }
 

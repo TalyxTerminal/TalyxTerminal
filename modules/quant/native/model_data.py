@@ -28,7 +28,6 @@ from . import metrics as M
 
 DAY = 86_400_000
 WARMUP = {"alpha158": 60, "alpha360": 60, "styles": 252}
-YEAR_BARS = {"1d": 252}
 MIN_NAMES = 5  # fewer names a day than this cannot be ranked against each other
 LEAVE_OUT_DEFAULT = {"halted": True, "young": True, "illiquid": False}
 
@@ -559,16 +558,19 @@ def process_label(raw, settings, form):
 
 
 # ---------------------------------------------------------------------------------------------------------------- who is in the data
-def rows_of(panel, leave_out, year_bars):
-    """Which names may be a row each day: members with a price, minus what the data settings leave out."""
+def rows_of(panel, leave_out):
+    """Which names may be a row each day: members with a price, minus what the data settings leave out. "Listed under 1 year" is a calendar year from the
+    name's first price (a crypto pair trading every day and a stock alike); a name priced on the data's first bar was listed before it and is never young."""
     close, volume = panel.fields["close"], panel.fields["volume"]
     keep = panel.member & ~np.isnan(close)
     if leave_out.get("halted", True):
         keep &= np.nan_to_num(volume, nan=0.0) > 0
-    if leave_out.get("young", True):
+    if leave_out.get("young", True) and len(close):
         have = ~np.isnan(close)
-        count = np.cumsum(have, axis=0)
-        keep &= (count >= year_bars) | have[0][None, :]
+        first = np.minimum(have.argmax(axis=0), len(have) - 1)
+        listed = pd.to_datetime(panel.labels[first], unit="ms") + pd.DateOffset(years=1)
+        a_year_on = np.asarray(listed.as_unit("ms").asi8, dtype="int64")
+        keep &= (panel.labels[:, None] >= a_year_on[None, :]) | have[0][None, :]
     if leave_out.get("illiquid", False):
         dollar = pd.DataFrame(panel.derived("amount")).rolling(20, min_periods=5).mean().to_numpy()
         keep &= np.nan_to_num(dollar, nan=0.0) >= float(leave_out.get("minDollar", 5e6))
@@ -669,15 +671,13 @@ class ModelData:
         self.gap_ahead = max([self.reach["ahead"]] + [F.reach(F.parse(item, ahead=True), item)["ahead"] for item in self.aux or []])
         self.horizon = self.reach["ahead"] - self.reach["start"]["bar"]  # bars from where the label starts to the furthest it reads
         self.days = self.horizon
-        timeframe = panel.info.get("timeframe", "1d")
-        self.year_bars = YEAR_BARS.get(timeframe, int(panel.annualization))
         tables = input_tables(panel, inputs, code=code, columns=columns)
         if not tables:
             raise DataError("has no inputs", "Add at least one input: a library factor, a factor run, a built-in set or a Market series.")
         self.features = list(tables)
         raw = np.stack([tables[name] for name in self.features], axis=2).astype(np.float32)
         self.coverage_raw = raw
-        self.rows = rows_of(panel, settings.get("leaveOut") or LEAVE_OUT_DEFAULT, self.year_bars)
+        self.rows = rows_of(panel, settings.get("leaveOut") or LEAVE_OUT_DEFAULT)
         names_a_day = self.rows.sum(axis=1)
         if names_a_day.max(initial=0) < MIN_NAMES:
             shown = ", ".join(panel.columns[:3]) + ("…" if len(panel.columns) > 3 else "")

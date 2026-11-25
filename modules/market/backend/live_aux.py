@@ -111,13 +111,24 @@ class AuxSession:
         return plan if plan.period is not None else None
 
     async def build_replace(self) -> dict:
-        if self.capability in STORED and self.history_plan() is not None:
-            try:
-                page = await self.window.page()
-            except MarketError as exc:  # the stored rows go out with the source's reason on the status
-                self.set_status("failed" if exc.code in FATAL else self.state, exc.problem())
+        if self.capability in STORED:
+            if self.history_plan() is None:
+                # A live observation (e.g. a predicted funding rate) is never a stored point.
                 page = await self.market.data.page(self.instrument, self.series, limit=self.warmup, fill="none",
                                                    environment=self.environment)
+                if not page["columns"]["time"]:
+                    message = t("No source provides {capability} history for {symbol}", capability=self.capability,
+                                symbol=self.instrument["displaySymbol"])
+                    page["fill"] = {"state": "failed", "problem": MarketError("unsupported", message).problem()}
+            else:
+                try:
+                    page = await self.window.page()
+                except MarketError as exc:
+                    self.set_status("failed" if exc.code in FATAL else self.state, exc.problem())
+                    page = await self.market.data.page(self.instrument, self.series, limit=self.warmup, fill="none",
+                                                       environment=self.environment)
+                    page["fill"] = {"state": "partial" if page["columns"]["time"] else "failed",
+                                    "problem": exc.problem()}
             times = page["columns"]["time"]
             if times:
                 self.last_stored = max(int(times[-1]), self.last_stored or 0)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextvars
 import hashlib
 import json
 import mimetypes
@@ -91,6 +92,7 @@ class AgentService:
         await saver.setup()
         self.engine = ConversationEngine(self, saver)
         await self.providers.start()
+        self.rates_task = asyncio.create_task(self.usage.rates.keep_fresh(), context=contextvars.Context())
         for row in self.store.db.execute("SELECT value FROM turns WHERE state='waiting_business'").fetchall():
             await self.refresh_business(json.loads(row[0]))
         for row in self.store.db.execute("SELECT value FROM turns WHERE state IN ('waiting_approval','running')"):
@@ -369,7 +371,9 @@ class AgentService:
             return None
         raise ContractError("invalid_input", t("This action does not apply to this card"))
 
-    async def send(self, conversation_id, workspace, text, *, include_view=True, attachments=(), supplemental=True):
+    def admit(self, conversation_id, workspace, attachments=()):
+        """The attachments a message to the conversation carries, once its model can take the message: it has a model,
+        and the model reads the images among them."""
         conversation = self.store.conversation(conversation_id, workspace)
         if conversation["modelId"] is None:
             raise ContractError("model_missing", t("Add and select a tool-capable model in Agent settings before sending"))
@@ -378,7 +382,14 @@ class AgentService:
         for attachment in selected:
             if attachment["mime"].startswith("image/") and model["images"] is not True:
                 raise ContractError("unsupported", t("This model cannot read image attachments; choose an image-capable model"))
+        return selected
+
+    async def send(self, conversation_id, workspace, text, *, include_view=True, attachments=(), supplemental=True):
+        selected = self.admit(conversation_id, workspace, attachments)
         view = await self.current_view(workspace) if include_view else None
+        return self.send_admitted(conversation_id, workspace, text, view, selected, supplemental=supplemental)
+
+    def send_admitted(self, conversation_id, workspace, text, view, selected, *, supplemental=True):
         active = self.store.active(conversation_id)
         if active is not None and supplemental and active["state"] != "stopping":
             with self.store.transaction():

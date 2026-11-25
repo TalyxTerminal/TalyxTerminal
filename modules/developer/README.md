@@ -38,7 +38,7 @@ This follows how VS Code extensions are written and tried in a development host,
 
 1. **New TALYX module** (or `projects.create_module` from the Agent) needs only a name. The module is created in the folder where TalyxTerminal keeps user modules, with one action, `greet`, and a panel that calls it. The frontend is plain JavaScript and needs no build step.
 2. **Use in TALYX** enables it like an installed module: its panel appears in the add-panel list and its actions enter the Agent's tool catalogue.
-3. After changing code, click **Reload**: files are saved first, the platform regenerates the contract and restarts only this module; other modules keep running. After disabling, click **Enable** again; **Uninstall** removes the module (an in-place module in the user modules folder is deleted together with its folder).
+3. After changing code, click **Reload**: files are saved first, the platform regenerates the contract and restarts only this module; other modules keep running. After disabling, click **Enable** again; **Uninstall** removes the code folder, including for modules developed in place. The module keeps its data when installed again.
 4. **Debug in VS Code** writes an attach configuration into the project's `.vscode/launch.json` and opens VS Code; starting it from Run and Debug attaches to the module's current Python process. After the module restarts, click **Debug in VS Code** again to update the PID in the configuration.
 
 Archives or folders from others are installed under Community → Installed. Building installer packages, starting a separate application instance for trying a module, and online publishing are not supported.

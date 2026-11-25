@@ -58,6 +58,26 @@ async def open_feed(fake, suffix, timeframe):
     return feed, session
 
 
+def test_empty_opening_page_waits_for_points_while_filling_and_reports_the_final_reason(monkeypatch):
+    async def main():
+        Clock(monkeypatch, T0 + MINUTE)
+        errors = []
+        feed = PointsFeed(Market(FakeMarket()), SWAP, "_FR", "5m", errors.append)
+
+        async def replace(times, state, problem=None):
+            await feed.take({"type": "replace", "page": {
+                "columns": {"time": times, "rate": [0.002] * len(times)}, "fill": {"state": state, "problem": problem}}})
+
+        await replace([], "filling")
+        assert not errors and not feed.ready.is_set()
+        await replace([str(T0 * 1_000_000)], "filling")
+        assert feed.ready.is_set() and feed.forming["close"] == 0.002
+        await replace([], "failed", {"message": "No source provides funding_rate history for BTC/USDT:USDT"})
+        assert errors == ["No source provides funding_rate history for BTC/USDT:USDT"]
+        await feed.close()
+    asyncio.run(main())
+
+
 def test_the_suffix_table():
     assert derived_of("OKX:BTC/USDT:USDT_OI") == ("OKX:BTC/USDT:USDT", "_OI")
     assert derived_of("OKX:BTC/USDT:USDT_FR") == ("OKX:BTC/USDT:USDT", "_FR")
@@ -187,6 +207,8 @@ def test_the_open_interest_and_funding_builtins_closed_live_equal_a_recompute(tm
             for collector in collectors.values():
                 await collector.wait(1)
                 assert collector.items[0]["op"] == "replace", collector.items[0]
+            funding_meta = collectors["funding_rate"].items[0]["meta"]
+            assert next(meta for meta in funding_meta if meta["id"] == "Funding rate")["precision"] == 4
             return engine, hub, chart, sessions, collectors
 
         engine, hub, chart, sessions, live = await start("live", history)

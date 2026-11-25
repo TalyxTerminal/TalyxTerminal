@@ -19,7 +19,7 @@ from ..native.allocation_holdings import (
     new_period,
     trade_spans,
 )
-from ..native.allocation_prices import aligned_lookback
+from ..native.allocation_prices import aligned_lookback, period_returns, risk_free_per_bar
 
 DAY = 86_400_000
 
@@ -106,16 +106,11 @@ def benchmark_of(meta):
 
 
 def rate_per_bar(spec, labels, annualization):
-    """The risk-free rate an observation on each bar label (ms) from `{basis: zero}` or ^IRX closes (`strategy_inputs.risk_free`): the newest close not later
-    than the bar, over `annualization`. 0.0 for zero, None when Market has no rate."""
-    if spec["basis"] == "zero":
-        return 0.0
-    if spec.get("unavailable") or not spec.get("rows"):
-        return None
-    closes = pd.Series([float(row[1]) for row in spec["rows"]], index=[int(row[0]) for row in spec["rows"]]).sort_index()
-    closes = closes[~closes.index.duplicated(keep="last")]
-    labels = sorted(int(label) for label in labels)
-    return closes.reindex(closes.index.union(labels)).ffill().reindex(labels) / 100 / annualization
+    """The risk-free rate an observation on each day label (ms, the pool's aligned closes) by the backtest's own rule (`allocation_prices.risk_free_per_bar`):
+    zero, a fixed percent a year or ^IRX closes (`allocation_prep.risk_free`). A number for zero and fixed, a Series by label for ^IRX, None when Market has no rate."""
+    labels = pd.Index(sorted(int(label) for label in labels))
+    rate = risk_free_per_bar(spec, pd.to_datetime(labels, unit="ms"), annualization)
+    return pd.Series(rate.to_numpy(float), index=labels) if isinstance(rate, pd.Series) else rate
 
 
 def allocation(values, prices, *, scheduled, published_through, published, annualization, shares, every, risk_free=0.0, benchmark=None, settings=None):
@@ -128,7 +123,7 @@ def allocation(values, prices, *, scheduled, published_through, published, annua
         return None, []
     weights = values.pivot_table(index="datetime", columns="instrument", values="value").sort_index()
     closes = prices.sort_index().reindex(columns=weights.columns)
-    returns = closes.pct_change(fill_method=None)
+    returns = period_returns(closes)
     # The first price is the base of the first return, outside the native fit window.
     if returns.index[0] < weights.index[0]:
         returns = returns.iloc[1:]

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => vi.fn());
 vi.mock("../../public/ts/types", () => ({ createClient: () => new Proxy({}, { get: (_target, name) => (input: unknown, options: unknown) => options === undefined ? api(name, input) : api(name, input, options) }) }));
+const routes = vi.hoisted(() => vi.fn());
+vi.mock("../api", () => ({ privateRequest: (_ctx: unknown, path: string, init?: unknown) => routes(path, init), jsonRequest: (value: unknown) => value }));
 import { ContractError } from "@talyx/sdk";
 import { DocumentStore, minimalEdit } from "./service";
 
@@ -13,6 +15,8 @@ function fakeModel(initial: string) {
     pushEditOperations: vi.fn((_selections: unknown, edits: { range: { startColumn: number; endColumn: number }; text: string }[]) => { const edit = edits[0]; value = value.slice(0, edit.range.startColumn - 1) + edit.text + value.slice(edit.range.endColumn - 1); }) };
 }
 function store(initial = "base") {
+  // The editor reads whole documents over Developer's route (/documents/<id>/text), the same snapshot documents.read gives.
+  routes.mockReset().mockImplementation(async (path: string) => path.endsWith("/text") ? api("documents.read", { documentId: "doc", full: true }) : undefined);
   const documents = new DocumentStore();
   (documents as any).ctx = { events: { subscribe: vi.fn(async () => ({ close: vi.fn() })) }, onBeforeStop: vi.fn() };
   documents.entries.set("doc", { snapshot: snapshot(1, initial) as any, queued: false, remote: false, dirty: false, model: fakeModel(initial) as any });
@@ -165,5 +169,43 @@ describe("which documents are shown", () => {
     releaseEmbedded();
     expect(documents.shownDocuments()).toEqual([]);
     expect(changes).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe("choosing after Compare", () => {
+  it("keeps this window's text over the disk version the author compared, never over a newer one saved since", async () => {
+    const documents = store("mine");
+    documents.entries.get("doc")!.snapshot = { ...snapshot(1, "mine"), conflict: true } as any;
+    let disk = { content: "B", version: "vB" };
+    routes.mockReset().mockImplementation(async (path: string, init: any) => {
+      if (path.endsWith("/versions")) return { base: { content: "base", version: "v" }, disk, unsaved: snapshot(1, "mine") };
+      if (path.endsWith("/text")) return api("documents.read", { documentId: "doc", full: true });
+      if (init.expectedSourceVersion !== disk.version) throw new ContractError({ code: "conflict", message: "The external version changed again." } as any);
+      return { ...snapshot(2, "mine", disk.content), conflict: false };
+    });
+    api.mockReset().mockImplementation(async (name: string) => name === "documents.save" ? { status: "saved" } : snapshot(3, "mine", "mine"));
+    expect(await documents.otherVersion("doc")).toEqual({ content: "B", elsewhere: false });
+    disk = { content: "C", version: "vC" };   // saved again in VS Code after the comparison
+    await expect(documents.resolve("doc", "mine", true)).rejects.toMatchObject({ code: "conflict" });
+    expect(routes).toHaveBeenLastCalledWith("/documents/doc/resolve", { mode: "mine", expectedVersion: 1, expectedSourceVersion: "vB" });
+    expect(api).not.toHaveBeenCalledWith("documents.save", expect.anything());
+    expect(await documents.otherVersion("doc")).toEqual({ content: "C", elsewhere: false });
+    await documents.resolve("doc", "mine", true);
+    expect(routes).toHaveBeenCalledWith("/documents/doc/resolve", { mode: "mine", expectedVersion: 1, expectedSourceVersion: "vC" });
+    expect(api).toHaveBeenCalledWith("documents.save", { documentId: "doc", expectedVersion: 2 });
+  });
+  it("takes the whole document once when it has no unsaved edits", async () => {
+    const documents = store();
+    api.mockReset().mockImplementation(async () => ({ ...snapshot(2, "same text", "same text"), baseContent: null }));
+    expect(await documents.read("doc")).toMatchObject({ content: "same text", baseContent: "same text" });
+    expect(documents.isDirty("doc")).toBe(false);
+  });
+  it("reads the whole document over Developer's route, which carries what one action answer cannot", async () => {
+    const documents = store();
+    api.mockReset();
+    routes.mockReset().mockResolvedValue(snapshot(2, "changed", "original"));
+    expect(await documents.read("doc")).toMatchObject({ content: "changed", baseContent: "original" });
+    expect(routes).toHaveBeenCalledWith("/documents/doc/text", undefined);
+    expect(api).not.toHaveBeenCalledWith("documents.read", expect.anything());
   });
 });

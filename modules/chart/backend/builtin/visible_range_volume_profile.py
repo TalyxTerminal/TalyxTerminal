@@ -28,12 +28,9 @@ DESCRIPTION = ("Visible Range Volume Profile: volume by price over the bars on s
                "range (or its left edge). It is computed again as the chart scrolls.")
 CATEGORY = 'Volume'
 
-UP = color.rgb(41, 98, 255)
-DOWN = color.rgb(251, 192, 45)
-
-
-def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area, right=False):
-    """Boxes (up and down volume per price row) and the point-of-control line of one range: Fixed Range
+def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area, colors, right=False):
+    """Boxes (up and down volume per price row) and the point-of-control line of one range (``colors``: up, down,
+    point of control): Fixed Range
     Volume Profile's, with the volume per row counted by numpy; ``right`` draws the rows from the range's
     right edge leftwards, up volume against the edge (TradingView's default placement)."""
     up, down, bottom, step = distribution(highs, lows, opens, closes, volumes, rows)
@@ -52,6 +49,7 @@ def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area, r
         else:
             low_row -= 1
             inside += below
+    up_color, down_color, poc_color = colors
     width = (end - start) * 0.7
     boxes = []
     for row in range(rows):
@@ -63,13 +61,13 @@ def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area, r
             up_span, down_span = (start, start + up_width), (start + up_width, start + up_width + down_width)
         row_bottom, row_top = bottom + row * step, bottom + (row + 1) * step
         if up[row] > 0:
-            boxes.append(box.new(up_span[0], row_top, up_span[1], row_bottom, border_color=color.new(UP, 100),
-                                 bgcolor=color.new(UP, strength), xloc=xloc.bar_time))
+            boxes.append(box.new(up_span[0], row_top, up_span[1], row_bottom, border_color=color.new(up_color, 100),
+                                 bgcolor=color.new(up_color, strength), xloc=xloc.bar_time))
         if down[row] > 0:
-            boxes.append(box.new(down_span[0], row_top, down_span[1], row_bottom, border_color=color.new(DOWN, 100),
-                                 bgcolor=color.new(DOWN, strength), xloc=xloc.bar_time))
+            boxes.append(box.new(down_span[0], row_top, down_span[1], row_bottom, border_color=color.new(down_color, 100),
+                                 bgcolor=color.new(down_color, strength), xloc=xloc.bar_time))
     middle = bottom + (poc + 0.5) * step
-    return boxes, [line.new(start, middle, end, middle, xloc=xloc.bar_time, color=color.rgb(242, 54, 69), width=2)]
+    return boxes, [line.new(start, middle, end, middle, xloc=xloc.bar_time, color=poc_color, width=2)]
 
 
 @script.indicator('Visible Range Volume Profile', shorttitle='VRVP', overlay=True, max_boxes_count=500,
@@ -78,7 +76,10 @@ def main(rows: int = input.int(24, "Row size", minval=1, maxval=100),
          value_area: float = input.float(70.0, "Value area volume %", minval=1.0, maxval=100.0),
          custom: bool = input.bool(False, "Use custom timeframe"),
          chosen: str = input.timeframe("1", "Timeframe"),
-         placement: str = input.string("Right", "Placement", options=("Right", "Left"))):
+         placement: str = input.string("Right", "Placement", options=("Right", "Left")),
+         up_volume: color.Color = input.color(color.rgb(41, 98, 255), "Up Volume"),
+         down_volume: color.Color = input.color(color.rgb(251, 192, 45), "Down Volume"),
+         poc: color.Color = input.color(color.rgb(242, 54, 69), "POC")):
     lower = chosen if custom else lower_timeframe(timeframe.in_seconds())
     highs, lows, opens, closes, volumes = request.security_lower_tf(
         syminfo.tickerid, lower, (high, low, open, close, volume))
@@ -119,6 +120,6 @@ def main(rows: int = input.int(24, "Row size", minval=1, maxval=100),
             if offset < len(range_highs):
                 boxes, lines = profile(bar_times[first], end, range_highs[offset:], range_lows[offset:],
                                        range_opens[offset:], range_closes[offset:], range_volumes[offset:], rows,
-                                       value_area, placement == "Right")
+                                       value_area, (up_volume, down_volume, poc), placement == "Right")
                 drawn_boxes.extend(boxes)
                 drawn_lines.extend(lines)

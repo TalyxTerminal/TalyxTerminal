@@ -4,7 +4,7 @@
  "deleteWorkspace": true,
  "actions": {
   "bot": {
-   "description": "Manage workspace bots, groups, routines and runs. List for panel settings and spend, inspect by id for\na bot, group, event source or routine. Read a thread by id. Patch with changes (model, duty, knowledge, skills,\npermission, limit, section). To send files, use recipients for the conversation IDs, agent.chat operation attach_paths\nfor attachment IDs, then send with attachments keyed by bot ID. Upload adds base64 data to knowledge.\nOversized results return a JSON file reference. Save routines with botId or conversationId, name, instruction,\nwhen, and either zone + rrule or source + params.",
+   "description": "Manage workspace bots, groups, routines and runs. List for panel settings and spend, inspect by id for\na bot, group, event source or routine. Read a thread by id. Patch with changes (model, duty, knowledge, skills,\npermission, limit, section). To send files, use recipients for the conversation IDs, agent.chat operation attach_paths\nfor attachment IDs, then send with attachments keyed by bot ID; send answers the bots that could not take the\nmessage ({skipped: [{botId, name, reason}]}), refused only when none can. Upload adds base64 data to knowledge.\nOversized results return a JSON file reference. Save routines with botId or conversationId, name, instruction,\nwhen, and either zone + rrule or source + params.",
    "effects": [
     "read",
     "write",

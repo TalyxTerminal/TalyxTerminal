@@ -417,6 +417,7 @@
   "{label} opacity": "{label}的不透明度",
   "{label} palette": "{label}调色板",
   "{module_id} comes with TALYX and cannot be uninstalled": "{module_id} 随 TALYX 提供，无法卸载",
+  "Some files of {name} could not be removed ({exc}). Close the programs using its folder {folder}, then uninstall it again.": "{name} 的部分文件删不掉（{exc}）。请关闭正在使用它的文件夹 {folder} 的程序，然后再卸载一次。",
   "{module_id} could not start: {problem}": "{module_id} 无法启动：{problem}",
   "{module_id} did not become ready to handle its changes": "{module_id} 尚未就绪，无法处理改动",
   "{module_id} did not confirm its changes request": "{module_id} 未确认改动请求",

@@ -6,7 +6,8 @@
   "version": "0.3.0",
   "ai": {"guide": "GUIDE.md", "docs": [
     {"topic": "indicators", "title": "Write a chart indicator: the Pine-style API, where it goes, saving and checking", "file": "backend/authoring.md"},
-    {"topic": "editing", "title": "Chart editing commands, templates, history, replay and file export", "file": "backend/editing.md"}
+    {"topic": "editing", "title": "Chart editing commands, templates, history, replay and file export", "file": "backend/editing.md"},
+    {"topic": "pine", "title": "Bring over a TradingView Pine script: how to turn it into a Chart indicator", "file": "backend/pine.md"}
   ]},
   "description": "Charts, indicators, drawings, alerts, watchlists and screens. Charts by TradingView Lightweight Charts™ (Apache-2.0), https://www.tradingview.com/",
   "entries": {

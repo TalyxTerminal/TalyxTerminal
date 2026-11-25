@@ -9,7 +9,7 @@ export function fsAddress(file, query = "") {
   return `/@fs/${encodeURI(file.replace(/\\/g, "/").replace(/^\//, ""))}${query ?? ""}`;
 }
 
-/** In development, a module file the window reads from the Host (`/api/modules/<id>/files/<path>`) that is source in
+/** In development, a module file the window reads from the Host (`/api/modules/<id>/files/<digest>/<path>`) that is source in
     this repository's `modules/` is compiled by the dev server instead: the request is sent to its `/@fs/` address, so
     TypeScript and its relative imports work. Every module's frontend is still loaded from the address its declaration
     gives; files that are not here (an installed module's built frontend) go to the Host as they are. */
@@ -24,7 +24,7 @@ export function moduleSources() {
     },
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
-        const match = /^\/api\/modules\/([a-z][a-z0-9_]*)\/files\/([^?]+)(\?.*)?$/.exec(request.url ?? "");
+        const match = /^\/api\/modules\/([a-z][a-z0-9_]*)\/files\/[^/?]+\/([^?]+)(\?.*)?$/.exec(request.url ?? "");
         if (!match) return next();
         const directory = resolve(modules, match[1]);
         const file = resolve(directory, decodeURIComponent(match[2]));

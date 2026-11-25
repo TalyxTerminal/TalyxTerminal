@@ -273,6 +273,10 @@ class ProjectService:
             candidates.extend(self.summary(project) for project in self.references.values())
         for project in sorted(candidates, key=lambda item: len(item["root"]), reverse=True):
             root = Path(project["root"]).resolve()
+            # Saved editor tabs and immutable checkpoints may still name the project's pre-migration folder.
+            previous = project.get("previousRoot")
+            if project_id and previous and file.is_relative_to(previous):
+                file = root / file.relative_to(previous)
             if file.is_relative_to(root) and (not project.get("readOnly") or os.path.normcase(str(file)) == os.path.normcase(str(root / project["referenceFile"]))):
                 relative = file.relative_to(root).as_posix()
                 self.path(project["projectId"], relative)

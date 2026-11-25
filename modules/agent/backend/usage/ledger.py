@@ -16,6 +16,7 @@ from talyx_sdk import ContractError
 from talyx_sdk.i18n import t
 
 from .context import CURRENT_USAGE
+from .rates import ExchangeRates
 
 UNLIMITED = "unlimited"  # A budget policy value, never a monetary amount.
 
@@ -100,6 +101,7 @@ class UsageLedger:
             "timezone": timezone_name, "monthlyLimit": None, "currency": "USD"}),))
         self.db.commit()
         self.lock = threading.RLock()
+        self.rates = ExchangeRates(path.with_name("exchange_rates.json"))
 
     def configure_group(self, group_id, workspace_id, *, monthly_limit, expected_version=0, currency=None):
         try:
@@ -148,19 +150,20 @@ class UsageLedger:
     def _month(self, now):
         return datetime.fromtimestamp(now, ZoneInfo(self.settings()["timezone"])).strftime("%Y-%m")
 
-    def _totals(self, month, currency, *, group_id=None):
-        spent = Decimal(0)
-        sql = "SELECT r.* FROM requests r LEFT JOIN request_context c ON r.id=c.request_id WHERE r.currency=?"
-        args = [currency]
+    def _spent(self, month, currency, *, group_id=None):
+        """A month's settled spending as a limit in `currency` counts it: every billing currency, the others converted at
+        the latest exchange rates. Also the currencies without a rate; then the amount is unknown (None)."""
+        amounts = {}
+        sql = ("SELECT r.started,r.currency,r.amount FROM requests r LEFT JOIN request_context c ON r.id=c.request_id "
+               "WHERE r.state='final' AND r.amount IS NOT NULL")
+        args = []
         if group_id is not None:
             sql += " AND c.group_id=?"
             args.append(group_id)
         for row in self.db.execute(sql, args):
-            if self._month(row["started"]) != month:
-                continue
-            if row["state"] == "final" and row["amount"] is not None:
-                spent += Decimal(row["amount"])
-        return spent
+            if self._month(row["started"]) == month:
+                amounts[row["currency"]] = amounts.get(row["currency"], Decimal(0)) + Decimal(row["amount"])
+        return self.rates.convert(amounts, currency)
 
     def group_status(self, group_id):
         with self.lock:
@@ -168,16 +171,17 @@ class UsageLedger:
             if row is None:
                 raise ContractError("target_gone", t("Group budget is not configured"))
             month = self._month(time.time())
-            spent = self._totals(month, row["currency"], group_id=group_id)
+            spent, missing = self._spent(month, row["currency"], group_id=group_id)
             return {"groupId": group_id, "workspaceId": row["workspace_id"], "version": row["version"],
                     "month": month, "currency": row["currency"], "monthlyLimit": None if row["monthly_limit"] == UNLIMITED else row["monthly_limit"],
-                    "spent": str(spent),
+                    "spent": str(spent) if spent is not None else None, "missingRates": missing,
                     "paused": row["paused_month"] == month, "reason": row["reason"] if row["paused_month"] == month else None}
 
     def month_spent(self):
-        """This month's priced spend in the Usage currency, the figure the overall limit is checked against."""
+        """This month's priced spend in the Usage currency, the figure the overall limit is checked against, and the
+        currencies without an exchange rate (then the spend is None)."""
         with self.lock:
-            return self._totals(self._month(time.time()), self.settings()["currency"])
+            return self._spent(self._month(time.time()), self.settings()["currency"])
 
     def claim_limit_notification(self):
         with self.lock, self.db:
@@ -185,7 +189,8 @@ class UsageLedger:
             if current["monthlyLimit"] is None:
                 return False
             month = self._month(time.time())
-            if self._totals(month, current["currency"]) < Decimal(current["monthlyLimit"]):
+            spent, _ = self._spent(month, current["currency"])
+            if spent is None or spent < Decimal(current["monthlyLimit"]):
                 return False
             return bool(self.db.execute("INSERT OR IGNORE INTO budget_notifications VALUES (?)", (month,)).rowcount)
 
@@ -231,14 +236,22 @@ class UsageLedger:
                     raise ContractError("permission_denied", t("Group usage requires its configured workspace budget"))
             if priced and group is not None and group["paused_month"] == month:
                 failure = ContractError("budget_exceeded", t("This group's monthly budget is paused"), self.group_status(context.group_id))
-            limits = [(None, settings["monthlyLimit"])] if settings["monthlyLimit"] is not None else []
+            # Each limit is in its own currency: the overall one in Usage's, a bot's in the one it was set in. It counts
+            # the spending in every currency, converted; one it cannot convert refuses the request rather than not count.
+            limits = [(None, settings["monthlyLimit"], settings["currency"])] if settings["monthlyLimit"] is not None else []
             if group is not None and group["monthly_limit"] != UNLIMITED:
-                limits.append((context.group_id, group["monthly_limit"]))
-            for group_id, limit in limits if priced else ():
-                spent = self._totals(month, settings["currency"], group_id=group_id)
+                limits.append((context.group_id, group["monthly_limit"], group["currency"]))
+            for group_id, limit, currency in limits if priced and failure is None else ():
+                spent, missing = self._spent(month, currency, group_id=group_id)
+                if missing:
+                    failure = ContractError("exchange_rate_missing", t(
+                        "The monthly limit can't be checked: there is no exchange rate for {currencies} yet. TALYX fetches "
+                        "the daily reference rates online; check the network connection.", currencies=", ".join(missing)),
+                        {"groupId": group_id, "month": month, "currency": currency, "missingRates": missing})
+                    break
                 if spent >= Decimal(limit):
                     failure = ContractError("budget_exceeded", t("Monthly budget cannot admit the next request"),
-                        {"groupId": group_id, "month": month, "spent": str(spent), "monthlyLimit": limit})
+                        {"groupId": group_id, "month": month, "spent": str(spent), "monthlyLimit": limit, "currency": currency})
                     break
             if failure is not None and failure.code == "budget_exceeded" and group is not None and group["paused_month"] != month:
                 self.db.execute("UPDATE group_budgets SET paused_month=?,reason='budget_exceeded' WHERE id=?", (month, context.group_id))
@@ -271,9 +284,11 @@ class UsageLedger:
                 group_id = context["group_id"]
                 group = self.group_status(group_id)
                 settings = self.settings()
-                spent = self._totals(group["month"], settings["currency"])
-                exhausted = (group["monthlyLimit"] is not None and Decimal(group["spent"]) >= Decimal(group["monthlyLimit"])
-                             or settings["monthlyLimit"] is not None and spent >= Decimal(settings["monthlyLimit"]))
+                spent, _ = self._spent(group["month"], settings["currency"])
+                # A limit that can't be converted yet pauses nothing here; the next request is refused with the reason.
+                exhausted = (group["monthlyLimit"] is not None and group["spent"] is not None
+                             and Decimal(group["spent"]) >= Decimal(group["monthlyLimit"])
+                             or settings["monthlyLimit"] is not None and spent is not None and spent >= Decimal(settings["monthlyLimit"]))
                 if exhausted and not group["paused"]:
                     self.db.execute("UPDATE group_budgets SET paused_month=?,reason=? WHERE id=?",
                                     (group["month"], "budget_exceeded", group_id))

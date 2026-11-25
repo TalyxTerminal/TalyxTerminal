@@ -274,3 +274,23 @@ def patched_last_history_bar(script_runner_raw: bytes) -> bytes:
     if source.count(before) != 1:
         raise ValueError("Last history bar patch location differs")
     return source.replace(before, after).replace("\n", "\r\n").encode()
+
+
+def patched_captured_lookahead(raw: bytes) -> bytes:
+    """Captured higher-timeframe feeds have the requested symbol's actual bars, including
+    other symbols. Lookahead-on selects the containing historical bar. In real time the
+    provider already hands over only accepted observations of the forming bar."""
+    source = raw.decode().replace("\r\n", "\n")
+    replacements = [
+        ("    if (ALLOW_LOOKAHEAD and state.lookahead is Lookahead.ON\n"
+         "            and state.htf_aggregator is not None):",
+         "    if (state.authoritative_observations and state.na_on_developing) or (\n"
+         "            ALLOW_LOOKAHEAD and state.lookahead is Lookahead.ON and state.htf_aggregator is not None):"),
+        ("            if state.gaps_on or state.na_on_developing:",
+         "            if state.gaps_on or (state.na_on_developing and not state.authoritative_observations):"),
+    ]
+    for before, after in replacements:
+        if source.count(before) != 1:
+            raise ValueError("Captured lookahead patch location differs")
+        source = source.replace(before, after)
+    return source.replace("\n", "\r\n").encode()

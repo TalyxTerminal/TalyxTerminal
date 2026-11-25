@@ -3,9 +3,9 @@ import { t } from "../i18n";
 /* Indicators, Metrics & Strategies, TradingView's library: categories on the left (favorites, built-in by kind, the
    user's indicators), search by full name and short name on top; a click adds to the active chart and the dialog stays.
    A row's {} on hover opens its code in the editor under the chart. */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TxButton, TxDialog, TxEmpty, TxIconButton, TxSearch, type ModuleContext } from "@talyx/sdk";
-import { commit, openOverlay, openSource, store, toggleFavorite, useStore } from "../store";
+import { commit, message, openOverlay, openSource, refreshCatalog, store, toggleFavorite, useStore } from "../store";
 import { PRICE_PANE, type CatalogEntry, type Scalar } from "../wire";
 
 const key = (entry: CatalogEntry) => `${entry.source}:${entry.id}`;
@@ -22,6 +22,8 @@ export function IndicatorsDialog({ ctx, panelId }: { ctx: ModuleContext; panelId
   const entries = useStore(state => state.catalog);
   const catalog = useMemo(() => entries?.map(displayIndicator) ?? null, [entries]);
   const favorites = useStore(state => state.layouts[panelId].favorites.indicators);
+  // The folder is read again on opening: an indicator put there by hand (or changed outside TALYX) shows without a reload.
+  useEffect(() => { refreshCatalog(ctx).catch(error => store.setState({ workspaceError: message(error) })); }, [ctx]);
   const [query, setQuery] = useState(""), [section, setSection] = useState("Built-in");
   const categories = useMemo(() => [...new Set((catalog ?? []).filter(item => item.source === "builtin").map(item => item.category))].sort(), [catalog]);
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);

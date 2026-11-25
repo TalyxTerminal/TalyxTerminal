@@ -108,8 +108,8 @@ class Charts:
                                      # TradingView's: a new chart comes with Volume, an indicator like any other.
                                      indicators=indicators if indicators is not None else [Indicator.model_validate(
                                          {"id": "volume", "definition": {"source": "builtin", "id": "volume"}})])
-        entry = self.entries[chart_id] = Entry(chart_id, workspace, 1, document, None)
         self.store.put_chart(chart_id, workspace, 1, document.model_dump(mode="json", by_alias=True))
+        entry = self.entries[chart_id] = Entry(chart_id, workspace, 1, document, None)
         self.published(entry)
         return self.state(entry)
 
@@ -175,9 +175,10 @@ class Charts:
             document = apply(entry.document, resolved)
         except (CommandError, ValueError) as error:
             raise ContractError("invalid_input", str(error)) from error
-        entry.undo = [*entry.undo, entry.document][-MAX_UNDO:]
-        entry.redo = []
+        previous = entry.document
         self.set(entry, document)
+        entry.undo = [*entry.undo, previous][-MAX_UNDO:]
+        entry.redo = []
         return self.state(entry)
 
     def step(self, workspace: str, chart_id: str, back: bool) -> dict:
@@ -185,14 +186,18 @@ class Charts:
         source, target = (entry.undo, entry.redo) if back else (entry.redo, entry.undo)
         if not source:
             raise ContractError("invalid_input", "Nothing to " + ("undo" if back else "redo"))
-        target.append(entry.document)
-        self.set(entry, source.pop())
+        current = entry.document
+        self.set(entry, source[-1])
+        source.pop()
+        target.append(current)
         return self.state(entry)
 
     def set(self, entry: Entry, document: ChartDocument) -> None:
-        previous = entry.document
-        entry.document, entry.revision = document, entry.revision + 1
-        self.store.put_chart(entry.id, entry.workspace, entry.revision, document.model_dump(mode="json", by_alias=True))
+        """The chart's next revision: written first, so a write that fails leaves the chart (and its undo) as it was and
+        the caller's base revision still current."""
+        previous, revision = entry.document, entry.revision + 1
+        self.store.put_chart(entry.id, entry.workspace, revision, document.model_dump(mode="json", by_alias=True))
+        entry.document, entry.revision = document, revision
         self.published(entry)
         if previous.drawings != document.drawings:
             self.drawings_changed(entry.workspace, entry.id, document)

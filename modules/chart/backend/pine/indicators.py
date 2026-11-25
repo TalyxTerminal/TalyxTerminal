@@ -286,7 +286,7 @@ class Indicators:
                 if points:  # Market's open interest or funding as bars (derived.py); it fails through ``failed``
                     feed = PointsFeed(market, instrument, derived[1], series_timeframe, failed)
                     await feed.open()
-                    await feed.whole.wait()
+                    await feed.ready.wait()  # start with the first points; the completed window replaces them
                 else:  # bars: last price, or the contract's mark or index price
                     basis = PRICE_SUFFIXES[derived[1]] if derived else None
                     feed = await self.hub.acquire(instrument, market.default_series(instrument, series_timeframe,
@@ -300,7 +300,7 @@ class Indicators:
                 return
             link = SecondaryLink(self.engine, need, feed)
             try:
-                if not points:  # a points feed is whole already (above)
+                if not points:
                     try:
                         await feed.wait_whole()
                     except ContractError as error:  # Market failed the series before giving any bars

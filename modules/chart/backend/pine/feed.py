@@ -120,6 +120,10 @@ class TalyxFeed(LiveProviderPlugin[TalyxFeedConfig]):
             if open_now is None and self.forming is not None and self.forming[1] < cutoff:
                 open_now = self.forming
             developing = self.candle(open_now, False) if open_now is not None else None
+        elif self.forming is not None and self.forming[1] <= target_time:
+            # Lookahead-on targets the containing period. At the end of the dataset only
+            # the latest accepted observation of that period is available.
+            developing = self.candle(self.forming, False)
         return closed, developing, historical
 
     def download_ohlcv(self, time_from, time_to, on_progress=None, limit=None, with_extra=False):

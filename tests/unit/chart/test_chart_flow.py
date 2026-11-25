@@ -6,6 +6,7 @@ import io
 import json
 
 import pyarrow.parquet as pq
+import pytest
 
 from modules.chart.backend.app import ChartApp
 from modules.chart.backend.document import COMMANDS
@@ -294,6 +295,34 @@ def test_a_stale_revision_conflicts_and_a_workspace_close_reverts(tmp_path):
         assert reopened.revision == 2 and reopened.document.display == {"theme": "dark"}
         assert app.store.chart(unsaved) is None
         await app.close()
+    asyncio.run(main())
+
+
+def test_a_commit_whose_write_fails_leaves_the_chart_and_its_undo_as_they_were(tmp_path):
+    """The document, revision and undo move only once the revision is on disk: the caller retries at the same base
+    revision, and a restart reads what the chart showed."""
+    import sqlite3
+
+    async def main():
+        app = ChartApp(FakeMarket(), tmp_path / "data", tmp_path / "indicators")
+        chart_id = (await app.create_chart("w1", ChartCreate(instrumentId=BTC["instrumentId"])))["chartId"]
+        await app.commit("w1", commit(chart_id, 1, {"type": "display.update", "patch": {"theme": "dark"}}))
+        app.store.db.execute("CREATE TRIGGER full BEFORE UPDATE ON charts BEGIN SELECT RAISE(ABORT, 'disk full'); END")
+        light = {"type": "display.update", "patch": {"theme": "light"}}
+        for attempt in (lambda: app.commit("w1", commit(chart_id, 2, light)),
+                        lambda: app.undo("w1", ChartTarget(chartId=chart_id))):
+            with pytest.raises(sqlite3.Error):
+                await attempt()
+            entry = app.charts.entry("w1", chart_id)
+            assert (entry.revision, entry.document.display, len(entry.undo), entry.redo) == (2, {"theme": "dark"}, 1, [])
+        app.store.db.execute("DROP TRIGGER full")
+        state = await app.commit("w1", commit(chart_id, 2, light))  # the same base revision, no conflict
+        assert state["revision"] == 3 and state["canUndo"]
+        await app.close()
+        again = ChartApp(FakeMarket(), tmp_path / "data", tmp_path / "indicators")
+        stored = again.charts.entry("w1", chart_id)
+        assert (stored.revision, stored.document.display) == (3, {"theme": "light"})
+        await again.close()
     asyncio.run(main())
 
 

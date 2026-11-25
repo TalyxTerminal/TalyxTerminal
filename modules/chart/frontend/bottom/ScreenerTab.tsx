@@ -3,18 +3,21 @@ import { t } from "../i18n";
    condition (prices, the active chart's indicator outputs, values). Run saves the screen first; progress and results
    come back on the workspace stream; a running screen can be cancelled. Matching rows, then failed ones; a click shows
    the symbol on the chart. */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TxButton, TxEmpty, TxIcon, TxIconButton, TxInput, TxMenu, TxProgress, TxSelect, TxTable, TxTd, TxTh, type ModuleContext } from "@talyx/sdk";
 import { post } from "../api";
 import { message, switchSymbol, useStore } from "../store";
 import { timeframeLabel } from "../chart/timeframes";
 import { TIMEFRAME_GROUPS } from "../panel/TimeframeMenu";
 import { ConditionFields, indicatorSources, type Sources } from "../panel/conditions";
-import type { Condition, ScreenSpec } from "../wire";
+import type { Condition, Screen, ScreenSpec } from "../wire";
 
 const MAX_CONDITIONS = 5;
 const PRICES: Sources = new Map((["close", "open", "high", "low", "volume"] as const).map(field =>
   [`price:${field}`, { label: field[0].toUpperCase() + field.slice(1), operand: { kind: "price", field } }]));
+
+/** The fields of a screen that are its spec: a save takes these and nothing else. */
+const specOf = ({ name, scope, timeframe, conditions }: Screen): ScreenSpec => ({ name, scope, timeframe, conditions });
 
 const number = (value: number | null) => value === null ? "∅" : value.toLocaleString("en-US", { maximumFractionDigits: 6 });
 
@@ -37,8 +40,10 @@ export function ScreenerTab({ ctx, panelId }: { ctx: ModuleContext; panelId: str
     name: t("Screen {number}", { number: list.length + 1 }), scope: { kind: "watchlist", watchlistId: lists[0].id }, timeframe: entry?.chart?.document.series.timeframe ?? "1d",
     conditions: [{ left: { kind: "price", field: "close" }, op: "greater", right: { kind: "value", value: last } }],
   });
+  // A new screen starts as a draft fixed when it opens (its value the price then), not recomputed as the price moves.
+  useEffect(() => { if (!saved && !draft && lists.length && last) setDraft(fresh()); });
   if (!lists.length) return <div className="chart-bottom-body"><TxEmpty title={t("No watchlist")} /></div>;
-  const spec = draft ?? saved ?? fresh();
+  const spec = draft ?? (saved ? specOf(saved) : fresh());
   const edit = (change: Partial<ScreenSpec>) => setDraft({ ...spec, ...change });
   const sources: Sources = new Map([...PRICES, ...(entry?.chart ? indicatorSources(entry, catalog, false) : [])]);
   const run = saved?.lastRun ?? null, running = run?.state === "running";

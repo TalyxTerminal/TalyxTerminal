@@ -12,7 +12,7 @@ SCHEMAS = {5: V5_SCHEMA}
 _MANIFEST_PATTERNS = (
     "modules/*/talyx.module.json",
     "examples/*/talyx.module.json",
-    "user/modules/*/talyx.module.json",
+    "user/installed-modules/*/talyx.module.json",
 )
 
 
@@ -86,7 +86,7 @@ def test_what_a_module_provides_is_the_descriptor_its_owner_declares() -> None:
 
 def test_user_installed_modules_never_run_in_process() -> None:
     """User-installed modules run in separate processes."""
-    for path in sorted(ROOT.glob("user/modules/*/talyx.module.json")):
+    for path in sorted(ROOT.glob("user/installed-modules/*/talyx.module.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         lane = data.get("runtime", {}).get("backend")
         assert lane != "in_process", f"{path}: user-installed module cannot declare in_process"

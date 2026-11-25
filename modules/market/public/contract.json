@@ -3394,12 +3394,18 @@
      "title": "Instrumentid",
      "type": "string"
     },
+    "seriesId": {
+     "description": "The series left out; the instrument's other series are still written.",
+     "title": "Seriesid",
+     "type": "string"
+    },
     "problem": {
      "$ref": "#/$defs/Problem"
     }
    },
    "required": [
     "instrumentId",
+    "seriesId",
     "problem"
    ],
    "title": "Failure1",
@@ -3686,9 +3692,17 @@
    "additionalProperties": false,
    "properties": {
     "content": {
-     "description": "ohlcv:<timeframe>:<adjustment>, <capability>:<timeframe>, research:<kind> or professional:<materialId>@<version>.",
+     "description": "ohlcv:<timeframe>:<adjustment> (ohlcv:<timeframe>:<priceBasis>:<adjustment> for mark, index or premium prices), <capability>:<timeframe>,\nresearch:<kind> or professional:<materialId>@<version>; an imported series adds @<importId>. Two series of one instrument never share a file.",
      "title": "Content",
      "type": "string"
+    },
+    "series": {
+     "description": "The seriesId of each selected series whose rows are in this file (none for research rows and professional materials).",
+     "items": {
+      "type": "string"
+     },
+     "title": "Series",
+     "type": "array"
     },
     "artifact": {
      "anyOf": [
@@ -3749,6 +3763,7 @@
    },
    "required": [
     "content",
+    "series",
     "artifact",
     "rows",
     "instruments",

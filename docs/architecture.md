@@ -31,7 +31,7 @@ Upper layers may depend on lower ones, never the reverse.
 | Layer | Contents | Location |
 |---|---|---|
 | 4 Application shell | Home window, workspace frame, top bar, settings window, desktop entry. Assembly only, no business flows | `web/src/shell/`, `host/desktop/` |
-| 3 Modules | Official and third-party modules, in one format and one runtime | `modules/<id>/`, `user/modules/` |
+| 3 Modules | Official and third-party modules, in one format and one runtime | `modules/<id>/`, `user/installed-modules/` |
 | 2 Platform | Routing, Host services and module supervision; the frontend registry, bridge and runtime; the SDK for modules | `kernel/`, `host/`, `web/src/kernel/`, `web/src/runtime/`, `sdk/` |
 | 1 Vocabulary | Shared data shapes: instruments, series, timeframes, bars, file references; the manifest schema. Shapes only, no fetching, computing or drawing | `vocabulary/`, `contracts/` |
 

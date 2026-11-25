@@ -30,6 +30,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 
 os.environ["PYNE_SAVE_SCRIPT_TOML"] = "0"
@@ -38,6 +39,8 @@ from pynecore import lib  # noqa: E402
 from pynecore.core import runner_context, script, viz  # noqa: E402
 from pynecore.core.script_runner import LIVE_TRANSITION, ScriptRunner, import_script  # noqa: E402
 from pynecore.core.syminfo import SymInfo  # noqa: E402
+from pynecore.types.color import Color  # noqa: E402
+from pynecore.types.na import NA  # noqa: E402
 from pynecore.types.ohlcv import OHLCV  # noqa: E402
 
 from modules.chart.backend.pine import intrabars, visible  # noqa: E402
@@ -49,6 +52,39 @@ from modules.chart.backend.pine.feed import (  # noqa: E402
 )
 
 intrabars.quiet_empty_periods()  # at import, not in main(): the security children import this module too
+
+
+def color_param(value) -> str:
+    """A colour param as PyneCore's ``Color(text)`` reads it, ``#RRGGBBAA``: #RGB, #RGBA and #RRGGBB are spelled out
+    as the settings do (``Color`` reads three or four digits as a number: #F00 became nearly black)."""
+    digits = value.removeprefix("#") if isinstance(value, str) else ""
+    if len(digits) not in (3, 4, 6, 8) or any(digit not in "0123456789abcdefABCDEF" for digit in digits):
+        raise ValueError(f"{value!r} is not a colour; give it as #RRGGBB or #RRGGBBAA")
+    if len(digits) <= 4:
+        digits = "".join(digit * 2 for digit in digits)
+    return "#" + digits.upper().ljust(8, "F")
+
+
+def install_inputs() -> None:
+    """Two of PyneCore's inputs, as Chart takes them: a colour param in any of the forms above (an AI may write #F00),
+    and ``input.time`` described as a time (PyneCore's records an int input), so the settings offer a date and time."""
+    color_input, time_input = script._Input.color.__func__, script._Input.time.__func__
+
+    def color(cls, defval, *args, _id: str = "", **kwargs):
+        if _id in script._old_input_values:
+            script._old_input_values[_id] = color_param(script._old_input_values[_id])
+        return color_input(cls, defval, *args, _id=_id, **kwargs)
+
+    def time_(cls, defval, *args, _id: str = "", **kwargs):
+        value = time_input(cls, defval, *args, _id=_id, **kwargs)
+        script.inputs[_id].input_type = "time"
+        return value
+
+    script._Input.color = classmethod(color)
+    script._Input.time = classmethod(time_)
+
+
+install_inputs()  # at import too: the security children run the script's inputs as well
 
 _out = threading.Lock()
 _imports = threading.Lock()
@@ -105,6 +141,25 @@ def number(value):
     if isinstance(value, (int, float)) and math.isfinite(value):
         return float(value)
     return None
+
+
+# The script's na colour, in meta records and colour rows: that output, or that bar of it, draws nothing (Pine). A null
+# in a colour row is a part the script gave no colour for, or a row from before the colour started to vary: the meta's.
+NA_COLOR = "na"
+META_COLORS = ("color", "textcolor", "colorup", "colordown", "wickcolor", "bordercolor")
+
+
+def color_channel(value, kind: str):
+    """One row of a dynamic colour channel (PyneCore's encoding, but na is ``NA_COLOR``, not null); a gradient fill's
+    is [top value, bottom value, top colour, bottom colour]."""
+    if isinstance(value, NA):
+        return NA_COLOR
+    if isinstance(value, tuple):
+        if kind == "fill":
+            top, bottom, *colors = value
+            return [number(top), number(bottom), *(color_channel(part, kind) for part in colors)]
+        return [color_channel(part, kind) for part in value]
+    return viz.color_str(value)
 
 
 def drawing_changes(before: dict, after: dict) -> dict:
@@ -185,6 +240,7 @@ class Instance(threading.Thread):
         self.behind_chart = True  # Pine's default for indicator() and strategy()
         self.no_scale = False  # indicator(scale=scale.none): its own scale, not shown
         self.format = "inherit"  # the script's indicator(format=...), which plots without their own take
+        self.precision: int | None = None
         self.context = None
         self.needs: set[str] = set()  # other (symbol, timeframe) feeds, "SYMBOL@TF"
         self.stopped = False
@@ -195,11 +251,20 @@ class Instance(threading.Thread):
     # the feed hands it the next item.
     def read_row(self, values: dict):
         self.rows.append({key: number(value) for key, value in values.items()})
-        self.colors.append({key: viz._encode_color_channel(value) for key, value in lib._viz_dyn.items()})
+        self.colors.append({key: color_channel(value, lib._plot_meta[key].kind) for key, value in lib._viz_dyn.items()})
 
-    def with_format(self, record: dict) -> dict:
-        """A meta record's ``format`` as shown: its own, else the script's (Pine's format.inherit)."""
-        return record if record.get("format", "inherit") != "inherit" else {**record, "format": self.format}
+    def meta_record(self, meta) -> dict:
+        """A meta record as sent: PyneCore's, with the script's na colours as ``NA_COLOR`` (PyneCore drops them like
+        colours not given), and ``format`` its own, else the script's (Pine's format.inherit)."""
+        record = viz.serialize_meta(meta)
+        for field in META_COLORS:
+            if isinstance(getattr(meta, field), NA):
+                record[field] = NA_COLOR
+        if record.get("format", "inherit") == "inherit":
+            record["format"] = self.format
+        if record.get("precision") is None and self.precision is not None:
+            record["precision"] = self.precision
+        return record
 
     def columns(self, op: str) -> dict:
         keys = list(dict.fromkeys(key for row in self.rows for key in row))
@@ -211,7 +276,7 @@ class Instance(threading.Thread):
             message["behindChart"] = self.behind_chart
             message["noScale"] = self.no_scale
         if op == "replace" or lib._plot_meta_new:
-            message["meta"] = [self.with_format(viz.serialize_meta(meta)) for meta in lib._plot_meta.values()]
+            message["meta"] = [self.meta_record(meta) for meta in lib._plot_meta.values()]
             lib._plot_meta_new.clear()
         if any(module._registry for module in _DRAWING_MODULES) or self.drawings:
             snapshot = viz.drawings_snapshot()
@@ -241,6 +306,7 @@ class Instance(threading.Thread):
                 elif not held:
                     runner_context.acquire(self.context)
                     held, until = True, time.monotonic() + SLICE_SECONDS
+                intrabars.closing(bar["time"], bar["closeTime"])
                 yield candle(bar, True)
         finally:
             if held:
@@ -254,6 +320,7 @@ class Instance(threading.Thread):
             bar, self.forming = self.forming, None
             if self.range is not None:
                 self.range.bar(bar["time"])
+            intrabars.closing(bar["time"], bar["closeTime"])
             yield candle(bar, False)
             with runner_context.inside(self.context):
                 replace = self.columns("replace")
@@ -273,6 +340,7 @@ class Instance(threading.Thread):
             bar, closed = item
             if self.range is not None:
                 self.range.bar(bar["time"])
+            intrabars.closing(bar["time"], bar["closeTime"])
             yield candle(bar, closed)
             with runner_context.inside(self.context):
                 if not closed:
@@ -320,6 +388,7 @@ class Instance(threading.Thread):
                 self.behind_chart = bool(runner.script.behind_chart)
                 self.no_scale = runner.script.scale is lib.scale.none
                 self.format = str(runner.script.format)
+                self.precision = runner.script.precision
                 # Every context's child follows the chart's observations (TALYX's patch).
                 modules = [runner.script_module, *(sys.modules[main.__module__] for _title, main
                                                   in script._registered_libraries if main.__module__ in sys.modules)]
@@ -399,14 +468,34 @@ def alertcondition(condition=None, title=None, message=None):
     lib._plot_data[ALERT_CONDITION + (title or "Alert")] = None if lib.is_na(condition) else int(bool(condition))
 
 
+def input_value(value):
+    """An input's default or option as JSON, in the form PyneCore takes it back as a param: a colour as
+    ``#RRGGBBAA`` (``Color(text)``), an enum member as its value (``Enum(value)``)."""
+    if isinstance(value, Color):
+        return viz.color_str(value)
+    if isinstance(value, Enum):
+        return value.value
+    return value
+
+
 def describe(path: Path, root: Path | None) -> dict:
     with isolated(root):
+        # PyneCore collects inputs in one module dict and clears it in the indicator decorator; a script whose
+        # request.security reads history (``close[1]``) leaves its inputs there after that, and the next script described
+        # in this process listed them as its own.
+        script.inputs.clear()
         declaration = import_script(path).main.script
+
+    def options(value):
+        # An enum input without options offers every member (Pine's input.enum)
+        choices = value.options or (list(type(value.defval)) if value.input_type == "enum" else None)
+        return [input_value(item) for item in choices] if choices else None
+
     return {"title": declaration.title, "shortTitle": declaration.shorttitle or declaration.title,
             "overlay": bool(declaration.overlay),
             "inputs": [{"id": key.removesuffix("__global__"), "title": value.title or key, "type": value.input_type,
-                        "default": value.defval, "min": value.minval, "max": value.maxval, "step": value.step,
-                        "options": list(value.options) if value.options else None, "group": value.group,
+                        "default": input_value(value.defval), "min": value.minval, "max": value.maxval,
+                        "step": value.step, "options": options(value), "group": value.group,
                         "tooltip": value.tooltip} for key, value in declaration.inputs.items()]}
 
 

@@ -428,6 +428,38 @@ def test_after_publication_an_allocation_has_its_turnover_a_year_sharpe_and_retu
     assert early["turnover"] is None and early["rebalances"] == 0, "no rebalance since publication yet"
 
 
+def test_after_publication_the_sharpe_is_over_the_rate_the_run_used():
+    """A fixed 4% a year over 252 observations is 0.04 / 252 an observation in the backtest and in the library alike (the library found no ^IRX rows for it
+    and left the Sharpe since publication empty); ^IRX closes give the same rate a day in both; weekly-aligned returns count 52 a year in both."""
+    import numpy as np
+    import pandas as pd
+
+    from modules.quant.backend import library_after
+    from modules.quant.native import metrics as M
+    from modules.quant.native.allocation_prices import observations_a_year, risk_free_per_bar
+    days = pd.date_range("2026-01-01", "2026-04-30", freq="D")
+    labels = [int(stamp.value // 1_000_000) for stamp in days]
+    fixed = {"basis": "fixed", "pct": 4.0}
+    assert library_after.rate_per_bar(fixed, labels, 252) == pytest.approx(0.04 / 252) == risk_free_per_bar(fixed, days, 252)
+    assert library_after.rate_per_bar({"basis": "zero"}, labels, 252) == 0.0
+    irx = {"basis": "irx", "rows": [[labels[0] + 21 * 3_600_000, "5.2"], [labels[40] + 21 * 3_600_000, "4.8"]]}
+    rates = library_after.rate_per_bar(irx, labels, 252)
+    assert np.allclose(rates.to_numpy(), risk_free_per_bar(irx, days, 252).to_numpy())
+    assert rates[labels[39]] == pytest.approx(0.052 / 252) and rates[labels[40]] == pytest.approx(0.048 / 252)
+    assert observations_a_year({"align": "weekly"}, 252) == 52 and observations_a_year({"align": "monthly"}, 252) == 12
+    assert observations_a_year({}, 251) == 251
+
+    prices = pd.DataFrame({"A": [100 * (1 + 0.01 * np.sin(n)) * 1.001 ** n for n in range(len(labels))], "B": [100.0] * len(labels)}, index=labels)
+    published_through = int(pd.Timestamp("2026-02-15").value // 1_000_000)
+    values = pd.DataFrame([(day, asset, weight) for day in labels for asset, weight in (("A", 1.0), ("B", 0.0))], columns=["datetime", "instrument", "value"])
+    scheduled = [day for day in labels if day > published_through]
+    figures, _ = library_after.allocation(values, prices, scheduled=scheduled, published_through=published_through, published={"value": 0.1, "riskShares": {"A": 1.0}},
+                                          annualization=252, shares={"A": 1.0}, every="month", risk_free=library_after.rate_per_bar(fixed, labels, 252))
+    since = prices["A"].pct_change().loc[scheduled]
+    assert figures["sharpe"] is not None
+    assert figures["sharpe"] == pytest.approx(M.sharpe(since.to_numpy(), 252, 0.04 / 252))
+
+
 def test_an_update_of_a_pool_in_another_currency_reads_the_rate_and_the_proxy_its_run_read(tmp_path, monkeypatch):
     """The run converts a euro asset with EURUSD=X and fills its early history from its proxy; the published version's updates did neither, so the backtest
     was in dollars and the updates in euros. The update now asks Market for the same two and hands the worker the same column maps."""

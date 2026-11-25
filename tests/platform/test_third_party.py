@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 
@@ -101,7 +102,8 @@ def test_install_enable_disable_uninstall(tmp_path, packed):
             await platform.ready("thirdparty")
             await invoke("platform.modules.uninstall", {"id": "thirdparty"})
             assert "thirdparty" not in [m["id"] for m in await platform.call("platform.modules.list")]
-            assert not (tmp_path / "user" / "modules" / "thirdparty").exists()
+            assert not (tmp_path / "user" / "installed-modules" / "thirdparty").exists()
+            assert Path(answer["dataDir"]).is_dir()   # uninstalling removes the code, not the module's data
 
     run(scenario())
 
@@ -172,3 +174,50 @@ def test_install_and_reload_validate_authoring_docs_before_switching(tmp_path):
             assert platform.process("thirdparty") is original
             await platform.call("thirdparty.ping")
     run(scenario())
+
+
+def frontend_module(folder: Path) -> Path:
+    """An installed module whose frontend entry imports a second file."""
+    module = prepare(folder, ("echo",)) / "echo"
+    manifest = json.loads((module / "talyx.module.json").read_text())
+    manifest["entries"]["frontend"] = "frontend/module.js"
+    (module / "talyx.module.json").write_text(json.dumps(manifest))
+    (module / "frontend").mkdir()
+    (module / "frontend" / "module.js").write_text('import { words } from "./words.js";\nexport function activate() {}\n')
+    (module / "frontend" / "words.js").write_text('export const words = "old";\n')
+    return module
+
+
+def test_a_change_to_a_file_the_frontend_imports_gives_the_module_new_file_addresses(tmp_path):
+    """The window imports a module's frontend from its assetBase; the files it imports have their addresses under it.
+    Each load changes the digest, and with it every address, so after Reload the
+    window loads the changed file instead of the one it already holds."""
+    from host.catalog import Catalog
+
+    module = frontend_module(tmp_path / "installed-modules")
+    catalog = Catalog(tmp_path / "official", module.parent, tmp_path / "state.json", tmp_path / "environments")
+    before = catalog.load(module, "installed").digest
+    (module / "frontend" / "words.js").write_text('export const words = "new";\n')
+    after = catalog.load(module, "installed").digest
+    assert before != after
+    async def scenario():
+        async with running(tmp_path / "app", test_modules=("echo",)) as platform:
+            definition = next(item for item in platform.host.definitions() if item["id"] == "echo")
+            assert definition["assetBase"] == f"/api/modules/echo/files/{definition['digest']}/"
+    run(scenario())
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a file another program holds open cannot be deleted on Windows")
+def test_an_uninstall_that_cannot_remove_the_folder_keeps_the_module_to_uninstall_again(tmp_path):
+    from host.catalog import Catalog
+
+    module = frontend_module(tmp_path / "installed-modules")
+    catalog = Catalog(tmp_path / "official", module.parent, tmp_path / "state.json", tmp_path / "environments")
+    catalog.discover()
+    with (module / "frontend" / "words.js").open("rb"):
+        with pytest.raises(ContractError) as refused:
+            catalog.uninstall("echo")
+        assert refused.value.code == "unavailable" and "words.js" in refused.value.message
+        assert catalog.get("echo").directory == module
+    catalog.uninstall("echo")
+    assert "echo" not in catalog.modules and not module.exists()

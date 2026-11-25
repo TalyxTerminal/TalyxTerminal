@@ -63,10 +63,16 @@ def read_chars(snapshot, offset, limit=PAGE_BYTES, *, fields=("content", "baseCo
         length //= 2
 
 
+def whole_document(snapshot):
+    return {**snapshot, "baseContent": None} if snapshot["content"] == snapshot["baseContent"] else snapshot
+
+
 def read_page(snapshot, options):
-    """The whole document when asked for in full; otherwise a page of whole lines from startLine or the cursor."""
+    """The whole document when asked for in full; otherwise a page of whole lines from startLine or the cursor.
+    Without unsaved edits the saved text is the same and is not sent twice (baseContent null): two copies of a large
+    file would not fit in one answer."""
     if options.full:
-        return snapshot
+        return whole_document(snapshot)
     start, char = options.startLine or 1, options.startChar
     if options.cursor is not None:
         line, _, offset = options.cursor.partition(":")
@@ -170,6 +176,12 @@ def router(documents):
     @routes.get("/unsaved")
     async def unsaved():
         return {"documents": documents.unsaved()}
+
+    @routes.get("/{document_id}/text")
+    async def editor_text(document_id: str):
+        # The editor accepts 16 MiB of source. JSON escaping, metadata or a dirty baseline can exceed
+        # the action transport budget even for a supported file. HTTP carries the snapshot in one read.
+        return whole_document(documents.snapshot(documents.record(document_id)))
 
     @routes.get("/{document_id}/versions")
     async def versions(document_id: str):

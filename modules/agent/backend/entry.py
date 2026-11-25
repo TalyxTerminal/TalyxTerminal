@@ -352,7 +352,8 @@ async def bot(input: BotInput, call: Call) -> OperationResult | ResultFile:
     """Manage workspace bots, groups, routines and runs. List for panel settings and spend, inspect by id for
     a bot, group, event source or routine. Read a thread by id. Patch with changes (model, duty, knowledge, skills,
     permission, limit, section). To send files, use recipients for the conversation IDs, agent.chat operation attach_paths
-    for attachment IDs, then send with attachments keyed by bot ID. Upload adds base64 data to knowledge.
+    for attachment IDs, then send with attachments keyed by bot ID; send answers the bots that could not take the
+    message ({skipped: [{botId, name, reason}]}), refused only when none can. Upload adds base64 data to knowledge.
     Oversized results return a JSON file reference. Save routines with botId or conversationId, name, instruction,
     when, and either zone + rrule or source + params."""
     op = input.operation

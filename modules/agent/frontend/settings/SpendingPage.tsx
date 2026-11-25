@@ -45,19 +45,23 @@ function Usage({settings,client}:{settings:AgentSettings;client:AgentClient}){
         </tr>;})}</tbody></TxTable></div></TxSettingsGroup>
   </TxSettingsPage>;
 }
-type Spending = {spent:string;bots:{groupId:string;name:string;currency:string;monthlyLimit:string;spent:string}[];unpriced:UsageGroup[]};
+// Spent is in the limit's currency, other currencies converted; null while missingRates have no exchange rate.
+type Spending = {spent:string|null;missingRates:string[];bots:{groupId:string;name:string;currency:string;monthlyLimit:string;spent:string|null;missingRates:string[]}[];unpriced:UsageGroup[]};
 function Limit({settings,client,refresh,models}:{settings:AgentSettings;client:AgentClient;refresh:()=>Promise<void>;models:()=>void}){
   const limit=settings.usage.monthlyLimit, currency=settings.usage.currency;
   const [enabled,setEnabled]=useState(limit!==null),[amount,setAmount]=useState(limit??""),[data,setData]=useState<Spending|null>(null),[error,setError]=useState("");
   useEffect(()=>{void client.settings<Spending>("spending").then(setData).catch(e=>setError(errorText(e)));},[client,limit]);
   const save=(v:string|null)=>{void client.settings("usage",{...settings.usage,monthlyLimit:v}).then(refresh).catch(e=>setError(errorText(e)));};
-  const meter=(title:string,spent:number,ceiling:number,unit=currency)=>{const percent=ceiling>0?spent/ceiling*100:100;return <div key={title} className="sm-meter"><div className="sm-meter-copy"><span className="sm-meter-title">{title}</span>
+  const meter=(title:string,used:{spent:string|null;missingRates:string[]},ceiling:number,unit=currency)=>{
+    if(used.spent===null)return <div key={title} className="sm-meter"><div className="sm-meter-copy"><span className="sm-meter-title">{title}</span>
+      <span className="sm-meter-sub">{t("No exchange rate for {currencies} yet", { currencies: used.missingRates.join(", ") })}</span></div></div>;
+    const spent=Number(used.spent),percent=ceiling>0?spent/ceiling*100:100;return <div key={title} className="sm-meter"><div className="sm-meter-copy"><span className="sm-meter-title">{title}</span>
     <span className="sm-meter-sub">{t("{spent} of {limit}", { spent: money(spent,unit), limit: money(ceiling,unit) })}</span></div><TxProgress value={Math.min(100,percent)} className="sm-meter-bar"/><span className="sm-meter-share">{t("{percent}% used", { percent: Math.round(percent) })}</span></div>;};
   return <TxSettingsPage>{error&&<TxAlert title={t("Spending limit")}>{error}</TxAlert>}
     <TxSettingsGroup title={t("Monthly limit")}><TxRow title={t("Limit all chats and bots")}><TxSwitch hideLabel label={t("Limit all chats and bots")} checked={enabled} onCheckedChange={on=>{setEnabled(on);if(!on)save(null);else if(amount!=="")save(amount);}}/></TxRow>
       {enabled&&<TxRow title={t("Amount")}><TxInput className="sm-amount" aria-label={t("Amount")} inputMode="decimal" value={amount} suffix={currency} onChange={e=>setAmount(e.target.value)}
-        onBlur={()=>{if(amount.trim()!==""&&amount!==limit)save(amount);}}/></TxRow>}{enabled&&limit!==null&&data&&meter(t("This month"),Number(data.spent),Number(limit))}</TxSettingsGroup>
-    <TxSettingsGroup title={t("Bots with their own limit")}>{data?.bots.map(b=>meter(b.name,Number(b.spent),Number(b.monthlyLimit),b.currency))}</TxSettingsGroup>
+        onBlur={()=>{if(amount.trim()!==""&&amount!==limit)save(amount);}}/></TxRow>}{enabled&&limit!==null&&data&&meter(t("This month"),data,Number(limit))}</TxSettingsGroup>
+    <TxSettingsGroup title={t("Bots with their own limit")}>{data?.bots.map(b=>meter(b.name,b,Number(b.monthlyLimit),b.currency))}</TxSettingsGroup>
     {enabled&&<TxSettingsGroup title={t("Not counted")}>{data?.unpriced.map(g=><TxRow key={g.key} title={settings.models.find(m=>m.id===g.key)?.model??g.key} detail={t("{count} requests this month", { count: g.tokenOnlyRequests })}>
       <TxButton size="sm" onClick={models}>{t("Set price…")}</TxButton></TxRow>)}</TxSettingsGroup>}</TxSettingsPage>;
 }

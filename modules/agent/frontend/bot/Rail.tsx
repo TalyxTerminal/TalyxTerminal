@@ -107,10 +107,11 @@ function Overview({ bot, onPage, onBot, onPrefill }: { bot: Bot; onPage: (page: 
     </Section>
     <Section title={t("This month")}>
       <div className="bot-spend">
-        <span className="bot-spend-total">{byCurrency(bot.spend) || money(0, bot.spend.currency)}</span>
+        <span className="bot-spend-total">{bot.spend.limit === null || bot.spend.month === null ? byCurrency(bot.spend) || money(0, bot.spend.currency) : money(bot.spend.month, bot.spend.currency)}</span>
         {bot.spend.limit !== null && <span className="bot-line-sub">{t("of {amount} limit", { amount: money(bot.spend.limit, bot.spend.currency) })}</span>}
       </div>
-      {bot.spend.limit !== null && <TxProgress value={bot.spend.limit ? bot.spend.month / bot.spend.limit * 100 : 100} className="bot-meter" />}
+      {bot.spend.limit !== null && bot.spend.month !== null && <TxProgress value={bot.spend.limit ? bot.spend.month / bot.spend.limit * 100 : 100} className="bot-meter" />}
+      {bot.spend.limit !== null && bot.spend.month === null && <span className="bot-line-sub">{t("No exchange rate for {currencies} yet", { currencies: bot.spend.missingRates.join(", ") })}</span>}
       <div className="bot-spend-parts">{bot.spend.parts.map(part => <div key={part.label} className="bot-spend-part">
         <span className="bot-line-title">{part.label}</span><span className="bot-line-sub">{part.runs === 1 ? t("1 run") : t("{count} runs", { count: part.runs })}</span><span className="bot-spend-amount">{byCurrency(part) || "—"}</span>
       </div>)}</div>
@@ -268,7 +269,7 @@ function Settings({ bot, onPage, onBot }: { bot: Bot; onPage: (page: RailPage) =
         <TxRow title={t("Notify with results")}><TxSwitch hideLabel label={t("Notify with results")} checked={bot.notify.results} onCheckedChange={results => onBot({ notify: { ...bot.notify, results } })} /></TxRow>
         <TxRow title={t("Also send to")}><TxSelect aria-label={t("Also send to")} value={bot.notify.phone} onChange={event => onBot({ notify: { ...bot.notify, phone: event.target.value } })}>
           <option value="">{t("None")}</option>{library.channels.map(ch=><option key={ch.id} value={ch.id}>{ch.name}</option>)}</TxSelect></TxRow>
-        <TxRow title={t("Monthly limit")} detail={t("{money} this month", { money: money(bot.spend.month, bot.spend.currency) })}>
+        <TxRow title={t("Monthly limit")} detail={t("{money} this month", { money: bot.spend.month === null ? byCurrency(bot.spend) : money(bot.spend.month, bot.spend.currency) })}>
           <TxInput className="bot-limit" inputMode="decimal" value={bot.spend.limit === null ? "" : String(bot.spend.limit)} placeholder={t("No limit")} suffix={bot.spend.currency}
             onChange={event => onBot({ spend: { ...bot.spend, limit: event.target.value ? Number(event.target.value) : null } })} />
         </TxRow>

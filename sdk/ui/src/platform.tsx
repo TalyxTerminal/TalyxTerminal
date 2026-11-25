@@ -519,7 +519,7 @@ contract: {
 }
 digest: string
 /**
- * Where the module's files are read (its frontend entry is under it)
+ * Where the module's files are read (its frontend entry is under it); it changes with the digest
  */
 assetBase: string
 }
@@ -948,18 +948,50 @@ presentation?: unknown
 }
 export interface SaveInput {
 name: string
-/**
- * The window's layout and panel states (at most 4 MB).
- */
-workspace: {
-[k: string]: unknown
-}
+workspace: WorkspaceState
 summary?: (LayoutSummary | null)
 /**
  * Save over this saved workspace (with the revision read); left out for the first save.
  */
 snapshotId?: (string | null)
 expectedRevision?: (string | null)
+}
+/**
+ * The window's layout and panel states (at most 4 MB).
+ */
+export interface WorkspaceState {
+version: 6
+layout: DockLayout
+panels: SavedPanel[]
+/**
+ * The active panel's id; naming no panel, none is active
+ */
+activePanelId?: unknown
+[k: string]: unknown
+}
+/**
+ * The window's dock arrangement (dockview's serialized layout): its grid, and an entry for each panel by id.
+ */
+export interface DockLayout {
+grid: {
+[k: string]: unknown
+}
+panels: {
+[k: string]: unknown
+}
+[k: string]: unknown
+}
+export interface SavedPanel {
+id: string
+/**
+ * module:<module id>
+ */
+kind: string
+/**
+ * The module's own state for the panel (at most 512 KB as JSON)
+ */
+state?: unknown
+[k: string]: unknown
 }
 export interface Saved {
 snapshotId: string

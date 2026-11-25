@@ -25,7 +25,8 @@ async def page_request(service, operation, args, workspace):
             status = service.usage.group_status(row[0])
             if status["monthlyLimit"] is not None:
                 limits.append({"name":row[1], **status})
-        return {"spent": str(service.usage.month_spent()), "bots": limits,
+        spent, missing = service.usage.month_spent()
+        return {"spent": str(spent) if spent is not None else None, "missingRates": missing, "bots": limits,
                 "unpriced": [g for g in groups if g["tokenOnlyRequests"]]}
     if operation == "page":
         channels = await service.ctx.call("platform.notifications.channels", {}) if kind == "bot" else []

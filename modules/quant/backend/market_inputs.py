@@ -83,12 +83,6 @@ def price_series(instrument, timeframe, adjusted, *, price_basis="last"):
                         adjustment=adjustment, adjustment_anchor="latest" if adjustment in {"split", "split_dividend"} else None).to_dict()
 
 
-def content_of(series):
-    if series["capability"] == "ohlcv":
-        return f"ohlcv:{series['timeframe']}:{series['adjustment']}"
-    return series["capability"] + (f":{series['timeframe']}" if series["timeframe"] else "")
-
-
 async def revisions(ctx, selections, until):
     """The effective read revision includes corporate actions, unlike coverage."""
     gate = asyncio.Semaphore(8)

@@ -1111,7 +1111,21 @@
     {
      "name": "Research",
      "workspace": {
-      "tiles": []
+      "version": 6,
+      "panels": [],
+      "activePanelId": "",
+      "layout": {
+       "grid": {
+        "root": {
+         "type": "branch",
+         "data": []
+        },
+        "width": 1000,
+        "height": 1000,
+        "orientation": "HORIZONTAL"
+       },
+       "panels": {}
+      }
      }
     }
    ]
@@ -2479,6 +2493,28 @@
    "title": "DocInfo",
    "type": "object"
   },
+  "DockLayout": {
+   "additionalProperties": true,
+   "description": "The window's dock arrangement (dockview's serialized layout): its grid, and an entry for each panel by id.",
+   "properties": {
+    "grid": {
+     "additionalProperties": true,
+     "title": "Grid",
+     "type": "object"
+    },
+    "panels": {
+     "additionalProperties": true,
+     "title": "Panels",
+     "type": "object"
+    }
+   },
+   "required": [
+    "grid",
+    "panels"
+   ],
+   "title": "DockLayout",
+   "type": "object"
+  },
   "EffectBranch": {
    "additionalProperties": false,
    "properties": {
@@ -2826,7 +2862,7 @@
      "type": "string"
     },
     "assetBase": {
-     "description": "Where the module's files are read (its frontend entry is under it)",
+     "description": "Where the module's files are read (its frontend entry is under it); it changes with the digest",
      "title": "Assetbase",
      "type": "string"
     }
@@ -3554,10 +3590,8 @@
      "type": "string"
     },
     "workspace": {
-     "additionalProperties": true,
-     "description": "The window's layout and panel states (at most 4 MB).",
-     "title": "Workspace",
-     "type": "object"
+     "$ref": "#/$defs/WorkspaceState",
+     "description": "The window's layout and panel states (at most 4 MB)."
     },
     "summary": {
      "anyOf": [
@@ -3700,6 +3734,32 @@
     "unreadable"
    ],
    "title": "SavedList",
+   "type": "object"
+  },
+  "SavedPanel": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "description": "module:<module id>",
+     "pattern": "^module:",
+     "title": "Kind",
+     "type": "string"
+    },
+    "state": {
+     "default": null,
+     "description": "The module's own state for the panel (at most 512 KB as JSON)",
+     "title": "State"
+    }
+   },
+   "required": [
+    "id",
+    "kind"
+   ],
+   "title": "SavedPanel",
    "type": "object"
   },
   "SavedWorkspace": {
@@ -4732,6 +4792,39 @@
     "workspaceId"
    ],
    "title": "WorkspaceInput",
+   "type": "object"
+  },
+  "WorkspaceState": {
+   "additionalProperties": true,
+   "description": "A workspace as the window saves it: the dock layout and the panels in it (the layout's panels are exactly\nthese, by id).",
+   "properties": {
+    "version": {
+     "const": 6,
+     "title": "Version",
+     "type": "integer"
+    },
+    "layout": {
+     "$ref": "#/$defs/DockLayout"
+    },
+    "panels": {
+     "items": {
+      "$ref": "#/$defs/SavedPanel"
+     },
+     "title": "Panels",
+     "type": "array"
+    },
+    "activePanelId": {
+     "default": null,
+     "description": "The active panel's id; naming no panel, none is active",
+     "title": "Activepanelid"
+    }
+   },
+   "required": [
+    "version",
+    "layout",
+    "panels"
+   ],
+   "title": "WorkspaceState",
    "type": "object"
   }
  }

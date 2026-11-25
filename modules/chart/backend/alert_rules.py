@@ -78,7 +78,7 @@ class Rule:
     conditions: list[dict]          # Condition: op, amount, bars
     frequency: str
     fired_bar: int | None = None    # the bar it last fired on (kept across restarts)
-    fired_at: int | None = None     # when it last fired (once per minute)
+    fired_at: int | None = None     # when it last fired (once per minute; kept across restarts, from the log)
     before: list[Values] | None = None
     closed_before: list[Values] | None = None
     history: list[deque] = field(default_factory=list)  # closed left values per moving condition

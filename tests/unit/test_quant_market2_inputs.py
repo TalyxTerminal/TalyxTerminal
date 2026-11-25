@@ -232,7 +232,8 @@ def test_export_failure_is_fatal_for_a_list_and_retained_for_index_exclusion(tmp
         return {item["series"]["seriesId"]: {"revision": 3, "source": {"sourceId": "fixture"}} for item in selections}
     async def task(ctx, name, args, progress):
         requests.append(args)
-        return {"files": [{"content": "ohlcv:1d:split_dividend", "artifact": reference}],
+        return {"files": [{"content": "ohlcv:1d:split_dividend", "artifact": reference, "series": [
+                    item["series"]["seriesId"] for item in args["series"] if item["instrumentId"] != b["instrumentId"]]}],
                 "gaps": [], "failures": [{"instrumentId": b["instrumentId"], "problem": problem}]}
     ctx = adapt(SimpleNamespace(), tmp_path / "quant")
     monkeypatch.setattr(C, "fetch", fetch)
@@ -265,7 +266,8 @@ def test_revision_change_reexports_and_releases_the_superseded_artifact(tmp_path
         return {item["series"]["seriesId"]: {"revision": 1 if len(reads) == 1 else 2, "source": {"sourceId": "fixture"}} for item in selections}
     async def task(ctx, name, args, progress):
         exports.append(None)
-        return {"files": [{"content": "ohlcv:1d:split_dividend", "artifact": references[len(exports) - 1]}],
+        return {"files": [{"content": "market-chosen-label", "artifact": references[len(exports) - 1],
+                           "series": [item["series"]["seriesId"] for item in args["series"]]}],
                 "gaps": [], "failures": []}
     monkeypatch.setattr(M, "revisions", revisions)
     monkeypatch.setattr(C, "run_task", task)
@@ -274,6 +276,7 @@ def test_revision_change_reexports_and_releases_the_superseded_artifact(tmp_path
                           "since": 0, "until": 1705000000000, "fill": "none"}, "run"))
     assert len(exports) == 2 and kept(ctx) == [references[1]["sha256"]]   # the superseded export was let go
     assert result["manifest"]["selections"][0]["version"] == 2
+    assert read_selection(result["manifest"]["selections"][0]).close.tolist() == [51.]
     assert result["references"][0]["sha256"] == references[1]["sha256"]
     asyncio.run(C.release(ctx, result["references"], "run"))
     assert kept(ctx) == []

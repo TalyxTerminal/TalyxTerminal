@@ -158,7 +158,8 @@ def prepared_context(tmp_path, instruments):
         ref = {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "bytes": path.stat().st_size}
         artifacts[str(path)] = path
         series = selections[0]["series"]
-        return {"files": [{"content": f"ohlcv:{series['timeframe']}:{series['adjustment']}", "artifact": ref}], "failures": [], "gaps": []}
+        return {"files": [{"content": f"ohlcv:{series['timeframe']}:{series['adjustment']}", "artifact": ref,
+                           "series": [item["series"]["seriesId"] for item in selections]}], "failures": [], "gaps": []}
 
     ctx = FakeContext(tmp_path, export)
     ctx.require = lambda name: market

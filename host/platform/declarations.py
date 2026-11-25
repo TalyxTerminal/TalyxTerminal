@@ -6,7 +6,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal
 
-from pydantic import Field
+import orjson
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from talyx_sdk.declare import EffectBranches, FieldPath, Model, Module
 
 from .. import changes
@@ -41,7 +42,8 @@ class ModuleDefinition(ModuleState):
     manifest: dict[str, Json] = Field(description="talyx.module.json (version 5)")
     contract: dict[str, Json] = Field(description="public/contract.json, generated from the module's code")
     digest: str
-    assetBase: str = Field(description="Where the module's files are read (its frontend entry is under it)")
+    assetBase: str = Field(description="Where the module's files are read (its frontend entry is under it); it "
+                           "changes with the digest")
 
 
 class ModuleId(Model):
@@ -243,9 +245,51 @@ class LayoutSummary(Model):
     tiles: Annotated[list[TileSummary], Field(max_length=64)]
 
 
+# The saved-workspace format the window writes and opens (web/src/workspace/types.ts). A save is refused for exactly
+# what the window's restoreWorkspace (web/src/shell/workspacePersistence.ts) refuses to open, and for nothing else:
+# each check here is one of its checks. The rest of the layout is the dock's own, kept as the window wrote it.
+WORKSPACE_VERSION = 6
+PANEL_STATE_BYTES = 512 * 1024   # the most one panel's state may hold (web/src/runtime/moduleState.ts)
+
+
+class SavedPanel(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    id: str
+    kind: Annotated[str, Field(pattern=r"^module:", description="module:<module id>")]
+    state: Json = Field(None, description="The module's own state for the panel (at most 512 KB as JSON)")
+
+
+class DockLayout(BaseModel):
+    """The window's dock arrangement (dockview's serialized layout): its grid, and an entry for each panel by id."""
+
+    model_config = ConfigDict(extra="allow")
+    grid: dict[str, Json]
+    panels: dict[str, Json]
+
+
+class WorkspaceState(BaseModel):
+    """A workspace as the window saves it: the dock layout and the panels in it (the layout's panels are exactly
+    these, by id)."""
+
+    model_config = ConfigDict(extra="allow")
+    version: Literal[WORKSPACE_VERSION]
+    layout: DockLayout
+    panels: list[SavedPanel]
+    activePanelId: Json = Field(None, description="The active panel's id; naming no panel, none is active")
+
+    @model_validator(mode="after")
+    def window_opens_it(self):
+        for panel in self.panels:
+            if len(orjson.dumps(panel.state)) > PANEL_STATE_BYTES:
+                raise ValueError(f"panel {panel.id}'s state is over {PANEL_STATE_BYTES // 1024} KB")
+        if sorted(self.layout.panels) != sorted(panel.id for panel in self.panels):
+            raise ValueError("layout.panels must have exactly one entry for each panel's id")
+        return self
+
+
 class SaveInput(Model):
     name: Annotated[str, Field(min_length=1, max_length=200)]
-    workspace: dict[str, Json]
+    workspace: WorkspaceState
     """The window's layout and panel states (at most 4 MB)."""
     summary: LayoutSummary | None = None
     snapshotId: str | None = None
@@ -338,7 +382,10 @@ async def workspace_shown(input: Shown, call) -> Empty:
     return {}
 
 
-@module.action("workspace.save", effects=["write"], examples=[{"name": "Research", "workspace": {"tiles": []}}])
+@module.action("workspace.save", effects=["write"], examples=[{"name": "Research", "workspace": {
+    "version": 6, "panels": [], "activePanelId": "",
+    "layout": {"grid": {"root": {"type": "branch", "data": []}, "width": 1000, "height": 1000,
+                        "orientation": "HORIZONTAL"}, "panels": {}}}}])
 async def workspace_save(input: SaveInput, call) -> Saved:
     """Save the calling workspace's state (the window's layout and panels) under a name; a workspace has one saved
     state, saved over with snapshotId and the revision read. Saved from no workspace, it is a new workspace's."""

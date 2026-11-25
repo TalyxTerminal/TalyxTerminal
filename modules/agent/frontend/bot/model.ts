@@ -53,7 +53,8 @@ export interface Bot {
   memoryOn: boolean;
   notify: { needsYou: boolean; results: boolean; phone: string };
   routines: Routine[]; runs: Run[];
-  spend: { currency: string; unpriced: boolean; amounts: Record<string, string>; month: number; limit: number | null; parts: SpendPart[] };
+  /** `month` is this month's spend in the limit's currency, other currencies converted; null while `missingRates` have no exchange rate. */
+  spend: { currency: string; unpriced: boolean; amounts: Record<string, string>; month: number | null; missingRates: string[]; limit: number | null; parts: SpendPart[] };
 }
 
 /** A skill a bot can be given: one of the global skills or one of this workspace's. */

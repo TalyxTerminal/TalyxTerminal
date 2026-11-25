@@ -18,6 +18,9 @@ import logging
 from bisect import bisect_left
 from collections.abc import Callable
 
+from talyx_sdk import ContractError
+from talyx_sdk.i18n import t
+
 from vocabulary.identity import timeframe_nanoseconds
 from vocabulary.instruments import MarketInstrument, market_data_series
 
@@ -63,7 +66,6 @@ class PointsFeed:
         self.forming: dict | None = None
         self.listeners: list = []
         self.ready = asyncio.Event()
-        self.whole = asyncio.Event()  # as feeds.Feed: Market's window is whole
         self.subscription = None
         self.task: asyncio.Task | None = None
         self.timer: asyncio.TimerHandle | None = None
@@ -74,8 +76,11 @@ class PointsFeed:
         self.task = asyncio.create_task(self.run())
 
     async def run(self) -> None:
-        async for delivered in self.subscription:
-            await self.guarded(self.take(delivered))
+        try:
+            async for delivered in self.subscription:
+                await self.guarded(self.take(delivered))
+        except ContractError as error:  # Market ended the subscription with its reason
+            self.failed(error.message)
 
     async def tick(self) -> None:
         await self.guarded(self.advance())
@@ -92,9 +97,16 @@ class PointsFeed:
         if item["type"] == "status" and item["state"] == "failed":
             self.failed(item["problem"]["message"] if item["problem"] else "Market stopped the series")
         elif item["type"] == "replace":
+            page = item["page"]
             self.times, self.values = [], []
-            self.add(item["page"]["columns"])
-            await self.rebuild(item["page"]["fill"]["state"] != "filling")
+            self.add(page["columns"])
+            if not self.times and page["fill"]["state"] != "filling":
+                problem = page["fill"]["problem"]
+                self.failed(problem["message"] if problem else t(
+                    "Market returned no historical {series} points for {symbol}",
+                    series=self.series["capability"], symbol=self.instrument["displaySymbol"]))
+                return
+            await self.rebuild()
         elif item["type"] == "append":
             self.add(item["columns"])
             await self.advance()
@@ -104,6 +116,8 @@ class PointsFeed:
             await self.advance()
 
     def add(self, columns: dict) -> None:
+        if not columns["time"]:
+            return  # Market's empty page names no value column
         for time, value in zip(columns["time"], columns[self.column], strict=True):
             time = int(time) // 1_000_000
             if value is not None and (not self.times or time > self.times[-1]):
@@ -136,7 +150,7 @@ class PointsFeed:
         return {"time": opens, "closeTime": closes, "open": values[0], "high": max(values), "low": min(values),
                 "close": values[-1], "volume": None}
 
-    async def rebuild(self, whole: bool) -> None:
+    async def rebuild(self) -> None:
         now = now_ms()
         self.opens, self.closes = [], []
         self.columns = {name: [] for name in self.columns}
@@ -148,17 +162,14 @@ class PointsFeed:
             self.next = 0
             self.close_through(now)
             self.forming = self.bar(self.next, True)
-        if whole:
-            self.whole.set()
-        else:
-            self.whole.clear()
-        self.ready.set()
+        if self.times:
+            self.ready.set()
         self.notify("on_replaced")
         self.schedule()
 
     async def advance(self) -> None:
         if not self.opens:
-            await self.rebuild(self.whole.is_set())
+            await self.rebuild()
             return
         now = now_ms()
         await self.grid_through(now)

@@ -168,12 +168,12 @@ class Watching:
     """One alert on one series (a watchlist alert has one per member)."""
 
     def __init__(self, alerts: Alerts, alert: dict, member: dict, watch: SeriesWatch, fired_bar: int | None,
-                 shapes: dict[str, dict]):
+                 fired_at: int | None, shapes: dict[str, dict]):
         self.alerts, self.alert_id, self.member, self.watch = alerts, alert["id"], member, watch
         self.shapes = shapes  # the alert's copies of its drawings, by "chartId/drawingId"
         self.conditions = alert["conditions"]
         self.rule = Rule([{key: item.get(key) for key in ("op", "amount", "bars")} for item in self.conditions],
-                         alert["frequency"], fired_bar=fired_bar)
+                         alert["frequency"], fired_bar=fired_bar, fired_at=fired_at)
         self.taps: dict[str, Tap] = {}
         for condition in self.conditions:
             for operand in operands(condition):
@@ -495,6 +495,7 @@ class Alerts:
         alert_id = alert["id"]
         watchings = self.running.setdefault(alert_id, [])
         fired_bars = (self.store.object("alert_fired_bar", alert_id) or {}).get("bars", {})
+        fired_ats = self.store.last_fired(alert_id)  # once per minute counts from the last fire, across reopening
         shapes = self.store.object("alert_drawings", alert_id)["shapes"]
         try:
             members = await self.members(workspace, alert)
@@ -514,7 +515,8 @@ class Alerts:
                         watch = self.watches[series["seriesId"]] = SeriesWatch(self, feed)
                     else:
                         await self.hub.release(feed)
-                watching = Watching(self, alert, instrument, watch, fired_bars.get(instrument["instrumentId"]), shapes)
+                watching = Watching(self, alert, instrument, watch, fired_bars.get(instrument["instrumentId"]),
+                                    fired_ats.get(instrument["instrumentId"]), shapes)
                 watch.watchings.append(watching)
                 watchings.append(watching)
                 added.append(watching)

@@ -285,6 +285,42 @@ def test_criterion_7_four_frequencies_with_three_crossings_inside_one_bar(tmp_pa
     asyncio.run(main())
 
 
+def test_once_per_minute_counts_from_the_last_fire_after_the_workspace_reopens(tmp_path, monkeypatch):
+    """Reopening (or restarting) brought back only the fired bar: a crossing on the next bar fired again within the
+    minute. The last fire's time comes from the log."""
+    from modules.chart.backend import alerting
+    clock = {"now": 1_000_000}
+    monkeypatch.setattr(alerting, "now_ms", lambda: clock["now"])
+
+    async def main():
+        rows = flat(60)
+        market = FakeMarket()
+        app = make(tmp_path, market)
+        app.workspace_opened("w1")
+        alert = await app.create_alert("w1", series_alert(BTC, op="crossing_up", frequency="once_per_minute"))
+        session = await market.session(BTC["instrumentId"])
+        session.replace(rows[:50])
+        session.status("live")
+        for second, index, close in ((0, 50, 95.0), (1, 50, 101.0)):  # fires at 1 s
+            clock["now"] = 1_000_000 + second * 1000
+            session.update({**rows[index], "close": close})
+            await session.drained()
+        app.workspace_closed("w1")
+        app.workspace_opened("w1")
+        await settle(lambda: alert["id"] in app.alerts.running and not app.alerts.starting)
+        session = await market.session(BTC["instrumentId"])
+        session.replace(rows[:51])
+        session.status("live")
+        for second, close in ((20, 95.0), (30, 102.0), (40, 95.0), (61, 103.0)):  # 29 s and 60 s after the fire
+            clock["now"] = 1_000_000 + second * 1000
+            session.update({**rows[51], "close": close})
+            await session.drained()
+        times = sorted(event["at"] for event in app.store.fired("w1", alert["id"], None, 10))
+        assert times == [1_001_000, 1_061_000]
+        await app.close()
+    asyncio.run(main())
+
+
 def test_an_indicator_condition_reads_the_instance_rows(tmp_path):
     async def main():
         market = FakeMarket()

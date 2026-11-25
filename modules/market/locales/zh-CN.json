@@ -243,6 +243,7 @@
   "No source quotes {symbol}": "没有数据源提供 {symbol} 的报价",
   "No source settings were changed by this call.": "本次调用未更改数据源设置。",
   "No source streams {capability} for {symbol}": "没有数据源推送 {symbol} 的 {capability}",
+  "No source provides {capability} history for {symbol}": "没有数据源提供 {symbol} 的 {capability} 历史数据",
   "No stored rows for {symbol}": "没有已存的 {symbol} 记录",
   "No such instrument": "没有此品种",
   "No trading calendar before ex-date {ex}": "除权除息日 {ex} 之前没有交易日历",

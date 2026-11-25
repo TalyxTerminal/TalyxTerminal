@@ -83,12 +83,45 @@ def test_a_screen_run_can_be_cancelled_and_crossing_looks_at_the_bar_before(tmp_
         await app.run_screen("w1", ScreenId(screenId=saved["id"]))
         cancelled = await app.cancel_screen("w1", ScreenId(screenId=saved["id"]))
         assert cancelled["lastRun"]["state"] == "cancelled"
+        other = app.screens.save("other", None, None, {
+            key: saved[key] for key in ("name", "scope", "timeframe", "conditions")})
+        await app.run_screen("other", ScreenId(screenId=other["id"]))
+        await app.run_screen("w1", ScreenId(screenId=saved["id"]))
+        task = app.screens.runs[saved["id"]]
+        await asyncio.sleep(0)
+        app.workspace_closed("w1")
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert app.screens.get("w1", saved["id"])["lastRun"]["state"] == "cancelled"
+        assert not app.screens.runs[other["id"]].done()
         with pytest.raises(ContractError):
             await app.save_screen("w1", ScreenSave.model_validate({"spec": {
                 "name": "Bad", "scope": {"kind": "instruments", "instruments": [BTC]}, "timeframe": "1m",
                 "conditions": [{"left": {"kind": "drawing", "chartId": "c", "drawingId": "d"}, "op": "greater",
                                 "right": {"kind": "value", "value": 1}}]}}))
         await app.close()
+    asyncio.run(main())
+
+
+def test_a_run_chart_stopped_in_is_failed_on_the_next_start_and_runs_again(tmp_path):
+    """Its task ended with the process: the panel would show Cancel for good, and cancel found nothing to stop."""
+    async def main():
+        market = FakeMarket()
+        market.histories = {BTC["instrumentId"]: history(5, 200.0)}
+        app = ChartApp(market, tmp_path / "data", tmp_path / "indicators")
+        saved = await app.save_screen("w1", ScreenSave.model_validate({"spec": {
+            "name": "Up", "scope": {"kind": "instruments", "instruments": [BTC]}, "timeframe": "1m",
+            "conditions": [{"left": {"kind": "price"}, "op": "greater", "right": {"kind": "value", "value": 100}}]}}))
+        market.read_gate = asyncio.Event()  # the run waits on Market when Chart stops
+        await app.run_screen("w1", ScreenId(screenId=saved["id"]))
+        await app.close()  # its task goes with it; the stored run still says running
+        again = ChartApp(market, tmp_path / "data", tmp_path / "indicators")
+        run = again.screens.get("w1", saved["id"])["lastRun"]
+        assert run["state"] == "failed" and run["finishedAt"] is not None and run["error"]
+        market.read_gate = None
+        await again.run_screen("w1", ScreenId(screenId=saved["id"]))
+        assert (await finished(again, saved["id"]))["lastRun"]["state"] == "completed"
+        await again.close()
     asyncio.run(main())
 
 

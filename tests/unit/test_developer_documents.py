@@ -391,6 +391,21 @@ def test_a_long_document_is_read_a_page_of_lines_at_a_time():
     assert len(json.dumps(first).encode()) <= actions.PAGE_BYTES
     rest = actions.read_lines(dict(snapshot), first["nextLine"], 3)
     assert rest["content"] == "".join(f"line {number}\n" for number in range(first["nextLine"], first["nextLine"] + 3))
+def test_a_clean_file_under_the_editor_limit_is_read_whole_in_one_answer():
+    """The editor opens files up to 16 MiB with one full read; without unsaved edits the saved text is the content and
+    is not sent a second time, so a 9 MiB file fits the 16 MiB a call answers with (two copies would not)."""
+    from talyx_sdk import wire
+
+    from modules.developer.backend.models import ReadDocumentInput
+    content = "x = 1\n" * (9 * 1024 * 1024 // 6)
+    snapshot = {"documentId": "document:1", "content": content, "baseContent": content, "version": 1}
+    whole = actions.read_page(snapshot, ReadDocumentInput(documentId="document:1", full=True))
+    assert whole["content"] == content and whole["baseContent"] is None
+    assert len(wire.encode(whole)) <= wire.MAX_BODY
+    edited = actions.read_page({**snapshot, "content": "y = 2\n"}, ReadDocumentInput(documentId="document:1", full=True))
+    assert edited["baseContent"] == content
+
+
 def test_a_long_single_line_pages_through_both_versions_at_character_offsets():
     from modules.developer.backend.documents import actions
     snapshot = {"content":"工" * 18_001,"baseContent":"Saved\t" * 8_000}

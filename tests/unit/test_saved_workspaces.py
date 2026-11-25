@@ -204,3 +204,35 @@ def test_corruption_is_reported_per_snapshot_and_other_workspaces_still_save(tmp
             await store.load(bad.stem)
 
     asyncio.run(scenario())
+
+
+def test_the_save_action_takes_only_a_workspace_the_window_can_open():
+    """workspace.save checks what the window's restore checks: format 6, a layout whose panels are exactly the panels,
+    each panel a module's with at most 512 KB of state. Its own example saves."""
+    from pydantic import ValidationError
+    from talyx_sdk.process import Codec
+
+    from host.platform.declarations import module
+
+    spec = module.actions["workspace.save"]
+    codec = Codec(spec.input)
+    for example in spec.examples:
+        codec.parse(orjson.dumps(example))
+    panel = {"id": "p1", "kind": "module:chart", "state": {"chartId": "c1"}}
+    from tests.platform.harness import window_state
+    good = window_state(panel)
+    assert codec.parse(orjson.dumps({"name": "Desk", "workspace": good})).workspace.layout.panels == good["layout"]["panels"]
+    floating = {**good["layout"], "grid": window_state()["layout"]["grid"], "floatingGroups": [{
+        "data": {"id": "floating", "views": ["p1"]}, "position": {"left": 20, "top": 20, "width": 100, "height": 100}}]}
+    codec.parse(orjson.dumps({"name": "Floating", "workspace": {**good, "layout": floating}}))
+    # What restore opens anyway (a grid it rebuilds, an active id naming no panel) is saved too.
+    for opened in ({**good, "layout": {**good["layout"], "grid": {}}}, {**good, "activePanelId": "missing"}):
+        codec.parse(orjson.dumps({"name": "Desk", "workspace": opened}))
+    refused = [{"tiles": []}, {**good, "layout": {**good["layout"], "grid": []}}, {**good, "panels": [{**panel, "id": 1}]},
+               {**good, "version": 5}, {**good, "layout": {**good["layout"], "panels": {}}},
+               {**good, "panels": [panel, panel], "layout": good["layout"]},
+               {**good, "panels": [{**panel, "kind": "chart"}]}, {**good, "layout": {"panels": {"p1": {}}}},
+               {**good, "panels": [{**panel, "state": {"text": "x" * (512 * 1024)}}]}]
+    for workspace in refused:
+        with pytest.raises(ValidationError):
+            codec.parse(orjson.dumps({"name": "Desk", "workspace": workspace}))

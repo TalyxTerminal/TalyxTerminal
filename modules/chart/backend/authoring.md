@@ -57,6 +57,9 @@ def main(length: int = input.int(50, "Length", minval=1)):
 - `DESCRIPTION` and `CATEGORY` are optional. Chart shows them in the indicator list. Without a
   category, the indicator goes under "Other".
 - `alertcondition(condition, title="...")` gives alerts a condition to trigger on.
+- A colour the user should be able to change on its own (a rising and a falling colour of one plot) is an
+  input: `up: color.Color = input.color(color.teal, "Up color")`, then `color=up if rising else down`. The
+  colour box on the Style tab paints the whole output in one colour.
 
 ## State across bars
 

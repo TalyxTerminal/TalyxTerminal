@@ -127,6 +127,7 @@ export const chartStyles = `
 .chart-settings-nav { flex: none; display: flex; flex-direction: column; gap: 2px; width: 150px; padding-right: var(--tx-space-2); border-right: var(--tx-hairline) solid var(--tx-line); }
 .chart-settings-nav > .tx-btn { justify-content: flex-start; }
 .chart-settings-page { flex: 1 1 auto; min-width: 280px; padding-top: 0; }
+.chart-settings-group { padding-top: var(--tx-space-1); font-size: var(--tx-size-xs); color: var(--tx-text-3); }
 .chart-style-row { display: flex; align-items: center; gap: var(--tx-space-2); flex-wrap: wrap; }
 .chart-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tx-space-1) var(--tx-space-3); }
 .chart-condition { display: flex; flex-direction: column; gap: var(--tx-space-1); }

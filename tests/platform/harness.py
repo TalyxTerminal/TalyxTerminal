@@ -56,6 +56,15 @@ def write_contract(directory: Path) -> dict:
     return contract
 
 
+def window_state(*panels: dict) -> dict:
+    """A workspace as the window saves it (format 6) with these panels, each ``{id, kind, state}``."""
+    leaves = [{"type": "leaf", "data": {"id": f"group-{i}", "views": [panel["id"]]}} for i, panel in enumerate(panels)]
+    return {"version": 6, "activePanelId": panels[0]["id"] if panels else "", "panels": list(panels),
+            "layout": {"grid": {"root": {"type": "branch", "data": leaves}, "width": 1000, "height": 1000,
+                                "orientation": "HORIZONTAL"},
+                       "panels": {panel["id"]: {"id": panel["id"], "contentComponent": "module"} for panel in panels}}}
+
+
 def user(workspace: str | None) -> dict:
     return {"origin": "user", "module": None, "workspaceId": workspace, "session": None}
 
@@ -93,10 +102,12 @@ class Running:
 
 @asynccontextmanager
 async def running(tmp_path: Path, test_modules: tuple[str, ...] = ("echo", "consumer", "late"),
-                  official_root: Path | None = None, only: set[str] | None = None, wait: tuple[str, ...] | None = None):
+                  official_root: Path | None = None, only: set[str] | None = None, wait: tuple[str, ...] | None = None,
+                  data_dir: Path | None = None, user_dir: Path | None = None):
     root = official_root or prepare(tmp_path / "modules", test_modules)
     port = free_port()
-    host = Host(HostConfig(data_dir=tmp_path / "data", user_dir=tmp_path / "user", port=port, official_root=root,
+    host = Host(HostConfig(data_dir=data_dir or tmp_path / "data", user_dir=user_dir or tmp_path / "user", port=port,
+                           official_root=root,
                            ui_url=f"http://127.0.0.1:{port}/",
                            secrets_store=MemorySecrets(), only=only))
     server = uvicorn.Server(uvicorn.Config(create_app(host), **server_options(port)))

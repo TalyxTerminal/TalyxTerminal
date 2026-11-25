@@ -146,6 +146,16 @@ def _digest(directory: Path, manifest: dict, contract: dict) -> str:
     return value.hexdigest()[:32]
 
 
+def remove_code(directory: Path, name: str) -> None:
+    """Delete an installed module's code folder; what cannot be deleted (a file another program holds) is said."""
+    try:
+        shutil.rmtree(directory)
+    except OSError as exc:
+        raise ContractError("unavailable", t(
+            "Some files of {name} could not be removed ({exc}). Close the programs using its folder {folder}, then "
+            "uninstall it again.", name=name, exc=exc, folder=directory)) from exc
+
+
 @dataclass
 class UnreadableModule:
     directory: Path
@@ -207,7 +217,10 @@ class Catalog:
         if contract.get("module") != manifest["id"]:
             raise ContractError("invalid_module", t("{id}: the contract belongs to {value}", id=manifest['id'], value=contract.get('module')))
         locale_files(directory, manifest)
-        item = Installed(manifest["id"], directory, manifest, contract, source, _digest(directory, manifest, contract),
+        # An installed entry can import arbitrary relative files, including ones outside its own folder.
+        # Give the whole asset tree fresh URLs on each load without crawling the user's project.
+        digest = uuid4().hex if source == "installed" else _digest(directory, manifest, contract)
+        item = Installed(manifest["id"], directory, manifest, contract, source, digest,
                          enabled=manifest["id"] not in self.disabled)
         if item.enabled and "ai" in manifest:
             item.guide = read_guide(directory, manifest["ai"]["guide"])
@@ -284,9 +297,11 @@ class Catalog:
         return item
 
     def uninstall(self, module_id: str) -> None:
+        """Remove the module's code folder (its data folder stays: installed again, it finds its data). It stays
+        installed until its folder is gone, so a folder another program holds can be uninstalled again by its id."""
         item = self.get(module_id)
+        remove_code(item.directory, item.manifest["name"])
         del self.modules[module_id]
-        shutil.rmtree(item.directory)
         shutil.rmtree(self.environments_root / module_id, ignore_errors=True)
         self.disabled.discard(module_id)
         self.save_state()

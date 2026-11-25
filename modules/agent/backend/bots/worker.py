@@ -317,6 +317,9 @@ class BotWorker:
             )
         }
         for row in sorted(rows, key=lambda r: PRIORITY[json.loads(r["cause"])["kind"]]):
+            if not self.db.execute("SELECT 1 FROM bot_wakes WHERE id=? AND result IS NULL AND turn_id IS NULL",
+                                   (row["id"],)).fetchone():
+                continue   # settled while an earlier wake started (its routine deleted)
             bot = row["bot"]
             if bot and self.agent.usage.group_status(bot)["paused"]:
                 with self.store.transaction():

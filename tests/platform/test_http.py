@@ -26,8 +26,8 @@ def test_every_http_error_has_the_one_error_body(tmp_path):
             async with httpx.AsyncClient(timeout=30) as client:
                 answers = {
                     "private route without a window": await client.get(f"{base}/m/echo/hello"),
-                    "missing module file": await client.get(f"{base}/api/modules/nobody/files/a.js"),
-                    "missing file": await client.get(f"{base}/api/modules/echo/files/none.js"),
+                    "missing module file": await client.get(f"{base}/api/modules/nobody/files/v1/a.js"),
+                    "missing file": await client.get(f"{base}/api/modules/echo/files/v1/none.js"),
                     "running code without a run": await client.post(f"{base}/api/runs/call",
                                                                     json={"action": "echo.whoami"}),
                     "MCP of a closed workspace": await client.post(f"{base}/mcp/workspaces/closed", json={}),

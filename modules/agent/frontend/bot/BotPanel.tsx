@@ -312,9 +312,11 @@ export function BotPanel({ ctx, mode, initialLine }: { ctx: ModuleContext; mode?
           attachments[member] = ids;
         }
       }
-      await botRequest(ctx, "send", { ...args, attachments });
+      const { skipped } = await botRequest<{ skipped: { botId: string; name: string; reason: string }[] }>(ctx, "send", { ...args, attachments });
       setReply(null);
-      await refresh();
+      // Sent to the others: the message is posted, so nothing is put back to send again.
+      for (const item of skipped) toast({ title: t("{name} didn't get this message", { name: item.name }), detail: item.reason, tone: "info" });
+      void refresh().catch(fail);
     })();
     work.catch(fail);
     return work;

@@ -64,6 +64,26 @@ def test_statistics_over_time_are_fitted_on_the_training_segment_only():
     assert np.array_equal(before["train"]["x"], after["train"]["x"]) and not np.array_equal(before["test"]["x"], after["test"]["x"])
 
 
+def test_listed_under_a_year_is_a_calendar_year_from_the_first_price():
+    """A crypto pair trading every day, first priced 2021-03-01: its first row is 2022-03-01, not its 252nd bar (2021-11-07); a weekday stock first priced
+    2021-03-01 also on 2022-03-01, not on its 252nd bar (2022-02-15). A name priced on the data's first bar was listed before it."""
+    def rows(labels, first):
+        count = len(labels)
+        close = np.full((count, 2), 100.0)
+        close[:first, 1] = np.nan
+        fields = {"close": close, "volume": np.ones((count, 2))}
+        data = W.Panel(labels, ["OLD", "NEW"], fields, np.ones((count, 2), dtype=bool), {"annualization": 252, "timeframe": "1d"})
+        keep = D.rows_of(data, {"halted": True, "young": True, "illiquid": False})
+        return pd.to_datetime(labels[keep[:, 1].argmax()], unit="ms"), keep[:, 0].all()
+
+    every_day = pd.date_range("2021-01-01", "2023-01-01", freq="D").as_unit("ms").asi8
+    first, old = rows(every_day, int(np.searchsorted(every_day, pd.Timestamp("2021-03-01").value // 10**6)))
+    assert first == pd.Timestamp("2022-03-01") and old
+    weekdays = pd.bdate_range("2021-01-01", "2023-01-01").as_unit("ms").asi8
+    first, old = rows(weekdays, int(np.searchsorted(weekdays, pd.Timestamp("2021-03-01").value // 10**6)))
+    assert first == pd.Timestamp("2022-03-01") and old
+
+
 def test_the_label_is_the_return_from_the_next_open():
     p = panel()
     label = D.label_of(p, 5)

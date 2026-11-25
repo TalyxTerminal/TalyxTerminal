@@ -9,15 +9,14 @@ import { ProjectDialog } from "./ProjectDialog";
 import { Recovery } from "./Recovery";
 import { DeveloperHelp } from "./Help";
 import { FileHistory } from "./FileHistory";
-import { ExternalChanges } from "./ExternalChanges";
 import { FileTree } from "./FileTree";
 import { EditorPane } from "./EditorPane";
 import { ModuleBar } from "./ModuleBar";
 import "./workbench.css";
 
-type Utility = "recovery" | "help" | "history" | "changes";
+type Utility = "recovery" | "help" | "history";
 export interface WorkbenchState { activeProjectId?: string | null; sources?: DocumentSource[]; activeSource?: DocumentSource | null; treeWidth?: number; checkpoint?: CheckpointReference }
-const utilityNames: Record<Utility, string> = { recovery: t("Recovery"), help: t("Developer help"), history: t("File history"), changes: t("External changes") };
+const utilityNames: Record<Utility, string> = { recovery: t("Recovery"), help: t("Developer help"), history: t("File history") };
 
 export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext; onStateChange?(state: WorkbenchState): void }) {
   useSyncExternalStore(documents.watch, documents.state, documents.state);
@@ -102,8 +101,10 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
     if (file) await documents.open({ kind: "file", uri: file, projectId });
   };
   const save = async () => { if (active && !active.readOnly) await documents.save(active.documentId); };
-  const conflicts = [...documents.entries.keys()].filter(id => documents.review(id));
+  // A document to review shows on its tab and above the editor; one that has no tab (closed with unsaved edits) is named here.
+  const conflicts = [...documents.entries.keys()].filter(id => documents.review(id) && !documents.tabs.includes(id));
   const conflictTitles = new Set(conflicts.map(id => documents.review(id)));
+  const openConflicts = () => { for (const id of [...conflicts].reverse()) documents.show(id); };
   const recentProjects = [...projects].sort((a, b) => (b.lastOpened ?? "").localeCompare(a.lastOpened ?? ""));
   const switchItems: TxMenuItem[] = [
     ...recentProjects.map(item => ({ id: item.projectId, label: item.name, checked: project?.projectId === item.projectId, onSelect: () => run(() => openProject(item)) })),
@@ -112,7 +113,7 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
     { id: "remove", label: t("Remove project…"), separated: true, disabled: !project || project.readOnly, onSelect: () => { if (project) { setRemoveError(null); setRemoving(project); } } },
   ];
   const utilities: TxMenuItem[] = [
-    ...(["history", "changes", "recovery", "help"] as Utility[]).map(name => ({ id: name, label: utilityNames[name], onSelect: () => setUtility(name) })),
+    ...(["history", "recovery", "help"] as Utility[]).map(name => ({ id: name, label: utilityNames[name], onSelect: () => setUtility(name) })),
     { id: "close", label: t("Close project"), disabled: !project, onSelect: () => { if (project) closeProject(project); } },
   ];
   return <div className="developer-workspace">
@@ -127,10 +128,10 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
     </header>
     {(error || documents.error) && <TxAlert title={t("Developer needs attention")} actions={<TxButton size="sm" onClick={() => { setError(null); documents.error = null; documents.changed(); }}>{t("Dismiss")}</TxButton>}>{error ?? documents.error}</TxAlert>}
     {problem && module && <TxAlert title={t("{name} couldn't start", { name: module.name })}><pre className="developer-project-output">{problem}</pre></TxAlert>}
-    {!!conflicts.length && <TxAlert title={conflictTitles.size === 1 ? [...conflictTitles][0]! : t("Changed elsewhere")} actions={<TxButton onClick={() => setUtility("changes")}>{t("Review")}</TxButton>}>{conflicts.map(id => documents.snapshot(id).name).join(", ")}</TxAlert>}
+    {!!conflicts.length && <TxAlert title={conflictTitles.size === 1 ? [...conflictTitles][0]! : t("Changed elsewhere")} actions={<TxButton onClick={openConflicts}>{t("Review")}</TxButton>}>{conflicts.map(id => documents.snapshot(id).name).join(", ")}</TxAlert>}
     {!!documents.checkpointConflicts.length && <TxAlert title={t("Files saved with the workspace differ")} actions={<TxButton onClick={() => setUtility("recovery")}>{t("Compare versions")}</TxButton>}>{t("Your current edits and the saved versions are both kept.")}</TxAlert>}
     <TxSplit sideLabel={t("Project files")} width={treeWidth} onWidth={setTreeWidth} min={160} max={480} mainMin={320} sideHidden={!project} side={project && <FileTree ctx={ctx} project={project} />}>
-      <EditorPane onReviewChanges={() => setUtility("changes")} onError={setError} />
+      <EditorPane compare={setCompare} onError={setError} />
     </TxSplit>
     <TxDialog open={!!removing} onOpenChange={open => { if (!open && !removingBusy) setRemoving(null); }} title={t("Remove project")} footer={<><TxButton disabled={removingBusy} onClick={() => setRemoving(null)}>{t("Cancel")}</TxButton><TxButton disabled={removingBusy} onClick={() => void confirmRemove("forget")}>{t("Remove from list")}</TxButton><TxButton variant="primary" disabled={removingBusy || removing?.status !== "available"} onClick={() => void confirmRemove("trash")}>{t("Move to Recycle Bin")}</TxButton></>}>
       <p>{removing?.name}</p><p style={{ overflowWrap: "anywhere" }}>{removing?.root}</p>
@@ -142,7 +143,6 @@ export function DeveloperWorkbench({ ctx, onStateChange }: { ctx: ModuleContext;
       {utility === "recovery" && <Recovery compare={setCompare} onOpened={() => setUtility(null)} />}
       {utility === "help" && <DeveloperHelp ctx={ctx} onOpened={() => setUtility(null)} />}
       {utility === "history" && <FileHistory ctx={ctx} compare={setCompare} />}
-      {utility === "changes" && <ExternalChanges compare={setCompare} />}
     </TxSheet>
     <CompareDialog request={compare} onClose={() => setCompare(null)} />
   </div>;

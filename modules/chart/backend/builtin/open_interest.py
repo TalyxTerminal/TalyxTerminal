@@ -4,6 +4,7 @@ from pynecore.lib import (
     color,
     format,
     high,
+    input,
     low,
     open,
     plotcandle,
@@ -18,8 +19,9 @@ DESCRIPTION = ("Open interest of the chart's contract as candles, teal when it r
 CATEGORY = 'Volume'
 
 @script.indicator('Open Interest', shorttitle='OI', overlay=False, format=format.volume)
-def main():
+def main(up_color: color.Color = input.color(color.teal, "Up color"),
+         down_color: color.Color = input.color(color.red, "Down color")):
     oi_open, oi_high, oi_low, oi_close, rising = request.security(
         syminfo.tickerid + "_OI", timeframe.period, (open, high, low, close, close > close[1]))
-    shade = color.teal if rising else color.red
+    shade = up_color if rising else down_color
     plotcandle(oi_open, oi_high, oi_low, oi_close, "Open Interest", color=shade, wickcolor=shade, bordercolor=shade)

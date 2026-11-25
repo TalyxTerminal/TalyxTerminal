@@ -28,12 +28,9 @@ DESCRIPTION = ("Fixed Range Volume Profile: volume by price between two times fr
                "start it begins with the chart's data; without an end it follows the latest bar.")
 CATEGORY = 'Volume'
 
-UP = color.rgb(41, 98, 255)
-DOWN = color.rgb(251, 192, 45)
-
-
-def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area):
-    """Boxes (up and down volume per price row) and the point-of-control line of one range."""
+def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area, colors):
+    """Boxes (up and down volume per price row) and the point-of-control line of one range (``colors``: up, down,
+    point of control)."""
     top, bottom = max(highs), min(lows)
     step = (top - bottom) / rows if top > bottom else 1.0
     up, down = array.new_float(rows, 0.0), array.new_float(rows, 0.0)
@@ -60,6 +57,7 @@ def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area):
         else:
             low_row -= 1
             inside += below
+    up_color, down_color, poc_color = colors
     width = (end - start) * 0.7
     boxes = []
     for row in range(rows):
@@ -68,13 +66,13 @@ def profile(start, end, highs, lows, opens, closes, volumes, rows, value_area):
         down_right = up_right + int(width * down[row] / peak)
         row_bottom, row_top = bottom + row * step, bottom + (row + 1) * step
         if up[row] > 0:
-            boxes.append(box.new(start, row_top, up_right, row_bottom, border_color=color.new(UP, 100),
-                                 bgcolor=color.new(UP, strength), xloc=xloc.bar_time))
+            boxes.append(box.new(start, row_top, up_right, row_bottom, border_color=color.new(up_color, 100),
+                                 bgcolor=color.new(up_color, strength), xloc=xloc.bar_time))
         if down[row] > 0:
-            boxes.append(box.new(up_right, row_top, down_right, row_bottom, border_color=color.new(DOWN, 100),
-                                 bgcolor=color.new(DOWN, strength), xloc=xloc.bar_time))
+            boxes.append(box.new(up_right, row_top, down_right, row_bottom, border_color=color.new(down_color, 100),
+                                 bgcolor=color.new(down_color, strength), xloc=xloc.bar_time))
     middle = bottom + (poc + 0.5) * step
-    return boxes, [line.new(start, middle, end, middle, xloc=xloc.bar_time, color=color.rgb(242, 54, 69), width=2)]
+    return boxes, [line.new(start, middle, end, middle, xloc=xloc.bar_time, color=poc_color, width=2)]
 
 
 @script.indicator('Fixed Range Volume Profile', shorttitle='FRVP', overlay=True, max_boxes_count=500,
@@ -83,7 +81,10 @@ def main(start_time: int = input.time(0, "From"), end_time: int = input.time(0, 
          rows: int = input.int(24, "Row size", minval=1, maxval=100),
          value_area: float = input.float(70.0, "Value area volume %", minval=1.0, maxval=100.0),
          custom: bool = input.bool(False, "Use custom timeframe"),
-         chosen: str = input.timeframe("1", "Timeframe")):
+         chosen: str = input.timeframe("1", "Timeframe"),
+         up_volume: color.Color = input.color(color.rgb(41, 98, 255), "Up Volume"),
+         down_volume: color.Color = input.color(color.rgb(251, 192, 45), "Down Volume"),
+         poc: color.Color = input.color(color.rgb(242, 54, 69), "POC")):
     lower = chosen if custom else lower_timeframe(timeframe.in_seconds())
     highs, lows, opens, closes, volumes = request.security_lower_tf(
         syminfo.tickerid, lower, (high, low, open, close, volume))
@@ -114,7 +115,7 @@ def main(start_time: int = input.time(0, "From"), end_time: int = input.time(0, 
         for item in drawn_lines:
             line.delete(item)
         boxes, lines = profile(start, end, range_highs, range_lows, range_opens, range_closes, range_volumes, rows,
-                               value_area)
+                               value_area, (up_volume, down_volume, poc))
         drawn_boxes.clear()
         drawn_boxes.extend(boxes)
         drawn_lines.clear()

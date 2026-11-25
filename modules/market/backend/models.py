@@ -651,7 +651,12 @@ class File(Model):
     )
     content: str
     """
-    ohlcv:<timeframe>:<adjustment>, <capability>:<timeframe>, research:<kind> or professional:<materialId>@<version>.
+    ohlcv:<timeframe>:<adjustment> (ohlcv:<timeframe>:<priceBasis>:<adjustment> for mark, index or premium prices), <capability>:<timeframe>,
+    research:<kind> or professional:<materialId>@<version>; an imported series adds @<importId>. Two series of one instrument never share a file.
+    """
+    series: list[str]
+    """
+    The seriesId of each selected series whose rows are in this file (none for research rows and professional materials).
     """
     artifact: Artifact | None
     rows: Annotated[int, Field(ge=0)]
@@ -679,6 +684,10 @@ class Failure1(Model):
         extra="forbid",
     )
     instrumentId: str
+    seriesId: str
+    """
+    The series left out; the instrument's other series are still written.
+    """
     problem: Problem
 
 

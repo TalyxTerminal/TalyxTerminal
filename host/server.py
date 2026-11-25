@@ -295,8 +295,10 @@ def create_app(host: Host) -> FastAPI:
         except ContractError as exc:
             return failed(exc, 400 if exc.execution == "not_started" else 500)
 
-    @app.get("/api/modules/{module_id}/files/{path:path}")
-    async def module_file(module_id: str, path: str):
+    @app.get("/api/modules/{module_id}/files/{digest}/{path:path}")
+    async def module_file(module_id: str, digest: str, path: str):
+        # The digest only names the version: a frontend's files imported from one another all get new addresses when
+        # any of them changed, so a window never keeps an old one it had already loaded.
         item = host.catalog.modules.get(module_id)
         if item is None:
             return failed(ContractError("not_found", t("No module {module_id} is installed", module_id=module_id)), 404)

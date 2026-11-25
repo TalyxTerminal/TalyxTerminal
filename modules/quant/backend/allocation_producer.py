@@ -8,7 +8,7 @@ import shutil
 import pandas as pd
 from talyx_sdk import ContractError
 
-from ..native.allocation_prices import daily_returns
+from ..native.allocation_prices import daily_returns, observations_a_year
 from . import allocation_prep, library_after, research_data
 from .allocation_runs import with_pool_market
 from .library_produce import Made, UpdateFailure, day_of
@@ -77,7 +77,7 @@ class AllocationProducer:
             prices = aligned["closes"].rename(columns=instruments)
             prices.index = prices.index.as_unit("ms").asi8
             return Made(rows=frame[frame["instrument"].notna()], present=present, prices=prices, total=len(instruments),
-                        risk_free=library_after.rate_per_bar(rate, present, info["annualization"]), solver={int(key): value for key, value in answer["solver"].items()})
+                        risk_free=library_after.rate_per_bar(rate, prices.index, observations_a_year(settings, info["annualization"])), solver={int(key): value for key, value in answer["solver"].items()})
         finally:
             shutil.rmtree(filesystem_path(directory), ignore_errors=True)
 

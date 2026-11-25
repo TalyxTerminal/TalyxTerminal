@@ -8,7 +8,7 @@ import { post } from "../api";
 import { chartEntry, message, openOverlay, useStore } from "../store";
 import { overlayTool } from "../drawings/registry";
 import { timeframeLabel } from "../chart/timeframes";
-import type { AlertSpec, Frequency } from "../wire";
+import type { Alert, AlertSpec, Frequency } from "../wire";
 import { ConditionFields, OPS, indicatorSources, type Sources } from "./conditions";
 
 const FREQUENCIES: { value: Frequency; label: string }[] = [
@@ -18,6 +18,10 @@ const FREQUENCIES: { value: Frequency; label: string }[] = [
 
 /** Drawings an alert can watch: lines and channels. */
 export const ALERT_TOOLS: string[] = ["trendline", "ray", "extended_line", "hline", "horizontal_ray", "parallel_channel"];
+
+/** The fields of an alert that are its spec: an update takes these and nothing else. */
+const specOf = ({ target, conditions, frequency, expiresAt, message, name, channels }: Alert): AlertSpec =>
+  ({ target, conditions, frequency, expiresAt, message, name, channels });
 
 /** The sources this chart offers, keyed for a select. */
 function useSources(chartId: string): Sources {
@@ -38,7 +42,7 @@ export function AlertDialog({ ctx, panelId, chartId, alertId, price, drawingId }
   const watchlists = useStore(state => state.watchlists);
   const sources = useSources(chartId);
   const feed = chartEntry(chartId).feed, last = feed.bars.close[feed.bars.close.length - 1] ?? 0;
-  const [spec, setSpec] = useState<AlertSpec | null>(() => existing ?? (chart ? {
+  const [spec, setSpec] = useState<AlertSpec | null>(() => existing ? specOf(existing) : (chart ? {
     target: { kind: "series", instrument: chart.document.instrument, series: chart.document.series, chartId },
     conditions: [{ left: drawingId ? { kind: "drawing", chartId, drawingId } : { kind: "price", field: "close" }, op: "crossing", right: drawingId ? { kind: "price", field: "close" } : { kind: "value", value: price ?? last } }],
     frequency: "once", expiresAt: null, message: "", name: null,

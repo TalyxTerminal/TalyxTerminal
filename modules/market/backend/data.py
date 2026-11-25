@@ -250,7 +250,8 @@ class Data:
         _, closes = calendars.bar_grid(calendar, target, max(start, end - step), end, plan.series.sessionScope)
         return max(end, int(closes[-1])) if len(closes) else end
 
-    def missing(self, plan: Plan, start: int, end: int, retry_unavailable: bool = False) -> list[tuple[int, int]]:
+    def missing(self, plan: Plan, start: int, end: int, retry_unavailable: bool = False,
+                *, now: int | None = None) -> list[tuple[int, int]]:
         """What to ask the source for in [start, end): not stored, within what some layer of the source reaches, and
         not recorded unavailable with its retry time still ahead (unless ``retry_unavailable``: a fetch the user or
         AI asked for)."""
@@ -258,7 +259,8 @@ class Data:
         if pointer and not pointer["parts"] and pointer["source"] != plan.source_id:
             pointer = None  # an empty response from another source says nothing about this source
         spans = pointer["spans"] if pointer else []
-        now = now_ns()
+        if now is None:
+            now = now_ns()
         end = self.reach_end(plan, self.base_end(plan, start, end), now)
         # Vocabulary times are non-negative nanoseconds: nothing before 1970 is asked for or kept (IBM's history
         # from 1962 starts at 1970 here).
@@ -298,10 +300,11 @@ class Data:
                 plan.source_id = pointer["source"]
                 plan.period = self._period(plan.source_id, plan.instrument, plan.base)
             # Pointer, actions and identity reads are files and SQLite: in a worker, never on the event loop.
-            gaps = await in_worker(self.missing, plan, start, end, retry_unavailable)
+            now = now_ns()
+            gaps = await in_worker(self.missing, plan, start, end, retry_unavailable, now=now)
             if not gaps:
                 return Fill("not_needed")
-            layers = self.layers(plan, now_ns())
+            layers = self.layers(plan, now)
             units = layers.units(gaps) if layers is not None else [Unit(a, b) for a, b in gaps]
             estimate = layers.requests(units) if layers is not None else len(units)
             if limit is not None and estimate > limit:
@@ -380,11 +383,12 @@ class Data:
         """A live session's opening page, without asking the source: where the newest rows held without a break start,
         and ``Fill("filling")`` when anything of [start, end) is missing (the newest published bars, or older parts),
         for the session to fill in the background."""
-        gaps = self.missing(plan, start, end)
+        now = now_ns()
+        gaps = self.missing(plan, start, end, now=now)
         if not gaps:
             return Fill("not_needed"), start
         # Gaps ending before ``newest`` are older parts of the window; one reaching it is the newest bars still to come.
-        newest = self.reach_end(plan, end, now_ns())
+        newest = self.reach_end(plan, end, now)
         older = [gap for gap in gaps if gap[1] < newest]
         return Fill("filling"), max(start, older[-1][1]) if older else start
 
@@ -392,10 +396,11 @@ class Data:
         """The newest source page of [start, end) when the newest published bar is missing (a live session fills it
         first, before the rest of its window): the rows one API request gives back from the newest bar, within its
         depth. ``Fill("not_needed")`` when the newest bar is held."""
-        gaps = await in_worker(self.missing, plan, start, end)
-        if not gaps or gaps[-1][1] < self.reach_end(plan, end, now_ns()):
+        now = now_ns()
+        gaps = await in_worker(self.missing, plan, start, end, now=now)
+        if not gaps or gaps[-1][1] < self.reach_end(plan, end, now):
             return Fill("not_needed")
-        layers = self.layers(plan, now_ns())
+        layers = self.layers(plan, now)
         gap_start = gaps[-1][0] if layers is None else max(gaps[-1][0], min(layers.api_from, gaps[-1][1] - 1))
         page_start = gap_start if layers is None or layers.rows is None else \
             max(gap_start, self.window_start(plan.instrument, plan.base or "1d", gaps[-1][1], layers.rows))

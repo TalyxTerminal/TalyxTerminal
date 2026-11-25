@@ -24,7 +24,9 @@ CATEGORY = 'Volume'
 @script.indicator('Cumulative Volume Delta', shorttitle='CVD', overlay=False, format=format.volume)
 def main(anchor: str = input.timeframe("1D", "Anchor period"),
          custom: bool = input.bool(False, "Use custom timeframe"),
-         chosen: str = input.timeframe("1", "Timeframe")):
+         chosen: str = input.timeframe("1", "Timeframe"),
+         up_color: color.Color = input.color(color.teal, "Up color"),
+         down_color: color.Color = input.color(color.red, "Down color")):
     lower = chosen if custom else "1S" if timeframe.isseconds else "1" if timeframe.isintraday else \
         "5" if timeframe.isdaily else "60"  # TradingView's intrabar rule
     opens, closes, volumes = request.security_lower_tf(syminfo.tickerid, lower, (open, close, volume))
@@ -44,5 +46,5 @@ def main(anchor: str = input.timeframe("1D", "Anchor period"),
         top = math.max(top, total)
         bottom = math.min(bottom, total)
         previous = step_close
-    shade = color.teal if total >= start else color.red
+    shade = up_color if total >= start else down_color
     plotcandle(start, top, bottom, total, "CVD", color=shade, wickcolor=shade, bordercolor=shade)

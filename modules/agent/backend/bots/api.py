@@ -139,7 +139,8 @@ def project_bot(bots, ws, bot):
         "routines": routines,
         "allowed": sorted(rules),
         "spend": {
-            "month": float(budget["spent"]),
+            "month": float(budget["spent"]) if budget["spent"] is not None else None,
+            "missingRates": budget["missingRates"],
             "currency": budget["currency"],
             "amounts": {k: str(v) for k, v in sorted(totals.items())},
             "unpriced": any(v["unpriced"] for v in month.values()),
@@ -362,6 +363,9 @@ async def dispatch(bots, ws, operation, args):
         bots.routine(ws, args["id"])
         with bots.store.transaction():
             bots.db.execute("DELETE FROM bot_routines WHERE id=?", (args["id"],))
+            # Its wakes still waiting in the queue go with it; a run already started finishes.
+            bots.db.execute("UPDATE bot_wakes SET result='stopped' WHERE workspace=? AND turn_id IS NULL AND result IS NULL "
+                            "AND json_extract(cause,'$.routineId')=?", (ws, args["id"]))
         bots.worker.signal(ws)
         return None
     if operation == "retry":

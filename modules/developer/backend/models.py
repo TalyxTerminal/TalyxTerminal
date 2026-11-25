@@ -43,7 +43,7 @@ class Document(Model):
     context: DocumentContext
     content: str
     baseContent: str | None
-    """The saved text; null on a page of a document without unsaved edits (the same as content)."""
+    """The saved text; null for a document without unsaved edits (the same as content)."""
     version: int
     sourceVersion: Version
     language: str

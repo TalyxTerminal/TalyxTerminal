@@ -380,7 +380,7 @@ source: (FileSource | ContributionSource)
 context: DocumentContext
 content: string
 /**
- * The saved text; null on a page of a document without unsaved edits (the same as content).
+ * The saved text; null for a document without unsaved edits (the same as content).
  */
 baseContent: (string | null)
 version: number

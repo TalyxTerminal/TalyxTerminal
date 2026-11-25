@@ -272,7 +272,7 @@ There is no TALYX account. The installed application keeps everything in `%LOCAL
 | Chart indicators | `module-files\chart\indicators\` |
 | Quant common code, `requirements.txt` | `module-files\quant\common\` |
 | Agent skills | `module-files\agent\skills\` |
-| Modules you installed or wrote | `modules\` |
+| Modules you installed or wrote (their code; their data is in `modules\<module>\` above, and uninstalling a module removes only its code) | `installed-modules\` |
 
 **Keys** for data sources, AI providers, search and notification channels are kept in Windows Credential Manager, not in files; TALYX only shows whether one is set.
 

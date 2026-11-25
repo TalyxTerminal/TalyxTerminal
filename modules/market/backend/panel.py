@@ -20,7 +20,7 @@ from .library import time_text
 from .routing import in_worker
 from .store import SeriesKey, Spans
 
-LIBRARY_COLUMNS = ("instrumentId", "symbol", "venue", "kind", "timeframe", "rows", "first", "last", "gaps", "bytes",
+LIBRARY_COLUMNS = ("instrumentId", "symbol", "venue", "kind", "timeframe", "priceBasis", "rows", "first", "last", "gaps", "bytes",
                    "source", "status", "name", "delistedAt", "importId", "former")
 
 
@@ -75,7 +75,8 @@ class Panel:
             for item in value["series"]:
                 record = self.market.instrument_record({"instrumentId": item["instrumentId"]})
                 kind = f"import:{item['importId']}" if item.get("importId") else item["kind"]
-                out.append({"instrument": record, "series": _series_of(record, {"kind": kind, "timeframe": item["timeframe"]})})
+                out.append({"instrument": record, "series": _series_of(record, {"kind": kind, "timeframe": item["timeframe"],
+                                                                                "priceBasis": item["priceBasis"]})})
             return out
         return {"selections": await in_worker(build)}
 
@@ -203,5 +204,5 @@ def _series_of(record: dict, row: dict) -> dict:
                             adjustment="raw" if record.get("adjustmentEligible") else "not_applicable",
                             importId=row["kind"][len("import:"):]).to_dict()
     if row["kind"] == "ohlcv":
-        return ohlcv_series(model, row["timeframe"] or "1d").to_dict()
+        return ohlcv_series(model, row["timeframe"] or "1d", price_basis=row["priceBasis"]).to_dict()
     return market_data_series(model, row["kind"], timeframe=row["timeframe"]).to_dict()

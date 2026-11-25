@@ -4,6 +4,7 @@ Every instance must equal its own full recompute value for value, however instan
 interleaved, and projects must not leak modules or state into each other.
 """
 import asyncio
+import json
 import math
 import random
 import textwrap
@@ -715,10 +716,10 @@ def test_a_plots_format_is_its_own_or_the_scripts(tmp_path):
             \"\"\"@pyne\"\"\"
             from pynecore.lib import close, format, plot, script, volume
 
-            @script.indicator("Mixed", format=format.volume)
+            @script.indicator("Mixed", format=format.volume, precision=4)
             def main():
                 plot(volume, "volume")
-                plot(close, "close", format=format.price)
+                plot(close, "close", format=format.price, precision=1)
             """})
         collectors = {"mixed": Collector(), "obv": Collector()}
         await engine.attach("s", mixed, {}, collectors["mixed"])
@@ -726,6 +727,117 @@ def test_a_plots_format_is_its_own_or_the_scripts(tmp_path):
         for collector in collectors.values():
             await collector.wait(1)
         assert {meta["id"]: meta["format"] for meta in collectors["mixed"].items[0]["meta"]} == {"volume": "volume", "close": "price"}
+        assert {meta["id"]: meta["precision"] for meta in collectors["mixed"].items[0]["meta"]} == {"volume": 4, "close": 1}
         assert [meta["format"] for meta in collectors["obv"].items[0]["meta"]] == ["volume"]
+        await engine.close()
+    run(main())
+
+
+def test_na_colours_are_sent_as_na_apart_from_colours_not_given(tmp_path):
+    """Pine: an output or a bar coloured na draws nothing. PyneCore writes na and "no colour given" both as null; the
+    worker sends na as "na", so null keeps meaning the meta's colour (rows from before the colour started to vary)."""
+    async def main():
+        engine = PineEngine(tmp_path / "logs")
+        engine.set_series("s", SYMINFO, columns(bars(60, 4)), None)
+        script = project(tmp_path / "na", {"main.py": """
+            \"\"\"@pyne\"\"\"
+            from pynecore.lib import bar_index, bgcolor, close, color, fill, na, plot, plotshape, script
+
+            @script.indicator("Na", overlay=True)
+            def main():
+                plot(close, "hidden", color=na)
+                plot(close, "gaps", color=color.red if bar_index < 10 or bar_index % 2 == 0 else na)
+                top = plot(close + 1, "top")
+                bottom = plot(close - 1, "bottom")
+                fill(top, bottom, color=color.blue if bar_index % 3 else na)
+                bgcolor(color.green if bar_index % 5 == 0 else na)
+                plotshape(True, "marks", color=color.red if bar_index % 2 else na, textcolor=color.white)
+            """})
+        collector = Collector()
+        await engine.attach("s", script, {}, collector)
+        await collector.wait(1)
+        item = collector.items[0]
+        meta = {entry["id"]: entry for entry in item["meta"]}
+        assert meta["hidden"]["color"] == "na" and not meta["hidden"].get("dynamic")
+        assert meta["gaps"]["color"] == "#F23645FF" and meta["gaps"]["dynamic"]
+        gaps = item["colors"]["gaps"]
+        assert gaps[:11] == [None] * 11  # before the colour varied (the same red until bar 11): the meta's
+        assert gaps[11:14] == ["na", "#F23645FF", "na"]
+        assert "top" not in item["colors"]  # a plot naming no colour never varies
+        # Bar 0 was na: the meta's colour is na, and so is the row before the colour varied.
+        assert meta["fill#0"]["color"] == meta["marks"]["color"] == "na"
+        assert item["colors"]["fill#0"][:4] == [None, "#2962FFFF", "#2962FFFF", "na"]
+        assert item["colors"]["bgcolor#0"][:6] == ["#4CAF50FF", "na", "na", "na", "na", "#4CAF50FF"]
+        assert item["colors"]["marks"][:3] == [None, ["#F23645FF", "#FFFFFFFF"], ["na", "#FFFFFFFF"]]
+        await engine.close()
+    run(main())
+
+
+def test_inputs_are_described_in_the_form_a_param_takes(tmp_path):
+    """A colour input's default is #RRGGBBAA and an enum's its member's value, options every member: what describe
+    gives goes back as a param and the script reads the same input. input.time is a time; a colour param in short
+    form reads as the long one."""
+    async def main():
+        engine = PineEngine(tmp_path / "logs")
+        engine.set_series("s", SYMINFO, columns(bars(20, 4)), None)
+        script = project(tmp_path / "inputs", {"main.py": """
+            \"\"\"@pyne\"\"\"
+            from enum import Enum
+            from pynecore.lib import close, color, input, plot, script
+
+            class Mode(Enum):
+                FAST = "Fast"
+                SLOW = "Slow"
+
+            @script.indicator("Inputs", overlay=True)
+            def main(tint: color.Color = input.color(color.rgb(255, 0, 0), "Tint"),
+                     mode: Mode = input.enum(Mode.SLOW, "Mode"),
+                     since: int = input.time(1700000000000, "Since")):
+                plot(close, "close", color=tint)
+                plot(1 if mode == Mode.FAST else 0, "fast")
+            """})
+        reply = await engine.describe(script)
+        inputs = {entry["id"]: entry for entry in reply["ok"]["inputs"]}
+        json.dumps(inputs)
+        assert (inputs["tint"]["type"], inputs["tint"]["default"]) == ("color", "#FF0000FF")
+        assert (inputs["mode"]["type"], inputs["mode"]["default"], inputs["mode"]["options"]) == ("enum", "Slow", ["Fast", "Slow"])
+        assert (inputs["since"]["type"], inputs["since"]["default"]) == ("time", 1700000000000)
+        collectors = {"default": Collector(), "chosen": Collector()}
+        await engine.attach("s", script, {}, collectors["default"])
+        # #RGB as an AI may write it reads as the settings would send it (PyneCore's Color read #0F0 as a number)
+        await engine.attach("s", script, {"tint": "#0F0", "mode": "Fast"}, collectors["chosen"])
+        for collector in collectors.values():
+            await collector.wait(1)
+        for name, color, fast in (("default", "#FF0000FF", 0.0), ("chosen", "#00FF00FF", 1.0)):
+            item = collectors[name].items[0]
+            assert next(entry["color"] for entry in item["meta"] if entry["id"] == "close") == color
+            assert set(item["values"]["fast"]) == {fast}
+        await engine.close()
+    run(main())
+
+
+def test_a_description_lists_only_its_own_scripts_inputs(tmp_path):
+    """A script whose request.security reads history left its inputs in PyneCore's registry, and the next script
+    described in that process showed them as its own (in the catalog and the settings)."""
+    async def main():
+        engine = PineEngine(tmp_path / "logs")
+        first = project(tmp_path / "first", {"main.py": """
+            \"\"\"@pyne\"\"\"
+            from pynecore.lib import close, input, plot, request, script, syminfo
+
+            @script.indicator("First")
+            def main(length: int = input.int(5, "Length")):
+                plot(request.security(syminfo.tickerid, "D", close[1]) + length, "daily")
+            """})
+        second = project(tmp_path / "second", {"main.py": """
+            \"\"\"@pyne\"\"\"
+            from pynecore.lib import close, plot, script
+
+            @script.indicator("Second")
+            def main():
+                plot(close, "close")
+            """})
+        assert [item["id"] for item in (await engine.describe(first))["ok"]["inputs"]] == ["length"]
+        assert (await engine.describe(second))["ok"]["inputs"] == []
         await engine.close()
     run(main())

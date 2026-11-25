@@ -21,6 +21,7 @@ import pandas as pd
 from talyx_sdk import ContractError
 from talyx_sdk.i18n import mark, t
 
+from ..native.allocation_prices import observations_a_year
 from . import library_after, library_summary, research_calendar
 from .library_produce import (
     FactorProducer,
@@ -424,7 +425,9 @@ class LibraryLoop:
             latest = shares_now[shares_now["datetime"] == shares_now["datetime"].max()]
             allocation = meta.get("allocation") or {}
             settings = {**(allocation.get("settings") or {}), "pool": [{**row, "ticker": row["instrumentId"]} for row in allocation.get("pool", [])]}
-            return library_after.allocation(values, prices, settings=settings, scheduled=scheduled, published_through=through, published=meta["published"], annualization=annualization,
+            # on the run's own observations a year: its returns aligned weekly or monthly count 52 or 12, as its Sharpe and volatility did
+            return library_after.allocation(values, prices, settings=settings, scheduled=scheduled, published_through=through, published=meta["published"],
+                                            annualization=observations_a_year(settings, annualization),
                                             shares=dict(zip(latest["instrument"], latest["value"], strict=True)), every=meta["rebalance"]["every"],
                                             risk_free=risk_free, benchmark=library_after.benchmark_of(meta))
         horizon = meta.get("horizon") or {}

@@ -25,7 +25,47 @@ def test_run_costs_keep_currencies_separate(tmp_path):
     assert ledger.run_costs("g", budget["month"]) == {"run": (2_000_002, {"USD": Decimal(1), "CNY": Decimal(7)}, True)}
     ledger.configure(timezone_name="UTC", monthly_limit=None, currency="CNY")
     updated = ledger.configure_group("g", "w", monthly_limit="5", expected_version=budget["version"])
-    assert updated["currency"] == "USD" and updated["spent"] == "1"
+    # The limit stays in USD; without rates its spending is unknown, with them CNY counts converted (7 CNY = 1 USD).
+    assert updated["currency"] == "USD" and updated["spent"] is None and updated["missingRates"] == ["CNY", "USD"]
+    ledger.rates.store("2026-11-25", {"EUR": "1", "USD": "1", "CNY": "7"}, 0)
+    assert ledger.group_status("g")["spent"] == "2"
+    ledger.close()
+
+
+def test_a_limit_counts_spending_in_every_currency_converted(tmp_path):
+    """A bot limited at 10 USD whose replies are priced in CNY: 80 CNY at 7.2 CNY a dollar is 11.11 USD, so the next
+    request is refused and the bot paused. The overall limit in CNY counts USD spending the same way."""
+    ledger = UsageLedger(tmp_path / "usage.sqlite")
+    ledger.rates.store("2026-11-25", {"EUR": "1", "USD": "1", "CNY": "7.2"}, 0)
+    ledger.configure_group("g", "w", monthly_limit="10")
+    ledger.configure(timezone_name="UTC", monthly_limit=None, currency="CNY")
+    context = UsageContext(workspace_id="w", group_id="g", work_run_id="run")
+    ledger.start("cny", "c", "m", price=Price("40", "0", "v", "CNY"), context=context)
+    ledger.finish("cny", {"input_tokens": 1_000_000, "output_tokens": 0})   # 40 CNY: 5.56 USD
+    assert ledger.start("next", "c", "m", price=Price("40", "0", "v", "CNY"), context=context)
+    ledger.finish("next", {"input_tokens": 1_000_000, "output_tokens": 0})  # 80 CNY: 11.11 USD
+    assert Decimal(ledger.group_status("g")["spent"]).quantize(Decimal("0.01")) == Decimal("11.11")
+    with pytest.raises(ContractError) as refused:
+        ledger.start("after", "c", "m", price=Price("1", "0", "v", "USD"), context=context)
+    assert refused.value.code == "budget_exceeded" and ledger.group_status("g")["paused"]
+    ledger.configure(timezone_name="UTC", monthly_limit="80", currency="CNY")
+    with pytest.raises(ContractError) as overall:
+        ledger.start("chat", "c", "m", price=Price("1", "0", "v", "USD"))
+    assert overall.value.code == "budget_exceeded"
+    ledger.close()
+
+
+def test_a_limit_without_an_exchange_rate_refuses_rather_than_not_count(tmp_path):
+    ledger = UsageLedger(tmp_path / "usage.sqlite")
+    ledger.configure_group("g", "w", monthly_limit="10")
+    context = UsageContext(workspace_id="w", group_id="g", work_run_id="run")
+    ledger.start("cny", "c", "m", price=Price("1", "0", "v", "CNY"), context=context)
+    ledger.finish("cny", {"input_tokens": 1_000_000, "output_tokens": 0})
+    with pytest.raises(ContractError) as refused:
+        ledger.start("next", "c", "m", price=Price("1", "0", "v", "USD"), context=context)
+    assert refused.value.code == "exchange_rate_missing" and refused.value.details["missingRates"] == ["CNY", "USD"]
+    ledger.rates.store("2026-11-25", {"EUR": "1", "USD": "1", "CNY": "7"}, 0)
+    assert ledger.start("next", "c", "m", price=Price("1", "0", "v", "USD"), context=context)
     ledger.close()
 
 
@@ -112,8 +152,8 @@ def test_parallel_requests_settle_without_reserving_and_stop_next_dispatch(tmp_p
     with ThreadPoolExecutor(max_workers=4) as workers:
         assert all(workers.map(lambda i: ledger.start(str(i), "c", "m", price=price, context=context), range(4)))
     assert ledger.group_status("g")["spent"] == "0"
-    ledger.finish("0", {"input_tokens": 600_000, "output_tokens": 0})
-    with pytest.raises(ContractError, match="Monthly budget"):
+    ledger.finish("0", {"input_tokens": 600_000, "output_tokens": 0})   # over the limit: the bot is paused
+    with pytest.raises(ContractError, match="monthly budget is paused"):
         ledger.start("next", "c", "m", price=price, context=context)
     for i in range(1, 4):
         ledger.finish(str(i), {"input_tokens": 100_000, "output_tokens": 0})
@@ -177,17 +217,17 @@ def test_dollar_cap_counts_inflight_replies_and_notifies_once_across_restart(tmp
     for identity in ("first","inflight"):
         ledger.start(identity, "c", "m", price=price)
     ledger.finish("first", {"input_tokens":800_000, "output_tokens":100_000})
-    assert ledger.month_spent() == Decimal("1.00")
+    assert ledger.month_spent() == (Decimal("1.00"), [])
     with pytest.raises(ContractError, match="Monthly budget"):
         ledger.start("next", "c", "m", price=price)
     assert ledger.claim_limit_notification()
     ledger.finish("inflight", {"input_tokens":1000,"output_tokens":0})
-    assert ledger.month_spent() == Decimal("1.001")
+    assert ledger.month_spent() == (Decimal("1.001"), [])
     ledger.close()
     ledger = UsageLedger(path)
     assert not ledger.claim_limit_notification()
     assert ledger.start("no_price", "c", "other", price=None)
     ledger.finish("no_price", {"input_tokens":10,"output_tokens":3})
-    assert ledger.month_spent() == Decimal("1.001")
+    assert ledger.month_spent() == (Decimal("1.001"), [])
     ledger.close()
 

@@ -11,6 +11,8 @@ thousand chart bars; a visible-range indicator runs again on every drag of the c
 The intrabars of a chart bar are the ones the child would have had: bars opening in the chart
 bar that closed by the chart's observation instant (the bar's close; for a developing bar the
 current time inside it), then, while the chart is live, the intrabar still open at that instant.
+The chart bar ends at Market's ``closeTime``, which the worker hands over with each bar
+(``closing``): a month, a quarter or a year is no fixed number of seconds.
 """
 from __future__ import annotations
 
@@ -66,6 +68,16 @@ def quiet_empty_periods() -> None:
 def serve(chart: TalyxFeed | None) -> None:
     """The chart feed of the run this thread starts next (its directory and history end)."""
     _local.chart = chart
+    _local.closes = {}
+
+
+def closing(bar_time: int, close_time: int) -> None:
+    """The close (Market's ``closeTime``, ms) of a chart bar this thread's run is handed. PyneCore reads the next bar
+    before running the script on the current one, so the last few are kept by bar time."""
+    closes = _local.closes
+    closes[bar_time] = close_time
+    if len(closes) > 4:
+        del closes[next(iter(closes))]
 
 
 def _inject(module, signal_fn, write_fn, read_fn, wait_fn, active_security=None, same_context=frozenset()):
@@ -147,7 +159,7 @@ class Feed:
 
     def window(self) -> list:
         start = int(lib._time)
-        close = start + int(_in_seconds(str(lib.syminfo.period)) * 1000)
+        close = _local.closes[start]
         if lib.barstate.isconfirmed:
             tick = close
         else:

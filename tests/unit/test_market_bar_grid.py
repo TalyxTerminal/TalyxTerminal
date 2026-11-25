@@ -68,6 +68,16 @@ def test_shanghai_calendar_covers_2027_with_the_published_holidays():
     assert len(days) == 243
 
 
+def test_hourly_bars_across_the_calendar_end_give_the_covered_sessions():
+    """From the last covered day (2027-12-31) two days of hourly bars: that day's four, and the next day unknown, not an error."""
+    start = utc("2027-12-30T16:00")   # 2027-12-31 00:00 Beijing
+    times = calendars.bar_times("XSHG", "1h", "regular", start, start + 2 * DAY_NS, None, 100)
+    assert times["evidence"] == "unknown" and times["coveredUntil"] == "2027-12-31"
+    assert [iso_of_ns(int(value)) for value in times["open"]] == [
+        "2027-12-31T01:30:00Z", "2027-12-31T02:30:00Z", "2027-12-31T05:00:00Z", "2027-12-31T06:00:00Z"]
+    assert [iso_of_ns(int(value)) for value in times["close"]][-1] == "2027-12-31T07:00:00Z"
+
+
 # ── stored bars: Yahoo's rows on the exchange's slots (recorded responses) ──
 
 def yahoo_rows(symbol: str, interval: str, calendar: str, timeframe: str, day: str):

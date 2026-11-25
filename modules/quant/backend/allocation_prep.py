@@ -77,7 +77,7 @@ def default_risk_free(obj):
 
 
 async def risk_free(ctx, params, since, until, owner):
-    """The run's rate as the worker reads it (`allocation_work.risk_free_per_bar`): {basis: zero}, {basis: fixed, pct}, or the ^IRX closes from Market between
+    """The run's rate as the worker reads it (`allocation_prices.risk_free_per_bar`): {basis: zero}, {basis: fixed, pct}, or the ^IRX closes from Market between
     `since` and `until` (ms) with `unavailable` saying why there are none."""
     from .strategy_inputs import risk_free as fetch
     basis = params["risk_free"]

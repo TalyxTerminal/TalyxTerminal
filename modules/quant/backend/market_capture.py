@@ -86,7 +86,6 @@ async def capture_window(ctx, request, owner):
     pending = [item for item in selections if item["instrument"]["instrumentId"] not in failed]
     before = await M.revisions(ctx, pending, until)
     references, selected, gaps = [], {}, []
-    # Different price bases have the same export content name. Keep them in separate exports.
     groups = defaultdict(list)
     for item in pending:
         series = item["series"]
@@ -100,6 +99,8 @@ async def capture_window(ctx, request, owner):
                     "fill": "none", "allowEmpty": allow_empty, "format": "parquet"},
                     progress and (lambda value: progress({**value, "step": "export"})))
                 own, files = [], []
+                # The file each series went to, as Market says.
+                written = {series: item["content"] for item in result["files"] for series in item["series"]}
                 try:
                     for item in result["files"]:
                         kept = await acquire(ctx, item["artifact"], owner, own)
@@ -124,8 +125,8 @@ async def capture_window(ctx, request, owner):
                         raise failure(first["problem"], instruments[first["instrumentId"]])
                     for item in todo:
                         series, instrument = item["series"], item["instrument"]
-                        detail = (None if instrument["instrumentId"] in failed else
-                                  inventory.get((M.content_of(series), instrument["instrumentId"])))
+                        detail = (None if instrument["instrumentId"] in failed or series["seriesId"] not in written else
+                                  inventory[(written[series["seriesId"]], instrument["instrumentId"])])
                         revision = after[series["seriesId"]]
                         selected[series["seriesId"]] = {
                             **item, "files": detail["files"] if detail else [], "version": revision["revision"],

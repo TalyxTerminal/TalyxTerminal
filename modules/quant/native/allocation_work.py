@@ -19,6 +19,7 @@ from native import allocation_options as O
 from native import metrics as M
 from native.allocation_holdings import book_period, cost_bps
 from native.allocation_holdings import groups_of as groups_of
+from native.allocation_prices import risk_free_per_bar as risk_free_per_bar
 
 NODE_LIMIT = 250
 EPS = 1e-6
@@ -517,22 +518,6 @@ def benchmark_daily(bars, weights, days, zones=None):
         raise SettingsError(f"The benchmark has no price of {', '.join(late)} on {days[0]:%b} {days[0].day}, {days[0].year}, where the pool starts", ["benchmark"])
     returns = levels.pct_change(fill_method=None).iloc[1:]
     return sum(returns[name] * (weight / 100) for name, weight in weights.items())
-
-
-def risk_free_per_bar(spec, index, annual):
-    """The risk-free rate an observation on each day of `index` from the run's rate (`{basis: zero}`, `{basis: fixed, pct}` or `{basis: irx, rows: [[ms, percent a
-    year]], unavailable}`): the fixed percent, or the newest ^IRX close not later than the day, over `annual`. 0.0 for zero; None when Market has no rate, so what
-    uses it is empty."""
-    if spec["basis"] == "zero":
-        return 0.0
-    if spec["basis"] == "fixed":
-        return float(spec["pct"]) / 100 / annual
-    if spec.get("unavailable") or not spec.get("rows"):
-        return None
-    days = pd.to_datetime([row[0] for row in spec["rows"]], unit="ms", utc=True).tz_localize(None).normalize()
-    pct = pd.Series([float(row[1]) for row in spec["rows"]], index=days)
-    pct = pct[~pct.index.duplicated(keep="last")].sort_index()
-    return pct.reindex(pct.index.union(index)).ffill().reindex(index) / 100 / annual
 
 
 def effective_assets(weights):

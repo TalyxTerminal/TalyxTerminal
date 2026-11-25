@@ -1,9 +1,9 @@
 {
   "distribution": "pynesys-pynecore",
   "version": "6.10.7",
-  "patchId": "talyx-security-accepted-observations-v2+runner-context-v1+own-symbol-feed-v1+last-history-bar-v1",
-  "wheel": "pynesys_pynecore-6.10.7-7talyx-cp313-cp313-win_amd64.whl",
-  "wheelSha256": "ad46f18026f763dca162486bf31edb8db71d6df0ce71f32be33783f0136c84b5",
+  "patchId": "talyx-security-accepted-observations-v2+runner-context-v1+own-symbol-feed-v1+last-history-bar-v1+captured-lookahead-v1",
+  "wheel": "pynesys_pynecore-6.10.7-8talyx-cp313-cp313-win_amd64.whl",
+  "wheelSha256": "09bb9f6e748d678550ef68e613ca07e69871a2aebd2d5063728fcfdb3a135286",
   "upstreamUrl": "https://files.pythonhosted.org/packages/50/65/fb92c28e04b9481f87b054e9885975f55126ee7bbd45f7da63b0770164dd/pynesys_pynecore-6.10.7-cp313-cp313-win_amd64.whl",
   "upstreamSha256": "094efc66773f1c07c9b3c93950279dccfebf7c28931f4102419970417aed81c4",
   "files": {
@@ -100,7 +100,7 @@
     "pynecore/core/script.py": "7e200c24711df1b4af5df05689972bd55e3fecb0c163a0cdc9b0969b4de0ca07",
     "pynecore/core/script_runner.py": "4a6cf765baf9f6b8328542fe31f5bbc51013f3aad49e5c8fd294e81ea32d7c74",
     "pynecore/core/script_timeframe.py": "9fc786d6f7f4f270499db1d5bc7569650c77e078c30329bb8ea2c817474623e2",
-    "pynecore/core/security.py": "3ed1cb6d8da0c4836cbc946a0ced3ffc27c424c43e7436c1d2a5f1c8dab1532f",
+    "pynecore/core/security.py": "78344dd940228578545bf9f7daf5a9b469407f197004cd41e27ade87ed44cc39",
     "pynecore/core/security_mp.py": "2ddaee42cba77f2b18a8f91de7900f4534da80c2a20f0777c2ae1e6b2f3da419",
     "pynecore/core/security_process.py": "841cd08c06f5433a2732a8d638a59c0f17ae32a649a34977d8ccebbe83454483",
     "pynecore/core/security_shm.py": "ff732781c2833fb0a90400256b4ba501debab65c3d2f5f76582b072b496ba80f",
@@ -304,6 +304,6 @@
     "pynecore/utils/sequence_view.py": "4330358f35a39b1b5c9119144970e6eacedcb5d911d3853951370729036b02f4",
     "pynecore/utils/stdlib_checker.py": "6dc217e6dfec4872c16f425ab6c8d30f2689dc584cd4e445ec0617354b97795c",
     "pynesys_pynecore-6.10.7.dist-info/METADATA": "9a9354b6e403d72eb381e205a0118c1b54bf6e74a2fd0b50e98721e2ebb9b886",
-    "pynesys_pynecore-6.10.7.dist-info/WHEEL": "242aafeae0095569c48b4a42ab6cc5754137fa3196582d9b07fbf20dddc56a36"
+    "pynesys_pynecore-6.10.7.dist-info/WHEEL": "1d3f2305eef947186702639e0406e3d6347e7b5ddb5d5a4b5f801e3971df80d5"
   }
 }

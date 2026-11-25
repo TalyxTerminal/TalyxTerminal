@@ -58,7 +58,7 @@ In development, module frontends under `modules/` are compiled by the dev server
 | Your files | `user/` | inside the data folder |
 | API keys | Windows Credential Manager | Windows Credential Manager |
 
-Inside your files folder: user indicators in `module-files/chart/indicators/`, global Agent skills in `module-files/agent/skills/<name>/SKILL.md`, workspace folders in `workspaces/` (each with its own `skills/`), and third-party modules in `modules/`.
+Inside your files folder: user indicators in `module-files/chart/indicators/`, global Agent skills in `module-files/agent/skills/<name>/SKILL.md`, workspace folders in `workspaces/` (each with its own `skills/`), and third-party module code in `installed-modules/`. Module data stays in the data folder under `modules/<id>/` when the module is uninstalled.
 
 Set `TALYX_DATA_DIR` to use another folder for both data and your files. Keys with the same name are kept separate per data folder. Uninstalling the app keeps your data.
 

@@ -158,7 +158,10 @@ class ExportResult(Model):
 
 
 class IndicatorInput(Model):
-    """One Pine input. ``type``: int, float, bool, string, source, color, timeframe, symbol, session."""
+    """One Pine input. ``type``: int, float, bool, string, source, color, enum, time (UTC ms), timeframe, symbol,
+    session.
+    ``default`` and ``options`` are in the form a param takes: a color as ``#RRGGBBAA``, an enum member as its
+    value (an enum input lists every member unless the script names its options)."""
     id: str
     title: str
     type: str
@@ -605,7 +608,10 @@ class IndicatorItem(TypedDict):
     changed. ``values``: per plot id, one value per row. ``colors``: per
     dynamic channel id (a meta with ``dynamic``), one color per row — a hex string, a list for
     multi-color kinds (shape: [color, textcolor]; arrow: [up, down]; candle: [color, wick,
-    border]; fill: [top value, bottom value, top color, bottom color] or a color) — or null.
+    border]; fill: [top value, bottom value, top color, bottom color] or a color), ``"na"`` (the
+    script's na: that bar draws nothing), or null (the meta's color: a part the script names no
+    color for, or a row from before the color started to vary). A meta's color fields are
+    ``"na"`` too when the script gives na there (the whole output draws nothing).
     ``drawings``: PyneCore's live drawing snapshot (``drawings_snapshot``: lines, labels, boxes,
     tables, polylines, linefills) when it changed; x with ``xloc`` ``bar_index`` counts rows of
     this window (0 = first bar; past the last row is the future), ``bar_time`` is a time.

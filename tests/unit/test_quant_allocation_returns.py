@@ -144,13 +144,51 @@ def test_weekly_and_monthly_align():
     weekly, info_w = A.daily_returns(bars, ["A", "B"], {"align": "weekly"})
     monthly, info_m = A.daily_returns(bars, ["A", "B"], {"align": "monthly"})
     assert info_w["annualization"] == 52 and info_m["annualization"] == 12
-    assert all(day.dayofweek == 4 for day in weekly.index) and 95 < len(weekly) < 110
+    assert all(day.dayofweek == 4 for day in weekly.index[:-1]) and 95 < len(weekly) < 110
+    assert weekly.index[-1] == days[-1]   # the week still running: its last close so far, not a Friday still to come
     assert 22 < len(monthly) < 26 and all((day + pd.offsets.MonthEnd(0)).month == day.month for day in monthly.index)
     first_two = bars[bars["column"] == "A"].set_index("label")["close"]
     friday = [d for d in days if d.dayofweek == 4]
     assert np.isclose(weekly["A"].iloc[1], first_two.loc[int(friday[2].value // 10**6)] / first_two.loc[int(friday[1].value // 10**6)] - 1)
     assert A.aligned_lookback({"align": "weekly", "lookback": 252}) == 50 and A.aligned_lookback({"lookback": 252}) == 252
     assert A.aligned_lookback({"align": "monthly", "lookback": 252}) == 12
+
+
+def test_a_week_or_month_is_labelled_on_its_last_trading_day():
+    """US markets close on Good Friday (2020-04-10) and on Friday 2020-07-03 (Independence Day observed); May 2020 ends
+    on a Sunday. Each period's close is its last trading day's, labelled with that day, a bar Market's calendar has: a
+    Friday label there is a day without a bar, and publishing the allocation was refused."""
+    holidays = pd.to_datetime(["2020-04-10", "2020-05-25", "2020-07-03"])
+    days = pd.bdate_range("2020-03-02", "2020-07-31").difference(holidays)
+    prices = np.arange(len(days), dtype=float) + 100
+    bars = closes_frame({"SPY": prices, "IEF": prices * 2}, days)
+    weekly, info = A.daily_returns(bars, ["SPY", "IEF"], {"align": "weekly"})
+    assert set(info["closes"].index) <= set(days)
+    assert {pd.Timestamp("2020-04-09"), pd.Timestamp("2020-07-02")} <= set(weekly.index)
+    assert all(day.dayofweek == 4 for day in weekly.index if day not in (pd.Timestamp("2020-04-09"), pd.Timestamp("2020-07-02")))
+    close = dict(zip(days, prices))
+    assert weekly.loc["2020-04-09", "SPY"] == pytest.approx(close[pd.Timestamp("2020-04-09")] / close[pd.Timestamp("2020-04-03")] - 1)
+    monthly, info = A.daily_returns(bars, ["SPY", "IEF"], {"align": "monthly"})
+    assert list(info["closes"].index) == list(pd.to_datetime(["2020-03-31", "2020-04-30", "2020-05-29", "2020-06-30", "2020-07-31"]))
+    assert monthly.loc["2020-05-29", "SPY"] == pytest.approx(close[pd.Timestamp("2020-05-29")] / close[pd.Timestamp("2020-04-30")] - 1)
+
+
+@pytest.mark.parametrize(("align", "after", "move"), [("weekly", 120.0, .20), ("weekly", 80.0, -.20), ("monthly", 120.0, .20)])
+def test_a_whole_period_without_a_close_keeps_the_move_for_the_period_it_comes_back(align, after, move):
+    """B closes 100, 100, (no close the whole third week or month), then 120 while A trades on: the third period B earns nothing, the fourth the whole 20%
+    from its last close; a book 100% in B grows 1.20 (0.80 when it comes back at 80)."""
+    days = pd.bdate_range("2024-01-01", "2024-01-26") if align == "weekly" else pd.bdate_range("2024-01-01", "2024-04-30")
+    period = days.to_period("W-FRI" if align == "weekly" else "M")
+    third = period == period.unique()[2]
+    b = np.select([period == period.unique()[0], period == period.unique()[1], third], [100.0, 100.0, np.nan], after)
+    a = np.linspace(100, 110, len(days))
+    returns, _ = A.daily_returns(closes_frame({"A": a, "B": b}, days), ["A", "B"], {"align": align})
+    assert len(returns) == 3
+    assert returns["B"].iloc[0] == 0.0 and np.isnan(returns["B"].iloc[1]) and returns["B"].iloc[2] == pytest.approx(move)
+    from native.allocation_holdings import hold_period
+    _, gross, _ = hold_period([0.0, 1.0], returns)
+    assert gross.tolist() == pytest.approx([0.0, 0.0, move])
+    assert np.prod(1 + gross) == pytest.approx(1 + move)
 
 
 def test_fx_converts():

@@ -1,6 +1,6 @@
 [project]
 name = "talyx"
-version = "0.2.0"
+version = "0.2.1"
 description = "TALYX — local-first modular workspace (new-era repository)"
 requires-python = ">=3.11"
 dependencies = [
@@ -74,7 +74,7 @@ environments = ["sys_platform == 'win32' and python_version == '3.13'"]
 exclude-dependencies = ["black", "isort", "pip-system-certs"]
 
 [tool.uv.sources]
-pynesys-pynecore = { path = "modules/chart/backend/engine_materials/pynesys_pynecore-6.10.7-7talyx-cp313-cp313-win_amd64.whl" }
+pynesys-pynecore = { path = "modules/chart/backend/engine_materials/pynesys_pynecore-6.10.7-8talyx-cp313-cp313-win_amd64.whl" }
 
 [build-system]
 requires = ["hatchling"]

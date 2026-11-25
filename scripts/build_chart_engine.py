@@ -18,8 +18,8 @@ UPSTREAM_URL = "https://files.pythonhosted.org/packages/50/65/fb92c28e04b9481f87
 UPSTREAM_SHA256 = "094efc66773f1c07c9b3c93950279dccfebf7c28931f4102419970417aed81c4"
 ORIGINAL_SECURITY = "988183fbc1289d7e986183c0bd7f4706051460eea262d89127c3b45543b2bbcf"
 PATCHED_SECURITY = "e70060ba84dc55d1562cccae7dc8eabd8b86d77616617a396d40cce504c60d35"
-PATCH_ID = "talyx-security-accepted-observations-v2+runner-context-v1+own-symbol-feed-v1+last-history-bar-v1"
-BUILD = "7talyx"
+PATCH_ID = "talyx-security-accepted-observations-v2+runner-context-v1+own-symbol-feed-v1+last-history-bar-v1+captured-lookahead-v1"
+BUILD = "8talyx"
 WHEEL_NAME = f"pynesys_pynecore-6.10.7-{BUILD}-cp313-cp313-win_amd64.whl"
 
 
@@ -75,6 +75,7 @@ def build(destination=DESTINATION):
         files = {name: archive.read(name) for name in archive.namelist()}
     files["pynecore/core/security.py"] = patched_security(files["pynecore/core/security.py"])
     from scripts.chart_engine.captured_patch import (
+        patched_captured_lookahead,
         patched_last_history_bar,
         patched_live_runner,
         patched_own_symbol_feed,
@@ -100,6 +101,7 @@ def build(destination=DESTINATION):
         files["pynecore/core/security.py"], files["pynecore/core/script_runner.py"]
     )
     files["pynecore/core/script_runner.py"] = patched_last_history_bar(files["pynecore/core/script_runner.py"])
+    files["pynecore/core/security.py"] = patched_captured_lookahead(files["pynecore/core/security.py"])
     # Build metadata records the local wheel identity without changing the
     # locked upstream version or adding another executable code modification.
     wheel = "pynesys_pynecore-6.10.7.dist-info/WHEEL"

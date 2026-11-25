@@ -18,6 +18,9 @@ export interface CheckpointConflict { checkpoint: CheckpointReference; sourceKey
 export interface PendingClose { documentIds: string[]; error: string | null; working: boolean; close(): void | Promise<void> }
 const loadMonaco = () => import("./monaco");
 
+/** A whole document as the editor keeps it: without unsaved edits the backend leaves out the saved text, which is the content. */
+const whole = (snapshot: DocumentSnapshot): DocumentSnapshot => snapshot.baseContent === null ? { ...snapshot, baseContent: snapshot.content } : snapshot;
+
 /** Replace only the changed middle of a model, so a remote edit keeps the reader's cursor. */
 export function minimalEdit(before: string, after: string) {
   let start = 0;
@@ -38,6 +41,9 @@ export class DocumentStore {
   error: string | null = null;
   pendingClose: PendingClose | null = null;
   checkpointConflicts: CheckpointConflict[] = [];
+  /** The version each conflict's Compare showed: another writer's buffer, or the file on disk. Choosing above the editor acts
+      on that version; one that moved on since is refused, so a version the author never saw is not overwritten. */
+  private compared = new Map<string, { other: number } | { disk: Json }>();
   private views = new Map<string, View>();
   private allowedClose = new Set<string>();
   private listeners = new Set<() => void>();
@@ -92,7 +98,7 @@ export class DocumentStore {
   /** Open in the backend; `reveal` also shows it as a tab of the full editor; `reference` opens a file outside every project read-only. */
   async open(source: DocumentSource, position?: Position, reveal = true, reference = false): Promise<DocumentSnapshot> {
     const opened = await this.client()["documents.open"]({ source, ...(reference ? { reference } : {}) });
-    const snapshot = await this.client()["documents.read"]({ documentId: opened.documentId, full: true });
+    const snapshot = await this.readWhole(opened.documentId);
     this.accept(snapshot);
     if (reveal) this.show(snapshot.documentId, position);
     return snapshot;
@@ -122,6 +128,7 @@ export class DocumentStore {
     if (snapshot.version < (entry.other ?? entry.snapshot).version) return;
     if (entry.sending) { entry.stale = true; return; }
     this.take(entry, snapshot);
+    if (!entry.other && !entry.snapshot.conflict) this.compared.delete(snapshot.documentId);
     entry.dirty = this.isDirty(snapshot.documentId);
     this.changed();
   }
@@ -147,10 +154,14 @@ export class DocumentStore {
     if (entry?.snapshot.conflict) return entry.snapshot.externalState === "deleted" ? t("Deleted on disk") : t("Changed on disk");
     return null;
   }
+  /** The whole document for the editor, over Developer's own route: a file the editor takes (up to 16 MiB) may not fit
+      in one action answer. */
+  private async readWhole(documentId: string) {
+    return whole(await privateRequest<DocumentSnapshot>(this.context(), `/documents/${encodeURIComponent(documentId)}/text`));
+  }
   async read(documentId: string): Promise<DocumentSnapshot> {
     await this.flush(documentId);
-    const snapshot = await this.client()["documents.read"]({ documentId, full: true });
-    this.accept(snapshot); return this.snapshot(documentId);
+    this.accept(await this.readWhole(documentId)); return this.snapshot(documentId);
   }
   /** The shared model, created on first use. Typing is sent to the backend as it happens, one request at a time. */
   async model(documentId: string): Promise<Model> {
@@ -182,7 +193,7 @@ export class DocumentStore {
         catch (error) {
           if (!(error instanceof ContractError) || error.code !== "conflict") throw error;
           // Another writer moved the buffer on. Its change is never overwritten here.
-          this.take(entry, await this.client()["documents.read"]({ documentId, full: true }));
+          this.take(entry, await this.readWhole(documentId));
         }
       } while (entry.queued && !entry.other);
     })().finally(() => {
@@ -213,18 +224,31 @@ export class DocumentStore {
   versions(documentId: string) {
     return privateRequest<{ base: { content: string; version: Json }; disk: { content: string; version: Json }; unsaved: DocumentSnapshot }>(this.context(), `/documents/${encodeURIComponent(documentId)}/versions`);
   }
-  /** Keep this window's edits, or take the other version: another writer's buffer first, otherwise the disk version. */
-  async resolve(documentId: string, mode: "mine" | "external") {
+  /** The other version of a document under review, for Compare: another writer's buffer, otherwise the file on disk. */
+  async otherVersion(documentId: string): Promise<{ content: string; elsewhere: boolean }> {
+    const other = this.entries.get(documentId)!.other;
+    if (other) { this.compared.set(documentId, { other: other.version }); return { content: other.content, elsewhere: true }; }
+    const { disk } = await this.versions(documentId);
+    this.compared.set(documentId, { disk: disk.version });
+    return { content: disk.content, elsewhere: false };
+  }
+  /** Keep this window's edits, or take the other version: another writer's buffer first, otherwise the disk version.
+      `asCompared`: the version Compare showed, refused when it changed since; without a comparison, the current one. */
+  async resolve(documentId: string, mode: "mine" | "external", asCompared = false) {
     await this.flush(documentId);
-    const entry = this.entries.get(documentId)!, other = entry.other;
+    const entry = this.entries.get(documentId)!, other = entry.other, shown = asCompared ? this.compared.get(documentId) : undefined;
+    if (shown && ("other" in shown ? shown.other !== other?.version : !!other))
+      throw failure("conflict", t("The other version changed again. Compare it before choosing."));
     if (other) {
-      entry.snapshot = other; entry.other = undefined;
+      entry.snapshot = other; entry.other = undefined; this.compared.delete(documentId);
       if (mode === "external") this.replaceModel(entry, other.content);
       else await this.send(documentId);
       entry.dirty = this.isDirty(documentId); this.changed(); return;
     }
-    const { disk, unsaved } = await this.versions(documentId);
-    this.accept(await privateRequest<DocumentSnapshot>(this.context(), `/documents/${encodeURIComponent(documentId)}/resolve`, jsonRequest({ mode, expectedVersion: unsaved.version, expectedSourceVersion: disk.version })));
+    const expectedVersion = entry.snapshot.version;
+    const sourceVersion = shown && "disk" in shown ? shown.disk : (await this.versions(documentId)).disk.version;
+    this.accept(await privateRequest<DocumentSnapshot>(this.context(), `/documents/${encodeURIComponent(documentId)}/resolve`, jsonRequest({ mode, expectedVersion, expectedSourceVersion: sourceVersion })));
+    this.compared.delete(documentId);
     if (mode === "mine") await this.save(documentId);
   }
 

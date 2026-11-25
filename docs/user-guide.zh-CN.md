@@ -272,7 +272,7 @@ TALYX 没有账号。安装版把所有数据放在 `%LOCALAPPDATA%\TALYX\Data`�
 | 图表指标 | `module-files\chart\indicators\` |
 | 量化公共代码、`requirements.txt` | `module-files\quant\common\` |
 | Agent 技能 | `module-files\agent\skills\` |
-| 你安装或编写的模块 | `modules\` |
+| 你安装或编写的模块（代码；它们的数据在上面的 `modules\<模块>\`，卸载模块只删代码） | `installed-modules\` |
 
 **密钥**（数据源、AI 服务商、搜索服务、通知渠道）存在 Windows 凭据管理器里，不写进文件；保存后 TALYX 只显示是否已设置。
 
